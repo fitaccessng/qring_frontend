@@ -16,5 +16,17 @@ export default defineConfig({
         ws: true
       }
     }
+  },
+  build: {
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'firebase': ['firebase/app', 'firebase/auth'],
+          'router': ['react-router-dom'],
+          'socket': ['socket.io-client']
+        }
+      }
+    }
   }
 });
