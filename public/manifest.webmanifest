@@ -1,0 +1,10 @@
+{
+  "name": "Qring",
+  "short_name": "Qring",
+  "description": "Modernizing Door Access Communication",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#020617",
+  "theme_color": "#2456f5",
+  "icons": []
+}
