@@ -45,13 +45,6 @@ export async function forgotPassword(payload) {
   });
 }
 
-export async function verifyOtp(payload) {
-  return apiRequest("/auth/verify-otp", {
-    method: "POST",
-    body: JSON.stringify(payload)
-  });
-}
-
 export async function resetPassword(payload) {
   return apiRequest("/auth/reset-password", {
     method: "POST",

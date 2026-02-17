@@ -2,19 +2,18 @@ import { Link } from "react-router-dom";
 import { useState } from "react";
 import AuthCard from "../../components/AuthCard";
 import { useAuth } from "../../state/AuthContext";
-import { resetPassword, verifyOtp } from "../../services/authService";
+import { resetPassword } from "../../services/authService";
 
 export default function ForgotPasswordPage() {
   const { forgotPassword } = useAuth();
   const [email, setEmail] = useState("");
-  const [otp, setOtp] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [step, setStep] = useState(1);
-  const [state, setState] = useState({ loading: false, error: "", done: false, otpHint: "" });
+  const [state, setState] = useState({ loading: false, error: "", done: false, message: "" });
 
-  const requestOtp = async (event) => {
+  const verifyEmail = async (event) => {
     event.preventDefault();
-    setState({ loading: true, error: "", done: false, otpHint: "" });
+    setState({ loading: true, error: "", done: false, message: "" });
     try {
       const response = await forgotPassword(email);
       const data = response?.data ?? response;
@@ -22,7 +21,7 @@ export default function ForgotPasswordPage() {
         loading: false,
         error: "",
         done: true,
-        otpHint: data?.otp ? `Use OTP: ${data.otp}` : "OTP sent to your email"
+        message: data?.status === "email_verified" ? "Email found. Set your new password." : "Email verified."
       });
       setStep(2);
     } catch (submitError) {
@@ -30,7 +29,7 @@ export default function ForgotPasswordPage() {
         loading: false,
         error: submitError.message ?? "Request failed",
         done: false,
-        otpHint: ""
+        message: ""
       });
     }
   };
@@ -39,9 +38,8 @@ export default function ForgotPasswordPage() {
     event.preventDefault();
     setState((prev) => ({ ...prev, loading: true, error: "" }));
     try {
-      await verifyOtp({ email, otp });
-      await resetPassword({ email, otp, newPassword });
-      setState({ loading: false, error: "", done: true, otpHint: "Password reset successful. You can now login." });
+      await resetPassword({ email, newPassword });
+      setState({ loading: false, error: "", done: true, message: "Password reset successful. You can now login." });
       setStep(3);
     } catch (submitError) {
       setState((prev) => ({
@@ -54,9 +52,9 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="grid min-h-screen place-items-center bg-slate-50 p-4 dark:bg-slate-950">
-      <AuthCard title="Forgot Password" subtitle="Request OTP and reset your password securely">
+      <AuthCard title="Forgot Password" subtitle="Verify your email and set a new password">
         {step === 1 ? (
-          <form onSubmit={requestOtp} className="space-y-4">
+          <form onSubmit={verifyEmail} className="space-y-4">
             <label className="block text-sm">
               <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">Email</span>
               <input
@@ -73,7 +71,7 @@ export default function ForgotPasswordPage() {
               disabled={state.loading}
               className="w-full rounded-xl bg-brand-500 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"
             >
-              {state.loading ? "Sending..." : "Send OTP"}
+              {state.loading ? "Checking..." : "Continue"}
             </button>
           </form>
         ) : null}
@@ -81,17 +79,8 @@ export default function ForgotPasswordPage() {
         {step === 2 ? (
           <form onSubmit={submitReset} className="space-y-4">
             <p className="rounded-xl bg-slate-100 p-3 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-              {state.otpHint || "Enter the OTP sent to your email."}
+              {state.message || "Set your new password."}
             </p>
-            <label className="block text-sm">
-              <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">OTP</span>
-              <input
-                required
-                value={otp}
-                onChange={(event) => setOtp(event.target.value)}
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-3 outline-none ring-brand-500 focus:ring-2 dark:border-slate-700 dark:bg-slate-900"
-              />
-            </label>
             <label className="block text-sm">
               <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">New Password</span>
               <input
@@ -116,7 +105,7 @@ export default function ForgotPasswordPage() {
 
         {step === 3 ? (
           <div className="space-y-3">
-            <p className="text-sm text-success">{state.otpHint}</p>
+            <p className="text-sm text-success">{state.message}</p>
             <Link
               to="/login"
               className="block w-full rounded-xl bg-slate-900 px-4 py-3 text-center text-sm font-semibold text-white dark:bg-white dark:text-slate-900"
