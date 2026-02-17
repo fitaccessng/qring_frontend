@@ -1,13 +1,15 @@
 const trimTrailingSlash = (value) => value?.replace(/\/+$/, "") ?? "";
 
+const productionBackendOrigin = "https://qring-backend.onrender.com";
+
 const defaultApiBase =
   typeof window !== "undefined"
-    ? `${window.location.protocol}//${window.location.hostname}:8000/api/v1`
-    : "http://localhost:8000/api/v1";
+    ? `${productionBackendOrigin}/api/v1`
+    : `${productionBackendOrigin}/api/v1`;
 const defaultSocketUrl =
   typeof window !== "undefined"
-    ? `${window.location.protocol}//${window.location.hostname}:8000`
-    : "http://localhost:8000";
+    ? productionBackendOrigin
+    : productionBackendOrigin;
 
 export const env = {
   apiBaseUrl: trimTrailingSlash(import.meta.env.VITE_API_BASE_URL ?? defaultApiBase),

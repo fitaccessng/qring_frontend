@@ -9,6 +9,20 @@ const rolePath = {
   estate: "/dashboard/estate"
 };
 
+function resolveTargetPath(data, fromPath) {
+  const role = data?.user?.role;
+  if (!role) {
+    throw new Error("Login succeeded but no user role was returned. Please contact support.");
+  }
+
+  const fallback = rolePath[role];
+  if (!fallback) {
+    throw new Error(`Login succeeded but role '${role}' is not supported in this app.`);
+  }
+
+  return fromPath ?? fallback;
+}
+
 export default function LoginPage() {
   const { login, googleSignIn, loading } = useAuth();
   const [searchParams] = useSearchParams();
@@ -23,8 +37,7 @@ export default function LoginPage() {
     setError("");
     try {
       const data = await login(form);
-      const fallback = rolePath[data?.user?.role] ?? "/dashboard/homeowner/overview";
-      const target = location.state?.from?.pathname ?? fallback;
+      const target = resolveTargetPath(data, location.state?.from?.pathname);
       navigate(target, { replace: true });
     } catch (submitError) {
       setError(submitError.message ?? "Login failed");
@@ -35,8 +48,7 @@ export default function LoginPage() {
     setError("");
     try {
       const data = await googleSignIn();
-      const fallback = rolePath[data?.user?.role] ?? "/dashboard/homeowner/overview";
-      const target = location.state?.from?.pathname ?? fallback;
+      const target = resolveTargetPath(data, location.state?.from?.pathname);
       navigate(target, { replace: true });
     } catch (submitError) {
       setError(submitError.message ?? "Google sign-in failed");
