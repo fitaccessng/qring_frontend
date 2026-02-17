@@ -118,6 +118,9 @@ export function AuthProvider({ children }) {
     try {
       const response = await authService.googleSignUp(role);
       const data = normalizeAuthData(response);
+      if (!data.user?.role && data.accessToken) {
+        data.user = { ...(data.user ?? {}), role };
+      }
       if (data.accessToken) {
         localStorage.setItem("qring_access_token", data.accessToken);
         setAccessToken(data.accessToken);

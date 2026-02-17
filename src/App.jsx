@@ -1,4 +1,5 @@
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { useEffect } from "react";
 import LandingPage from "./pages/landing/LandingPage";
 import AboutPage from "./pages/landing/AboutPage";
 import PricingPage from "./pages/landing/PricingPage";
@@ -57,6 +58,7 @@ export default function App() {
     <ThemeProvider>
       <AuthProvider>
         <BrowserRouter>
+          <SpaRedirectRecovery />
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/about" element={<AboutPage />} />
@@ -127,4 +129,19 @@ export default function App() {
       </AuthProvider>
     </ThemeProvider>
   );
+}
+
+function SpaRedirectRecovery() {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const redirect = params.get("redirect");
+    if (!redirect) return;
+    if (!redirect.startsWith("/") || redirect.startsWith("//")) return;
+    navigate(redirect, { replace: true });
+  }, [location.search, navigate]);
+
+  return null;
 }

@@ -67,6 +67,12 @@ export async function signUpWithGoogle(role = "homeowner") {
       }),
     });
 
+    const data = response?.data ?? response;
+    if (!data?.accessToken && !data?.user) {
+      throw new Error(
+        "Google signup API returned no auth payload. Check VITE_API_BASE_URL and backend /auth/google-signup deployment."
+      );
+    }
     return response;
   } catch (error) {
     if (error.code === "auth/popup-closed-by-user") {
