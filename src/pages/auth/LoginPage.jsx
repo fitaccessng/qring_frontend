@@ -12,7 +12,7 @@ const rolePath = {
 function resolveTargetPath(data, fromPath) {
   const role = data?.user?.role;
   if (!role) {
-    throw new Error("Login succeeded but no user role was returned. Please contact support.");
+    return null;
   }
 
   const fallback = rolePath[role];
@@ -38,6 +38,9 @@ export default function LoginPage() {
     try {
       const data = await login(form);
       const target = resolveTargetPath(data, location.state?.from?.pathname);
+      if (!target) {
+        throw new Error("Login succeeded but no user role was returned. Please contact support.");
+      }
       navigate(target, { replace: true });
     } catch (submitError) {
       setError(submitError.message ?? "Login failed");
@@ -49,6 +52,13 @@ export default function LoginPage() {
     try {
       const data = await googleSignIn();
       const target = resolveTargetPath(data, location.state?.from?.pathname);
+      if (!target) {
+        navigate("/google-role", {
+          replace: true,
+          state: { from: location.state?.from?.pathname }
+        });
+        return;
+      }
       navigate(target, { replace: true });
     } catch (submitError) {
       setError(submitError.message ?? "Google sign-in failed");

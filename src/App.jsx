@@ -17,6 +17,7 @@ import LoginPage from "./pages/auth/LoginPage";
 import AdminLoginPage from "./pages/auth/AdminLoginPage";
 import AdminSignupPage from "./pages/auth/AdminSignupPage";
 import SignupPage from "./pages/auth/SignupPage";
+import GoogleRolePage from "./pages/auth/GoogleRolePage";
 import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
 import HomeownerDashboardPage from "./pages/dashboard/HomeownerDashboardPage";
 import HomeownerVisitsPage from "./pages/dashboard/HomeownerVisitsPage";
@@ -75,6 +76,7 @@ export default function App() {
             <Route path="/admin/login" element={<AdminLoginPage />} />
             <Route path="/admin/signup" element={<AdminSignupPage />} />
             <Route path="/signup" element={<SignupPage />} />
+            <Route path="/google-role" element={<GoogleRolePage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
             <Route path="/scan/:qrId" element={<ScanPage />} />
