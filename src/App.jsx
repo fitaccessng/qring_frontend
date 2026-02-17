@@ -52,12 +52,14 @@ import ProtectedRoute from "./routes/ProtectedRoute";
 import RoleRoute from "./routes/RoleRoute";
 import { AuthProvider } from "./state/AuthContext";
 import { ThemeProvider } from "./state/ThemeContext";
+import FlashModal from "./components/FlashModal";
 
 export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
         <BrowserRouter>
+          <FlashModal />
           <SpaRedirectRecovery />
           <Routes>
             <Route path="/" element={<LandingPage />} />

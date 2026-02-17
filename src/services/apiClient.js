@@ -11,6 +11,15 @@ export class ApiError extends Error {
 
 let refreshPromise = null;
 
+function emitFlash(message, type = "error") {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(
+    new CustomEvent("qring:toast", {
+      detail: { message, type }
+    })
+  );
+}
+
 async function refreshAccessToken() {
   if (refreshPromise) return refreshPromise;
   const refreshToken = localStorage.getItem("qring_refresh_token");
@@ -84,8 +93,10 @@ export async function apiRequest(path, options = {}, attempt = 0) {
   }
 
   if (response.ok && !payload) {
+    const message = `API returned an empty/non-JSON success response. Check VITE_API_BASE_URL (${env.apiBaseUrl}) and backend routing.`;
+    emitFlash(message, "error");
     throw new ApiError(
-      `API returned an empty/non-JSON success response. Check VITE_API_BASE_URL (${env.apiBaseUrl}) and backend routing.`,
+      message,
       response.status,
       { raw }
     );
@@ -99,8 +110,10 @@ export async function apiRequest(path, options = {}, attempt = 0) {
       }
       clearAuthStorage();
     }
+    const message = payload?.message ?? payload?.detail ?? `Request failed (${response.status})`;
+    emitFlash(message, "error");
     throw new ApiError(
-      payload?.message ?? payload?.detail ?? `Request failed (${response.status})`,
+      message,
       response.status,
       payload
     );

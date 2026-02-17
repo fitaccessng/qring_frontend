@@ -21,7 +21,7 @@ export async function signInWithGoogle() {
   try {
     const result = await signInWithPopup(auth, googleProvider);
     const user = result.user;
-    const idToken = await user.getIdToken();
+    const idToken = await user.getIdToken(true);
 
     // Exchange Firebase token for backend token
     const response = await apiRequest("/auth/google-signin", {
@@ -52,8 +52,8 @@ export async function signInWithGoogle() {
  */
 export async function signUpWithGoogle(role = "homeowner") {
   try {
-    const user = auth.currentUser ?? (await signInWithPopup(auth, googleProvider)).user;
-    const idToken = await user.getIdToken();
+    const user = (await signInWithPopup(auth, googleProvider)).user;
+    const idToken = await user.getIdToken(true);
 
     // Exchange Firebase token for backend token with role
     const response = await apiRequest("/auth/google-signup", {
