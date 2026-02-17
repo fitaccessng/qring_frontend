@@ -22,6 +22,7 @@ export function useSessionRealtime(sessionId) {
   const [joined, setJoined] = useState(false);
   const [callState, setCallState] = useState("idle");
   const [muted, setMuted] = useState(false);
+  const [remoteMuted, setRemoteMuted] = useState(false);
   const [cameraOn, setCameraOn] = useState(false);
   const [messages, setMessages] = useState([]);
   const [status, setStatus] = useState("");
@@ -31,6 +32,7 @@ export function useSessionRealtime(sessionId) {
   const localStreamRef = useRef(null);
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
+  const remoteAudioRef = useRef(null);
   const pendingRemoteCandidates = useRef([]);
   const isMakingOfferRef = useRef(false);
 
@@ -75,9 +77,17 @@ export function useSessionRealtime(sessionId) {
     if (peerRef.current) return peerRef.current;
     const pc = new RTCPeerConnection(rtcConfig);
     pc.ontrack = (event) => {
+      const stream = event.streams?.[0];
+      if (!stream) return;
       if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = event.streams[0];
+        remoteVideoRef.current.srcObject = stream;
         remoteVideoRef.current.play().catch(() => {});
+      }
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.srcObject = stream;
+        remoteAudioRef.current.muted = false;
+        remoteAudioRef.current.volume = 1;
+        remoteAudioRef.current.play().catch(() => {});
       }
     };
     pc.onicecandidate = (event) => {
@@ -221,9 +231,11 @@ export function useSessionRealtime(sessionId) {
     }
     if (localVideoRef.current) localVideoRef.current.srcObject = null;
     if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
+    if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
     setCallState("ended");
     setCameraOn(false);
     setMuted(false);
+    setRemoteMuted(false);
   }
 
   useEffect(() => {
@@ -292,11 +304,7 @@ export function useSessionRealtime(sessionId) {
       try {
         const wantsVideo =
           typeof payload?.sdp?.sdp === "string" && payload.sdp.sdp.includes("m=video");
-        try {
-          await attachLocalStream({ video: wantsVideo });
-        } catch {
-          ensurePeer();
-        }
+        await attachLocalStream({ video: wantsVideo });
         await applyRemoteDescriptionAndDrain(payload.sdp);
         const pc = ensurePeer();
         const answer = await pc.createAnswer();
@@ -346,8 +354,14 @@ export function useSessionRealtime(sessionId) {
     socket.on("session.control", (payload) => {
       if (payload?.sessionId !== sessionId) return;
       const action = payload?.action;
-      if (action === "mute") setStatus("Other participant muted microphone");
-      if (action === "unmute") setStatus("Other participant unmuted microphone");
+      if (action === "mute") {
+        setRemoteMuted(true);
+        setStatus("Other participant muted microphone");
+      }
+      if (action === "unmute") {
+        setRemoteMuted(false);
+        setStatus("Other participant unmuted microphone");
+      }
       if (action === "end") {
         setStatus("Call ended by participant");
         endCall(false);
@@ -372,7 +386,9 @@ export function useSessionRealtime(sessionId) {
     featureError,
     localVideoRef,
     remoteVideoRef,
+    remoteAudioRef,
     localStreamRef,
+    remoteMuted,
     sendMessage,
     toggleMute,
     endCall,

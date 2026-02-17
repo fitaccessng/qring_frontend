@@ -8,11 +8,13 @@ export default function SessionVideoPage() {
     joined,
     callState,
     muted,
+    remoteMuted,
     localStreamRef,
     status,
     featureError,
     localVideoRef,
     remoteVideoRef,
+    remoteAudioRef,
     toggleMute,
     endCall,
     startVideoCall
@@ -32,6 +34,7 @@ export default function SessionVideoPage() {
         </header>
 
         <section className="rounded-3xl border border-slate-200/80 bg-white/90 p-3 shadow-soft">
+          <audio ref={remoteAudioRef} autoPlay playsInline />
           <article className="relative overflow-hidden rounded-2xl bg-black">
             <video
               ref={remoteVideoRef}
@@ -49,7 +52,8 @@ export default function SessionVideoPage() {
 
           <div className="mt-3 rounded-2xl bg-slate-900 px-4 py-3 text-xs text-slate-200">
             {connected ? "Signaling Online" : "Connecting"} | {joined ? "Room Joined" : "Waiting Room"} | Call:{" "}
-            {callState} | {localStreamRef.current ? "Media ready" : "Media not started"}
+            {callState} | {localStreamRef.current ? "Media ready" : "Media not started"} | Remote mic:{" "}
+            {remoteMuted ? "Muted" : "Active"}
           </div>
 
           {featureError ? <p className="mt-2 text-sm text-rose-700">{featureError}</p> : null}

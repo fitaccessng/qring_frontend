@@ -8,7 +8,9 @@ export default function SessionAudioPage() {
     joined,
     callState,
     muted,
+    remoteMuted,
     localStreamRef,
+    remoteAudioRef,
     status,
     featureError,
     toggleMute,
@@ -30,6 +32,7 @@ export default function SessionAudioPage() {
         </header>
 
         <section className="rounded-3xl border border-slate-200/80 bg-white/90 p-6 shadow-soft">
+          <audio ref={remoteAudioRef} autoPlay playsInline />
           <div className="rounded-2xl bg-slate-900 p-8 text-center text-white">
             <div className="mx-auto h-32 w-32 rounded-full bg-emerald-500/20 p-2">
               <div className="grid h-full place-items-center rounded-full bg-emerald-500 text-lg font-bold">
@@ -43,6 +46,9 @@ export default function SessionAudioPage() {
             </p>
             <p className="mt-1 text-xs text-slate-300">
               {localStreamRef.current ? "Audio stream connected" : "Start call to connect microphone"}
+            </p>
+            <p className="mt-1 text-xs text-slate-300">
+              Remote mic: {remoteMuted ? "Muted" : "Active"}
             </p>
           </div>
 
