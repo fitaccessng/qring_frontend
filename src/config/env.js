@@ -12,7 +12,7 @@ const defaultSocketUrl =
     : productionBackendOrigin;
 
 export const env = {
-  apiBaseUrl: trimTrailingSlash(import.meta.env.VITE_API_BASE_URL ?? defaultApiBase),
+  apiBaseUrl: trimTrailingSlash(import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? defaultApiBase),
   socketUrl: trimTrailingSlash(import.meta.env.VITE_SOCKET_URL ?? defaultSocketUrl),
   socketPath: import.meta.env.VITE_SOCKET_PATH ?? "/socket.io",
   dashboardNamespace:

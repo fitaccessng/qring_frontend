@@ -83,6 +83,14 @@ export async function apiRequest(path, options = {}, attempt = 0) {
     }
   }
 
+  if (response.ok && !payload) {
+    throw new ApiError(
+      `API returned an empty/non-JSON success response. Check VITE_API_BASE_URL (${env.apiBaseUrl}) and backend routing.`,
+      response.status,
+      { raw }
+    );
+  }
+
   if (!response.ok) {
     if (response.status === 401 && attempt === 0) {
       const newToken = await refreshAccessToken();
