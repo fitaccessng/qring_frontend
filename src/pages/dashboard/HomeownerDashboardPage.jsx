@@ -50,6 +50,15 @@ export default function HomeownerDashboardPage() {
         <Metric title="Unread Messages" value={metrics.unreadMessages} tone="danger" loading={loading} sub="Recent threads" />
       </section>
 
+      <section className="mt-4">
+        <Link
+          to="/dashboard/homeowner/doors"
+          className="inline-flex items-center rounded-xl bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600"
+        >
+          Create a Door
+        </Link>
+      </section>
+
       <section className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-12">
         <article className="xl:col-span-7 rounded-2xl border border-slate-200 bg-white/90 p-4 sm:p-6 shadow-soft dark:border-slate-800 dark:bg-slate-900/80">
           <div className="mb-4 flex items-center justify-between">

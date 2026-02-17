@@ -54,6 +54,15 @@ export default function EstateDashboardPage() {
         <MetricCard label="Homeowners" value={counts.homeowners} />
       </section>
 
+      <section className="mb-4">
+        <Link
+          to="/dashboard/estate/create"
+          className="inline-flex items-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white dark:bg-white dark:text-slate-900"
+        >
+          Create an Estate
+        </Link>
+      </section>
+
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {modules.map((item) => (
           <article
