@@ -2,7 +2,7 @@ const trimTrailingSlash = (value) => value?.replace(/\/+$/, "") ?? "";
 const hasHttpProtocol = (value) => /^https?:\/\//i.test(value ?? "");
 const looksLikeDomain = (value) => /^[a-z0-9.-]+\.[a-z]{2,}(\/.*)?$/i.test(value ?? "");
 
-const productionBackendOrigin = "https://qring-backend.onrender.com";
+const productionBackendOrigin = "https://qring-backend-1.onrender.com";
 
 const defaultApiBase =
   typeof window !== "undefined"
