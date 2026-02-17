@@ -34,7 +34,7 @@ export async function signInWithGoogle() {
       }),
     });
 
-    return response?.data ?? response;
+    return response;
   } catch (error) {
     if (error.code === "auth/popup-closed-by-user") {
       throw new Error("Sign-in popup was closed");
@@ -67,7 +67,7 @@ export async function signUpWithGoogle(role = "homeowner") {
       }),
     });
 
-    return response?.data ?? response;
+    return response;
   } catch (error) {
     if (error.code === "auth/popup-closed-by-user") {
       throw new Error("Sign-up popup was closed");

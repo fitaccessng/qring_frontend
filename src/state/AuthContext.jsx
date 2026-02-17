@@ -13,6 +13,44 @@ function loadJson(key, fallback) {
   }
 }
 
+function decodeJwtPayload(token) {
+  if (!token || typeof token !== "string" || !token.includes(".")) return null;
+  try {
+    const base64Url = token.split(".")[1];
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), "=");
+    return JSON.parse(atob(padded));
+  } catch {
+    return null;
+  }
+}
+
+function normalizeAuthData(response) {
+  const first = response?.data ?? response;
+  const data = first?.data ?? first;
+
+  const accessToken = data?.accessToken ?? first?.accessToken ?? "";
+  const refreshToken = data?.refreshToken ?? first?.refreshToken ?? "";
+  const jwtPayload = decodeJwtPayload(accessToken);
+  const roleFromToken = jwtPayload?.role ?? null;
+
+  const userCandidate = data?.user ?? first?.user ?? null;
+  const normalizedUser = userCandidate
+    ? {
+        ...userCandidate,
+        role: userCandidate.role ?? userCandidate.userRole ?? roleFromToken ?? null
+      }
+    : roleFromToken
+      ? { role: roleFromToken }
+      : null;
+
+  return {
+    accessToken,
+    refreshToken,
+    user: normalizedUser
+  };
+}
+
 export function AuthProvider({ children }) {
   const [accessToken, setAccessToken] = useState(() => localStorage.getItem("qring_access_token") ?? "");
   const [user, setUser] = useState(() => {
@@ -26,15 +64,15 @@ export function AuthProvider({ children }) {
     setLoading(true);
     try {
       const response = await authService.login(credentials);
-      const data = response?.data ?? response;
-      if (data?.accessToken) {
+      const data = normalizeAuthData(response);
+      if (data.accessToken) {
         localStorage.setItem("qring_access_token", data.accessToken);
         setAccessToken(data.accessToken);
       }
-      if (data?.refreshToken) {
+      if (data.refreshToken) {
         localStorage.setItem("qring_refresh_token", data.refreshToken);
       }
-      if (data?.user) {
+      if (data.user) {
         localStorage.setItem("qring_user", JSON.stringify(data.user));
         setUser(data.user);
       }
@@ -57,15 +95,15 @@ export function AuthProvider({ children }) {
     setLoading(true);
     try {
       const response = await authService.googleSignIn();
-      const data = response?.data ?? response;
-      if (data?.accessToken) {
+      const data = normalizeAuthData(response);
+      if (data.accessToken) {
         localStorage.setItem("qring_access_token", data.accessToken);
         setAccessToken(data.accessToken);
       }
-      if (data?.refreshToken) {
+      if (data.refreshToken) {
         localStorage.setItem("qring_refresh_token", data.refreshToken);
       }
-      if (data?.user) {
+      if (data.user) {
         localStorage.setItem("qring_user", JSON.stringify(data.user));
         setUser(data.user);
       }
@@ -79,15 +117,15 @@ export function AuthProvider({ children }) {
     setLoading(true);
     try {
       const response = await authService.googleSignUp(role);
-      const data = response?.data ?? response;
-      if (data?.accessToken) {
+      const data = normalizeAuthData(response);
+      if (data.accessToken) {
         localStorage.setItem("qring_access_token", data.accessToken);
         setAccessToken(data.accessToken);
       }
-      if (data?.refreshToken) {
+      if (data.refreshToken) {
         localStorage.setItem("qring_refresh_token", data.refreshToken);
       }
-      if (data?.user) {
+      if (data.user) {
         localStorage.setItem("qring_user", JSON.stringify(data.user));
         setUser(data.user);
       }

@@ -22,7 +22,14 @@ export default function GoogleRolePage() {
 
     try {
       const data = await googleSignUp(role);
-      const userRole = data?.user?.role;
+      const storedUser = (() => {
+        try {
+          return JSON.parse(localStorage.getItem("qring_user") ?? "null");
+        } catch {
+          return null;
+        }
+      })();
+      const userRole = data?.user?.role ?? storedUser?.role;
       if (!userRole) {
         throw new Error("Account setup completed but role was not returned.");
       }
