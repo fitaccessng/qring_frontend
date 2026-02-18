@@ -585,6 +585,21 @@ export default function AppShell({ title, children }) {
                 <span className="leading-none">{item.label}</span>
               </NavLink>
             ))}
+            {showHelpButton ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setOnboardingDismissed(false);
+                  setOnboardingOpen(true);
+                }}
+                className="flex min-w-[76px] flex-col items-center justify-center rounded-xl px-2 py-2 text-[11px] font-semibold text-slate-600 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                <span className="mb-1">
+                  <NavIcon name="help" />
+                </span>
+                <span className="leading-none">Help</span>
+              </button>
+            ) : null}
           </div>
         </nav>
       ) : null}
