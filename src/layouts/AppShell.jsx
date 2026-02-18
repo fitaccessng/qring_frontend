@@ -11,6 +11,7 @@ import {
   registerPushSubscription,
   requestBrowserNotificationPermission
 } from "../services/notificationService";
+import OnboardingGuideModal from "../components/OnboardingGuideModal";
 
 const navByRole = {
   homeowner: [
@@ -58,6 +59,8 @@ export default function AppShell({ title, children }) {
   const [soundAlertsEnabled, setSoundAlertsEnabled] = useState(
     () => localStorage.getItem("qring_sound_alerts") !== "false"
   );
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const [onboardingDismissed, setOnboardingDismissed] = useState(false);
   const [muteVisitRing, setMuteVisitRing] = useState(true);
   const audioContextRef = useRef(null);
   const ringTimerRef = useRef(null);
@@ -97,6 +100,8 @@ export default function AppShell({ title, children }) {
     },
     [navItems, user?.role, isEstateManagedHomeowner]
   );
+  const showHelpButton = user?.role === "homeowner" || user?.role === "estate";
+  const onboardingSteps = useMemo(() => getOnboardingSteps(user?.role), [user?.role]);
 
   useEffect(() => {
     let active = true;
@@ -123,6 +128,17 @@ export default function AppShell({ title, children }) {
       active = false;
     };
   }, [user?.role]);
+
+  useEffect(() => {
+    if (!showHelpButton || onboardingDismissed) return;
+    const identity = user?.email ?? user?.id ?? "anonymous";
+    const key = `qring_onboarding_seen_${user?.role}_${identity}`;
+    const seen = localStorage.getItem(key);
+    if (!seen) {
+      setOnboardingOpen(true);
+      localStorage.setItem(key, "true");
+    }
+  }, [showHelpButton, onboardingDismissed, user?.role, user?.email, user?.id]);
 
   useEffect(() => {
     let active = true;
@@ -405,6 +421,21 @@ export default function AppShell({ title, children }) {
                 <span className="flex-1">{item.label}</span>
               </NavLink>
             ))}
+            {showHelpButton ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setOnboardingDismissed(false);
+                  setOnboardingOpen(true);
+                }}
+                className="group relative flex w-full items-center gap-3 rounded-xl border border-transparent px-4 py-3 text-sm font-semibold text-slate-700 transition-all hover:border-slate-200 hover:bg-slate-100 dark:text-slate-200 dark:hover:border-slate-700 dark:hover:bg-slate-800"
+              >
+                <span className="grid h-7 w-7 place-items-center rounded-lg border border-white/25 bg-white/20">
+                  <NavIcon name="help" />
+                </span>
+                <span className="flex-1 text-left">Help</span>
+              </button>
+            ) : null}
           </nav>
           <div className="mt-8 rounded-2xl bg-slate-100 p-4 dark:bg-slate-800">
             <p className="text-xs uppercase tracking-wide text-slate-500">Live Status</p>
@@ -557,8 +588,91 @@ export default function AppShell({ title, children }) {
           </div>
         </nav>
       ) : null}
+      <OnboardingGuideModal
+        open={onboardingOpen}
+        role={user?.role}
+        steps={onboardingSteps}
+        onClose={() => {
+          setOnboardingDismissed(true);
+          setOnboardingOpen(false);
+        }}
+        onComplete={() => {
+          setOnboardingDismissed(true);
+          setOnboardingOpen(false);
+        }}
+        onNavigate={(route) => {
+          navigate(route);
+          setOnboardingDismissed(true);
+          setOnboardingOpen(false);
+        }}
+      />
     </div>
   );
+}
+
+function getOnboardingSteps(role) {
+  const isEstate = role === "estate";
+  const dashboardRoute = isEstate ? "/dashboard/estate" : "/dashboard/homeowner/overview";
+  const visitRoute = isEstate ? "/dashboard/estate/logs" : "/dashboard/homeowner/visits";
+  const doorRoute = isEstate ? "/dashboard/estate/doors" : "/dashboard/homeowner/doors";
+  const actionRoute = isEstate ? "/dashboard/estate/assign" : "/dashboard/homeowner/messages";
+
+  return [
+    {
+      title: "What QRing Is",
+      description:
+        "QRing transforms physical doors into smart access points, giving homeowners and estate teams real-time visibility, control, and security over visits.",
+      points: [
+        "No expensive cameras or IoT hardware needed.",
+        "QR code + software creates a digital access layer.",
+        "Works for homes, estates, rentals, offices, and gated communities."
+      ],
+      route: dashboardRoute,
+      routeLabel: "Open Dashboard"
+    },
+    {
+      title: "How Visits Work",
+      description:
+        "When a visitor arrives, they scan your QR code, share identity and visit reason, and QRing instantly notifies you so you can approve or deny access.",
+      points: [
+        "Visitor scans QR at the door or gate.",
+        "Identity and intent are captured digitally.",
+        "You get instant alert and control access."
+      ],
+      route: visitRoute,
+      routeLabel: isEstate ? "View Access Logs" : "View Visits"
+    },
+    {
+      title: "Why It Matters",
+      description:
+        "QRing solves missed deliveries, unknown visitors, and manual logbooks by replacing reactive security with proactive, trackable, real-time access control.",
+      points: [
+        "Homeowners know who is at the door in real time.",
+        "Estates get centralized tracking instead of manual records.",
+        "Every visit is securely logged for follow-up and accountability."
+      ],
+      route: doorRoute,
+      routeLabel: isEstate ? "Set Up Doors" : "Manage Doors"
+    },
+    {
+      title: "Your Next Steps",
+      description:
+        "Start by setting up your access points, then monitor incoming requests and manage approvals through your dashboard. Use Help anytime from the sidebar.",
+      points: isEstate
+        ? [
+            "Create or review your estate setup.",
+            "Assign doors to homes and owners.",
+            "Track logs and enforce plan rules."
+          ]
+        : [
+            "Keep your door QR active.",
+            "Review visits and messages daily.",
+            "Control who enters even when away."
+          ],
+      route: actionRoute,
+      routeLabel: isEstate ? "Assign Doors" : "Open Messages"
+    }
+  ];
 }
 
 function formatTime(value) {
@@ -624,6 +738,7 @@ function NavIcon({ name }) {
     ,
     user_admin: <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm10 0v-2m0 0V7m0 2h-2m2 0h2" />,
     sessions: <path d="M8 7h13M8 12h13M8 17h13M3 7h.01M3 12h.01M3 17h.01" />,
+    help: <path d="M12 17h.01M9.1 9a3 3 0 1 1 4.9 2.3c-.8.7-2 1.5-2 2.7v.5M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z" />,
     settings: <path d="M12 8.5A3.5 3.5 0 1 1 8.5 12 3.5 3.5 0 0 1 12 8.5zm0-6 1.2 2.4 2.7.4.4 2.7L18.8 9l-1.5 2.3 1.5 2.3-2.5 1.2-.4 2.7-2.7.4L12 21.5l-1.2-2.4-2.7-.4-.4-2.7L5.2 13.6 6.7 11.3 5.2 9l2.5-1.2.4-2.7 2.7-.4z" />
   };
 
