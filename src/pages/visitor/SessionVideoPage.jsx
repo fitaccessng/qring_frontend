@@ -15,9 +15,13 @@ export default function SessionVideoPage() {
     localVideoRef,
     remoteVideoRef,
     remoteAudioRef,
+    incomingCall,
+    canStartCall,
     toggleMute,
     endCall,
-    startVideoCall
+    startVideoCall,
+    acceptIncomingCall,
+    rejectIncomingCall
   } = useSessionRealtime(sessionId);
 
   return (
@@ -70,14 +74,33 @@ export default function SessionVideoPage() {
           {status ? <p className="mt-2 text-sm text-amber-700">{status}</p> : null}
 
           <div className="mt-4 grid grid-cols-3 gap-3">
-            <button
-              type="button"
-              onClick={startVideoCall}
-              disabled={Boolean(featureError)}
-              className="rounded-xl bg-[#00a884] px-3 py-3 text-xs font-semibold text-white disabled:opacity-50"
-            >
-              Start Video
-            </button>
+            {incomingCall.pending ? (
+              <>
+                <button
+                  type="button"
+                  onClick={acceptIncomingCall}
+                  className="rounded-xl bg-[#00a884] px-3 py-3 text-xs font-semibold text-white"
+                >
+                  Accept
+                </button>
+                <button
+                  type="button"
+                  onClick={rejectIncomingCall}
+                  className="rounded-xl bg-[#e53935] px-3 py-3 text-xs font-semibold text-white"
+                >
+                  Reject
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={startVideoCall}
+                disabled={Boolean(featureError) || !canStartCall}
+                className="rounded-xl bg-[#00a884] px-3 py-3 text-xs font-semibold text-white disabled:opacity-50"
+              >
+                Start Video
+              </button>
+            )}
             <button
               type="button"
               onClick={toggleMute}

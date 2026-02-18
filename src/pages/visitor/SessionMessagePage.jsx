@@ -1,13 +1,19 @@
-import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import SessionModeNav from "../../components/SessionModeNav";
 import { useSessionRealtime } from "../../hooks/useSessionRealtime";
 
 export default function SessionMessagePage() {
   const { sessionId } = useParams();
+  const navigate = useNavigate();
   const [text, setText] = useState("");
-  const { connected, joined, callState, messages, status, featureError, sendMessage } =
+  const { connected, joined, callState, messages, status, featureError, incomingCall, sendMessage } =
     useSessionRealtime(sessionId);
+
+  useEffect(() => {
+    if (!incomingCall?.pending) return;
+    navigate(`/session/${sessionId}/${incomingCall.hasVideo ? "video" : "audio"}`);
+  }, [incomingCall, navigate, sessionId]);
 
   function onSubmit(event) {
     event.preventDefault();

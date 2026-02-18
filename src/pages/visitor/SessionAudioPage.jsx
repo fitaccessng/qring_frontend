@@ -13,9 +13,13 @@ export default function SessionAudioPage() {
     remoteAudioRef,
     status,
     featureError,
+    incomingCall,
+    canStartCall,
     toggleMute,
     endCall,
-    startAudioCall
+    startAudioCall,
+    acceptIncomingCall,
+    rejectIncomingCall
   } = useSessionRealtime(sessionId);
 
   return (
@@ -60,14 +64,33 @@ export default function SessionAudioPage() {
           {status ? <p className="mt-2 text-sm text-amber-300">{status}</p> : null}
 
           <div className="mt-5 grid grid-cols-3 gap-3">
-            <button
-              type="button"
-              onClick={startAudioCall}
-              disabled={Boolean(featureError)}
-              className="rounded-xl bg-[#00a884] px-3 py-3 text-xs font-semibold text-white disabled:opacity-50"
-            >
-              Start
-            </button>
+            {incomingCall.pending ? (
+              <>
+                <button
+                  type="button"
+                  onClick={acceptIncomingCall}
+                  className="rounded-xl bg-[#00a884] px-3 py-3 text-xs font-semibold text-white"
+                >
+                  Accept
+                </button>
+                <button
+                  type="button"
+                  onClick={rejectIncomingCall}
+                  className="rounded-xl bg-[#e53935] px-3 py-3 text-xs font-semibold text-white"
+                >
+                  Reject
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={startAudioCall}
+                disabled={Boolean(featureError) || !canStartCall}
+                className="rounded-xl bg-[#00a884] px-3 py-3 text-xs font-semibold text-white disabled:opacity-50"
+              >
+                Start
+              </button>
+            )}
             <button
               type="button"
               onClick={toggleMute}

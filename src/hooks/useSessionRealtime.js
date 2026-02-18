@@ -2,6 +2,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import { env } from "../config/env";
 import { getVisitorSessionMessages } from "../services/homeownerService";
+import {
+  clearSessionCallAccess,
+  grantSessionCallAccess
+} from "../services/sessionCallAccess";
 
 const rtcConfig = {
   iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
@@ -17,6 +21,7 @@ export function useSessionRealtime(sessionId) {
     }
   }, []);
   const displayName = user?.fullName || "Visitor";
+  const isHomeowner = user?.role === "homeowner";
 
   const [connected, setConnected] = useState(false);
   const [joined, setJoined] = useState(false);
@@ -26,6 +31,10 @@ export function useSessionRealtime(sessionId) {
   const [cameraOn, setCameraOn] = useState(false);
   const [messages, setMessages] = useState([]);
   const [status, setStatus] = useState("");
+  const [incomingCall, setIncomingCall] = useState({
+    pending: false,
+    hasVideo: false
+  });
 
   const socketRef = useRef(null);
   const peerRef = useRef(null);
@@ -35,6 +44,7 @@ export function useSessionRealtime(sessionId) {
   const remoteAudioRef = useRef(null);
   const pendingRemoteCandidates = useRef([]);
   const isMakingOfferRef = useRef(false);
+  const pendingOfferRef = useRef(null);
 
   const supportsWebRTC =
     typeof window !== "undefined" && typeof window.RTCPeerConnection !== "undefined";
@@ -99,9 +109,15 @@ export function useSessionRealtime(sessionId) {
     };
     pc.onconnectionstatechange = () => {
       const state = pc.connectionState;
-      if (state === "connected") setCallState("connected");
+      if (state === "connected") {
+        setCallState("connected");
+        if (!isHomeowner) {
+          grantSessionCallAccess(sessionId, "connected");
+        }
+      }
       if (state === "failed" || state === "disconnected" || state === "closed") {
         setCallState("ended");
+        clearSessionCallAccess(sessionId);
       }
     };
     peerRef.current = pc;
@@ -169,11 +185,53 @@ export function useSessionRealtime(sessionId) {
   }
 
   function startAudioCall() {
+    if (!isHomeowner) {
+      setStatus("Only homeowner can start calls. Wait for incoming call.");
+      return;
+    }
     startCall({ video: false });
   }
 
   function startVideoCall() {
+    if (!isHomeowner) {
+      setStatus("Only homeowner can start calls. Wait for incoming call.");
+      return;
+    }
     startCall({ video: true });
+  }
+
+  async function acceptIncomingCall() {
+    if (!incomingCall.pending) return;
+    const pending = pendingOfferRef.current;
+    if (!pending?.sdp) return;
+    try {
+      setStatus("");
+      await attachLocalStream({ video: incomingCall.hasVideo });
+      await applyRemoteDescriptionAndDrain(pending.sdp);
+      const pc = ensurePeer();
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      socketRef.current?.emit("webrtc.answer", { sessionId, sdp: answer });
+      setCallState("connected");
+      grantSessionCallAccess(sessionId, "connected");
+      setIncomingCall({ pending: false, hasVideo: false });
+      pendingOfferRef.current = null;
+    } catch (error) {
+      setStatus(error?.message ?? "Failed to accept incoming call");
+    }
+  }
+
+  function rejectIncomingCall() {
+    if (!incomingCall.pending) return;
+    socketRef.current?.emit("session.control", {
+      sessionId,
+      action: "call_rejected"
+    });
+    setStatus("Incoming call rejected");
+    setCallState("idle");
+    setIncomingCall({ pending: false, hasVideo: false });
+    pendingOfferRef.current = null;
+    clearSessionCallAccess(sessionId);
   }
 
   async function applyRemoteDescriptionAndDrain(desc) {
@@ -236,6 +294,9 @@ export function useSessionRealtime(sessionId) {
     setCameraOn(false);
     setMuted(false);
     setRemoteMuted(false);
+    setIncomingCall({ pending: false, hasVideo: false });
+    pendingOfferRef.current = null;
+    clearSessionCallAccess(sessionId);
   }
 
   useEffect(() => {
@@ -304,6 +365,14 @@ export function useSessionRealtime(sessionId) {
       try {
         const wantsVideo =
           typeof payload?.sdp?.sdp === "string" && payload.sdp.sdp.includes("m=video");
+        if (!isHomeowner) {
+          pendingOfferRef.current = payload;
+          setIncomingCall({ pending: true, hasVideo: wantsVideo });
+          setCallState("incoming");
+          setStatus(wantsVideo ? "Incoming video call" : "Incoming audio call");
+          grantSessionCallAccess(sessionId, "incoming");
+          return;
+        }
         await attachLocalStream({ video: wantsVideo });
         await applyRemoteDescriptionAndDrain(payload.sdp);
         const pc = ensurePeer();
@@ -366,6 +435,10 @@ export function useSessionRealtime(sessionId) {
         setStatus("Call ended by participant");
         endCall(false);
       }
+      if (action === "call_rejected") {
+        setStatus("Call rejected by visitor");
+        endCall(false);
+      }
     });
 
     return () => {
@@ -373,7 +446,7 @@ export function useSessionRealtime(sessionId) {
       endCall(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId, displayName, token]);
+  }, [sessionId, displayName, token, isHomeowner]);
 
   return {
     connected,
@@ -389,10 +462,14 @@ export function useSessionRealtime(sessionId) {
     remoteAudioRef,
     localStreamRef,
     remoteMuted,
+    incomingCall,
+    canStartCall: isHomeowner,
     sendMessage,
     toggleMute,
     endCall,
     startAudioCall,
-    startVideoCall
+    startVideoCall,
+    acceptIncomingCall,
+    rejectIncomingCall
   };
 }

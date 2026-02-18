@@ -50,6 +50,7 @@ import UnauthorizedPage from "./pages/common/UnauthorizedPage";
 import NotFoundPage from "./pages/common/NotFoundPage";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import RoleRoute from "./routes/RoleRoute";
+import VisitorCallRoute from "./routes/VisitorCallRoute";
 import { AuthProvider } from "./state/AuthContext";
 import { ThemeProvider } from "./state/ThemeContext";
 import FlashModal from "./components/FlashModal";
@@ -86,8 +87,22 @@ export default function App() {
             <Route path="/scan/:qrId" element={<ScanPage />} />
             <Route path="/session/:sessionId" element={<Navigate to="message" replace />} />
             <Route path="/session/:sessionId/message" element={<SessionMessagePage />} />
-            <Route path="/session/:sessionId/audio" element={<SessionAudioPage />} />
-            <Route path="/session/:sessionId/video" element={<SessionVideoPage />} />
+            <Route
+              path="/session/:sessionId/audio"
+              element={
+                <VisitorCallRoute>
+                  <SessionAudioPage />
+                </VisitorCallRoute>
+              }
+            />
+            <Route
+              path="/session/:sessionId/video"
+              element={
+                <VisitorCallRoute>
+                  <SessionVideoPage />
+                </VisitorCallRoute>
+              }
+            />
 
             <Route element={<ProtectedRoute />}>
               <Route element={<RoleRoute allowedRoles={["homeowner", "estate"]} />}>

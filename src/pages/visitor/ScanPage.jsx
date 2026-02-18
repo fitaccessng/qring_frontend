@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import SessionModePickerModal from "../../components/SessionModePickerModal";
 import { apiRequest } from "../../services/apiClient";
 import { getVisitorSessionStatus } from "../../services/homeownerService";
 
@@ -22,7 +21,6 @@ export default function ScanPage() {
     name: "",
     purpose: ""
   });
-  const [modePickerOpen, setModePickerOpen] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -72,6 +70,12 @@ export default function ScanPage() {
     };
   }, [requestState.sent, requestState.sessionId]);
 
+  useEffect(() => {
+    if (!requestState.sessionId) return;
+    if (requestState.status !== "approved" && requestState.status !== "active") return;
+    navigate(`/session/${requestState.sessionId}/message`, { replace: true });
+  }, [navigate, requestState.sessionId, requestState.status]);
+
   const onSubmit = async (event) => {
     event.preventDefault();
     setError("");
@@ -106,16 +110,6 @@ export default function ScanPage() {
     () => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`,
     [seconds]
   );
-
-  function handleOpenSessionClick() {
-    setModePickerOpen(true);
-  }
-
-  function handleSelectMode(mode) {
-    if (!requestState.sessionId) return;
-    setModePickerOpen(false);
-    navigate(`/session/${requestState.sessionId}/${mode}`);
-  }
 
   return (
     <div className="grid min-h-screen place-items-center bg-slate-50 p-4 dark:bg-slate-950">
@@ -192,14 +186,8 @@ export default function ScanPage() {
                   : "Waiting for homeowner approval"}
             </p>
             <p className="mt-1 text-xs text-slate-500">Timer: {status}</p>
-            {requestState.sessionId && requestState.status === "approved" ? (
-              <button
-                type="button"
-                onClick={handleOpenSessionClick}
-                className="mt-4 inline-block rounded-lg bg-brand-500 px-4 py-2 text-xs font-semibold text-white"
-              >
-                Open Session
-              </button>
+            {requestState.sessionId && (requestState.status === "approved" || requestState.status === "active") ? (
+              <p className="mt-3 text-xs text-success">Homeowner is ready. Opening session automatically...</p>
             ) : null}
             {requestState.status === "rejected" ? (
               <p className="mt-3 text-xs font-semibold text-danger">You can retry another request or contact the resident.</p>
@@ -207,12 +195,6 @@ export default function ScanPage() {
           </div>
         ) : null}
       </article>
-      <SessionModePickerModal
-        open={modePickerOpen}
-        sessionId={requestState.sessionId}
-        onClose={() => setModePickerOpen(false)}
-        onSelect={handleSelectMode}
-      />
     </div>
   );
 }
