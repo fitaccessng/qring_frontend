@@ -4,14 +4,38 @@ import AppShell from "../../layouts/AppShell";
 import { getEstateOverview } from "../../services/estateService";
 
 const modules = [
-  "Create Estate",
-  "Add Doors",
-  "Assign Doors To Homeowners",
-  "Invite Homeowners",
-  "Manage Door Mappings",
-  "View Access Logs",
-  "Plan Restrictions",
-  "Multi-Home Support"
+  {
+    title: "Create Estate",
+    description: "Set up a new estate profile before adding homes and access doors."
+  },
+  {
+    title: "Add Doors",
+    description: "Register entry points so each door can be mapped and monitored."
+  },
+  {
+    title: "Assign Doors To Homeowners",
+    description: "Link doors to responsible homeowners for approvals and notifications."
+  },
+  {
+    title: "Invite Homeowners",
+    description: "Send access invites so residents can sign in and control their doors."
+  },
+  {
+    title: "Manage Door Mappings",
+    description: "Review and adjust door-to-homeowner mappings at any time."
+  },
+  {
+    title: "View Access Logs",
+    description: "Track entry attempts and approvals for audit and security review."
+  },
+  {
+    title: "Plan Restrictions",
+    description: "See usage limits and plan-based restrictions for estate operations."
+  },
+  {
+    title: "Multi-Home Support",
+    description: "Handle multiple homes under one estate workspace."
+  }
 ];
 
 export default function EstateDashboardPage() {
@@ -48,10 +72,24 @@ export default function EstateDashboardPage() {
       {error ? <Alert tone="danger" message={error} /> : null}
 
       <section className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Estates" value={counts.estates} />
-        <MetricCard label="Homes" value={counts.homes} />
-        <MetricCard label="Doors" value={counts.doors} />
-        <MetricCard label="Homeowners" value={counts.homeowners} />
+        <MetricCard label="Estates" tip="Total estate profiles currently configured." value={counts.estates} />
+        <MetricCard label="Homes" tip="Number of homes across your estate setup." value={counts.homes} />
+        <MetricCard label="Doors" tip="Registered access doors managed from this account." value={counts.doors} />
+        <MetricCard
+          label="Homeowners"
+          tip="Residents linked to doors and available for approvals."
+          value={counts.homeowners}
+        />
+      </section>
+
+      <section className="mb-4 rounded-2xl border border-brand-100 bg-brand-50/70 p-4 dark:border-brand-500/30 dark:bg-brand-500/10">
+        <div className="flex items-center gap-2">
+          <h2 className="font-heading text-base font-bold">How to use estate dashboard</h2>
+          <HelpTip text="Use this as your control center: configure estate structure, then manage residents and logs." />
+        </div>
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+          Start with create estate and add doors, then assign homeowners and monitor access logs daily.
+        </p>
       </section>
 
       <section className="mb-4">
@@ -66,13 +104,14 @@ export default function EstateDashboardPage() {
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {modules.map((item) => (
           <article
-            key={item}
+            key={item.title}
             className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-soft dark:border-slate-800 dark:bg-slate-900/70"
           >
-            <h2 className="font-heading text-lg font-bold">{item}</h2>
-            <p className="mt-2 text-sm text-slate-500">
-              Built for multi-home estates with central control and audit-ready workflows.
-            </p>
+            <div className="flex items-center gap-2">
+              <h2 className="font-heading text-lg font-bold">{item.title}</h2>
+              <HelpTip text={item.description} />
+            </div>
+            <p className="mt-2 text-sm text-slate-500">{item.description}</p>
           </article>
         ))}
       </section>
@@ -97,10 +136,13 @@ export default function EstateDashboardPage() {
   );
 }
 
-function MetricCard({ label, value }) {
+function MetricCard({ label, tip, value }) {
   return (
     <article className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-soft dark:border-slate-800 dark:bg-slate-900/80">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+      <div className="flex items-center gap-2">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+        <HelpTip text={tip} />
+      </div>
       <p className="mt-2 text-2xl font-black">{value}</p>
     </article>
   );
@@ -109,4 +151,21 @@ function MetricCard({ label, value }) {
 function Alert({ tone, message }) {
   const toneClass = tone === "danger" ? "border-danger/30 bg-danger/10 text-danger" : "border-brand-200 bg-brand-50 text-brand-700";
   return <div className={`mb-4 rounded-xl border px-4 py-3 text-sm ${toneClass}`}>{message}</div>;
+}
+
+function HelpTip({ text }) {
+  return (
+    <span className="group relative inline-flex">
+      <button
+        type="button"
+        className="grid h-5 w-5 place-items-center rounded-full bg-slate-200 text-[11px] font-bold text-slate-700 dark:bg-slate-700 dark:text-slate-100"
+        aria-label="More information"
+      >
+        ?
+      </button>
+      <span className="pointer-events-none absolute left-1/2 top-7 z-10 hidden w-56 -translate-x-1/2 rounded-lg bg-slate-900 px-2 py-1 text-xs text-white shadow-lg group-hover:block group-focus-within:block">
+        {text}
+      </span>
+    </span>
+  );
 }

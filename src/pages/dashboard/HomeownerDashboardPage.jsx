@@ -44,10 +44,48 @@ export default function HomeownerDashboardPage() {
       ) : null}
 
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Metric title="Active Visitors" value={metrics.activeVisitors} tone="success" loading={loading} sub="Live now" />
-        <Metric title="Pending Approvals" value={metrics.pendingApprovals} tone="warning" loading={loading} sub="Needs action" />
-        <Metric title="Calls Today" value={metrics.callsToday} tone="brand" loading={loading} sub="Audio + video" />
-        <Metric title="Unread Messages" value={metrics.unreadMessages} tone="danger" loading={loading} sub="Recent threads" />
+        <Metric
+          title="Active Visitors"
+          tip="Number of visitors currently waiting or interacting right now."
+          value={metrics.activeVisitors}
+          tone="success"
+          loading={loading}
+          sub="Live now"
+        />
+        <Metric
+          title="Pending Approvals"
+          tip="Requests that need you to allow or deny entry."
+          value={metrics.pendingApprovals}
+          tone="warning"
+          loading={loading}
+          sub="Needs action"
+        />
+        <Metric
+          title="Calls Today"
+          tip="Total audio and video calls completed today."
+          value={metrics.callsToday}
+          tone="brand"
+          loading={loading}
+          sub="Audio + video"
+        />
+        <Metric
+          title="Unread Messages"
+          tip="Messages in visitor threads you have not opened yet."
+          value={metrics.unreadMessages}
+          tone="danger"
+          loading={loading}
+          sub="Recent threads"
+        />
+      </section>
+
+      <section className="mt-4 rounded-2xl border border-brand-100 bg-brand-50/70 p-4 dark:border-brand-500/30 dark:bg-brand-500/10">
+        <div className="flex items-center gap-2">
+          <h2 className="font-heading text-base font-bold">How to use this dashboard</h2>
+          <HelpTip text="Use this quick guide to understand what each area does before taking actions." />
+        </div>
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+          Start with pending approvals, review activity for context, then open Realtime Interaction for call and message actions.
+        </p>
       </section>
 
       <section className="mt-4">
@@ -129,7 +167,7 @@ export default function HomeownerDashboardPage() {
   );
 }
 
-function Metric({ title, value, tone, loading, sub }) {
+function Metric({ title, tip, value, tone, loading, sub }) {
   const badge = {
     success: "bg-success/20 text-success",
     warning: "bg-warning/20 text-warning",
@@ -140,7 +178,10 @@ function Metric({ title, value, tone, loading, sub }) {
   return (
     <article className="rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-soft transition hover:-translate-y-0.5 dark:border-slate-800 dark:bg-slate-900/80">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-500">{title}</p>
+        <div className="flex items-center gap-2">
+          <p className="text-sm text-slate-500">{title}</p>
+          <HelpTip text={tip} />
+        </div>
         <span className={`rounded-full px-2 py-1 text-xs font-semibold ${badge[tone]}`}>Live</span>
       </div>
       <p className="mt-3 font-heading text-2xl font-extrabold sm:text-3xl">{loading ? "..." : value}</p>
@@ -194,4 +235,21 @@ function MiniChart() {
 
 function Empty({ text }) {
   return <p className="rounded-xl bg-slate-100 p-4 text-sm text-slate-500 dark:bg-slate-800">{text}</p>;
+}
+
+function HelpTip({ text }) {
+  return (
+    <span className="group relative inline-flex">
+      <button
+        type="button"
+        className="grid h-5 w-5 place-items-center rounded-full bg-slate-200 text-[11px] font-bold text-slate-700 dark:bg-slate-700 dark:text-slate-100"
+        aria-label="More information"
+      >
+        ?
+      </button>
+      <span className="pointer-events-none absolute left-1/2 top-7 z-10 hidden w-56 -translate-x-1/2 rounded-lg bg-slate-900 px-2 py-1 text-xs text-white shadow-lg group-hover:block group-focus-within:block">
+        {text}
+      </span>
+    </span>
+  );
 }

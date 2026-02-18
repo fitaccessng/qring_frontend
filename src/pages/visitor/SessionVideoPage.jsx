@@ -21,36 +21,46 @@ export default function SessionVideoPage() {
   } = useSessionRealtime(sessionId);
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_#dbeafe_0,_#f8fafc_42%,_#e2e8f0_100%)] p-4 text-slate-900">
-      <div className="mx-auto w-full max-w-6xl py-6">
-        <header className="mb-4 flex items-center justify-between rounded-3xl border border-slate-200/80 bg-white/85 p-4 shadow-soft">
+    <div className="min-h-screen bg-[#0c1317] p-4 text-slate-100 sm:p-6">
+      <div className="mx-auto w-full max-w-6xl py-3">
+        <header className="mb-4 flex items-center justify-between rounded-3xl border border-white/10 bg-[#1f2c34] p-4 shadow-soft">
           <div>
             <h1 className="font-heading text-2xl font-black">Video Call</h1>
-            <p className="text-xs text-slate-500">Session {sessionId}</p>
+            <p className="text-xs text-slate-400">Session {sessionId}</p>
           </div>
-          <Link to="/dashboard" className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white">
+          <Link to="/dashboard" className="rounded-xl bg-[#00a884] px-4 py-2 text-xs font-semibold text-white">
             Go Back Home
           </Link>
         </header>
 
-        <section className="rounded-3xl border border-slate-200/80 bg-white/90 p-3 shadow-soft">
+        <section className="rounded-3xl border border-white/10 bg-[#111b21] p-3 shadow-soft">
           <audio ref={remoteAudioRef} autoPlay playsInline />
-          <article className="relative overflow-hidden rounded-2xl bg-black">
-            <video
-              ref={remoteVideoRef}
-              autoPlay
-              playsInline
-              className="h-[480px] w-full rounded-2xl bg-slate-950 object-cover"
-            />
-            <video
-              ref={localVideoRef}
-              autoPlay
-              playsInline
-              className="absolute bottom-4 right-4 h-32 w-48 rounded-xl border-2 border-white/70 bg-slate-900 object-cover shadow-lg"
-            />
-          </article>
+          <div className="grid gap-3 md:grid-cols-2">
+            <article className="relative overflow-hidden rounded-2xl bg-black">
+              <video
+                ref={remoteVideoRef}
+                autoPlay
+                playsInline
+                className="h-[300px] w-full rounded-2xl bg-slate-950 object-cover sm:h-[420px]"
+              />
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-3 pb-2 pt-8">
+                <p className="text-xs font-semibold text-white">Visitor</p>
+              </div>
+            </article>
+            <article className="relative overflow-hidden rounded-2xl bg-black">
+              <video
+                ref={localVideoRef}
+                autoPlay
+                playsInline
+                className="h-[300px] w-full rounded-2xl bg-slate-900 object-cover sm:h-[420px]"
+              />
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-3 pb-2 pt-8">
+                <p className="text-xs font-semibold text-white">You</p>
+              </div>
+            </article>
+          </div>
 
-          <div className="mt-3 rounded-2xl bg-slate-900 px-4 py-3 text-xs text-slate-200">
+          <div className="mt-3 rounded-2xl bg-[#1f2c34] px-4 py-3 text-xs text-slate-200">
             {connected ? "Signaling Online" : "Connecting"} | {joined ? "Room Joined" : "Waiting Room"} | Call:{" "}
             {callState} | {localStreamRef.current ? "Media ready" : "Media not started"} | Remote mic:{" "}
             {remoteMuted ? "Muted" : "Active"}
@@ -64,7 +74,7 @@ export default function SessionVideoPage() {
               type="button"
               onClick={startVideoCall}
               disabled={Boolean(featureError)}
-              className="rounded-xl bg-cyan-600 px-3 py-3 text-xs font-semibold text-white disabled:opacity-50"
+              className="rounded-xl bg-[#00a884] px-3 py-3 text-xs font-semibold text-white disabled:opacity-50"
             >
               Start Video
             </button>
@@ -72,14 +82,14 @@ export default function SessionVideoPage() {
               type="button"
               onClick={toggleMute}
               disabled={!localStreamRef.current}
-              className="rounded-xl bg-amber-500 px-3 py-3 text-xs font-semibold text-white disabled:opacity-50"
+              className="rounded-xl bg-[#8696a0] px-3 py-3 text-xs font-semibold text-white disabled:opacity-50"
             >
               {muted ? "Unmute" : "Mute"}
             </button>
             <button
               type="button"
               onClick={endCall}
-              className="rounded-xl bg-rose-600 px-3 py-3 text-xs font-semibold text-white"
+              className="rounded-xl bg-[#e53935] px-3 py-3 text-xs font-semibold text-white"
             >
               End
             </button>
