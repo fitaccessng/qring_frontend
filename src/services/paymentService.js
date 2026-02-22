@@ -28,10 +28,10 @@ export async function requestSubscription(plan) {
   return response?.data ?? null;
 }
 
-export async function initializePaystackPayment(plan, callbackUrl) {
+export async function initializePaystackPayment(plan, callbackUrl, billingCycle = "monthly") {
   const response = await apiRequest("/payment/paystack/initialize", {
     method: "POST",
-    body: JSON.stringify({ plan, callbackUrl })
+    body: JSON.stringify({ plan, callbackUrl, billingCycle })
   });
   return response?.data ?? null;
 }

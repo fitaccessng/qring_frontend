@@ -17,6 +17,7 @@ export default function HomeownerPaywallPage() {
   const [subscription, setSubscription] = useState(null);
   const [plans, setPlans] = useState([]);
   const [submitting, setSubmitting] = useState("");
+  const [billingCycle, setBillingCycle] = useState("monthly");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const navigate = useNavigate();
@@ -85,7 +86,7 @@ export default function HomeownerPaywallPage() {
         const callbackUrl = !isLocalHost && window.location.protocol === "https:"
           ? `${window.location.origin}/billing/callback`
           : undefined;
-        const initialized = await initializePaystackPayment(plan.id, callbackUrl);
+        const initialized = await initializePaystackPayment(plan.id, callbackUrl, billingCycle);
         if (!initialized?.authorization_url) {
           throw new Error("Unable to start Paystack checkout");
         }
@@ -130,6 +131,26 @@ export default function HomeownerPaywallPage() {
             Back to {dashboardLabel}
           </button>
         </div>
+        <div className="mt-4 inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-800">
+          <button
+            type="button"
+            onClick={() => setBillingCycle("monthly")}
+            className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+              billingCycle === "monthly" ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900" : "text-slate-600 dark:text-slate-300"
+            }`}
+          >
+            Monthly
+          </button>
+          <button
+            type="button"
+            onClick={() => setBillingCycle("yearly")}
+            className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+              billingCycle === "yearly" ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900" : "text-slate-600 dark:text-slate-300"
+            }`}
+          >
+            Yearly
+          </button>
+        </div>
       </section>
 
       <section className="mt-4 grid gap-3 sm:mt-6 sm:gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -140,8 +161,8 @@ export default function HomeownerPaywallPage() {
           >
             <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">{plan.name}</p>
             <p className="mt-2 text-2xl font-bold">
-              {formatMoney(plan.amount, plan.currency)}
-              <span className="ml-1 text-sm font-medium text-slate-500">/month</span>
+              {formatMoney(resolvePlanAmount(plan, billingCycle), plan.currency)}
+              <span className="ml-1 text-sm font-medium text-slate-500">/{billingCycle === "yearly" ? "year" : "month"}</span>
             </p>
             <p className="text-xs text-slate-500">{(plan.currency || "NGN").toUpperCase()}</p>
             <p className="mt-2 text-sm text-slate-500">Up to {plan.maxDoors} doors</p>
@@ -159,7 +180,7 @@ export default function HomeownerPaywallPage() {
                   ? "Processing..."
                   : plan.amount === 0
                     ? "Activate free"
-                    : "Pay with Paystack"}
+                    : `Pay with Paystack (${billingCycle === "yearly" ? "Yearly" : "Monthly"})`}
             </button>
           </article>
         ))}
@@ -203,5 +224,10 @@ function formatMoney(amount, currency = "NGN") {
   } catch {
     return `${safeCurrency} ${safeAmount.toLocaleString("en-US")}`;
   }
+}
+
+function resolvePlanAmount(plan, cycle) {
+  const base = Number(plan?.amount || 0);
+  return cycle === "yearly" ? base * 12 : base;
 }
 
