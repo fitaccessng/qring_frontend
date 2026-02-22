@@ -13,8 +13,10 @@ export default function GoogleRolePage() {
   const { googleSignUp, loading } = useAuth();
   const [role, setRole] = useState("homeowner");
   const [error, setError] = useState("");
+  const [showSuccess, setShowSuccess] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  const intent = location.state?.intent ?? "signin-fallback";
 
   async function onContinue(event) {
     event.preventDefault();
@@ -22,6 +24,25 @@ export default function GoogleRolePage() {
 
     try {
       const data = await googleSignUp(role);
+      if (intent === "signup") {
+        localStorage.removeItem("qring_access_token");
+        localStorage.removeItem("qring_refresh_token");
+        localStorage.removeItem("qring_user");
+        setShowSuccess(true);
+        window.dispatchEvent(
+          new CustomEvent("qring:flash", {
+            detail: {
+              type: "success",
+              title: "Signup Successful",
+              message: "Google account setup complete. Redirecting to login...",
+              duration: 2600
+            }
+          })
+        );
+        window.setTimeout(() => window.location.assign("/login"), 1800);
+        return;
+      }
+
       const storedUser = (() => {
         try {
           return JSON.parse(localStorage.getItem("qring_user") ?? "null");
@@ -30,15 +51,10 @@ export default function GoogleRolePage() {
         }
       })();
       const userRole = data?.user?.role ?? storedUser?.role;
-      if (!userRole) {
-        throw new Error("Account setup completed but role was not returned.");
-      }
+      if (!userRole) throw new Error("Account setup completed but role was not returned.");
       const fallback = rolePath[userRole];
-      if (!fallback) {
-        throw new Error(`Account setup completed but role '${userRole}' is not supported.`);
-      }
-      const target = location.state?.from ?? fallback;
-      navigate(target, { replace: true });
+      if (!fallback) throw new Error(`Account setup completed but role '${userRole}' is not supported.`);
+      navigate(location.state?.from ?? fallback, { replace: true });
     } catch (submitError) {
       setError(submitError.message ?? "Unable to finish Google account setup");
     }
@@ -71,6 +87,16 @@ export default function GoogleRolePage() {
           </button>
         </form>
       </AuthCard>
+      {showSuccess ? (
+        <div className="fixed inset-0 z-40 grid place-items-center bg-slate-900/50 p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-emerald-200 bg-white p-5 shadow-2xl">
+            <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Success</p>
+            <p className="mt-2 text-sm font-medium text-slate-800">
+              Account setup complete. Redirecting to login...
+            </p>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

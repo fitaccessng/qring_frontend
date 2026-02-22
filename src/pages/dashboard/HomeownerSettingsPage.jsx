@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import AppShell from "../../layouts/AppShell";
 import { getHomeownerSettings, updateHomeownerSettings } from "../../services/homeownerSettingsService";
 import { changePassword } from "../../services/authService";
+import { getReferralSummary } from "../../services/paymentService";
 
 export default function HomeownerSettingsPage() {
   const [settings, setSettings] = useState({
@@ -12,6 +13,7 @@ export default function HomeownerSettingsPage() {
   const [managedByEstate, setManagedByEstate] = useState(false);
   const [estateName, setEstateName] = useState("");
   const [subscription, setSubscription] = useState(null);
+  const [referral, setReferral] = useState(null);
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: "",
     newPassword: "",
@@ -30,7 +32,7 @@ export default function HomeownerSettingsPage() {
       setLoading(true);
       setError("");
       try {
-        const data = await getHomeownerSettings();
+        const [data, referralData] = await Promise.all([getHomeownerSettings(), getReferralSummary()]);
         if (!active) return;
         setSettings({
           pushAlerts: Boolean(data?.pushAlerts),
@@ -42,6 +44,7 @@ export default function HomeownerSettingsPage() {
         localStorage.setItem("qring_sound_alerts", String(Boolean(data?.soundAlerts)));
         window.dispatchEvent(new Event("qring:sound-alerts-updated"));
         setSubscription(data?.subscription ?? null);
+        setReferral(referralData);
       } catch (requestError) {
         if (!active) return;
         setError(requestError.message ?? "Failed to load settings");
@@ -180,6 +183,16 @@ export default function HomeownerSettingsPage() {
             ) : (
               <p className="mt-3 text-sm text-slate-500">No subscription information available.</p>
             )}
+
+            <div className="mt-4 rounded-xl bg-slate-100 p-4 dark:bg-slate-800">
+              <p className="text-xs uppercase tracking-wide text-slate-500">Referral</p>
+              <p className="mt-1 text-xs text-slate-500">Share your code. You earn NGN 2,000 when a referred user subscribes to a paid plan.</p>
+              <p className="mt-2 text-sm font-semibold">Code: {referral?.referralCode ?? "N/A"}</p>
+              <p className="mt-1 text-sm">Earnings: NGN {new Intl.NumberFormat("en-NG").format(referral?.earnings ?? 0)}</p>
+              <p className="mt-1 text-xs text-slate-500">
+                Rewarded referrals: {referral?.rewardedReferrals ?? 0} / {referral?.totalReferrals ?? 0}
+              </p>
+            </div>
 
             <form className="mt-6 space-y-3" onSubmit={handleChangePassword}>
               <h3 className="text-sm font-semibold">Reset Password</h3>

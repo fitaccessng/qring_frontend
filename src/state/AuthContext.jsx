@@ -138,6 +138,15 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const beginGoogleSignUp = async (referralCode = "") => {
+    setLoading(true);
+    try {
+      return await authService.beginGoogleSignUp(referralCode);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const forgotPassword = async (email) =>
     authService.forgotPassword({
       email
@@ -167,6 +176,7 @@ export function AuthProvider({ children }) {
       signup,
       googleSignIn,
       googleSignUp,
+      beginGoogleSignUp,
       forgotPassword,
       logout
     }),

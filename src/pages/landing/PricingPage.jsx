@@ -8,44 +8,102 @@ const NAIRA = "\u20A6";
 const plans = [
   {
     id: "free",
-    name: "Free",
+    name: "Starter",
     monthly: 0,
     yearly: 0,
-    bestFor: "Single homeowner getting started",
-    features: ["1 door", "1 QR code", "Realtime alerts", "Basic access history"]
+    bestFor: "Get started at no cost",
+    cta: "Get Started Free",
+    features: ["1 door", "1 QR code", "Visitor notifications", "Basic access logs", "Mobile alerts"]
   },
   {
     id: "doors_20",
-    name: "1-20 Doors",
-    monthly: 20000,
-    yearly: 240000,
-    bestFor: "Small compounds",
-    features: ["Up to 20 doors", "Up to 20 QR codes", "Realtime approvals", "Chat and calls"]
+    name: "Basic Plan",
+    monthly: 12000,
+    yearly: 120000,
+    bestFor: "Up to 10 doors",
+    cta: "Start Basic",
+    features: [
+      "Up to 10 doors",
+      "Up to 10 QR codes",
+      "Realtime visitor alerts",
+      "Access logs",
+      "Guest approvals",
+      "Resident management",
+      "Mobile dashboard"
+    ]
   },
   {
     id: "doors_40",
-    name: "1-40 Doors",
-    monthly: 50000,
-    yearly: 600000,
-    bestFor: "Growing estates",
-    features: ["Up to 40 doors", "Up to 40 QR codes", "Session logs", "Priority support"],
-    popular: true
+    name: "Standard Plan",
+    monthly: 25000,
+    yearly: 250000,
+    bestFor: "Up to 22 doors",
+    cta: "Choose Standard",
+    features: [
+      "Up to 22 doors",
+      "Up to 22 QR codes",
+      "Realtime approvals",
+      "Visitor session logs",
+      "Chat + call access",
+      "Admin panel",
+      "Multi-user access"
+    ]
   },
   {
     id: "doors_80",
-    name: "1-80 Doors",
-    monthly: 80000,
-    yearly: 960000,
-    bestFor: "Large compounds",
-    features: ["Up to 80 doors", "Up to 80 QR codes", "Advanced analytics", "Realtime controls"]
+    name: "Pro Estate Plan",
+    monthly: 50000,
+    yearly: 500000,
+    bestFor: "Up to 46 doors",
+    cta: "Start Pro Estate",
+    features: [
+      "Up to 46 doors",
+      "Up to 46 QR codes",
+      "Visitor scheduling",
+      "Access time windows",
+      "Multi-admin roles",
+      "Advanced analytics",
+      "Realtime controls",
+      "Priority support"
+    ],
+    popular: true
   },
   {
     id: "doors_100",
-    name: "1-100 Doors",
-    monthly: 120000,
-    yearly: 1440000,
-    bestFor: "Enterprise estates",
-    features: ["Up to 100 doors", "Up to 100 QR codes", "Dedicated onboarding", "Priority SLA"]
+    name: "Premium Estate Plan",
+    monthly: 100000,
+    yearly: 1000000,
+    bestFor: "Up to 100 doors",
+    cta: "Choose Premium",
+    features: [
+      "Up to 100 doors",
+      "Up to 100 QR codes",
+      "Estate-level analytics",
+      "Security audit logs",
+      "Multi-location control",
+      "Advanced permissions",
+      "API access",
+      "Dedicated support"
+    ]
+  },
+  {
+    id: "enterprise",
+    name: "Enterprise",
+    monthly: null,
+    yearly: null,
+    bestFor: "Custom pricing - annual contract",
+    cta: "Contact Sales",
+    features: [
+      "Unlimited doors",
+      "Unlimited QR codes",
+      "Custom workflows",
+      "Custom security policies",
+      "Onsite onboarding",
+      "SLA contracts",
+      "Private cloud deployment",
+      "API + integrations",
+      "Dedicated account manager"
+    ]
   }
 ];
 
@@ -173,10 +231,13 @@ export default function PricingPage() {
               ) : null}
               <p className="text-sm font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300">{plan.name}</p>
               <p className="mt-4 text-4xl font-black tracking-tight sm:text-5xl">
-                {NAIRA}
-                {formatAmount(mode === "monthly" ? plan.monthly : plan.yearly)}
+                {plan.monthly === null || plan.yearly === null
+                  ? "Custom"
+                  : `${NAIRA}${formatAmount(mode === "monthly" ? plan.monthly : plan.yearly)}`}
               </p>
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">{mode === "monthly" ? "per month" : "per year"}</p>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">
+                {plan.monthly === null || plan.yearly === null ? "Annual contract" : mode === "monthly" ? "per month" : "per year"}
+              </p>
               <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">{plan.bestFor}</p>
               <ul className="mt-5 space-y-2 text-sm text-slate-700 dark:text-slate-200">
                 {plan.features.map((feature) => (
@@ -184,14 +245,14 @@ export default function PricingPage() {
                 ))}
               </ul>
               <Link
-                to="/billing/paywall"
+                to={plan.id === "enterprise" ? "/contact" : "/billing/paywall"}
                 className={`mt-8 block rounded-lg py-3 text-center text-sm font-semibold transition ${
                   plan.popular
                     ? "bg-slate-900 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
                     : "border border-slate-200 text-slate-900 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-800"
                 }`}
               >
-                Choose {plan.name}
+                {plan.cta ?? `Choose ${plan.name}`}
               </Link>
             </article>
           ))}

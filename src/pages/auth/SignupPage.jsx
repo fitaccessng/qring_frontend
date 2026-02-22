@@ -4,12 +4,13 @@ import AuthCard from "../../components/AuthCard";
 import { useAuth } from "../../state/AuthContext";
 
 export default function SignupPage() {
-  const { signup, googleSignUp } = useAuth();
+  const { signup, beginGoogleSignUp } = useAuth();
   const [form, setForm] = useState({
     fullName: "",
     email: "",
     password: "",
-    role: "homeowner"
+    role: "homeowner",
+    referralCode: ""
   });
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -33,8 +34,10 @@ export default function SignupPage() {
     setError("");
     setSubmitting(true);
     try {
-      const data = await googleSignUp(form.role);
-      navigate("/login");
+      await beginGoogleSignUp(form.referralCode);
+      navigate("/google-role", {
+        state: { intent: "signup" }
+      });
     } catch (submitError) {
       setError(submitError.message ?? "Google sign-up failed");
     } finally {
@@ -49,6 +52,13 @@ export default function SignupPage() {
           <Input label="Full name" type="text" value={form.fullName} onChange={(value) => setForm((prev) => ({ ...prev, fullName: value }))} />
           <Input label="Email" type="email" value={form.email} onChange={(value) => setForm((prev) => ({ ...prev, email: value }))} />
           <Input label="Password" type="password" value={form.password} onChange={(value) => setForm((prev) => ({ ...prev, password: value }))} />
+          <Input
+            label="Referral code (optional)"
+            type="text"
+            value={form.referralCode}
+            required={false}
+            onChange={(value) => setForm((prev) => ({ ...prev, referralCode: value }))}
+          />
 
           <label className="block text-sm">
             <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">Role</span>
@@ -107,12 +117,12 @@ export default function SignupPage() {
   );
 }
 
-function Input({ label, type, value, onChange }) {
+function Input({ label, type, value, onChange, required = true }) {
   return (
     <label className="block text-sm">
       <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">{label}</span>
       <input
-        required
+        required={required}
         type={type}
         value={value}
         onChange={(event) => onChange(event.target.value)}

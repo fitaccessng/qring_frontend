@@ -11,8 +11,6 @@ import {
 } from "../../services/paymentService";
 import { getHomeownerContext } from "../../services/homeownerService";
 
-const NAIRA = "\u20A6";
-
 export default function HomeownerPaywallPage() {
   const { user } = useAuth();
   const [purposes, setPurposes] = useState([]);
@@ -79,7 +77,9 @@ export default function HomeownerPaywallPage() {
             maxQrCodes: plan.maxQrCodes
           }
         }));
-        setNotice("Free plan activated. You can manage up to 1 door and 1 QR code.");
+        setNotice(
+          `Free plan activated. You can manage up to ${plan.maxDoors} door${plan.maxDoors === 1 ? "" : "s"} and ${plan.maxQrCodes} QR code${plan.maxQrCodes === 1 ? "" : "s"}.`
+        );
       } else {
         const isLocalHost = ["localhost", "127.0.0.1"].includes(window.location.hostname);
         const callbackUrl = !isLocalHost && window.location.protocol === "https:"
@@ -140,9 +140,10 @@ export default function HomeownerPaywallPage() {
           >
             <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">{plan.name}</p>
             <p className="mt-2 text-2xl font-bold">
-              {plan.amount === 0 ? `${NAIRA}0` : `${NAIRA}${new Intl.NumberFormat("en-NG").format(plan.amount)}`}
+              {formatMoney(plan.amount, plan.currency)}
               <span className="ml-1 text-sm font-medium text-slate-500">/month</span>
             </p>
+            <p className="text-xs text-slate-500">{(plan.currency || "NGN").toUpperCase()}</p>
             <p className="mt-2 text-sm text-slate-500">Up to {plan.maxDoors} doors</p>
             <p className="text-sm text-slate-500">Up to {plan.maxQrCodes} QR codes</p>
 
@@ -188,5 +189,19 @@ export default function HomeownerPaywallPage() {
       </section>
     </AppShell>
   );
+}
+
+function formatMoney(amount, currency = "NGN") {
+  const safeAmount = Number(amount || 0);
+  const safeCurrency = String(currency || "NGN").toUpperCase();
+  try {
+    return new Intl.NumberFormat("en", {
+      style: "currency",
+      currency: safeCurrency,
+      maximumFractionDigits: 0,
+    }).format(safeAmount);
+  } catch {
+    return `${safeCurrency} ${safeAmount.toLocaleString("en-US")}`;
+  }
 }
 

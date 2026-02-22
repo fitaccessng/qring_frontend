@@ -15,6 +15,11 @@ export async function listPaymentPurposes() {
   return Array.isArray(response?.data) ? response.data : [];
 }
 
+export async function getReferralSummary() {
+  const response = await apiRequest("/payment/referral/me");
+  return response?.data ?? null;
+}
+
 export async function requestSubscription(plan) {
   const response = await apiRequest("/payment/subscription/request", {
     method: "POST",
