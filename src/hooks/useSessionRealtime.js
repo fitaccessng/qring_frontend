@@ -8,8 +8,15 @@ import {
 } from "../services/sessionCallAccess";
 
 const rtcConfig = {
-  iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+  iceServers: [
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun1.l.google.com:19302" }
+  ],
+  iceCandidatePoolSize: 8
 };
+
+const CALL_RETRY_DELAY_MS = 5000;
+const CALL_RETRY_LIMIT = 2;
 
 export function useSessionRealtime(sessionId) {
   const token = localStorage.getItem("qring_access_token");
@@ -31,6 +38,8 @@ export function useSessionRealtime(sessionId) {
   const [cameraOn, setCameraOn] = useState(false);
   const [messages, setMessages] = useState([]);
   const [status, setStatus] = useState("");
+  const [networkQuality, setNetworkQuality] = useState("reconnecting");
+  const [networkDetail, setNetworkDetail] = useState("Connecting...");
   const [callLaunchStage, setCallLaunchStage] = useState("idle");
   const [callLaunchStartedAt, setCallLaunchStartedAt] = useState(null);
   const [incomingCall, setIncomingCall] = useState({
@@ -47,6 +56,12 @@ export function useSessionRealtime(sessionId) {
   const pendingRemoteCandidates = useRef([]);
   const isMakingOfferRef = useRef(false);
   const pendingOfferRef = useRef(null);
+  const callStateRef = useRef("idle");
+  const retryOfferTimerRef = useRef(null);
+  const lastOfferRef = useRef(null);
+  const offerRetryCountRef = useRef(0);
+  const pendingLocalMessageIdsRef = useRef(new Set());
+  const connectedOnceRef = useRef(false);
 
   const supportsWebRTC =
     typeof window !== "undefined" && typeof window.RTCPeerConnection !== "undefined";
@@ -63,6 +78,10 @@ export function useSessionRealtime(sessionId) {
     if (!supportsUserMedia) return "Camera/microphone APIs are unavailable in this browser.";
     return "";
   }, [isSecureOrigin, supportsUserMedia, supportsWebRTC]);
+
+  useEffect(() => {
+    callStateRef.current = callState;
+  }, [callState]);
 
   function isMineBySenderType(senderType) {
     if (user?.role === "homeowner") return senderType === "homeowner";
@@ -130,6 +149,50 @@ export function useSessionRealtime(sessionId) {
     return pc;
   }
 
+  function markNetworkGood(detail = "Realtime connection is stable.") {
+    setNetworkQuality("good");
+    setNetworkDetail(detail);
+  }
+
+  function markNetworkSlow(detail = "Network is unstable. Trying to keep the session active.") {
+    setNetworkQuality("slow");
+    setNetworkDetail(detail);
+  }
+
+  function markNetworkReconnecting(detail = "Reconnecting to session...") {
+    setNetworkQuality("reconnecting");
+    setNetworkDetail(detail);
+  }
+
+  function clearOfferRetryTimer() {
+    if (retryOfferTimerRef.current) {
+      clearTimeout(retryOfferTimerRef.current);
+      retryOfferTimerRef.current = null;
+    }
+  }
+
+  function scheduleOfferRetry() {
+    clearOfferRetryTimer();
+    retryOfferTimerRef.current = setTimeout(() => {
+      if (callStateRef.current !== "ringing") return;
+      if (!lastOfferRef.current || !socketRef.current) return;
+      if (offerRetryCountRef.current >= CALL_RETRY_LIMIT) {
+        setStatus("Network looks slow. Keep this page open while we continue trying.");
+        markNetworkSlow("Signaling is delayed. Keeping call setup in progress.");
+        return;
+      }
+      offerRetryCountRef.current += 1;
+      socketRef.current.emit("webrtc.offer", {
+        sessionId,
+        sdp: lastOfferRef.current,
+        retryAttempt: offerRetryCountRef.current
+      });
+      markNetworkSlow("Retrying call request due to network delay.");
+      setStatus(`Network is slow. Retrying call request (${offerRetryCountRef.current}/${CALL_RETRY_LIMIT})...`);
+      scheduleOfferRetry();
+    }, CALL_RETRY_DELAY_MS);
+  }
+
   async function attachLocalStream({ video }) {
     if (featureError) {
       throw new Error(featureError);
@@ -167,6 +230,8 @@ export function useSessionRealtime(sessionId) {
       setStatus("");
       setCallLaunchStage("preparing");
       setCallLaunchStartedAt(Date.now());
+      offerRetryCountRef.current = 0;
+      clearOfferRetryTimer();
       if (featureError) {
         setStatus(featureError);
         setCallLaunchStage("idle");
@@ -188,8 +253,10 @@ export function useSessionRealtime(sessionId) {
         sessionId,
         sdp: offer
       });
+      lastOfferRef.current = offer;
       setCallState("ringing");
       setCallLaunchStage("ringing");
+      scheduleOfferRetry();
     } catch (error) {
       setStatus(error?.message ?? "Unable to start call");
       setCallLaunchStage("idle");
@@ -230,6 +297,7 @@ export function useSessionRealtime(sessionId) {
       setCallState("connected");
       setCallLaunchStage("idle");
       setCallLaunchStartedAt(null);
+      clearOfferRetryTimer();
       grantSessionCallAccess(sessionId, "connected");
       setIncomingCall({ pending: false, hasVideo: false });
       pendingOfferRef.current = null;
@@ -248,6 +316,7 @@ export function useSessionRealtime(sessionId) {
     setCallState("idle");
     setCallLaunchStage("idle");
     setCallLaunchStartedAt(null);
+    clearOfferRetryTimer();
     setIncomingCall({ pending: false, hasVideo: false });
     pendingOfferRef.current = null;
     clearSessionCallAccess(sessionId);
@@ -267,10 +336,24 @@ export function useSessionRealtime(sessionId) {
   function sendMessage(text) {
     const body = (text || "").trim();
     if (!body || !socketRef.current || !joined) return false;
+    const clientId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    pendingLocalMessageIdsRef.current.add(clientId);
+    setMessages((prev) => [
+      ...prev,
+      normalizeMessage({
+        id: clientId,
+        clientId,
+        text: body,
+        displayName,
+        senderType: user?.role || "visitor",
+        at: new Date().toISOString()
+      })
+    ]);
     socketRef.current.emit("chat.message", {
       sessionId,
       text: body,
-      displayName
+      displayName,
+      clientId
     });
     return true;
   }
@@ -317,6 +400,9 @@ export function useSessionRealtime(sessionId) {
     setRemoteMuted(false);
     setIncomingCall({ pending: false, hasVideo: false });
     pendingOfferRef.current = null;
+    clearOfferRetryTimer();
+    lastOfferRef.current = null;
+    offerRetryCountRef.current = 0;
     clearSessionCallAccess(sessionId);
   }
 
@@ -342,6 +428,12 @@ export function useSessionRealtime(sessionId) {
     const socket = io(`${env.socketUrl}${env.signalingNamespace ?? "/realtime/signaling"}`, {
       path: env.socketPath,
       transports: ["websocket", "polling"],
+      rememberUpgrade: true,
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 400,
+      reconnectionDelayMax: 2000,
+      timeout: 7000,
       auth: token ? { token } : undefined,
       withCredentials: true
     });
@@ -349,19 +441,26 @@ export function useSessionRealtime(sessionId) {
 
     socket.on("connect", () => {
       setConnected(true);
+      connectedOnceRef.current = true;
+      markNetworkReconnecting("Connected to signaling. Joining session room...");
       socket.emit("session.join", { sessionId, displayName });
     });
     socket.on("disconnect", () => {
       setConnected(false);
       setJoined(false);
+      markNetworkReconnecting(
+        connectedOnceRef.current ? "Connection lost. Reconnecting..." : "Connecting..."
+      );
     });
     socket.on("connect_error", (error) => {
       setStatus(error?.message ?? "Socket connection failed");
+      markNetworkSlow("Unable to reach signaling server. Retrying...");
     });
     socket.on("session.joined", (payload) => {
       if (!payload?.sid) return;
       setJoined(true);
       setStatus("Session connected");
+      markNetworkGood("Session connected.");
     });
     socket.on("session.participant_joined", async () => {
       if (isMakingOfferRef.current) return;
@@ -415,8 +514,13 @@ export function useSessionRealtime(sessionId) {
         setCallState("connected");
         setCallLaunchStage("idle");
         setCallLaunchStartedAt(null);
+        clearOfferRetryTimer();
+        lastOfferRef.current = null;
+        offerRetryCountRef.current = 0;
+        markNetworkGood("Call connected.");
       } catch (error) {
         setStatus(error?.message ?? "Failed to establish call");
+        markNetworkSlow("Call signaling is unstable.");
       }
     });
 
@@ -436,8 +540,21 @@ export function useSessionRealtime(sessionId) {
 
     socket.on("chat.message", (payload) => {
       if (payload?.sessionId !== sessionId) return;
+      markNetworkGood("Realtime messages synced.");
       const incoming = normalizeMessage(payload);
       setMessages((prev) => {
+        const clientId = payload?.clientId;
+        if (clientId && pendingLocalMessageIdsRef.current.has(clientId)) {
+          pendingLocalMessageIdsRef.current.delete(clientId);
+          return prev.map((item) =>
+            item.id === clientId
+              ? {
+                  ...incoming,
+                  id: incoming.id || clientId
+                }
+              : item
+          );
+        }
         if (incoming.id && prev.some((item) => item.id && item.id === incoming.id)) {
           return prev;
         }
@@ -466,7 +583,30 @@ export function useSessionRealtime(sessionId) {
       }
     });
 
+    const manager = socket.io;
+    const onReconnectAttempt = () => {
+      markNetworkReconnecting("Reconnecting to signaling...");
+    };
+    const onReconnect = () => {
+      markNetworkGood("Reconnected.");
+    };
+    const onReconnectError = () => {
+      markNetworkSlow("Reconnect attempt failed. Retrying...");
+    };
+    const onReconnectFailed = () => {
+      markNetworkSlow("Could not reconnect automatically.");
+    };
+    manager.on("reconnect_attempt", onReconnectAttempt);
+    manager.on("reconnect", onReconnect);
+    manager.on("reconnect_error", onReconnectError);
+    manager.on("reconnect_failed", onReconnectFailed);
+
     return () => {
+      clearOfferRetryTimer();
+      manager.off("reconnect_attempt", onReconnectAttempt);
+      manager.off("reconnect", onReconnect);
+      manager.off("reconnect_error", onReconnectError);
+      manager.off("reconnect_failed", onReconnectFailed);
       socket.disconnect();
       endCall(false);
     };
@@ -481,6 +621,8 @@ export function useSessionRealtime(sessionId) {
     cameraOn,
     messages,
     status,
+    networkQuality,
+    networkDetail,
     callLaunchStage,
     callLaunchStartedAt,
     featureError,

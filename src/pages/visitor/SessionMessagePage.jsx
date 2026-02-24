@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
+import SessionNetworkBadge from "../../components/SessionNetworkBadge";
 import SessionModeNav from "../../components/SessionModeNav";
 import VisitorIncomingCallModal from "../../components/VisitorIncomingCallModal";
 import { useSessionRealtime } from "../../hooks/useSessionRealtime";
@@ -13,6 +14,8 @@ export default function SessionMessagePage() {
     callState,
     messages,
     status,
+    networkQuality,
+    networkDetail,
     featureError,
     incomingCall,
     canStartCall,
@@ -36,6 +39,7 @@ export default function SessionMessagePage() {
             Session {sessionId} | {connected ? "Signaling Online" : "Connecting"} |{" "}
             {joined ? "Room Joined" : "Waiting Room"} | Call: {callState}
           </p>
+          <SessionNetworkBadge quality={networkQuality} detail={networkDetail} />
           {featureError ? <p className="mt-2 text-sm text-rose-700">{featureError}</p> : null}
           {status ? <p className="mt-2 text-sm text-amber-700">{status}</p> : null}
         </header>

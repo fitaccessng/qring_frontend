@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import SessionNetworkBadge from "../../components/SessionNetworkBadge";
 import VisitorIncomingCallModal from "../../components/VisitorIncomingCallModal";
 import { useSessionRealtime } from "../../hooks/useSessionRealtime";
 
@@ -14,6 +15,8 @@ export default function SessionAudioPage() {
     localStreamRef,
     remoteAudioRef,
     status,
+    networkQuality,
+    networkDetail,
     featureError,
     callLaunchStage,
     callLaunchStartedAt,
@@ -81,6 +84,11 @@ export default function SessionAudioPage() {
           </div>
 
           {featureError ? <p className="mt-3 text-sm text-rose-400">{featureError}</p> : null}
+          <SessionNetworkBadge
+            quality={networkQuality}
+            detail={networkDetail}
+            detailClassName="text-slate-300"
+          />
           {status ? <p className="mt-2 text-sm text-amber-300">{status}</p> : null}
           {showingCallProgress ? (
             <section className="mt-3 rounded-2xl border border-[#00a884]/35 bg-[#0f2428] p-4">

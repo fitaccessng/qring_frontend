@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import SessionNetworkBadge from "../../components/SessionNetworkBadge";
 import VisitorIncomingCallModal from "../../components/VisitorIncomingCallModal";
 import { useSessionRealtime } from "../../hooks/useSessionRealtime";
 
@@ -13,6 +14,8 @@ export default function SessionVideoPage() {
     remoteMuted,
     localStreamRef,
     status,
+    networkQuality,
+    networkDetail,
     featureError,
     callLaunchStage,
     callLaunchStartedAt,
@@ -89,6 +92,11 @@ export default function SessionVideoPage() {
             {callState} | {localStreamRef.current ? "Media ready" : "Media not started"} | Remote mic:{" "}
             {remoteMuted ? "Muted" : "Active"}
           </div>
+          <SessionNetworkBadge
+            quality={networkQuality}
+            detail={networkDetail}
+            detailClassName="text-slate-300"
+          />
 
           {featureError ? <p className="mt-2 text-sm text-rose-700">{featureError}</p> : null}
           {status ? <p className="mt-2 text-sm text-amber-700">{status}</p> : null}
