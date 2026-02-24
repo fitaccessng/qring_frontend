@@ -31,6 +31,8 @@ export function useSessionRealtime(sessionId) {
   const [cameraOn, setCameraOn] = useState(false);
   const [messages, setMessages] = useState([]);
   const [status, setStatus] = useState("");
+  const [callLaunchStage, setCallLaunchStage] = useState("idle");
+  const [callLaunchStartedAt, setCallLaunchStartedAt] = useState(null);
   const [incomingCall, setIncomingCall] = useState({
     pending: false,
     hasVideo: false
@@ -111,12 +113,16 @@ export function useSessionRealtime(sessionId) {
       const state = pc.connectionState;
       if (state === "connected") {
         setCallState("connected");
+        setCallLaunchStage("idle");
+        setCallLaunchStartedAt(null);
         if (!isHomeowner) {
           grantSessionCallAccess(sessionId, "connected");
         }
       }
       if (state === "failed" || state === "disconnected" || state === "closed") {
         setCallState("ended");
+        setCallLaunchStage("idle");
+        setCallLaunchStartedAt(null);
         clearSessionCallAccess(sessionId);
       }
     };
@@ -159,15 +165,21 @@ export function useSessionRealtime(sessionId) {
   async function startCall({ video }) {
     try {
       setStatus("");
+      setCallLaunchStage("preparing");
+      setCallLaunchStartedAt(Date.now());
       if (featureError) {
         setStatus(featureError);
+        setCallLaunchStage("idle");
+        setCallLaunchStartedAt(null);
         return;
       }
       if (!joined) {
         setStatus("Joining session room...");
+        setCallLaunchStage("waiting");
         return;
       }
       await attachLocalStream({ video });
+      setCallLaunchStage("signaling");
       const pc = ensurePeer();
       isMakingOfferRef.current = true;
       const offer = await pc.createOffer();
@@ -177,8 +189,11 @@ export function useSessionRealtime(sessionId) {
         sdp: offer
       });
       setCallState("ringing");
+      setCallLaunchStage("ringing");
     } catch (error) {
       setStatus(error?.message ?? "Unable to start call");
+      setCallLaunchStage("idle");
+      setCallLaunchStartedAt(null);
     } finally {
       isMakingOfferRef.current = false;
     }
@@ -213,6 +228,8 @@ export function useSessionRealtime(sessionId) {
       await pc.setLocalDescription(answer);
       socketRef.current?.emit("webrtc.answer", { sessionId, sdp: answer });
       setCallState("connected");
+      setCallLaunchStage("idle");
+      setCallLaunchStartedAt(null);
       grantSessionCallAccess(sessionId, "connected");
       setIncomingCall({ pending: false, hasVideo: false });
       pendingOfferRef.current = null;
@@ -229,6 +246,8 @@ export function useSessionRealtime(sessionId) {
     });
     setStatus("Incoming call rejected");
     setCallState("idle");
+    setCallLaunchStage("idle");
+    setCallLaunchStartedAt(null);
     setIncomingCall({ pending: false, hasVideo: false });
     pendingOfferRef.current = null;
     clearSessionCallAccess(sessionId);
@@ -291,6 +310,8 @@ export function useSessionRealtime(sessionId) {
     if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
     if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
     setCallState("ended");
+    setCallLaunchStage("idle");
+    setCallLaunchStartedAt(null);
     setCameraOn(false);
     setMuted(false);
     setRemoteMuted(false);
@@ -380,6 +401,8 @@ export function useSessionRealtime(sessionId) {
         await pc.setLocalDescription(answer);
         socket.emit("webrtc.answer", { sessionId, sdp: answer });
         setCallState("connected");
+        setCallLaunchStage("idle");
+        setCallLaunchStartedAt(null);
       } catch (error) {
         setStatus(error?.message ?? "Failed to handle incoming call");
       }
@@ -390,6 +413,8 @@ export function useSessionRealtime(sessionId) {
       try {
         await applyRemoteDescriptionAndDrain(payload.sdp);
         setCallState("connected");
+        setCallLaunchStage("idle");
+        setCallLaunchStartedAt(null);
       } catch (error) {
         setStatus(error?.message ?? "Failed to establish call");
       }
@@ -456,6 +481,8 @@ export function useSessionRealtime(sessionId) {
     cameraOn,
     messages,
     status,
+    callLaunchStage,
+    callLaunchStartedAt,
     featureError,
     localVideoRef,
     remoteVideoRef,

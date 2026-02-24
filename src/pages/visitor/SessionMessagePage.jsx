@@ -1,19 +1,25 @@
-import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useState } from "react";
+import { useParams } from "react-router-dom";
 import SessionModeNav from "../../components/SessionModeNav";
+import VisitorIncomingCallModal from "../../components/VisitorIncomingCallModal";
 import { useSessionRealtime } from "../../hooks/useSessionRealtime";
 
 export default function SessionMessagePage() {
   const { sessionId } = useParams();
-  const navigate = useNavigate();
   const [text, setText] = useState("");
-  const { connected, joined, callState, messages, status, featureError, incomingCall, sendMessage } =
-    useSessionRealtime(sessionId);
-
-  useEffect(() => {
-    if (!incomingCall?.pending) return;
-    navigate(`/session/${sessionId}/${incomingCall.hasVideo ? "video" : "audio"}`);
-  }, [incomingCall, navigate, sessionId]);
+  const {
+    connected,
+    joined,
+    callState,
+    messages,
+    status,
+    featureError,
+    incomingCall,
+    canStartCall,
+    sendMessage,
+    acceptIncomingCall,
+    rejectIncomingCall
+  } = useSessionRealtime(sessionId);
 
   function onSubmit(event) {
     event.preventDefault();
@@ -35,7 +41,10 @@ export default function SessionMessagePage() {
         </header>
 
         <div className="grid gap-4 lg:grid-cols-12">
-          <SessionModeNav sessionId={sessionId} />
+          <SessionModeNav
+            sessionId={sessionId}
+            disableCallModes={!canStartCall && !incomingCall.pending && callState !== "connected"}
+          />
           <section className="space-y-4 lg:col-span-9">
             <article className="rounded-3xl border border-slate-200/80 bg-white/90 p-4 shadow-soft">
               <h2 className="font-heading text-lg font-bold">Conversation</h2>
@@ -71,6 +80,13 @@ export default function SessionMessagePage() {
           </section>
         </div>
       </div>
+
+      <VisitorIncomingCallModal
+        open={incomingCall.pending && !canStartCall}
+        hasVideo={incomingCall.hasVideo}
+        onAccept={acceptIncomingCall}
+        onReject={rejectIncomingCall}
+      />
     </div>
   );
 }

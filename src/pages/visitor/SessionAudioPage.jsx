@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import VisitorIncomingCallModal from "../../components/VisitorIncomingCallModal";
 import { useSessionRealtime } from "../../hooks/useSessionRealtime";
 
 export default function SessionAudioPage() {
@@ -13,6 +15,8 @@ export default function SessionAudioPage() {
     remoteAudioRef,
     status,
     featureError,
+    callLaunchStage,
+    callLaunchStartedAt,
     incomingCall,
     canStartCall,
     toggleMute,
@@ -21,6 +25,22 @@ export default function SessionAudioPage() {
     acceptIncomingCall,
     rejectIncomingCall
   } = useSessionRealtime(sessionId);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const showingCallProgress = canStartCall && (callLaunchStage !== "idle" || callState === "ringing");
+  const startButtonBusy = showingCallProgress || callState === "connected";
+
+  useEffect(() => {
+    if (!showingCallProgress || !callLaunchStartedAt) {
+      setElapsedSeconds(0);
+      return;
+    }
+    const tick = () => {
+      setElapsedSeconds(Math.max(0, Math.floor((Date.now() - callLaunchStartedAt) / 1000)));
+    };
+    tick();
+    const timer = setInterval(tick, 1000);
+    return () => clearInterval(timer);
+  }, [callLaunchStartedAt, showingCallProgress]);
 
   return (
     <div className="min-h-screen bg-[#0c1317] p-4 text-slate-100 sm:p-6">
@@ -62,35 +82,34 @@ export default function SessionAudioPage() {
 
           {featureError ? <p className="mt-3 text-sm text-rose-400">{featureError}</p> : null}
           {status ? <p className="mt-2 text-sm text-amber-300">{status}</p> : null}
+          {showingCallProgress ? (
+            <section className="mt-3 rounded-2xl border border-[#00a884]/35 bg-[#0f2428] p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#00a884]">
+                Call Setup In Progress
+              </p>
+              <p className="mt-1 text-sm text-slate-100">
+                {callState === "ringing"
+                  ? "Call request sent. Waiting for visitor to accept."
+                  : "Preparing call and connecting signaling services."}
+              </p>
+              <p className="mt-1 text-xs text-slate-300">Elapsed: {elapsedSeconds}s</p>
+              {elapsedSeconds >= 8 ? (
+                <p className="mt-2 rounded-xl bg-amber-500/20 px-3 py-2 text-xs text-amber-200">
+                  Network looks slow. Keep this page open while we continue trying.
+                </p>
+              ) : null}
+            </section>
+          ) : null}
 
           <div className="mt-5 grid grid-cols-3 gap-3">
-            {incomingCall.pending ? (
-              <>
-                <button
-                  type="button"
-                  onClick={acceptIncomingCall}
-                  className="rounded-xl bg-[#00a884] px-3 py-3 text-xs font-semibold text-white"
-                >
-                  Accept
-                </button>
-                <button
-                  type="button"
-                  onClick={rejectIncomingCall}
-                  className="rounded-xl bg-[#e53935] px-3 py-3 text-xs font-semibold text-white"
-                >
-                  Reject
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                onClick={startAudioCall}
-                disabled={Boolean(featureError) || !canStartCall}
-                className="rounded-xl bg-[#00a884] px-3 py-3 text-xs font-semibold text-white disabled:opacity-50"
-              >
-                Start
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={startAudioCall}
+              disabled={Boolean(featureError) || !canStartCall || startButtonBusy}
+              className="rounded-xl bg-[#00a884] px-3 py-3 text-xs font-semibold text-white disabled:opacity-50"
+            >
+              {startButtonBusy ? "Starting..." : "Start"}
+            </button>
             <button
               type="button"
               onClick={toggleMute}
@@ -109,6 +128,13 @@ export default function SessionAudioPage() {
           </div>
         </section>
       </div>
+
+      <VisitorIncomingCallModal
+        open={incomingCall.pending && !canStartCall}
+        hasVideo={incomingCall.hasVideo}
+        onAccept={acceptIncomingCall}
+        onReject={rejectIncomingCall}
+      />
     </div>
   );
 }
