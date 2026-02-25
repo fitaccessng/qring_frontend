@@ -48,7 +48,6 @@ export default function AppShell({ title, children }) {
   const { user, logout } = useAuth();
   const { isDark, toggleTheme } = useTheme();
   const navigate = useNavigate();
-  const [open, setOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [homeownerContext, setHomeownerContext] = useState(null);
@@ -89,19 +88,21 @@ export default function AppShell({ title, children }) {
   const mobileNavItems = useMemo(
     () => {
       if (user?.role === "homeowner") {
-        const pick = ["/dashboard/homeowner/overview", "/dashboard/homeowner/visits", "/dashboard/homeowner/messages"];
-        const fourth = isEstateManagedHomeowner ? "/dashboard/homeowner/settings" : "/billing/paywall";
-        const desired = [...pick, fourth];
-        return desired
-          .map((path) => navItems.find((item) => item.to === path))
-          .filter(Boolean);
+        return [
+          { to: "/dashboard/homeowner/overview", label: "Home", icon: "overview" },
+          { to: "/dashboard/homeowner/doors", label: "Door", icon: "doors" },
+          { to: "/dashboard/homeowner/visits", label: "Visits", icon: "visits" },
+          { to: "/dashboard/homeowner/messages", label: "Message", icon: "messages" },
+          { to: "/dashboard/homeowner/settings", label: "Profile", icon: "settings" }
+        ];
       }
       return navItems.filter((item) => !item.to.endsWith("/settings")).slice(0, 4);
     },
-    [navItems, user?.role, isEstateManagedHomeowner]
+    [navItems, user?.role]
   );
-  const showHelpButton = user?.role === "homeowner" || user?.role === "estate";
+  const showHelpButton = user?.role === "estate";
   const onboardingSteps = useMemo(() => getOnboardingSteps(user?.role), [user?.role]);
+  const canGoBack = typeof window !== "undefined" && window.history.length > 1;
 
   useEffect(() => {
     let active = true;
@@ -235,6 +236,27 @@ export default function AppShell({ title, children }) {
     const hasNewVisitRequest = unreadVisitRequestIds.some((id) => !previous.includes(id));
     if (hasNewVisitRequest) {
       setMuteVisitRing(false);
+      try {
+        if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+          navigator.vibrate([120, 80, 120]);
+        }
+      } catch {
+        // No-op on unsupported platforms.
+      }
+      try {
+        window.dispatchEvent(
+          new CustomEvent("qring:flash", {
+            detail: {
+              type: "info",
+              title: "New Visitor Request",
+              message: "A visitor is requesting access.",
+              duration: 3200
+            }
+          })
+        );
+      } catch {
+        // Keep notifications non-blocking.
+      }
     }
     prevVisitUnreadIdsRef.current = unreadVisitRequestIds;
   }, [unreadVisitRequestIds]);
@@ -292,19 +314,34 @@ export default function AppShell({ title, children }) {
   }, [soundAlertsEnabled, unreadVisitRequestIds, muteVisitRing]);
 
   useEffect(() => {
-    if (typeof window === "undefined" || typeof window.Notification === "undefined") return;
-    if (window.Notification.permission !== "granted") return;
+    if (typeof window === "undefined") return;
+
+    const notificationSupported = typeof window.Notification !== "undefined";
+    const canNotify = notificationSupported && window.Notification.permission === "granted";
 
     parsedNotifications.forEach((item) => {
       if (item.readAt) return;
       if (browserAlertedIdsRef.current.has(item.id)) return;
       browserAlertedIdsRef.current.add(item.id);
       const body = item.payload?.message ?? "You have a new alert";
-      const notification = new window.Notification("Qring Alert", { body });
-      notification.onclick = () => {
-        window.focus();
-        openNotification(item);
-      };
+      if (canNotify) {
+        const notification = new window.Notification("Qring Alert", { body });
+        notification.onclick = () => {
+          window.focus();
+          openNotification(item);
+        };
+        return;
+      }
+      window.dispatchEvent(
+        new CustomEvent("qring:flash", {
+          detail: {
+            type: "info",
+            title: "Qring Alert",
+            message: body,
+            duration: 3600
+          }
+        })
+      );
     });
   }, [parsedNotifications]);
 
@@ -374,22 +411,26 @@ export default function AppShell({ title, children }) {
     }
   }
 
+  function handleBack() {
+    if (canGoBack) {
+      navigate(-1);
+      return;
+    }
+    const fallback =
+      user?.role === "estate"
+        ? "/dashboard/estate"
+        : user?.role === "admin"
+          ? "/dashboard/admin"
+          : "/dashboard/homeowner/overview";
+    navigate(fallback);
+  }
+
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_top_right,_rgba(36,86,245,0.16),_transparent_40%),radial-gradient(circle_at_bottom_left,_rgba(20,184,166,0.12),_transparent_35%)]" />
       <div className="flex min-h-screen">
-        {open ? (
-          <button
-            type="button"
-            aria-label="Close navigation"
-            className="fixed inset-0 z-30 bg-slate-950/35 lg:hidden"
-            onClick={() => setOpen(false)}
-          />
-        ) : null}
         <aside
-          className={`fixed inset-y-0 left-0 z-40 w-72 transform border-r border-slate-200/70 bg-white/90 p-6 backdrop-blur transition-transform duration-300 dark:border-slate-800 dark:bg-slate-900/95 lg:static lg:translate-x-0 ${
-            open ? "translate-x-0" : "-translate-x-full"
-          }`}
+          className="hidden w-72 border-r border-slate-200/70 bg-white/90 p-6 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95 lg:block"
         >
           <div className="mb-8 flex items-center gap-3">
             <div className="grid h-10 w-16 place-items-center rounded-xl  text-xs font-bold text-white shadow-soft">
@@ -447,26 +488,26 @@ export default function AppShell({ title, children }) {
           </div>
         </aside>
 
-        <main className="flex-1 p-3 pb-24 sm:p-4 sm:pb-24 lg:p-8 lg:pb-8">
-          <header className="sticky top-3 z-30 mb-4 flex items-center justify-between rounded-2xl border border-slate-200 bg-white/80 p-3 shadow-soft backdrop-blur dark:border-slate-800 dark:bg-slate-900/70 sm:mb-6 sm:p-4">
-            <div className="flex items-center gap-3">
+        <main className="flex-1 p-3 pb-[calc(5.25rem+env(safe-area-inset-bottom))] pt-16 sm:p-4 sm:pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pt-16 lg:p-8 lg:pb-8 lg:pt-8">
+          <header className="fixed inset-x-0 top-0 z-30 px-3 pt-2 sm:px-4 lg:static lg:px-0 lg:pt-0 lg:mb-6">
+            <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
               <button
                 type="button"
-                className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold dark:border-slate-700 lg:hidden"
-                onClick={() => setOpen((prev) => !prev)}
+                onClick={handleBack}
+                className="rounded-lg border border-slate-300 bg-white/60 p-1.5 text-xs font-semibold backdrop-blur dark:border-slate-700 dark:bg-slate-900/60 sm:p-2"
+                aria-label="Go back"
+                title="Back"
               >
-                MENU
+                <BackIcon />
               </button>
-              <div>
-                <p className="text-xs uppercase tracking-wide text-slate-500">Dashboard</p>
-                <h1 className="font-heading text-xs font-bold lg:text-2xl">{title}</h1>
-              </div>
+              <h1 className="font-heading text-sm font-bold sm:text-base lg:text-2xl">{title}</h1>
             </div>
-            <div className="relative flex items-center gap-4 sm:gap-3">
+            <div className="relative flex items-center gap-1.5 sm:gap-2">
               <button
                 type="button"
                 onClick={() => setNotificationsOpen((prev) => !prev)}
-                className="relative rounded-lg border border-slate-300 p-2 text-xs font-semibold dark:border-slate-700"
+                className="relative rounded-lg border border-slate-300 bg-white/60 p-1.5 text-xs font-semibold backdrop-blur dark:border-slate-700 dark:bg-slate-900/60 sm:p-2"
                 aria-label="Notifications"
               >
                 <BellIcon />
@@ -526,56 +567,45 @@ export default function AppShell({ title, children }) {
               <button
                 type="button"
                 onClick={toggleTheme}
-                className="hidden rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold dark:border-slate-700 sm:inline-flex">{isDark ? "LIGHT" : "DARK"}
+                className="hidden rounded-lg border border-slate-300 px-2 py-1.5 text-xs font-semibold dark:border-slate-700 sm:inline-flex">{isDark ? "LIGHT" : "DARK"}
               </button>
               {settingsNavItem ? (
                 <Link
                   to={settingsNavItem.to}
-                  className="rounded-lg border border-slate-300 p-2 text-xs font-semibold dark:border-slate-700"
+                  className="rounded-lg border border-slate-300 bg-white/60 p-1.5 text-xs font-semibold backdrop-blur dark:border-slate-700 dark:bg-slate-900/60 sm:p-2"
                   aria-label="Settings"
                   title="Settings"
                 >
                   <SettingsIcon />
                 </Link>
               ) : null}
-              <span className="hidden rounded-lg bg-brand-100 px-3 py-2 text-xs font-semibold text-brand-700 dark:bg-brand-500/20 dark:text-brand-100 sm:inline-flex">
-                {user?.role ?? "guest"}
-              </span>
-              <div className="hidden items-center gap-2 rounded-xl border border-slate-300 px-3 py-2 md:flex dark:border-slate-700">
-                <div className="grid h-7 w-7 place-items-center rounded-lg bg-brand-100 dark:bg-brand-500/30">
-                  <UserIcon />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold">{user?.fullName ?? "Qring User"}</p>
-                  <p className="text-[10px] text-slate-500">{user?.email ?? "user@useqring.online"}</p>
-                </div>
-              </div>
               <button
                 type="button"
                 onClick={logout}
-                className="rounded-lg border border-slate-300 p-2 text-xs font-semibold dark:border-slate-700"
+                className="rounded-lg border border-slate-300 bg-white/60 p-1.5 text-xs font-semibold backdrop-blur dark:border-slate-700 dark:bg-slate-900/60 sm:p-2"
                 aria-label="Logout"
                 title="Logout"
               >
                 <LogoutIcon />
               </button>
             </div>
+            </div>
           </header>
           {children}
         </main>
       </div>
       {mobileNavItems.length > 0 ? (
-        <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-2 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95 lg:hidden">
-          <div className="flex gap-1 overflow-x-auto pb-1">
+        <nav className="fixed inset-x-0 bottom-0 z-[9999] border-t border-slate-200 bg-white/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur supports-[backdrop-filter]:bg-white/85 dark:border-slate-800 dark:bg-slate-900/95 dark:supports-[backdrop-filter]:bg-slate-900/85 lg:hidden">
+          <div className="flex h-12 items-stretch gap-1 sm:h-14">
             {mobileNavItems.map((item) => (
               <NavLink
                 key={`mobile-${item.to}`}
                 to={item.to}
                 className={({ isActive }) =>
-                  `flex min-w-[76px] flex-col items-center justify-center rounded-xl px-2 py-2 text-[11px] font-semibold transition ${
+                  `flex min-w-0 flex-1 flex-col items-center justify-center rounded-xl px-1 py-1.5 text-[10px] font-semibold transition-transform duration-200 sm:text-[11px] ${
                     isActive
-                      ? "bg-brand-500 text-white"
-                      : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+                      ? "scale-105 bg-brand-500 text-white shadow-sm"
+                      : "scale-95 bg-slate-100/70 text-slate-600 dark:bg-slate-800/70 dark:text-slate-300"
                   }`
                 }
               >
@@ -586,16 +616,16 @@ export default function AppShell({ title, children }) {
               </NavLink>
             ))}
             {showHelpButton ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setOnboardingDismissed(false);
-                  setOnboardingOpen(true);
-                }}
-                className="flex min-w-[76px] flex-col items-center justify-center rounded-xl px-2 py-2 text-[11px] font-semibold text-slate-600 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
-              >
-                <span className="mb-1">
-                  <NavIcon name="help" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOnboardingDismissed(false);
+                    setOnboardingOpen(true);
+                  }}
+                  className="flex min-w-0 flex-1 flex-col items-center justify-center rounded-xl px-1 py-1.5 text-[10px] font-semibold text-slate-600 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 sm:text-[11px]"
+                >
+                  <span className="mb-1">
+                    <NavIcon name="help" />
                 </span>
                 <span className="leading-none">Help</span>
               </button>
@@ -706,11 +736,10 @@ function BellIcon() {
   );
 }
 
-function UserIcon() {
+function BackIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="12" cy="8" r="4" />
-      <path d="M4 21a8 8 0 0 1 16 0" />
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M15 18l-6-6 6-6" />
     </svg>
   );
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AppShell from "../../layouts/AppShell";
 import SessionModePickerModal from "../../components/SessionModePickerModal";
@@ -14,27 +14,50 @@ export default function HomeownerVisitsPage() {
   const [endingId, setEndingId] = useState("");
   const [modePickerOpen, setModePickerOpen] = useState(false);
   const [sessionForPicker, setSessionForPicker] = useState("");
+  const inFlightRef = useRef(false);
 
-  const loadVisits = useCallback(async () => {
-    setLoading(true);
-    setError("");
+  const loadVisits = useCallback(async ({ background = false, force = false } = {}) => {
+    if (inFlightRef.current && !force) return;
+    inFlightRef.current = true;
+    if (!background) {
+      setLoading(true);
+      setError("");
+    }
     try {
       const data = await getHomeownerVisits();
       setRows(data);
     } catch (requestError) {
-      setError(requestError.message ?? "Failed to load visits");
+      if (!background) {
+        setError(requestError.message ?? "Failed to load visits");
+      }
     } finally {
-      setLoading(false);
+      if (!background) {
+        setLoading(false);
+      }
+      inFlightRef.current = false;
     }
   }, []);
 
   useEffect(() => {
-    loadVisits();
+    loadVisits({ force: true });
   }, [loadVisits]);
 
   useEffect(() => {
-    const id = setInterval(loadVisits, 5000);
-    return () => clearInterval(id);
+    const refresh = () => {
+      if (document.visibilityState !== "visible") return;
+      loadVisits({ background: true });
+    };
+    const id = setInterval(refresh, 15000);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        loadVisits({ background: true });
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, [loadVisits]);
 
   async function handleDecision(sessionId, action) {
@@ -108,12 +131,12 @@ export default function HomeownerVisitsPage() {
       <section className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-soft dark:border-slate-800 dark:bg-slate-900/80 sm:p-6">
         <div className="mb-4 flex items-center justify-between gap-3">
           <h2 className="font-heading text-lg font-bold sm:text-xl">Visitor Log</h2>
-          <button
-            type="button"
-            onClick={loadVisits}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold dark:border-slate-700"
-          >
-            Refresh
+            <button
+              type="button"
+              onClick={() => loadVisits({ force: true })}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold dark:border-slate-700"
+            >
+              Refresh
           </button>
         </div>
 

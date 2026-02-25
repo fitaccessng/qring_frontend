@@ -3,6 +3,10 @@ import { NavLink, useParams } from "react-router-dom";
 import { io } from "socket.io-client";
 import { env } from "../../config/env";
 import { getVisitorSessionMessages } from "../../services/homeownerService";
+import {
+  playIncomingCallNotificationSound,
+  playMessageNotificationSound
+} from "../../utils/notificationSound";
 
 const rtcConfig = {
   iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
@@ -267,7 +271,10 @@ export default function SessionPage({ mode = "message" }) {
     const socket = io(`${env.socketUrl}${env.signalingNamespace ?? "/realtime/signaling"}`, {
       path: env.socketPath,
       transports: ["websocket", "polling"],
-      auth: token ? { token } : undefined,
+      auth: (cb) => {
+        const latestToken = localStorage.getItem("qring_access_token");
+        cb(latestToken ? { token: latestToken } : {});
+      },
       withCredentials: true
     });
     socketRef.current = socket;
@@ -309,6 +316,7 @@ export default function SessionPage({ mode = "message" }) {
 
     socket.on("webrtc.offer", async (payload) => {
       if (payload?.sessionId !== sessionId) return;
+      playIncomingCallNotificationSound();
       try {
         const wantsVideo = typeof payload?.sdp?.sdp === "string" && payload.sdp.sdp.includes("m=video");
         try {
@@ -357,6 +365,9 @@ export default function SessionPage({ mode = "message" }) {
     socket.on("chat.message", (payload) => {
       if (payload?.sessionId !== sessionId) return;
       const incoming = normalizeMessage(payload);
+      if (!incoming.mine) {
+        playMessageNotificationSound();
+      }
       setMessages((prev) => {
         if (
           incoming.id &&

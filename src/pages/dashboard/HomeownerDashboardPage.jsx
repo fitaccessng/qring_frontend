@@ -36,7 +36,7 @@ export default function HomeownerDashboardPage() {
   }, []);
 
   return (
-    <AppShell className="text-sm" title="Homeowner Workspace">
+    <AppShell className="text-sm" title="Homeowner">
       {error ? (
         <div className="mb-4 rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
           {error}
@@ -128,7 +128,7 @@ export default function HomeownerDashboardPage() {
           </div>
         </article>
 
-        <article className="xl:col-span-5 rounded-2xl border border-slate-200 bg-white/90 p-4 sm:p-6 shadow-soft dark:border-slate-800 dark:bg-slate-900/80">
+        <article className="hidden md:block xl:col-span-5 rounded-2xl border border-slate-200 bg-white/90 p-4 sm:p-6 shadow-soft dark:border-slate-800 dark:bg-slate-900/80">
           <h2 className="mb-4 font-heading text-lg font-bold">Realtime Interaction</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             <Panel title="Waiting Room" value={`${waitingRoom.length} Visitors`} tone="warning" />
@@ -146,7 +146,7 @@ export default function HomeownerDashboardPage() {
       </section>
 
       {!managedByEstate ? (
-        <section className="mt-6">
+        <section className="mt-6 hidden md:block">
           <article className="rounded-2xl border border-slate-200 bg-white/90 p-4 sm:p-6 shadow-soft dark:border-slate-800 dark:bg-slate-900/80">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>

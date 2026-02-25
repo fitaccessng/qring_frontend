@@ -3,6 +3,44 @@ import { useNavigate, useParams } from "react-router-dom";
 import { apiRequest } from "../../services/apiClient";
 import { getVisitorSessionStatus } from "../../services/homeownerService";
 
+const RETRYABLE_STATUSES = new Set([0, 502, 503, 504]);
+const MAX_SUBMIT_RETRIES = 2;
+const RETRY_BASE_DELAY_MS = 700;
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRetryableSubmitError(error) {
+  const status = Number(error?.status ?? -1);
+  return RETRYABLE_STATUSES.has(status);
+}
+
+async function submitVisitorRequestWithRetry(payload, onRetry) {
+  let lastError = null;
+  for (let attempt = 0; attempt <= MAX_SUBMIT_RETRIES; attempt += 1) {
+    try {
+      return await apiRequest("/visitor/request", {
+        method: "POST",
+        body: JSON.stringify(payload)
+      });
+    } catch (error) {
+      lastError = error;
+      if (attempt >= MAX_SUBMIT_RETRIES || !isRetryableSubmitError(error)) {
+        throw error;
+      }
+      const waitMs = RETRY_BASE_DELAY_MS * 2 ** attempt + Math.floor(Math.random() * 220);
+      onRetry?.({
+        attempt: attempt + 1,
+        maxRetries: MAX_SUBMIT_RETRIES,
+        nextDelayMs: waitMs
+      });
+      await sleep(waitMs);
+    }
+  }
+  throw lastError;
+}
+
 export default function ScanPage() {
   const { qrId } = useParams();
   const navigate = useNavigate();
@@ -12,11 +50,16 @@ export default function ScanPage() {
   const [doorId, setDoorId] = useState("");
   const [requestState, setRequestState] = useState({
     sending: false,
+    retrying: false,
+    retryAttempt: 0,
+    requestStartedAt: 0,
+    lastLatencyMs: null,
     sent: false,
     sessionId: "",
     status: ""
   });
   const [seconds, setSeconds] = useState(0);
+  const [requestLatencyMs, setRequestLatencyMs] = useState(0);
   const [visitorForm, setVisitorForm] = useState({
     name: "",
     purpose: ""
@@ -53,6 +96,14 @@ export default function ScanPage() {
   }, [requestState.sent]);
 
   useEffect(() => {
+    if (!requestState.sending || !requestState.requestStartedAt) return;
+    const tick = () => setRequestLatencyMs(Date.now() - requestState.requestStartedAt);
+    tick();
+    const id = setInterval(tick, 150);
+    return () => clearInterval(id);
+  }, [requestState.sending, requestState.requestStartedAt]);
+
+  useEffect(() => {
     if (!requestState.sent || !requestState.sessionId) return;
     let active = true;
     const id = setInterval(async () => {
@@ -79,26 +130,57 @@ export default function ScanPage() {
   const onSubmit = async (event) => {
     event.preventDefault();
     setError("");
-    setRequestState((prev) => ({ ...prev, sending: true }));
+    const startedAt = Date.now();
+    setRequestLatencyMs(0);
+    setRequestState((prev) => ({
+      ...prev,
+      sending: true,
+      retrying: false,
+      retryAttempt: 0,
+      requestStartedAt: startedAt,
+      lastLatencyMs: null
+    }));
     try {
-        const response = await apiRequest("/visitor/request", {
-        method: "POST",
-        body: JSON.stringify({
+      const response = await submitVisitorRequestWithRetry(
+        {
           qrId,
           doorId,
           name: visitorForm.name,
           purpose: visitorForm.purpose
-        })
-      });
+        },
+        ({ attempt }) => {
+          setRequestState((prev) => ({
+            ...prev,
+            sending: true,
+            retrying: true,
+            retryAttempt: attempt
+          }));
+        }
+      );
       const data = response?.data ?? response;
+      const latencyMs = Date.now() - startedAt;
       setRequestState({
         sending: false,
+        retrying: false,
+        retryAttempt: 0,
+        requestStartedAt: 0,
+        lastLatencyMs: latencyMs,
         sent: true,
         sessionId: data?.sessionId ?? "",
         status: data?.status ?? "pending"
       });
+      setRequestLatencyMs(latencyMs);
     } catch (submitError) {
-      setRequestState((prev) => ({ ...prev, sending: false }));
+      const latencyMs = Date.now() - startedAt;
+      setRequestState((prev) => ({
+        ...prev,
+        sending: false,
+        retrying: false,
+        retryAttempt: 0,
+        requestStartedAt: 0,
+        lastLatencyMs: latencyMs
+      }));
+      setRequestLatencyMs(latencyMs);
       setError(submitError.message ?? "Request failed");
     }
   };
@@ -171,8 +253,25 @@ export default function ScanPage() {
               disabled={requestState.sending}
               className="w-full rounded-xl bg-brand-500 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"
             >
-              {requestState.sending ? "Submitting..." : "Request Access"}
+              {requestState.retrying
+                ? `Retrying (${requestState.retryAttempt}/${MAX_SUBMIT_RETRIES})...`
+                : requestState.sending
+                  ? "Submitting..."
+                  : "Request Access"}
             </button>
+            {requestState.sending || requestState.lastLatencyMs !== null ? (
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Request latency:{" "}
+                {requestState.sending
+                  ? `${(requestLatencyMs / 1000).toFixed(2)}s (live)`
+                  : `${((requestState.lastLatencyMs ?? 0) / 1000).toFixed(2)}s`}
+              </p>
+            ) : null}
+            {requestState.retrying ? (
+              <p className="text-xs text-amber-600 dark:text-amber-300">
+                Network is unstable. Retrying your request automatically...
+              </p>
+            ) : null}
           </form>
         ) : null}
 

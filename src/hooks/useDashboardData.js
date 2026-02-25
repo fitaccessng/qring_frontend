@@ -10,6 +10,19 @@ import {
 
 const initialData = normalizeDashboard({});
 
+function hasDashboardPayload(payload) {
+  if (!payload || typeof payload !== "object") return false;
+  return Boolean(
+    payload.metrics ||
+      payload.activity ||
+      payload.waitingRoom ||
+      payload.session ||
+      payload.messages ||
+      payload.traffic ||
+      payload.callControls
+  );
+}
+
 export function useDashboardData() {
   const [dashboard, setDashboard] = useState(initialData);
   const [loading, setLoading] = useState(true);
@@ -37,7 +50,9 @@ export function useDashboardData() {
     const onDisconnect = () => mounted && setConnected(false);
     const onSnapshot = (payload) => {
       if (!mounted) return;
-      setDashboard(normalizeDashboard(payload?.data ?? payload));
+      const data = payload?.data ?? payload;
+      if (!hasDashboardPayload(data)) return;
+      setDashboard(normalizeDashboard(data));
     };
     const onPatch = (payload) => {
       if (!mounted) return;
@@ -52,9 +67,14 @@ export function useDashboardData() {
       if (!mounted) return;
       setError(payload?.message ?? "Realtime error");
     };
+    const onConnectError = () => {
+      if (!mounted) return;
+      setConnected(false);
+    };
 
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);
+    socket.on("connect_error", onConnectError);
     socket.on("dashboard.snapshot", onSnapshot);
     socket.on("dashboard.patch", onPatch);
     socket.on("dashboard.error", onError);
@@ -65,6 +85,7 @@ export function useDashboardData() {
       mounted = false;
       socket.off("connect", onConnect);
       socket.off("disconnect", onDisconnect);
+      socket.off("connect_error", onConnectError);
       socket.off("dashboard.snapshot", onSnapshot);
       socket.off("dashboard.patch", onPatch);
       socket.off("dashboard.error", onError);

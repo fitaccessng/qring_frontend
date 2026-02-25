@@ -22,6 +22,7 @@ export default function HomeownerSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
+  const [copyingReferralCode, setCopyingReferralCode] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
 
@@ -107,8 +108,27 @@ export default function HomeownerSettingsPage() {
     }
   }
 
+  async function handleCopyReferralCode() {
+    const code = String(referral?.referralCode || "").trim();
+    if (!code) {
+      setError("No referral code available yet.");
+      return;
+    }
+
+    setCopyingReferralCode(true);
+    setError("");
+    try {
+      await navigator.clipboard.writeText(code);
+      setNotice("Referral code copied.");
+    } catch {
+      setError("Unable to copy referral code. Please copy manually.");
+    } finally {
+      setCopyingReferralCode(false);
+    }
+  }
+
   return (
-    <AppShell title="Settings">
+    <AppShell title="Profile & Settings">
       {error ? (
         <div className="mb-4 rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
           {error}
@@ -131,6 +151,44 @@ export default function HomeownerSettingsPage() {
         </div>
       ) : (
         <section className="grid gap-3 sm:gap-4 xl:grid-cols-12">
+          <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-soft dark:border-slate-800 dark:bg-slate-900/85 xl:col-span-12">
+            <div className="bg-gradient-to-r from-brand-600 via-brand-500 to-teal-500 px-4 py-5 text-white sm:px-6">
+              <p className="text-xs uppercase tracking-wide text-white/80">Profile Hub</p>
+              <h2 className="font-heading text-xl font-bold sm:text-2xl">Your Account Overview</h2>
+              <p className="mt-1 max-w-2xl text-sm text-white/90">
+                Manage alerts, referrals, subscription and account security from one place.
+              </p>
+            </div>
+            <div className="grid gap-3 p-4 sm:p-6 md:grid-cols-3">
+              <div className="rounded-xl bg-slate-100 p-4 dark:bg-slate-800">
+                <p className="text-xs uppercase tracking-wide text-slate-500">Plan</p>
+                <p className="mt-1 text-base font-semibold">{subscription?.plan ?? "Not available"}</p>
+                <p className="mt-1 text-xs text-slate-500">Status: {subscription?.status ?? "Unknown"}</p>
+              </div>
+              <div className="rounded-xl bg-slate-100 p-4 dark:bg-slate-800">
+                <p className="text-xs uppercase tracking-wide text-slate-500">Referral Earnings</p>
+                <p className="mt-1 text-base font-semibold">
+                  NGN {new Intl.NumberFormat("en-NG").format(referral?.earnings ?? 0)}
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Rewarded: {referral?.rewardedReferrals ?? 0} / {referral?.totalReferrals ?? 0}
+                </p>
+              </div>
+              <div className="rounded-xl bg-slate-100 p-4 dark:bg-slate-800">
+                <p className="text-xs uppercase tracking-wide text-slate-500">Referral Code</p>
+                <p className="mt-1 text-base font-semibold">{referral?.referralCode ?? "N/A"}</p>
+                <button
+                  type="button"
+                  onClick={handleCopyReferralCode}
+                  disabled={copyingReferralCode || !referral?.referralCode}
+                  className="mt-2 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold disabled:opacity-50 dark:border-slate-700"
+                >
+                  {copyingReferralCode ? "Copying..." : "Copy code"}
+                </button>
+              </div>
+            </div>
+          </article>
+
           <article className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-soft dark:border-slate-800 dark:bg-slate-900/80 sm:p-6 xl:col-span-7">
             <h2 className="font-heading text-lg font-bold sm:text-xl">Preferences</h2>
             <p className="mt-1 text-xs text-slate-500">Manage how you receive alerts and visitor auto-reject behavior.</p>
@@ -168,31 +226,17 @@ export default function HomeownerSettingsPage() {
           </article>
 
           <article className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-soft dark:border-slate-800 dark:bg-slate-900/80 sm:p-6 xl:col-span-5">
-            <h2 className="font-heading text-lg font-bold sm:text-xl">Current Subscription</h2>
-            {subscription ? (
-              <div className="mt-4 rounded-xl bg-slate-100 p-4 dark:bg-slate-800">
-                <p className="text-xs uppercase tracking-wide text-slate-500">Plan</p>
-                <p className="mt-1 text-base font-semibold">{subscription.plan}</p>
-                <p className="mt-1 text-xs text-slate-500">Status: {subscription.status}</p>
-                {subscription.limits ? (
-                  <p className="mt-2 text-xs text-slate-500">
-                    Limits: {subscription.limits.maxDoors} doors, {subscription.limits.maxQrCodes} QR codes
-                  </p>
-                ) : null}
-              </div>
-            ) : (
-              <p className="mt-3 text-sm text-slate-500">No subscription information available.</p>
-            )}
+            <h2 className="font-heading text-lg font-bold sm:text-xl">Security</h2>
+            <p className="mt-1 text-xs text-slate-500">Update your password regularly to keep your account protected.</p>
 
-            <div className="mt-4 rounded-xl bg-slate-100 p-4 dark:bg-slate-800">
-              <p className="text-xs uppercase tracking-wide text-slate-500">Referral</p>
-              <p className="mt-1 text-xs text-slate-500">Share your code. You earn NGN 2,000 when a referred user subscribes to a paid plan.</p>
-              <p className="mt-2 text-sm font-semibold">Code: {referral?.referralCode ?? "N/A"}</p>
-              <p className="mt-1 text-sm">Earnings: NGN {new Intl.NumberFormat("en-NG").format(referral?.earnings ?? 0)}</p>
-              <p className="mt-1 text-xs text-slate-500">
-                Rewarded referrals: {referral?.rewardedReferrals ?? 0} / {referral?.totalReferrals ?? 0}
-              </p>
-            </div>
+            {subscription?.limits ? (
+              <div className="mt-4 rounded-xl bg-slate-100 p-4 dark:bg-slate-800">
+                <p className="text-xs uppercase tracking-wide text-slate-500">Plan Limits</p>
+                <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">
+                  {subscription.limits.maxDoors} doors, {subscription.limits.maxQrCodes} QR codes
+                </p>
+              </div>
+            ) : null}
 
             <form className="mt-6 space-y-3" onSubmit={handleChangePassword}>
               <h3 className="text-sm font-semibold">Reset Password</h3>

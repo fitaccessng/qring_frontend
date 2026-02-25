@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "../../layouts/AppShell";
+import { env } from "../../config/env";
 import { createEstate, createEstateSharedQr, getEstateOverview, listEstateSharedQrs } from "../../services/estateService";
 
 export default function EstateCreatePage() {
@@ -147,7 +148,7 @@ export default function EstateCreatePage() {
                       </a>
                       <button
                         type="button"
-                        onClick={() => copyText(`${window.location.origin}${estate.sharedQr.scanUrl}`)}
+                        onClick={() => copyText(toPublicUrl(estate.sharedQr.scanUrl))}
                         className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold dark:border-slate-700"
                       >
                         Copy Link
@@ -170,6 +171,13 @@ export default function EstateCreatePage() {
       </section>
     </AppShell>
   );
+}
+
+function toPublicUrl(path) {
+  const base = (env.publicAppUrl || window.location.origin || "").replace(/\/+$/, "");
+  if (!path) return base;
+  if (/^https?:\/\//i.test(path)) return path;
+  return `${base}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
 async function copyText(value) {

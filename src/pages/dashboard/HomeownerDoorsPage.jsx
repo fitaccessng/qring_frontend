@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import AppShell from "../../layouts/AppShell";
+import { env } from "../../config/env";
 import { createHomeownerDoor, generateDoorQr, getHomeownerContext, getHomeownerDoors } from "../../services/homeownerService";
 
 export default function HomeownerDoorsPage() {
@@ -137,7 +138,7 @@ export default function HomeownerDoorsPage() {
       );
 
       if (created?.qr?.qr_id) {
-        const fullUrl = `${window.location.origin}/scan/${created.qr.qr_id}`;
+        const fullUrl = toScanUrl(created.qr.qr_id);
         try {
           await navigator.clipboard.writeText(fullUrl);
           setNotice(`Door created and QR copied: ${fullUrl}`);
@@ -181,7 +182,7 @@ export default function HomeownerDoorsPage() {
               }
             : prev
         );
-        const fullUrl = `${window.location.origin}/scan/${newQr}`;
+        const fullUrl = toScanUrl(newQr);
         try {
           await navigator.clipboard.writeText(fullUrl);
           setNotice(`QR created and copied: ${fullUrl}`);
@@ -207,7 +208,7 @@ export default function HomeownerDoorsPage() {
       ? {
           qrId: selectedQrId,
           doorName: activeDoor.name,
-          scanUrl: `${window.location.origin}/scan/${selectedQrId}`
+          scanUrl: toScanUrl(selectedQrId)
         }
       : null;
 
@@ -345,7 +346,7 @@ export default function HomeownerDoorsPage() {
                         className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-semibold transition hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800"
                       >
                         <img
-                          src={buildQrImageUrl(`${window.location.origin}/scan/${qrId}`, 40)}
+                          src={buildQrImageUrl(toScanUrl(qrId), 40)}
                           alt={`QR ${qrId}`}
                           className="h-5 w-5 rounded"
                         />
@@ -413,7 +414,7 @@ export default function HomeownerDoorsPage() {
                       }`}
                     >
                       <img
-                        src={buildQrImageUrl(`${window.location.origin}/scan/${qrId}`, 40)}
+                        src={buildQrImageUrl(toScanUrl(qrId), 40)}
                         alt={`QR ${qrId}`}
                         className="h-8 w-8 rounded"
                       />
@@ -494,6 +495,11 @@ export default function HomeownerDoorsPage() {
 
 function buildQrImageUrl(value, size = 240) {
   return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(value)}`;
+}
+
+function toScanUrl(qrId) {
+  const base = (env.publicAppUrl || window.location.origin || "").replace(/\/+$/, "");
+  return `${base}/scan/${qrId}`;
 }
 
 function shapeClass(shape) {

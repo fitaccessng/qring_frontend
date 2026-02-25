@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import AppShell from "../../layouts/AppShell";
 import { env } from "../../config/env";
+import { playMessageNotificationSound } from "../../utils/notificationSound";
 import {
   deleteHomeownerSessionMessage,
   getHomeownerMessages,
@@ -21,6 +22,17 @@ export default function HomeownerMessagesPage() {
   const [error, setError] = useState("");
   const messagesRef = useRef(null);
   const token = localStorage.getItem("qring_access_token");
+
+  function isLikelyDuplicateMessage(current, next) {
+    if (!current || !next) return false;
+    if (current.id && next.id && current.id === next.id) return true;
+    if ((current.text || "").trim() !== (next.text || "").trim()) return false;
+    if ((current.senderType || "") !== (next.senderType || "")) return false;
+    const currentTs = new Date(current.at).getTime();
+    const nextTs = new Date(next.at).getTime();
+    if (Number.isNaN(currentTs) || Number.isNaN(nextTs)) return false;
+    return Math.abs(currentTs - nextTs) < 10000;
+  }
 
   function upsertThreadPreview(message) {
     if (!message?.sessionId) return;
@@ -114,7 +126,10 @@ export default function HomeownerMessagesPage() {
     const socket = io(`${env.socketUrl}${env.signalingNamespace ?? "/realtime/signaling"}`, {
       path: env.socketPath,
       transports: ["websocket", "polling"],
-      auth: token ? { token } : undefined,
+      auth: (cb) => {
+        const latestToken = localStorage.getItem("qring_access_token");
+        cb(latestToken ? { token: latestToken } : {});
+      },
       withCredentials: true
     });
     socket.on("connect", () => {
@@ -133,12 +148,15 @@ export default function HomeownerMessagesPage() {
       };
       setMessagesByThread((prev) => {
         const current = prev[incomingSessionId] ?? [];
-        if (current.some((item) => item.id === normalized.id)) return prev;
+        if (current.some((item) => isLikelyDuplicateMessage(item, normalized))) return prev;
         return {
           ...prev,
           [incomingSessionId]: [...current, normalized]
         };
       });
+      if (normalized.senderType !== "homeowner") {
+        playMessageNotificationSound();
+      }
       upsertThreadPreview(normalized);
     });
     return () => {
@@ -163,15 +181,7 @@ export default function HomeownerMessagesPage() {
     if (!selectedId || !text) return;
     setSending(true);
     try {
-      const data = await sendHomeownerSessionMessage(selectedId, text);
-      if (data) {
-        setMessagesByThread((prev) => {
-          const current = prev[selectedId] ?? [];
-          if (current.some((item) => item.id === data.id)) return prev;
-          return { ...prev, [selectedId]: [...current, data] };
-        });
-        upsertThreadPreview(data);
-      }
+      await sendHomeownerSessionMessage(selectedId, text);
       setDraft("");
     } catch (requestError) {
       setError(requestError.message ?? "Failed to send message");

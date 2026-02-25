@@ -22,6 +22,9 @@ export default function SessionAudioPage() {
     callLaunchStartedAt,
     incomingCall,
     canStartCall,
+    lowBandwidthMode,
+    autoLowBandwidthActive,
+    setLowBandwidthMode,
     toggleMute,
     endCall,
     startAudioCall,
@@ -46,19 +49,19 @@ export default function SessionAudioPage() {
   }, [callLaunchStartedAt, showingCallProgress]);
 
   return (
-    <div className="min-h-screen bg-[#0c1317] p-4 text-slate-100 sm:p-6">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#17212a_0%,_#0f1720_55%,_#0b1118_100%)] p-4 text-slate-100 sm:p-6">
       <div className="mx-auto w-full max-w-5xl py-3">
-        <header className="mb-4 flex items-center justify-between rounded-3xl border border-white/10 bg-[#1f2c34] p-4 shadow-soft">
+        <header className="mb-4 flex items-center justify-between rounded-3xl border border-white/10 bg-white/5 p-4 shadow-soft backdrop-blur">
           <div>
-            <h1 className="font-heading text-2xl font-black">Audio Call</h1>
-            <p className="text-xs text-slate-400">Session {sessionId}</p>
+            <h1 className="font-heading text-2xl font-black tracking-tight">Audio Call</h1>
+            <p className="text-xs text-slate-300/80">Session {sessionId}</p>
           </div>
-          <Link to="/dashboard" className="rounded-xl bg-[#00a884] px-4 py-2 text-xs font-semibold text-white">
+          <Link to="/dashboard" className="rounded-xl bg-brand-500 px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-600">
             Go Back Home
           </Link>
         </header>
 
-        <section className="rounded-3xl border border-white/10 bg-[#111b21] p-6 shadow-soft">
+        <section className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-soft backdrop-blur">
           <audio ref={remoteAudioRef} autoPlay playsInline />
           <div className="grid gap-4 md:grid-cols-2">
             <ParticipantCard
@@ -72,7 +75,7 @@ export default function SessionAudioPage() {
               muted={muted}
             />
           </div>
-          <div className="mt-4 rounded-2xl bg-[#1f2c34] p-4 text-center text-white">
+          <div className="mt-4 rounded-2xl border border-white/10 bg-slate-900/40 p-4 text-center text-white">
             <p className="text-sm font-semibold">{callState === "ringing" ? "Calling..." : "In audio room"}</p>
             <p className="mt-1 text-xs text-slate-300">
               {localStreamRef.current ? "Audio stream connected" : "Start call to connect microphone"}
@@ -109,12 +112,44 @@ export default function SessionAudioPage() {
             </section>
           ) : null}
 
+          <div className="mt-3 rounded-2xl border border-white/10 bg-slate-900/30 px-4 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-200">
+                  Low Bandwidth Mode
+                </p>
+                <p className="mt-1 text-[11px] text-slate-300">
+                  Keeps calls stable on weak internet and limits media usage.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setLowBandwidthMode(!lowBandwidthMode)}
+                className={`relative h-7 w-12 rounded-full transition ${
+                  lowBandwidthMode ? "bg-brand-500" : "bg-slate-600"
+                }`}
+                aria-pressed={lowBandwidthMode}
+              >
+                <span
+                  className={`absolute top-1 h-5 w-5 rounded-full bg-white transition ${
+                    lowBandwidthMode ? "left-6" : "left-1"
+                  }`}
+                />
+              </button>
+            </div>
+            {autoLowBandwidthActive ? (
+              <p className="mt-2 text-[11px] font-semibold text-brand-300">
+                Bandwidth saver active.
+              </p>
+            ) : null}
+          </div>
+
           <div className="mt-5 grid grid-cols-3 gap-3">
             <button
               type="button"
               onClick={startAudioCall}
               disabled={Boolean(featureError) || !canStartCall || startButtonBusy}
-              className="rounded-xl bg-[#00a884] px-3 py-3 text-xs font-semibold text-white disabled:opacity-50"
+              className="rounded-xl bg-brand-500 px-3 py-3 text-xs font-semibold text-white transition hover:bg-brand-600 disabled:opacity-50"
             >
               {startButtonBusy ? "Starting..." : "Start"}
             </button>
@@ -122,14 +157,14 @@ export default function SessionAudioPage() {
               type="button"
               onClick={toggleMute}
               disabled={!localStreamRef.current}
-              className="rounded-xl bg-[#8696a0] px-3 py-3 text-xs font-semibold text-white disabled:opacity-50"
+              className="rounded-xl bg-slate-600 px-3 py-3 text-xs font-semibold text-white transition hover:bg-slate-500 disabled:opacity-50"
             >
               {muted ? "Unmute" : "Mute"}
             </button>
             <button
               type="button"
               onClick={endCall}
-              className="rounded-xl bg-[#e53935] px-3 py-3 text-xs font-semibold text-white"
+              className="rounded-xl bg-rose-600 px-3 py-3 text-xs font-semibold text-white transition hover:bg-rose-500"
             >
               End
             </button>
@@ -149,11 +184,11 @@ export default function SessionAudioPage() {
 
 function ParticipantCard({ label, state, muted }) {
   return (
-    <article className="rounded-2xl bg-[#1f2c34] p-6 text-center">
-      <div className="mx-auto h-28 w-28 rounded-full bg-[#00a884]/20 p-2">
+    <article className="rounded-2xl border border-white/10 bg-slate-900/45 p-6 text-center">
+      <div className="mx-auto h-28 w-28 rounded-full bg-brand-500/20 p-2">
         <div
           className={`grid h-full place-items-center rounded-full text-lg font-bold text-white ${
-            muted ? "bg-[#8696a0]" : "bg-[#00a884] animate-pulse"
+            muted ? "bg-slate-600" : "bg-brand-500 animate-pulse"
           }`}
         >
           {label === "You" ? "YOU" : "VIS"}

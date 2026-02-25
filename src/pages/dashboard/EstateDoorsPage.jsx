@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "../../layouts/AppShell";
+import { env } from "../../config/env";
 import {
   addEstateDoor,
   createEstateSharedQr,
@@ -79,7 +80,7 @@ export default function EstateDoorsPage() {
         if (data?.qr?.qrId) {
           setCreatedQr({
             qrId: data.qr.qrId,
-            scanUrl: `${window.location.origin}/scan/${data.qr.qrId}`,
+            scanUrl: toScanUrl(data.qr.qrId),
             doorName: data?.door?.name ?? form.name
           });
         }
@@ -96,7 +97,7 @@ export default function EstateDoorsPage() {
         if (data?.qr?.qrId) {
           setCreatedQr({
             qrId: data.qr.qrId,
-            scanUrl: `${window.location.origin}/scan/${data.qr.qrId}`,
+            scanUrl: toScanUrl(data.qr.qrId),
             doorName: data?.door?.name ?? form.name
           });
         }
@@ -126,7 +127,7 @@ export default function EstateDoorsPage() {
       const data = await createEstateSharedQr(form.estateId);
       setSharedQr({
         ...data,
-        fullScanUrl: `${window.location.origin}${data.scanUrl}`
+        fullScanUrl: toPublicUrl(data.scanUrl)
       });
       setNotice("Estate shared QR generated. Visitors can pick a door after scanning.");
       await load();
@@ -171,7 +172,7 @@ export default function EstateDoorsPage() {
   }
 
   function printDoorQr(door, qrId) {
-    const scanUrl = `${window.location.origin}/scan/${qrId}`;
+    const scanUrl = toScanUrl(qrId);
     const html = `
       <html>
         <head>
@@ -461,7 +462,7 @@ export default function EstateDoorsPage() {
                   )}
                   {firstQr ? (
                     <img
-                      src={qrImageUrl(`${window.location.origin}/scan/${firstQr}`, 64)}
+                      src={qrImageUrl(toScanUrl(firstQr), 64)}
                       alt={firstQr}
                       className="h-12 w-12 rounded border border-slate-200 bg-white p-1 dark:border-slate-700"
                     />
@@ -534,6 +535,20 @@ export default function EstateDoorsPage() {
       ) : null}
     </AppShell>
   );
+}
+
+function getPublicBaseUrl() {
+  return (env.publicAppUrl || window.location.origin || "").replace(/\/+$/, "");
+}
+
+function toScanUrl(qrId) {
+  return `${getPublicBaseUrl()}/scan/${qrId}`;
+}
+
+function toPublicUrl(path) {
+  if (!path) return getPublicBaseUrl();
+  if (/^https?:\/\//i.test(path)) return path;
+  return `${getPublicBaseUrl()}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
 function Select({ label, value, onChange, options }) {

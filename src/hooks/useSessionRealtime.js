@@ -6,6 +6,10 @@ import {
   clearSessionCallAccess,
   grantSessionCallAccess
 } from "../services/sessionCallAccess";
+import {
+  playIncomingCallNotificationSound,
+  playMessageNotificationSound
+} from "../utils/notificationSound";
 
 const rtcConfig = {
   iceServers: [
@@ -17,6 +21,7 @@ const rtcConfig = {
 
 const CALL_RETRY_DELAY_MS = 5000;
 const CALL_RETRY_LIMIT = 2;
+const LOW_BANDWIDTH_STORAGE_KEY = "qring_low_bandwidth_mode";
 
 export function useSessionRealtime(sessionId) {
   const token = localStorage.getItem("qring_access_token");
@@ -45,6 +50,10 @@ export function useSessionRealtime(sessionId) {
   const [incomingCall, setIncomingCall] = useState({
     pending: false,
     hasVideo: false
+  });
+  const [lowBandwidthMode, setLowBandwidthModeState] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem(LOW_BANDWIDTH_STORAGE_KEY) === "true";
   });
 
   const socketRef = useRef(null);
@@ -78,6 +87,7 @@ export function useSessionRealtime(sessionId) {
     if (!supportsUserMedia) return "Camera/microphone APIs are unavailable in this browser.";
     return "";
   }, [isSecureOrigin, supportsUserMedia, supportsWebRTC]);
+  const autoLowBandwidthActive = lowBandwidthMode || networkQuality === "slow";
 
   useEffect(() => {
     callStateRef.current = callState;
@@ -102,6 +112,14 @@ export function useSessionRealtime(sessionId) {
           ? isMineBySenderType(senderType)
           : payload?.displayName === displayName
     };
+  }
+
+  function setLowBandwidthMode(nextValue) {
+    const normalized = Boolean(nextValue);
+    setLowBandwidthModeState(normalized);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(LOW_BANDWIDTH_STORAGE_KEY, normalized ? "true" : "false");
+    }
   }
 
   function ensurePeer() {
@@ -204,9 +222,25 @@ export function useSessionRealtime(sessionId) {
       localStreamRef.current.getTracks().forEach((track) => track.stop());
       localStreamRef.current = null;
     }
+    const wantsVideo = Boolean(video);
+    const videoConstraints = wantsVideo
+      ? autoLowBandwidthActive
+        ? {
+            width: { ideal: 640, max: 960 },
+            height: { ideal: 360, max: 540 },
+            frameRate: { ideal: 15, max: 20 },
+            facingMode: "user"
+          }
+        : {
+            width: { ideal: 1280, max: 1920 },
+            height: { ideal: 720, max: 1080 },
+            frameRate: { ideal: 24, max: 30 },
+            facingMode: "user"
+          }
+      : false;
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: true,
-      video: Boolean(video)
+      video: videoConstraints
     });
     localStreamRef.current = stream;
     if (localVideoRef.current) {
@@ -220,7 +254,7 @@ export function useSessionRealtime(sessionId) {
       if (sender.track) pc.removeTrack(sender);
     });
     stream.getTracks().forEach((track) => pc.addTrack(track, stream));
-    setCameraOn(Boolean(video));
+    setCameraOn(Boolean(videoConstraints));
     setCallState("ready");
     return stream;
   }
@@ -279,6 +313,11 @@ export function useSessionRealtime(sessionId) {
       setStatus("Only homeowner can start calls. Wait for incoming call.");
       return;
     }
+    if (lowBandwidthMode) {
+      setStatus("Low bandwidth mode is enabled. Starting audio-only call.");
+      startCall({ video: false });
+      return;
+    }
     startCall({ video: true });
   }
 
@@ -288,7 +327,11 @@ export function useSessionRealtime(sessionId) {
     if (!pending?.sdp) return;
     try {
       setStatus("");
-      await attachLocalStream({ video: incomingCall.hasVideo });
+      const allowVideo = incomingCall.hasVideo && !lowBandwidthMode;
+      if (incomingCall.hasVideo && !allowVideo) {
+        setStatus("Low bandwidth mode enabled. Accepting call with audio-only.");
+      }
+      await attachLocalStream({ video: allowVideo });
       await applyRemoteDescriptionAndDrain(pending.sdp);
       const pc = ensurePeer();
       const answer = await pc.createAnswer();
@@ -434,7 +477,10 @@ export function useSessionRealtime(sessionId) {
       reconnectionDelay: 400,
       reconnectionDelayMax: 2000,
       timeout: 7000,
-      auth: token ? { token } : undefined,
+      auth: (cb) => {
+        const latestToken = localStorage.getItem("qring_access_token");
+        cb(latestToken ? { token: latestToken } : {});
+      },
       withCredentials: true
     });
     socketRef.current = socket;
@@ -482,6 +528,7 @@ export function useSessionRealtime(sessionId) {
 
     socket.on("webrtc.offer", async (payload) => {
       if (payload?.sessionId !== sessionId) return;
+      playIncomingCallNotificationSound();
       try {
         const wantsVideo =
           typeof payload?.sdp?.sdp === "string" && payload.sdp.sdp.includes("m=video");
@@ -493,7 +540,11 @@ export function useSessionRealtime(sessionId) {
           grantSessionCallAccess(sessionId, "incoming");
           return;
         }
-        await attachLocalStream({ video: wantsVideo });
+        const allowVideo = wantsVideo && !lowBandwidthMode;
+        if (wantsVideo && !allowVideo) {
+          setStatus("Low bandwidth mode enabled. Joining with audio-only.");
+        }
+        await attachLocalStream({ video: allowVideo });
         await applyRemoteDescriptionAndDrain(payload.sdp);
         const pc = ensurePeer();
         const answer = await pc.createAnswer();
@@ -542,6 +593,9 @@ export function useSessionRealtime(sessionId) {
       if (payload?.sessionId !== sessionId) return;
       markNetworkGood("Realtime messages synced.");
       const incoming = normalizeMessage(payload);
+      if (!incoming.mine) {
+        playMessageNotificationSound();
+      }
       setMessages((prev) => {
         const clientId = payload?.clientId;
         if (clientId && pendingLocalMessageIdsRef.current.has(clientId)) {
@@ -557,6 +611,26 @@ export function useSessionRealtime(sessionId) {
         }
         if (incoming.id && prev.some((item) => item.id && item.id === incoming.id)) {
           return prev;
+        }
+        if (incoming.mine) {
+          const incomingTs = new Date(incoming.at).getTime();
+          const optimisticIndex = prev.findIndex((item) => {
+            if (!String(item.id ?? "").startsWith("local-")) return false;
+            if ((item.text || "").trim() !== (incoming.text || "").trim()) return false;
+            const localTs = new Date(item.at).getTime();
+            if (Number.isNaN(localTs) || Number.isNaN(incomingTs)) return false;
+            return Math.abs(incomingTs - localTs) < 15000;
+          });
+          if (optimisticIndex >= 0) {
+            return prev.map((item, idx) =>
+              idx === optimisticIndex
+                ? {
+                    ...incoming,
+                    id: incoming.id || item.id
+                  }
+                : item
+            );
+          }
         }
         return [...prev, incoming];
       });
@@ -611,7 +685,7 @@ export function useSessionRealtime(sessionId) {
       endCall(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId, displayName, token, isHomeowner]);
+  }, [sessionId, displayName, token, isHomeowner, lowBandwidthMode]);
 
   return {
     connected,
@@ -632,6 +706,9 @@ export function useSessionRealtime(sessionId) {
     localStreamRef,
     remoteMuted,
     incomingCall,
+    lowBandwidthMode,
+    autoLowBandwidthActive,
+    setLowBandwidthMode,
     canStartCall: isHomeowner,
     sendMessage,
     toggleMute,

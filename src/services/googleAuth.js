@@ -1,5 +1,7 @@
 import {
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider,
 } from "firebase/auth";
 import { auth } from "../config/firebase";
@@ -11,6 +13,7 @@ const googleProvider = new GoogleAuthProvider();
 googleProvider.addScope("profile");
 googleProvider.addScope("email");
 const PENDING_GOOGLE_SIGNUP_KEY = "qring_pending_google_signup";
+const GOOGLE_REDIRECT_INTENT_KEY = "qring_google_redirect_intent";
 
 function savePendingGoogleSignup(payload) {
   sessionStorage.setItem(PENDING_GOOGLE_SIGNUP_KEY, JSON.stringify(payload));
@@ -34,14 +37,45 @@ export function getPendingGoogleSignup() {
   return readPendingGoogleSignup();
 }
 
+function isNativeCapacitor() {
+  try {
+    return Boolean(window?.Capacitor?.isNativePlatform?.());
+  } catch {
+    return false;
+  }
+}
+
+function setRedirectIntent(intent) {
+  sessionStorage.setItem(GOOGLE_REDIRECT_INTENT_KEY, intent);
+}
+
+function clearRedirectIntent() {
+  sessionStorage.removeItem(GOOGLE_REDIRECT_INTENT_KEY);
+}
+
+async function getGoogleUserFromAuth(intent = "signin") {
+  if (isNativeCapacitor()) {
+    const redirectResult = await getRedirectResult(auth);
+    if (redirectResult?.user) {
+      clearRedirectIntent();
+      return redirectResult.user;
+    }
+    setRedirectIntent(intent);
+    await signInWithRedirect(auth, googleProvider);
+    throw new Error("Redirecting to Google...");
+  }
+
+  const result = await signInWithPopup(auth, googleProvider);
+  return result.user;
+}
+
 /**
  * Sign in with Google
  * Returns Firebase user data and exchanges for backend token
  */
 export async function signInWithGoogle() {
   try {
-    const result = await signInWithPopup(auth, googleProvider);
-    const user = result.user;
+    const user = await getGoogleUserFromAuth("signin");
     const idToken = await user.getIdToken(true);
 
     // Exchange Firebase token for backend token
@@ -57,6 +91,9 @@ export async function signInWithGoogle() {
 
     return response;
   } catch (error) {
+    if (error?.message === "Redirecting to Google...") {
+      throw error;
+    }
     if (error.code === "auth/popup-closed-by-user") {
       throw new Error("Sign-in popup was closed");
     }
@@ -72,7 +109,7 @@ export async function signInWithGoogle() {
  */
 export async function beginGoogleSignup(referralCode = "") {
   try {
-    const user = (await signInWithPopup(auth, googleProvider)).user;
+    const user = await getGoogleUserFromAuth("signup");
     const idToken = await user.getIdToken(true);
     const pending = {
       idToken,
@@ -84,6 +121,9 @@ export async function beginGoogleSignup(referralCode = "") {
     savePendingGoogleSignup(pending);
     return pending;
   } catch (error) {
+    if (error?.message === "Redirecting to Google...") {
+      throw error;
+    }
     if (error.code === "auth/popup-closed-by-user") {
       throw new Error("Sign-up popup was closed");
     }

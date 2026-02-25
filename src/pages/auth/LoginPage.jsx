@@ -28,6 +28,7 @@ export default function LoginPage() {
   const [searchParams] = useSearchParams();
   const initialLogin = searchParams.get("email") ?? searchParams.get("username") ?? "";
   const [form, setForm] = useState({ email: initialLogin, password: "" });
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const navigate = useNavigate();
   const location = useLocation();
@@ -75,10 +76,11 @@ export default function LoginPage() {
             value={form.email}
             onChange={(value) => setForm((prev) => ({ ...prev, email: value }))}
           />
-          <Input
+          <PasswordInput
             label="Password"
-            type="password"
             value={form.password}
+            show={showPassword}
+            onToggle={() => setShowPassword((prev) => !prev)}
             onChange={(value) => setForm((prev) => ({ ...prev, password: value }))}
           />
           {error ? <p className="text-sm text-danger">{error}</p> : null}
@@ -139,6 +141,30 @@ function Input({ label, type, value, onChange }) {
         onChange={(event) => onChange(event.target.value)}
         className="w-full rounded-xl border border-slate-300 bg-white px-3 py-3 outline-none ring-brand-500 focus:ring-2 dark:border-slate-700 dark:bg-slate-900"
       />
+    </label>
+  );
+}
+
+function PasswordInput({ label, value, onChange, show, onToggle }) {
+  return (
+    <label className="block text-sm">
+      <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">{label}</span>
+      <div className="relative">
+        <input
+          required
+          type={show ? "text" : "password"}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className="w-full rounded-xl border border-slate-300 bg-white px-3 py-3 pr-16 outline-none ring-brand-500 focus:ring-2 dark:border-slate-700 dark:bg-slate-900"
+        />
+        <button
+          type="button"
+          onClick={onToggle}
+          className="absolute inset-y-0 right-2 my-1 rounded-lg px-3 text-xs font-semibold text-slate-600 dark:text-slate-300"
+        >
+          {show ? "Hide" : "Show"}
+        </button>
+      </div>
     </label>
   );
 }

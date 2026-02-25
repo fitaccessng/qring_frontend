@@ -5,12 +5,21 @@ let socket;
 
 export function getDashboardSocket() {
   if (!socket) {
-    const token = localStorage.getItem("qring_access_token");
     socket = io(`${env.socketUrl}${env.dashboardNamespace}`, {
       path: env.socketPath,
-      transports: ["websocket"],
-      auth: token ? { token } : undefined,
-      withCredentials: true
+      transports: ["websocket", "polling"],
+      rememberUpgrade: true,
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 400,
+      reconnectionDelayMax: 2000,
+      timeout: 7000,
+      auth: (cb) => {
+        const token = localStorage.getItem("qring_access_token");
+        cb(token ? { token } : {});
+      },
+      withCredentials: true,
+      autoConnect: true
     });
   }
   return socket;
