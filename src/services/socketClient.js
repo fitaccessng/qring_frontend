@@ -7,8 +7,7 @@ export function getDashboardSocket() {
   if (!socket) {
     socket = io(`${env.socketUrl}${env.dashboardNamespace}`, {
       path: env.socketPath,
-      transports: ["websocket", "polling"],
-      rememberUpgrade: true,
+      transports: ["polling", "websocket"],
       reconnection: true,
       reconnectionAttempts: 10,
       reconnectionDelay: 400,

@@ -114,6 +114,17 @@ export function useSessionRealtime(sessionId) {
     };
   }
 
+  function isLikelyDuplicateMessage(current, next) {
+    if (!current || !next) return false;
+    if (current.id && next.id && current.id === next.id) return true;
+    if ((current.text || "").trim() !== (next.text || "").trim()) return false;
+    if ((current.senderType || "") !== (next.senderType || "")) return false;
+    const currentTs = Date.parse(current.at || "");
+    const nextTs = Date.parse(next.at || "");
+    if (Number.isNaN(currentTs) || Number.isNaN(nextTs)) return false;
+    return Math.abs(currentTs - nextTs) < 12000;
+  }
+
   function setLowBandwidthMode(nextValue) {
     const normalized = Boolean(nextValue);
     setLowBandwidthModeState(normalized);
@@ -470,8 +481,7 @@ export function useSessionRealtime(sessionId) {
   useEffect(() => {
     const socket = io(`${env.socketUrl}${env.signalingNamespace ?? "/realtime/signaling"}`, {
       path: env.socketPath,
-      transports: ["websocket", "polling"],
-      rememberUpgrade: true,
+      transports: ["polling", "websocket"],
       reconnection: true,
       reconnectionAttempts: 10,
       reconnectionDelay: 400,
@@ -612,12 +622,15 @@ export function useSessionRealtime(sessionId) {
         if (incoming.id && prev.some((item) => item.id && item.id === incoming.id)) {
           return prev;
         }
+        if (prev.some((item) => isLikelyDuplicateMessage(item, incoming))) {
+          return prev;
+        }
         if (incoming.mine) {
-          const incomingTs = new Date(incoming.at).getTime();
+          const incomingTs = Date.parse(incoming.at || "");
           const optimisticIndex = prev.findIndex((item) => {
             if (!String(item.id ?? "").startsWith("local-")) return false;
             if ((item.text || "").trim() !== (incoming.text || "").trim()) return false;
-            const localTs = new Date(item.at).getTime();
+            const localTs = Date.parse(item.at || "");
             if (Number.isNaN(localTs) || Number.isNaN(incomingTs)) return false;
             return Math.abs(incomingTs - localTs) < 15000;
           });

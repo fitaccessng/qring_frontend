@@ -16,7 +16,7 @@ const defaultSocketUrl =
 const defaultPublicAppUrl =
   typeof window !== "undefined"
     ? window.location.origin
-    : "https://qring.io";
+    : "https://www.useqring.online";
 
 function resolveApiBaseUrl(rawValue) {
   const value = (rawValue ?? "").trim();

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import SessionNetworkBadge from "../../components/SessionNetworkBadge";
 import SessionModeNav from "../../components/SessionModeNav";
 import VisitorIncomingCallModal from "../../components/VisitorIncomingCallModal";
@@ -7,6 +7,7 @@ import { useSessionRealtime } from "../../hooks/useSessionRealtime";
 
 export default function SessionMessagePage() {
   const { sessionId } = useParams();
+  const navigate = useNavigate();
   const [text, setText] = useState("");
   const {
     connected,
@@ -28,6 +29,20 @@ export default function SessionMessagePage() {
     event.preventDefault();
     if (!sendMessage(text)) return;
     setText("");
+  }
+
+  async function handleAcceptIncomingCall() {
+    try {
+      await acceptIncomingCall();
+      navigate(`/session/${sessionId}/${incomingCall.hasVideo ? "video" : "audio"}`);
+    } catch {
+      // keep user on message page if accept fails
+    }
+  }
+
+  function handleRejectIncomingCall() {
+    rejectIncomingCall();
+    navigate(`/session/${sessionId}/message`, { replace: true });
   }
 
   return (
@@ -88,8 +103,8 @@ export default function SessionMessagePage() {
       <VisitorIncomingCallModal
         open={incomingCall.pending && !canStartCall}
         hasVideo={incomingCall.hasVideo}
-        onAccept={acceptIncomingCall}
-        onReject={rejectIncomingCall}
+        onAccept={handleAcceptIncomingCall}
+        onReject={handleRejectIncomingCall}
       />
     </div>
   );

@@ -125,7 +125,12 @@ export default function HomeownerMessagesPage() {
     if (!selectedId) return;
     const socket = io(`${env.socketUrl}${env.signalingNamespace ?? "/realtime/signaling"}`, {
       path: env.socketPath,
-      transports: ["websocket", "polling"],
+      transports: ["polling", "websocket"],
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 400,
+      reconnectionDelayMax: 2000,
+      timeout: 7000,
       auth: (cb) => {
         const latestToken = localStorage.getItem("qring_access_token");
         cb(latestToken ? { token: latestToken } : {});
