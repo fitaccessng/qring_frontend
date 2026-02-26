@@ -84,17 +84,19 @@ export default function HomeownerMessagesPage() {
     const id = setInterval(async () => {
       try {
         const data = await getHomeownerMessages();
-        setThreads((prev) => {
-          if (!prev.length) return data;
-          const unreadById = Object.fromEntries(prev.map((item) => [item.id, item.unread || 0]));
-          return data.map((item) => ({ ...item, unread: unreadById[item.id] ?? item.unread ?? 0 }));
-        });
+        setThreads(
+          data.map((item) => (
+            item.id === selectedId
+              ? { ...item, unread: 0 }
+              : item
+          ))
+        );
       } catch {
         // silent background refresh failure
       }
     }, 8000);
     return () => clearInterval(id);
-  }, []);
+  }, [selectedId]);
 
   useEffect(() => {
     if (!selectedId) return;
