@@ -13,6 +13,7 @@ const defaultSocketUrl =
   typeof window !== "undefined" && isDev
     ? window.location.origin
     : productionBackendOrigin;
+const defaultLivekitUrl = "";
 const defaultPublicAppUrl =
   typeof window !== "undefined"
     ? window.location.origin
@@ -49,6 +50,14 @@ function resolvePublicAppUrl(rawValue) {
     return trimTrailingSlash(`${window.location.origin}${value}`);
   }
   return trimTrailingSlash(defaultPublicAppUrl);
+}
+
+function resolveLivekitUrl(rawValue) {
+  const value = (rawValue ?? "").trim();
+  if (!value) return defaultLivekitUrl;
+  if (/^wss?:\/\//i.test(value) || /^https?:\/\//i.test(value)) return trimTrailingSlash(value);
+  if (looksLikeDomain(value)) return trimTrailingSlash(`wss://${value}`);
+  return defaultLivekitUrl;
 }
 
 function parseIceServers(rawValue) {
@@ -100,5 +109,6 @@ export const env = {
     import.meta.env.VITE_DASHBOARD_NAMESPACE ?? "/realtime/dashboard",
   signalingNamespace:
     import.meta.env.VITE_SIGNALING_NAMESPACE ?? "/realtime/signaling",
-  webRtcIceServers: parseIceServers(import.meta.env.VITE_WEBRTC_ICE_SERVERS)
+  webRtcIceServers: parseIceServers(import.meta.env.VITE_WEBRTC_ICE_SERVERS),
+  livekitUrl: resolveLivekitUrl(import.meta.env.VITE_LIVEKIT_URL)
 };
