@@ -19,6 +19,52 @@ const rtcConfig = {
 const CALL_RETRY_DELAY_MS = 5000;
 const CALL_RETRY_LIMIT = 2;
 const LOW_BANDWIDTH_STORAGE_KEY = "qring_low_bandwidth_mode";
+const SOCKET_RELEASE_GRACE_MS = 2 * 60 * 1000;
+const signalingSocketPool = new Map();
+
+function acquireSignalingSocket(sessionId) {
+  const key = String(sessionId || "");
+  let entry = signalingSocketPool.get(key);
+  if (!entry) {
+    const socket = io(`${env.socketUrl}${env.signalingNamespace ?? "/realtime/signaling"}`, {
+      path: env.socketPath,
+      transports: ["websocket"],
+      upgrade: false,
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 400,
+      reconnectionDelayMax: 2000,
+      timeout: 7000,
+      auth: (cb) => {
+        const latestToken = localStorage.getItem("qring_access_token");
+        cb(latestToken ? { token: latestToken } : {});
+      },
+      withCredentials: true
+    });
+    entry = { socket, refs: 0, releaseTimer: null };
+    signalingSocketPool.set(key, entry);
+  }
+  if (entry.releaseTimer) {
+    clearTimeout(entry.releaseTimer);
+    entry.releaseTimer = null;
+  }
+  entry.refs += 1;
+  return entry.socket;
+}
+
+function releaseSignalingSocket(sessionId) {
+  const key = String(sessionId || "");
+  const entry = signalingSocketPool.get(key);
+  if (!entry) return;
+  entry.refs = Math.max(0, entry.refs - 1);
+  if (entry.refs > 0) return;
+  entry.releaseTimer = setTimeout(() => {
+    const latest = signalingSocketPool.get(key);
+    if (!latest || latest.refs > 0) return;
+    latest.socket.disconnect();
+    signalingSocketPool.delete(key);
+  }, SOCKET_RELEASE_GRACE_MS);
+}
 
 export function useSessionRealtime(sessionId) {
   const token = localStorage.getItem("qring_access_token");
@@ -48,6 +94,7 @@ export function useSessionRealtime(sessionId) {
     pending: false,
     hasVideo: false
   });
+  const [acceptedCallMode, setAcceptedCallMode] = useState("");
   const [lowBandwidthMode, setLowBandwidthModeState] = useState(() => {
     if (typeof window === "undefined") return false;
     return localStorage.getItem(LOW_BANDWIDTH_STORAGE_KEY) === "true";
@@ -362,7 +409,12 @@ export function useSessionRealtime(sessionId) {
       if (incomingCall.hasVideo && !allowVideo) {
         setStatus("Low bandwidth mode enabled. Accepting call with audio-only.");
       }
-      await attachLocalStream({ video: allowVideo });
+      try {
+        await attachLocalStream({ video: allowVideo });
+      } catch (mediaError) {
+        setStatus(mediaError?.message || "Media permission unavailable. Joining to receive remote stream.");
+        ensurePeer();
+      }
       await applyRemoteDescriptionAndDrain(pending.sdp);
       const pc = ensurePeer();
       const answer = await pc.createAnswer();
@@ -373,6 +425,7 @@ export function useSessionRealtime(sessionId) {
       setCallLaunchStartedAt(null);
       clearOfferRetryTimer();
       grantSessionCallAccess(sessionId, "connected");
+      setAcceptedCallMode(allowVideo ? "video" : "audio");
       setIncomingCall({ pending: false, hasVideo: false });
       pendingOfferRef.current = null;
     } catch (error) {
@@ -391,6 +444,7 @@ export function useSessionRealtime(sessionId) {
     setCallLaunchStage("idle");
     setCallLaunchStartedAt(null);
     clearOfferRetryTimer();
+    setAcceptedCallMode("");
     setIncomingCall({ pending: false, hasVideo: false });
     pendingOfferRef.current = null;
     clearSessionCallAccess(sessionId);
@@ -483,6 +537,7 @@ export function useSessionRealtime(sessionId) {
     setCameraOn(false);
     setMuted(false);
     setRemoteMuted(false);
+    setAcceptedCallMode("");
     setIncomingCall({ pending: false, hasVideo: false });
     pendingOfferRef.current = null;
     clearOfferRetryTimer();
@@ -510,21 +565,7 @@ export function useSessionRealtime(sessionId) {
   }, [sessionId]);
 
   useEffect(() => {
-    const socket = io(`${env.socketUrl}${env.signalingNamespace ?? "/realtime/signaling"}`, {
-      path: env.socketPath,
-      transports: ["websocket"],
-      upgrade: false,
-      reconnection: true,
-      reconnectionAttempts: 10,
-      reconnectionDelay: 400,
-      reconnectionDelayMax: 2000,
-      timeout: 7000,
-      auth: (cb) => {
-        const latestToken = localStorage.getItem("qring_access_token");
-        cb(latestToken ? { token: latestToken } : {});
-      },
-      withCredentials: true
-    });
+    const socket = acquireSignalingSocket(sessionId);
     socketRef.current = socket;
 
     socket.on("connect", () => {
@@ -573,7 +614,13 @@ export function useSessionRealtime(sessionId) {
         }
       }
     });
-    socket.on("session.participant_left", () => setStatus("Participant left"));
+    socket.on("session.participant_left", () => {
+      if (callStateRef.current === "connected") {
+        setStatus("Participant connection changed. Waiting for reconnect...");
+        return;
+      }
+      setStatus("Participant left");
+    });
 
     socket.on("webrtc.offer", async (payload) => {
       if (payload?.sessionId !== sessionId) return;
@@ -780,10 +827,20 @@ export function useSessionRealtime(sessionId) {
       manager.off("reconnect", onReconnect);
       manager.off("reconnect_error", onReconnectError);
       manager.off("reconnect_failed", onReconnectFailed);
+      socket.off("connect");
+      socket.off("disconnect");
+      socket.off("connect_error");
+      socket.off("session.joined");
+      socket.off("session.participant_joined");
+      socket.off("session.participant_left");
+      socket.off("webrtc.offer");
+      socket.off("webrtc.answer");
+      socket.off("webrtc.ice");
+      socket.off("chat.message");
+      socket.off("session.control");
       socket.off("chat.persisted");
       socket.off("chat.persist_failed");
-      socket.disconnect();
-      endCall(false);
+      releaseSignalingSocket(sessionId);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, displayName, token, isHomeowner, lowBandwidthMode]);
@@ -807,6 +864,7 @@ export function useSessionRealtime(sessionId) {
     localStreamRef,
     remoteMuted,
     incomingCall,
+    acceptedCallMode,
     lowBandwidthMode,
     autoLowBandwidthActive,
     setLowBandwidthMode,

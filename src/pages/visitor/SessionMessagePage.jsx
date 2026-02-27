@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import SessionNetworkBadge from "../../components/SessionNetworkBadge";
 import SessionModeNav from "../../components/SessionModeNav";
@@ -19,6 +19,7 @@ export default function SessionMessagePage() {
     networkDetail,
     featureError,
     incomingCall,
+    acceptedCallMode,
     canStartCall,
     sendMessage,
     retryFailedMessage,
@@ -45,6 +46,11 @@ export default function SessionMessagePage() {
     rejectIncomingCall();
     navigate(`/session/${sessionId}/message`, { replace: true });
   }
+
+  useEffect(() => {
+    if (!acceptedCallMode) return;
+    navigate(`/session/${sessionId}/${acceptedCallMode}`);
+  }, [acceptedCallMode, navigate, sessionId]);
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_#f8fafc_0,_#eef2ff_42%,_#e0f2fe_78%,_#dbeafe_100%)] p-4 text-slate-900">
