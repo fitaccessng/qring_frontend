@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import SessionNetworkBadge from "../../components/SessionNetworkBadge";
+import SessionDiagnosticsPanel from "../../components/SessionDiagnosticsPanel";
 import VisitorIncomingCallModal from "../../components/VisitorIncomingCallModal";
 import { useSessionRealtime } from "../../hooks/useSessionRealtime";
 
@@ -18,6 +19,7 @@ export default function SessionAudioPage() {
     status,
     networkQuality,
     networkDetail,
+    callDiagnostics,
     featureError,
     callLaunchStage,
     callLaunchStartedAt,
@@ -93,6 +95,7 @@ export default function SessionAudioPage() {
             detail={networkDetail}
             detailClassName="text-slate-300"
           />
+          <SessionDiagnosticsPanel diagnostics={callDiagnostics} networkQuality={networkQuality} />
           {status ? <p className="mt-2 text-sm text-amber-300">{status}</p> : null}
           {showingCallProgress ? (
             <section className="mt-3 rounded-2xl border border-[#00a884]/35 bg-[#0f2428] p-4">

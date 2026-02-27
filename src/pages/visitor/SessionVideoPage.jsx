@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import SessionNetworkBadge from "../../components/SessionNetworkBadge";
+import SessionDiagnosticsPanel from "../../components/SessionDiagnosticsPanel";
 import VisitorIncomingCallModal from "../../components/VisitorIncomingCallModal";
 import { useSessionRealtime } from "../../hooks/useSessionRealtime";
 
@@ -17,6 +18,7 @@ export default function SessionVideoPage() {
     status,
     networkQuality,
     networkDetail,
+    callDiagnostics,
     featureError,
     callLaunchStage,
     callLaunchStartedAt,
@@ -101,6 +103,7 @@ export default function SessionVideoPage() {
             detail={networkDetail}
             detailClassName="text-slate-300"
           />
+          <SessionDiagnosticsPanel diagnostics={callDiagnostics} networkQuality={networkQuality} />
 
           {featureError ? <p className="mt-2 text-sm text-rose-700">{featureError}</p> : null}
           {status ? <p className="mt-2 text-sm text-amber-700">{status}</p> : null}
