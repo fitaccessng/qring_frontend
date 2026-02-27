@@ -29,10 +29,12 @@ export default function SessionVideoPage() {
     canStartCall,
     lowBandwidthMode,
     autoLowBandwidthActive,
+    isMobileWebView,
     setLowBandwidthMode,
     toggleMute,
     endCall,
     startVideoCall,
+    retryCallConnection,
     acceptIncomingCall,
     rejectIncomingCall
   } = useSessionRealtime(sessionId);
@@ -156,9 +158,14 @@ export default function SessionVideoPage() {
                 Bandwidth saver active.
               </p>
             ) : null}
+            {isMobileWebView ? (
+              <p className="mt-2 text-[11px] text-slate-300">
+                Mobile WebView mode: video starts with safer constraints and uses relay fallback when needed.
+              </p>
+            ) : null}
           </div>
 
-          <div className="mt-4 grid grid-cols-3 gap-3 rounded-2xl border border-white/10 bg-slate-950/50 p-3">
+          <div className="mt-4 grid grid-cols-4 gap-3 rounded-2xl border border-white/10 bg-slate-950/50 p-3">
             <button
               type="button"
               onClick={startVideoCall}
@@ -181,6 +188,14 @@ export default function SessionVideoPage() {
               className="rounded-xl bg-rose-600 px-3 py-3 text-xs font-semibold text-white transition hover:bg-rose-500"
             >
               End
+            </button>
+            <button
+              type="button"
+              onClick={retryCallConnection}
+              disabled={!canStartCall}
+              className="rounded-xl bg-cyan-600 px-3 py-3 text-xs font-semibold text-white transition hover:bg-cyan-500 disabled:opacity-50"
+            >
+              Retry
             </button>
           </div>
         </section>

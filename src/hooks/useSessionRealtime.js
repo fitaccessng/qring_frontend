@@ -21,6 +21,36 @@ const CALL_RETRY_LIMIT = 2;
 const LOW_BANDWIDTH_STORAGE_KEY = "qring_low_bandwidth_mode";
 const SOCKET_RELEASE_GRACE_MS = 2 * 60 * 1000;
 const signalingSocketPool = new Map();
+const DIAGNOSTICS_POLL_MS = 3000;
+const CONNECTION_RECOVERY_LIMIT = 2;
+
+function isLikelyMobileWebView() {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  return /Android|iPhone|iPad|iPod|wv|Version\/[\d.]+ Mobile/i.test(ua);
+}
+
+function shouldForceSecureSocket(url) {
+  if (!url) return false;
+  if (/^https:\/\//i.test(url) || /^wss:\/\//i.test(url)) return false;
+  if (!/^http:\/\//i.test(url) && !/^ws:\/\//i.test(url)) return false;
+  if (/localhost|127\.0\.0\.1|192\.168\.|10\./i.test(url)) return false;
+  return true;
+}
+
+function emptyDiagnostics() {
+  return {
+    connectionState: "new",
+    iceConnectionState: "new",
+    signalingState: "stable",
+    localCandidateType: "-",
+    remoteCandidateType: "-",
+    roundTripTimeMs: null,
+    packetLoss: null,
+    jitterMs: null,
+    updatedAt: null
+  };
+}
 
 function acquireSignalingSocket(sessionId) {
   const key = String(sessionId || "");
@@ -77,6 +107,7 @@ export function useSessionRealtime(sessionId) {
   }, []);
   const displayName = user?.fullName || "Visitor";
   const isHomeowner = user?.role === "homeowner";
+  const isMobileWebView = isLikelyMobileWebView();
 
   const [connected, setConnected] = useState(false);
   const [joined, setJoined] = useState(false);
@@ -95,6 +126,7 @@ export function useSessionRealtime(sessionId) {
     hasVideo: false
   });
   const [acceptedCallMode, setAcceptedCallMode] = useState("");
+  const [callDiagnostics, setCallDiagnostics] = useState(() => emptyDiagnostics());
   const [lowBandwidthMode, setLowBandwidthModeState] = useState(() => {
     if (typeof window === "undefined") return false;
     return localStorage.getItem(LOW_BANDWIDTH_STORAGE_KEY) === "true";
@@ -116,6 +148,10 @@ export function useSessionRealtime(sessionId) {
   const pendingLocalMessageIdsRef = useRef(new Set());
   const connectedOnceRef = useRef(false);
   const pendingStartCallRef = useRef(null);
+  const diagnosticsTimerRef = useRef(null);
+  const forceRelayRef = useRef(false);
+  const pendingVideoUpgradeRef = useRef(false);
+  const connectionRecoveryCountRef = useRef(0);
 
   const supportsWebRTC =
     typeof window !== "undefined" && typeof window.RTCPeerConnection !== "undefined";
@@ -128,6 +164,9 @@ export function useSessionRealtime(sessionId) {
     if (!supportsWebRTC) return "This browser does not support WebRTC calls.";
     if (!isSecureOrigin) {
       return "Camera and microphone require HTTPS on network devices. Open the app with HTTPS or localhost.";
+    }
+    if (shouldForceSecureSocket(env.socketUrl)) {
+      return "Insecure signaling URL detected. Use HTTPS/WSS backend for reliable calls.";
     }
     if (!supportsUserMedia) return "Camera/microphone APIs are unavailable in this browser.";
     return "";
@@ -186,7 +225,12 @@ export function useSessionRealtime(sessionId) {
 
   function ensurePeer() {
     if (peerRef.current) return peerRef.current;
-    const pc = new RTCPeerConnection(rtcConfig);
+    const peerConfig = {
+      ...rtcConfig,
+      iceTransportPolicy:
+        forceRelayRef.current || (isMobileWebView && autoLowBandwidthActive) ? "relay" : "all"
+    };
+    const pc = new RTCPeerConnection(peerConfig);
     pc.ontrack = (event) => {
       const stream = event.streams?.[0];
       if (!stream) return;
@@ -210,23 +254,146 @@ export function useSessionRealtime(sessionId) {
     };
     pc.onconnectionstatechange = () => {
       const state = pc.connectionState;
+      refreshPeerDiagnostics();
       if (state === "connected") {
+        connectionRecoveryCountRef.current = 0;
         setCallState("connected");
         setCallLaunchStage("idle");
         setCallLaunchStartedAt(null);
         if (!isHomeowner) {
           grantSessionCallAccess(sessionId, "connected");
         }
+        if (pendingVideoUpgradeRef.current) {
+          pendingVideoUpgradeRef.current = false;
+          setStatus("Call connected. Upgrading to video...");
+          upgradeCallToVideo().catch((error) => {
+            setStatus(error?.message || "Video upgrade failed. Staying on audio.");
+          });
+        }
       }
       if (state === "failed" || state === "disconnected" || state === "closed") {
+        const canRecover =
+          isHomeowner &&
+          state !== "closed" &&
+          connectionRecoveryCountRef.current < CONNECTION_RECOVERY_LIMIT;
+        if (canRecover) {
+          connectionRecoveryCountRef.current += 1;
+          forceRelayRef.current = true;
+          setCallState("reconnecting");
+          setCallLaunchStage("signaling");
+          setStatus(
+            `Connection unstable. Retrying with relay/audio-only (${connectionRecoveryCountRef.current}/${CONNECTION_RECOVERY_LIMIT})...`
+          );
+          startCall({ video: false, restart: true, forceRelay: true }).catch(() => {
+            // surfaced by startCall status
+          });
+          return;
+        }
         setCallState("ended");
         setCallLaunchStage("idle");
         setCallLaunchStartedAt(null);
         clearSessionCallAccess(sessionId);
       }
     };
+    pc.oniceconnectionstatechange = () => {
+      refreshPeerDiagnostics();
+    };
+    pc.onsignalingstatechange = () => {
+      refreshPeerDiagnostics();
+    };
     peerRef.current = pc;
+    startDiagnosticsPolling();
     return pc;
+  }
+
+  function stopDiagnosticsPolling() {
+    if (diagnosticsTimerRef.current) {
+      clearInterval(diagnosticsTimerRef.current);
+      diagnosticsTimerRef.current = null;
+    }
+  }
+
+  function startDiagnosticsPolling() {
+    stopDiagnosticsPolling();
+    refreshPeerDiagnostics();
+    diagnosticsTimerRef.current = setInterval(() => {
+      refreshPeerDiagnostics();
+    }, DIAGNOSTICS_POLL_MS);
+  }
+
+  async function refreshPeerDiagnostics() {
+    const pc = peerRef.current;
+    if (!pc) {
+      setCallDiagnostics(emptyDiagnostics());
+      return;
+    }
+    try {
+      const stats = await pc.getStats();
+      const pairs = new Map();
+      let selectedPair = null;
+      let jitterMs = null;
+      let packetLoss = 0;
+      let hasPacketLoss = false;
+
+      stats.forEach((item) => {
+        if (item.type === "candidate-pair") {
+          pairs.set(item.id, item);
+        }
+      });
+
+      stats.forEach((item) => {
+        if (item.type === "transport" && item.selectedCandidatePairId && pairs.has(item.selectedCandidatePairId)) {
+          selectedPair = pairs.get(item.selectedCandidatePairId);
+        }
+      });
+
+      if (!selectedPair) {
+        for (const pair of pairs.values()) {
+          if (pair.nominated || pair.selected || pair.state === "succeeded") {
+            selectedPair = pair;
+            break;
+          }
+        }
+      }
+
+      stats.forEach((item) => {
+        if (item.type === "inbound-rtp" && !item.isRemote) {
+          if (typeof item.jitter === "number" && jitterMs === null) {
+            jitterMs = item.jitter * 1000;
+          }
+          if (typeof item.packetsLost === "number") {
+            packetLoss += item.packetsLost;
+            hasPacketLoss = true;
+          }
+        }
+      });
+
+      const localCandidate = selectedPair?.localCandidateId ? stats.get(selectedPair.localCandidateId) : null;
+      const remoteCandidate = selectedPair?.remoteCandidateId ? stats.get(selectedPair.remoteCandidateId) : null;
+
+      setCallDiagnostics({
+        connectionState: pc.connectionState || "new",
+        iceConnectionState: pc.iceConnectionState || "new",
+        signalingState: pc.signalingState || "stable",
+        localCandidateType: localCandidate?.candidateType || "-",
+        remoteCandidateType: remoteCandidate?.candidateType || "-",
+        roundTripTimeMs:
+          typeof selectedPair?.currentRoundTripTime === "number"
+            ? Math.round(selectedPair.currentRoundTripTime * 1000)
+            : null,
+        packetLoss: hasPacketLoss ? packetLoss : null,
+        jitterMs: jitterMs !== null ? Math.round(jitterMs) : null,
+        updatedAt: new Date().toISOString()
+      });
+    } catch {
+      setCallDiagnostics((prev) => ({
+        ...prev,
+        connectionState: pc.connectionState || prev.connectionState,
+        iceConnectionState: pc.iceConnectionState || prev.iceConnectionState,
+        signalingState: pc.signalingState || prev.signalingState,
+        updatedAt: new Date().toISOString()
+      }));
+    }
   }
 
   function markNetworkGood(detail = "Realtime connection is stable.") {
@@ -288,17 +455,24 @@ export function useSessionRealtime(sessionId) {
     const videoConstraints = wantsVideo
       ? autoLowBandwidthActive
         ? {
-            width: { ideal: 640, max: 960 },
-            height: { ideal: 360, max: 540 },
-            frameRate: { ideal: 15, max: 20 },
+            width: { ideal: 480, max: 640 },
+            height: { ideal: 270, max: 360 },
+            frameRate: { ideal: 12, max: 15 },
             facingMode: "user"
           }
-        : {
-            width: { ideal: 1280, max: 1920 },
-            height: { ideal: 720, max: 1080 },
-            frameRate: { ideal: 24, max: 30 },
-            facingMode: "user"
-          }
+        : isMobileWebView
+          ? {
+              width: { ideal: 640, max: 960 },
+              height: { ideal: 360, max: 540 },
+              frameRate: { ideal: 15, max: 20 },
+              facingMode: "user"
+            }
+          : {
+              width: { ideal: 1280, max: 1920 },
+              height: { ideal: 720, max: 1080 },
+              frameRate: { ideal: 24, max: 30 },
+              facingMode: "user"
+            }
       : false;
     let stream;
     try {
@@ -334,11 +508,15 @@ export function useSessionRealtime(sessionId) {
     return stream;
   }
 
-  async function startCall({ video }) {
+  async function startCall({ video, restart = false, forceRelay = false, requestVideoUpgrade = false }) {
     try {
       setStatus("");
-      setCallLaunchStage("preparing");
-      setCallLaunchStartedAt(Date.now());
+      if (!restart) {
+        setCallLaunchStage("preparing");
+        setCallLaunchStartedAt(Date.now());
+      }
+      forceRelayRef.current = Boolean(forceRelay);
+      pendingVideoUpgradeRef.current = Boolean(requestVideoUpgrade);
       offerRetryCountRef.current = 0;
       clearOfferRetryTimer();
       if (featureError) {
@@ -378,12 +556,24 @@ export function useSessionRealtime(sessionId) {
     }
   }
 
+  async function upgradeCallToVideo() {
+    if (!joined || !socketRef.current) return;
+    await attachLocalStream({ video: true });
+    const pc = ensurePeer();
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    socketRef.current.emit("webrtc.offer", {
+      sessionId,
+      sdp: offer
+    });
+  }
+
   function startAudioCall() {
     if (!isHomeowner) {
       setStatus("Only homeowner can start calls. Wait for incoming call.");
       return;
     }
-    startCall({ video: false });
+    startCall({ video: false, forceRelay: autoLowBandwidthActive });
   }
 
   function startVideoCall() {
@@ -393,10 +583,31 @@ export function useSessionRealtime(sessionId) {
     }
     if (lowBandwidthMode) {
       setStatus("Low bandwidth mode is enabled. Starting audio-only call.");
-      startCall({ video: false });
+      startCall({ video: false, forceRelay: true });
       return;
     }
-    startCall({ video: true });
+    if (isMobileWebView) {
+      setStatus("Starting audio first for mobile stability, then upgrading to video.");
+      startCall({
+        video: false,
+        forceRelay: autoLowBandwidthActive,
+        requestVideoUpgrade: true
+      });
+      return;
+    }
+    startCall({ video: true, forceRelay: autoLowBandwidthActive });
+  }
+
+  function retryCallConnection() {
+    if (!isHomeowner) {
+      setStatus("Reconnect from homeowner side or re-open session.");
+      return;
+    }
+    forceRelayRef.current = true;
+    setStatus("Retrying call with relay and audio-only fallback...");
+    startCall({ video: false, restart: true, forceRelay: true }).catch(() => {
+      // status is handled in startCall
+    });
   }
 
   async function acceptIncomingCall() {
@@ -405,6 +616,7 @@ export function useSessionRealtime(sessionId) {
     if (!pending?.sdp) return;
     try {
       setStatus("");
+      forceRelayRef.current = isMobileWebView && (lowBandwidthMode || networkQuality === "slow");
       const allowVideo = incomingCall.hasVideo && !lowBandwidthMode;
       if (incomingCall.hasVideo && !allowVideo) {
         setStatus("Low bandwidth mode enabled. Accepting call with audio-only.");
@@ -524,6 +736,8 @@ export function useSessionRealtime(sessionId) {
       peerRef.current.close();
       peerRef.current = null;
     }
+    stopDiagnosticsPolling();
+    setCallDiagnostics(emptyDiagnostics());
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((track) => track.stop());
       localStreamRef.current = null;
@@ -538,6 +752,9 @@ export function useSessionRealtime(sessionId) {
     setMuted(false);
     setRemoteMuted(false);
     setAcceptedCallMode("");
+    forceRelayRef.current = false;
+    pendingVideoUpgradeRef.current = false;
+    connectionRecoveryCountRef.current = 0;
     setIncomingCall({ pending: false, hasVideo: false });
     pendingOfferRef.current = null;
     clearOfferRetryTimer();
@@ -822,6 +1039,7 @@ export function useSessionRealtime(sessionId) {
 
     return () => {
       clearOfferRetryTimer();
+      stopDiagnosticsPolling();
       pendingStartCallRef.current = null;
       manager.off("reconnect_attempt", onReconnectAttempt);
       manager.off("reconnect", onReconnect);
@@ -863,10 +1081,12 @@ export function useSessionRealtime(sessionId) {
     remoteAudioRef,
     localStreamRef,
     remoteMuted,
+    callDiagnostics,
     incomingCall,
     acceptedCallMode,
     lowBandwidthMode,
     autoLowBandwidthActive,
+    isMobileWebView,
     setLowBandwidthMode,
     canStartCall: isHomeowner,
     sendMessage,
@@ -875,6 +1095,7 @@ export function useSessionRealtime(sessionId) {
     endCall,
     startAudioCall,
     startVideoCall,
+    retryCallConnection,
     acceptIncomingCall,
     rejectIncomingCall
   };

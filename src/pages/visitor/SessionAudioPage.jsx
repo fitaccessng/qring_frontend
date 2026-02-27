@@ -27,10 +27,12 @@ export default function SessionAudioPage() {
     canStartCall,
     lowBandwidthMode,
     autoLowBandwidthActive,
+    isMobileWebView,
     setLowBandwidthMode,
     toggleMute,
     endCall,
     startAudioCall,
+    retryCallConnection,
     acceptIncomingCall,
     rejectIncomingCall
   } = useSessionRealtime(sessionId);
@@ -146,9 +148,14 @@ export default function SessionAudioPage() {
                 Bandwidth saver active.
               </p>
             ) : null}
+            {isMobileWebView ? (
+              <p className="mt-2 text-[11px] text-slate-300">
+                Mobile WebView mode: relay/audio fallback is used automatically when network degrades.
+              </p>
+            ) : null}
           </div>
 
-          <div className="mt-5 grid grid-cols-3 gap-3 rounded-2xl border border-white/10 bg-slate-950/50 p-3">
+          <div className="mt-5 grid grid-cols-4 gap-3 rounded-2xl border border-white/10 bg-slate-950/50 p-3">
             <button
               type="button"
               onClick={startAudioCall}
@@ -171,6 +178,14 @@ export default function SessionAudioPage() {
               className="rounded-xl bg-rose-600 px-3 py-3 text-xs font-semibold text-white transition hover:bg-rose-500"
             >
               End
+            </button>
+            <button
+              type="button"
+              onClick={retryCallConnection}
+              disabled={!canStartCall}
+              className="rounded-xl bg-cyan-600 px-3 py-3 text-xs font-semibold text-white transition hover:bg-cyan-500 disabled:opacity-50"
+            >
+              Retry
             </button>
           </div>
         </section>
