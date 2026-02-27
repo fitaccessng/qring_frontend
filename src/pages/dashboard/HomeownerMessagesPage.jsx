@@ -21,7 +21,12 @@ export default function HomeownerMessagesPage() {
   const [deletingMessageId, setDeletingMessageId] = useState("");
   const [error, setError] = useState("");
   const messagesRef = useRef(null);
+  const selectedIdRef = useRef("");
   const token = localStorage.getItem("qring_access_token");
+
+  useEffect(() => {
+    selectedIdRef.current = selectedId;
+  }, [selectedId]);
 
   function isLikelyDuplicateMessage(current, next) {
     if (!current || !next) return false;
@@ -44,7 +49,7 @@ export default function HomeownerMessagesPage() {
               last: message.text,
               time: message.at,
               unread:
-                selectedId === message.sessionId || message.senderType === "homeowner"
+                selectedIdRef.current === message.sessionId || message.senderType === "homeowner"
                   ? 0
                   : (thread.unread || 0) + 1
             }
@@ -89,8 +94,12 @@ export default function HomeownerMessagesPage() {
         const rows = await getHomeownerSessionMessages(selectedId);
         if (!active) return;
         setMessagesByThread((prev) => ({ ...prev, [selectedId]: rows }));
-        setThreads((prev) =>
-          prev.map((item) => (item.id === selectedId ? { ...item, unread: 0 } : item))
+        const freshThreads = await getHomeownerMessages();
+        if (!active) return;
+        setThreads(
+          freshThreads.map((item) =>
+            item.id === selectedId ? { ...item, unread: 0 } : item
+          )
         );
       } catch (requestError) {
         if (!active) return;

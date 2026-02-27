@@ -6,6 +6,7 @@ import { useSessionRealtime } from "../../hooks/useSessionRealtime";
 
 export default function SessionVideoPage() {
   const { sessionId } = useParams();
+  const dashboardRoute = getDashboardRoute();
   const {
     connected,
     joined,
@@ -51,19 +52,19 @@ export default function SessionVideoPage() {
   }, [callLaunchStartedAt, showingCallProgress]);
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#17212a_0%,_#0f1720_55%,_#0b1118_100%)] p-4 text-slate-100 sm:p-6">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#0f172a_0%,_#0b1220_52%,_#020617_100%)] p-4 text-slate-100 sm:p-6">
       <div className="mx-auto w-full max-w-6xl py-3">
-        <header className="mb-4 flex items-center justify-between rounded-3xl border border-white/10 bg-white/5 p-4 shadow-soft backdrop-blur">
+        <header className="mb-4 flex items-center justify-between rounded-3xl border border-cyan-400/20 bg-slate-900/50 p-4 shadow-soft backdrop-blur">
           <div>
             <h1 className="font-heading text-2xl font-black tracking-tight">Video Call</h1>
             <p className="text-xs text-slate-300/80">Session {sessionId}</p>
           </div>
-          <Link to="/dashboard" className="rounded-xl bg-brand-500 px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-600">
-            Go Back Home
+          <Link to={dashboardRoute} className="rounded-xl bg-brand-500 px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-600">
+            Home Dashboard
           </Link>
         </header>
 
-        <section className="rounded-3xl border border-white/10 bg-white/5 p-3 shadow-soft backdrop-blur">
+        <section className="rounded-3xl border border-cyan-400/20 bg-slate-900/45 p-3 shadow-soft backdrop-blur">
           <audio ref={remoteAudioRef} autoPlay playsInline />
           <div className="grid gap-3 md:grid-cols-2">
             <article className="relative overflow-hidden rounded-2xl bg-black">
@@ -90,7 +91,7 @@ export default function SessionVideoPage() {
             </article>
           </div>
 
-          <div className="mt-3 rounded-2xl border border-white/10 bg-slate-900/40 px-4 py-3 text-xs text-slate-200">
+          <div className="mt-3 rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-xs text-slate-200">
             {connected ? "Signaling Online" : "Connecting"} | {joined ? "Room Joined" : "Waiting Room"} | Call:{" "}
             {callState} | {localStreamRef.current ? "Media ready" : "Media not started"} | Remote mic:{" "}
             {remoteMuted ? "Muted" : "Active"}
@@ -154,7 +155,7 @@ export default function SessionVideoPage() {
             ) : null}
           </div>
 
-          <div className="mt-4 grid grid-cols-3 gap-3">
+          <div className="mt-4 grid grid-cols-3 gap-3 rounded-2xl border border-white/10 bg-slate-950/50 p-3">
             <button
               type="button"
               onClick={startVideoCall}
@@ -190,4 +191,15 @@ export default function SessionVideoPage() {
       />
     </div>
   );
+}
+
+function getDashboardRoute() {
+  try {
+    const user = JSON.parse(localStorage.getItem("qring_user") || "null");
+    if (user?.role === "admin") return "/dashboard/admin";
+    if (user?.role === "estate") return "/dashboard/estate";
+    return "/dashboard/homeowner/overview";
+  } catch {
+    return "/dashboard/homeowner/overview";
+  }
 }

@@ -6,6 +6,7 @@ import { useSessionRealtime } from "../../hooks/useSessionRealtime";
 
 export default function SessionAudioPage() {
   const { sessionId } = useParams();
+  const dashboardRoute = getDashboardRoute();
   const {
     connected,
     joined,
@@ -49,19 +50,19 @@ export default function SessionAudioPage() {
   }, [callLaunchStartedAt, showingCallProgress]);
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#17212a_0%,_#0f1720_55%,_#0b1118_100%)] p-4 text-slate-100 sm:p-6">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#0f172a_0%,_#0b1220_52%,_#020617_100%)] p-4 text-slate-100 sm:p-6">
       <div className="mx-auto w-full max-w-5xl py-3">
-        <header className="mb-4 flex items-center justify-between rounded-3xl border border-white/10 bg-white/5 p-4 shadow-soft backdrop-blur">
+        <header className="mb-4 flex items-center justify-between rounded-3xl border border-cyan-400/20 bg-slate-900/50 p-4 shadow-soft backdrop-blur">
           <div>
             <h1 className="font-heading text-2xl font-black tracking-tight">Audio Call</h1>
             <p className="text-xs text-slate-300/80">Session {sessionId}</p>
           </div>
-          <Link to="/dashboard" className="rounded-xl bg-brand-500 px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-600">
-            Go Back Home
+          <Link to={dashboardRoute} className="rounded-xl bg-brand-500 px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-600">
+            Home Dashboard
           </Link>
         </header>
 
-        <section className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-soft backdrop-blur">
+        <section className="rounded-3xl border border-cyan-400/20 bg-slate-900/45 p-6 shadow-soft backdrop-blur">
           <audio ref={remoteAudioRef} autoPlay playsInline />
           <div className="grid gap-4 md:grid-cols-2">
             <ParticipantCard
@@ -75,7 +76,7 @@ export default function SessionAudioPage() {
               muted={muted}
             />
           </div>
-          <div className="mt-4 rounded-2xl border border-white/10 bg-slate-900/40 p-4 text-center text-white">
+          <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950/60 p-4 text-center text-white">
             <p className="text-sm font-semibold">{callState === "ringing" ? "Calling..." : "In audio room"}</p>
             <p className="mt-1 text-xs text-slate-300">
               {localStreamRef.current ? "Audio stream connected" : "Start call to connect microphone"}
@@ -144,7 +145,7 @@ export default function SessionAudioPage() {
             ) : null}
           </div>
 
-          <div className="mt-5 grid grid-cols-3 gap-3">
+          <div className="mt-5 grid grid-cols-3 gap-3 rounded-2xl border border-white/10 bg-slate-950/50 p-3">
             <button
               type="button"
               onClick={startAudioCall}
@@ -198,4 +199,15 @@ function ParticipantCard({ label, state, muted }) {
       <p className="mt-1 text-xs text-slate-300">{state}</p>
     </article>
   );
+}
+
+function getDashboardRoute() {
+  try {
+    const user = JSON.parse(localStorage.getItem("qring_user") || "null");
+    if (user?.role === "admin") return "/dashboard/admin";
+    if (user?.role === "estate") return "/dashboard/estate";
+    return "/dashboard/homeowner/overview";
+  } catch {
+    return "/dashboard/homeowner/overview";
+  }
 }

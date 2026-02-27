@@ -68,6 +68,7 @@ export function useSessionRealtime(sessionId) {
   const offerRetryCountRef = useRef(0);
   const pendingLocalMessageIdsRef = useRef(new Set());
   const connectedOnceRef = useRef(false);
+  const pendingStartCallRef = useRef(null);
 
   const supportsWebRTC =
     typeof window !== "undefined" && typeof window.RTCPeerConnection !== "undefined";
@@ -252,10 +253,23 @@ export function useSessionRealtime(sessionId) {
             facingMode: "user"
           }
       : false;
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: true,
-      video: videoConstraints
-    });
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: videoConstraints
+      });
+    } catch (error) {
+      if (error?.name === "NotAllowedError") {
+        throw new Error(
+          "Camera/microphone permission denied. Allow access in your browser settings and try again."
+        );
+      }
+      if (error?.name === "NotFoundError") {
+        throw new Error("No microphone/camera device found on this device.");
+      }
+      throw error;
+    }
     localStreamRef.current = stream;
     if (localVideoRef.current) {
       localVideoRef.current.srcObject = stream;
@@ -289,8 +303,10 @@ export function useSessionRealtime(sessionId) {
       if (!joined) {
         setStatus("Joining session room...");
         setCallLaunchStage("waiting");
+        pendingStartCallRef.current = { video };
         return;
       }
+      pendingStartCallRef.current = null;
       await attachLocalStream({ video });
       setCallLaunchStage("signaling");
       const pc = ensurePeer();
@@ -309,6 +325,7 @@ export function useSessionRealtime(sessionId) {
       setStatus(error?.message ?? "Unable to start call");
       setCallLaunchStage("idle");
       setCallLaunchStartedAt(null);
+      pendingStartCallRef.current = null;
     } finally {
       isMakingOfferRef.current = false;
     }
@@ -532,6 +549,13 @@ export function useSessionRealtime(sessionId) {
       setJoined(true);
       setStatus("Session connected");
       markNetworkGood("Session connected.");
+      if (isHomeowner && pendingStartCallRef.current) {
+        const queued = pendingStartCallRef.current;
+        pendingStartCallRef.current = null;
+        setTimeout(() => {
+          startCall({ video: Boolean(queued?.video) });
+        }, 0);
+      }
     });
     socket.on("session.participant_joined", async () => {
       if (isMakingOfferRef.current) return;
@@ -751,6 +775,7 @@ export function useSessionRealtime(sessionId) {
 
     return () => {
       clearOfferRetryTimer();
+      pendingStartCallRef.current = null;
       manager.off("reconnect_attempt", onReconnectAttempt);
       manager.off("reconnect", onReconnect);
       manager.off("reconnect_error", onReconnectError);
