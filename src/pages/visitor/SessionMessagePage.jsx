@@ -21,6 +21,7 @@ export default function SessionMessagePage() {
     incomingCall,
     canStartCall,
     sendMessage,
+    retryFailedMessage,
     acceptIncomingCall,
     rejectIncomingCall
   } = useSessionRealtime(sessionId);
@@ -77,6 +78,20 @@ export default function SessionMessagePage() {
                   >
                     <p className="text-[11px] font-semibold">{message.displayName}</p>
                     <p>{message.text}</p>
+                    {message.mine && message.failed ? (
+                      <div className="mt-1 flex items-center justify-between gap-2 text-[10px]">
+                        <span className="rounded bg-amber-200/90 px-2 py-0.5 font-semibold text-amber-900">
+                          Not saved
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => retryFailedMessage(message.id)}
+                          className="rounded bg-white/20 px-2 py-0.5 font-semibold text-white hover:bg-white/30"
+                        >
+                          Retry
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
                 ))}
                 {messages.length === 0 ? <p className="text-xs text-slate-500">No messages yet.</p> : null}

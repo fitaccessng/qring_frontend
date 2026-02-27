@@ -12,10 +12,7 @@ import {
 } from "../utils/notificationSound";
 
 const rtcConfig = {
-  iceServers: [
-    { urls: "stun:stun.l.google.com:19302" },
-    { urls: "stun:stun1.l.google.com:19302" }
-  ],
+  iceServers: env.webRtcIceServers,
   iceCandidatePoolSize: 8
 };
 
@@ -101,12 +98,18 @@ export function useSessionRealtime(sessionId) {
 
   function normalizeMessage(payload) {
     const senderType = payload?.senderType || null;
+    const persisted = payload?.persisted !== false;
+    const clientId = payload?.clientId || null;
     return {
       id: payload?.id || null,
+      clientId,
       text: payload?.text || "",
       displayName: payload?.displayName || "Participant",
       senderType,
       at: payload?.at || new Date().toISOString(),
+      persisted,
+      failed: payload?.persistFailed === true,
+      persistError: payload?.persistError || "",
       mine:
         senderType !== null
           ? isMineBySenderType(senderType)
@@ -387,29 +390,40 @@ export function useSessionRealtime(sessionId) {
     pendingRemoteCandidates.current = [];
   }
 
-  function sendMessage(text) {
+  function sendMessage(text, options = {}) {
     const body = (text || "").trim();
     if (!body || !socketRef.current || !joined) return false;
     const clientId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     pendingLocalMessageIdsRef.current.add(clientId);
-    setMessages((prev) => [
-      ...prev,
-      normalizeMessage({
+    setMessages((prev) => {
+      const nextMessage = normalizeMessage({
         id: clientId,
         clientId,
         text: body,
         displayName,
         senderType: user?.role || "visitor",
-        at: new Date().toISOString()
-      })
-    ]);
+        at: new Date().toISOString(),
+        persisted: false
+      });
+      if (options.replaceMessageId) {
+        return prev.map((item) => (item.id === options.replaceMessageId ? nextMessage : item));
+      }
+      return [...prev, nextMessage];
+    });
     socketRef.current.emit("chat.message", {
       sessionId,
       text: body,
       displayName,
+      senderType: user?.role || "visitor",
       clientId
     });
     return true;
+  }
+
+  function retryFailedMessage(messageId) {
+    const target = messages.find((item) => item.id === messageId);
+    if (!target?.mine || !target?.failed) return false;
+    return sendMessage(target.text, { replaceMessageId: messageId });
   }
 
   function toggleMute() {
@@ -481,7 +495,8 @@ export function useSessionRealtime(sessionId) {
   useEffect(() => {
     const socket = io(`${env.socketUrl}${env.signalingNamespace ?? "/realtime/signaling"}`, {
       path: env.socketPath,
-      transports: ["polling", "websocket"],
+      transports: ["websocket"],
+      upgrade: false,
       reconnection: true,
       reconnectionAttempts: 10,
       reconnectionDelay: 400,
@@ -614,7 +629,9 @@ export function useSessionRealtime(sessionId) {
             item.id === clientId
               ? {
                   ...incoming,
-                  id: incoming.id || clientId
+                  id: incoming.id || clientId,
+                  failed: false,
+                  persistError: ""
                 }
               : item
           );
@@ -647,6 +664,50 @@ export function useSessionRealtime(sessionId) {
         }
         return [...prev, incoming];
       });
+    });
+
+    socket.on("chat.persisted", (payload) => {
+      if (payload?.sessionId !== sessionId) return;
+      const messageId = payload?.id;
+      const clientId = payload?.clientId;
+      setMessages((prev) =>
+        prev.map((item) => {
+          const matchesById = messageId && item.id === messageId;
+          const matchesByClientId = clientId && (item.id === clientId || item.clientId === clientId);
+          if (!matchesById && !matchesByClientId) return item;
+          return {
+            ...item,
+            id: messageId || item.id,
+            clientId: clientId || item.clientId || null,
+            persisted: true,
+            failed: false,
+            persistError: ""
+          };
+        })
+      );
+    });
+
+    socket.on("chat.persist_failed", (payload) => {
+      if (payload?.sessionId !== sessionId) return;
+      const messageId = payload?.id;
+      const clientId = payload?.clientId;
+      const error = payload?.error || "Failed to save message";
+      setMessages((prev) =>
+        prev.map((item) => {
+          const matchesById = messageId && item.id === messageId;
+          const matchesByClientId = clientId && (item.id === clientId || item.clientId === clientId);
+          if (!matchesById && !matchesByClientId) return item;
+          return {
+            ...item,
+            id: messageId || item.id,
+            clientId: clientId || item.clientId || null,
+            persisted: false,
+            failed: true,
+            persistError: error
+          };
+        })
+      );
+      setStatus("A message was delivered but not saved. Retry to persist.");
     });
 
     socket.on("session.control", (payload) => {
@@ -694,6 +755,8 @@ export function useSessionRealtime(sessionId) {
       manager.off("reconnect", onReconnect);
       manager.off("reconnect_error", onReconnectError);
       manager.off("reconnect_failed", onReconnectFailed);
+      socket.off("chat.persisted");
+      socket.off("chat.persist_failed");
       socket.disconnect();
       endCall(false);
     };
@@ -724,6 +787,7 @@ export function useSessionRealtime(sessionId) {
     setLowBandwidthMode,
     canStartCall: isHomeowner,
     sendMessage,
+    retryFailedMessage,
     toggleMute,
     endCall,
     startAudioCall,

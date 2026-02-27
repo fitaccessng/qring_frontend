@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import AppShell from "../../layouts/AppShell";
 import { env } from "../../config/env";
 import { createHomeownerDoor, generateDoorQr, getHomeownerContext, getHomeownerDoors } from "../../services/homeownerService";
+import QrPrintDesigner from "../../components/qr/QrPrintDesigner";
 
 export default function HomeownerDoorsPage() {
   const [doors, setDoors] = useState([]);
@@ -18,10 +19,6 @@ export default function HomeownerDoorsPage() {
   const [managedByEstate, setManagedByEstate] = useState(false);
   const [estateName, setEstateName] = useState("");
   const [contextLoading, setContextLoading] = useState(true);
-  const [printOptions, setPrintOptions] = useState({
-    size: "240",
-    shape: "rounded"
-  });
   const detailsSectionRef = useRef(null);
 
   const planDoorLimitReached = Boolean(
@@ -197,17 +194,13 @@ export default function HomeownerDoorsPage() {
     }
   }
 
-  async function handleGenerateFromSection() {
-    if (!selectedDoorId) return;
-    await handleGenerateQr(selectedDoorId);
-  }
-
   const activeDoor = doors.find((door) => String(door.id) === String(activeDoorId)) ?? null;
   const selectedPreview =
     activeDoor && selectedQrId
       ? {
           qrId: selectedQrId,
           doorName: activeDoor.name,
+          homeName: activeDoor.homeName,
           scanUrl: toScanUrl(selectedQrId)
         }
       : null;
@@ -395,7 +388,7 @@ export default function HomeownerDoorsPage() {
             Door: {activeDoor.name} | QR: {selectedQrId || "None selected"}
           </p>
 
-          <div className="mt-4 grid gap-4 lg:grid-cols-[300px_1fr]">
+          <div className="mt-4 grid gap-4">
             <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800">
               <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                 QR Codes Created
@@ -425,67 +418,9 @@ export default function HomeownerDoorsPage() {
                   <p className="text-xs text-slate-500">No QR codes for this door yet.</p>
                 )}
               </div>
-
-              <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Print Size
-                <select
-                  value={printOptions.size}
-                  onChange={(event) => setPrintOptions((prev) => ({ ...prev, size: event.target.value }))}
-                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm font-medium dark:border-slate-700 dark:bg-slate-900"
-                >
-                  <option value="180">Small (180px)</option>
-                  <option value="240">Medium (240px)</option>
-                  <option value="320">Large (320px)</option>
-                  <option value="420">XL Poster (420px)</option>
-                </select>
-              </label>
-
-              <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Gen Z Shape
-                <select
-                  value={printOptions.shape}
-                  onChange={(event) => setPrintOptions((prev) => ({ ...prev, shape: event.target.value }))}
-                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm font-medium dark:border-slate-700 dark:bg-slate-900"
-                >
-                  <option value="rounded">Rounded Card</option>
-                  <option value="circle">Circle Sticker</option>
-                  <option value="diamond">Diamond Tilt</option>
-                  <option value="squircle">Squircle</option>
-                  <option value="ticket">Ticket Cut</option>
-                  <option value="home">Home Badge</option>
-                  <option value="bell">Bell Badge</option>
-                  <option value="star">Star Pop</option>
-                </select>
-              </label>
-
-              <button
-                type="button"
-                disabled={!selectedPreview}
-                onClick={() => printQrCard(selectedPreview, printOptions)}
-                className="w-full rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white dark:bg-white dark:text-slate-900"
-              >
-                Print QR
-              </button>
             </div>
 
-            <div className="grid place-items-center rounded-xl border border-dashed border-slate-300 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
-              {selectedPreview ? (
-                <div className={`bg-white p-4 shadow-lg ${shapeClass(printOptions.shape)}`} style={{ width: `${Number(printOptions.size) + 40}px` }}>
-                  <div className="mb-2 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    {selectedPreview.doorName}
-                  </div>
-                  <img
-                    src={buildQrImageUrl(selectedPreview.scanUrl, Number(printOptions.size))}
-                    alt={`QR for ${selectedPreview.doorName}`}
-                    className={`mx-auto bg-white p-2 ${shapeClass(printOptions.shape)}`}
-                    style={{ width: `${Number(printOptions.size)}px`, height: `${Number(printOptions.size)}px` }}
-                  />
-                  <div className="mt-2 text-center text-[10px] font-medium text-slate-500">{selectedPreview.scanUrl}</div>
-                </div>
-              ) : (
-                <p className="text-sm text-slate-500">Pick a QR code to preview and print.</p>
-              )}
-            </div>
+            <QrPrintDesigner key={activeDoor.id} preview={selectedPreview} defaultLabel={activeDoor.homeName || ""} />
           </div>
         </section>
       ) : null}
@@ -500,59 +435,4 @@ function buildQrImageUrl(value, size = 240) {
 function toScanUrl(qrId) {
   const base = (env.publicAppUrl || window.location.origin || "").replace(/\/+$/, "");
   return `${base}/scan/${qrId}`;
-}
-
-function shapeClass(shape) {
-  if (shape === "circle") return "rounded-full";
-  if (shape === "diamond") return "rotate-2 rounded-2xl";
-  if (shape === "squircle") return "rounded-[32px]";
-  if (shape === "ticket") return "rounded-[22px]";
-  if (shape === "home") return "rounded-[18px]";
-  if (shape === "bell") return "rounded-[24px]";
-  if (shape === "star") return "rounded-[14px]";
-  return "rounded-2xl";
-}
-
-function printQrCard(preview, options) {
-  const size = Number(options.size || 240);
-  const qrUrl = buildQrImageUrl(preview.scanUrl, size);
-
-  const shapeStyle = {
-    rounded: "border-radius:18px;",
-    circle: "border-radius:9999px;",
-    diamond: "border-radius:22px;transform:rotate(2deg);",
-    squircle: "border-radius:32px;",
-    ticket: "border-radius:22px;clip-path: polygon(6% 0,94% 0,100% 18%,100% 82%,94% 100%,6% 100%,0 82%,0 18%);",
-    home: "clip-path: polygon(50% 0,100% 30%,100% 100%,0 100%,0 30%);border-radius:10px;",
-    bell: "clip-path: polygon(20% 22%,30% 8%,70% 8%,80% 22%,86% 64%,74% 88%,26% 88%,14% 64%);border-radius:10px;",
-    star: "clip-path: polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 92%,50% 70%,21% 92%,32% 57%,2% 35%,39% 35%);border-radius:8px;"
-  }[options.shape] || "border-radius:18px;";
-
-  const html = `
-    <html>
-      <head>
-        <title>Print QR</title>
-        <style>
-          body{font-family:Inter,Arial,sans-serif;padding:24px;background:#fff;color:#111}
-          .card{width:${size + 40}px;padding:16px;border:1px solid #e2e8f0;${shapeStyle}}
-          .door{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;text-align:center;color:#334155;margin-bottom:8px}
-          .qr{width:${size}px;height:${size}px;display:block;margin:0 auto;background:#fff;padding:8px;${shapeStyle}}
-          .url{font-size:10px;color:#64748b;text-align:center;margin-top:8px;word-break:break-all}
-        </style>
-      </head>
-      <body>
-        <div class="card">
-          <div class="door">${preview.doorName}</div>
-          <img class="qr" src="${qrUrl}" alt="QR" />
-          <div class="url">${preview.scanUrl}</div>
-        </div>
-        <script>window.onload = () => { window.print(); };</script>
-      </body>
-    </html>`;
-
-  const printWindow = window.open("", "_blank", "width=700,height=800");
-  if (!printWindow) return;
-  printWindow.document.open();
-  printWindow.document.write(html);
-  printWindow.document.close();
 }

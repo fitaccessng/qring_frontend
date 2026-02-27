@@ -9,7 +9,7 @@ import {
 } from "../../utils/notificationSound";
 
 const rtcConfig = {
-  iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+  iceServers: env.webRtcIceServers
 };
 
 const sessionModes = [
@@ -204,7 +204,8 @@ export default function SessionPage({ mode = "message" }) {
     socketRef.current.emit("chat.message", {
       sessionId,
       text: body,
-      displayName
+      displayName,
+      senderType: user?.role || "visitor"
     });
     setText("");
   }
@@ -270,7 +271,8 @@ export default function SessionPage({ mode = "message" }) {
   useEffect(() => {
     const socket = io(`${env.socketUrl}${env.signalingNamespace ?? "/realtime/signaling"}`, {
       path: env.socketPath,
-      transports: ["polling", "websocket"],
+      transports: ["websocket"],
+      upgrade: false,
       reconnection: true,
       reconnectionAttempts: 10,
       reconnectionDelay: 400,

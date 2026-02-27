@@ -81,24 +81,6 @@ export default function HomeownerMessagesPage() {
   }, []);
 
   useEffect(() => {
-    const id = setInterval(async () => {
-      try {
-        const data = await getHomeownerMessages();
-        setThreads(
-          data.map((item) => (
-            item.id === selectedId
-              ? { ...item, unread: 0 }
-              : item
-          ))
-        );
-      } catch {
-        // silent background refresh failure
-      }
-    }, 8000);
-    return () => clearInterval(id);
-  }, [selectedId]);
-
-  useEffect(() => {
     if (!selectedId) return;
     let active = true;
     const run = async () => {
@@ -127,7 +109,8 @@ export default function HomeownerMessagesPage() {
     if (!selectedId) return;
     const socket = io(`${env.socketUrl}${env.signalingNamespace ?? "/realtime/signaling"}`, {
       path: env.socketPath,
-      transports: ["polling", "websocket"],
+      transports: ["websocket"],
+      upgrade: false,
       reconnection: true,
       reconnectionAttempts: 10,
       reconnectionDelay: 400,
