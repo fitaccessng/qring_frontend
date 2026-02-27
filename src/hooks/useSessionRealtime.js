@@ -52,6 +52,39 @@ function emptyDiagnostics() {
   };
 }
 
+function emitRealtimeTextAlert({
+  title = "Qring Alert",
+  message,
+  type = "info",
+  duration = 3200
+}) {
+  if (typeof window === "undefined") return;
+  const body = String(message || "").trim();
+  if (!body) return;
+  window.dispatchEvent(
+    new CustomEvent("qring:flash", {
+      detail: {
+        title,
+        message: body,
+        type,
+        duration
+      }
+    })
+  );
+  if (
+    typeof document !== "undefined" &&
+    document.visibilityState === "hidden" &&
+    typeof window.Notification !== "undefined" &&
+    window.Notification.permission === "granted"
+  ) {
+    try {
+      new window.Notification(title, { body });
+    } catch {
+      // Keep alerts non-blocking.
+    }
+  }
+}
+
 function acquireSignalingSocket(sessionId) {
   const key = String(sessionId || "");
   let entry = signalingSocketPool.get(key);
@@ -152,6 +185,7 @@ export function useSessionRealtime(sessionId) {
   const forceRelayRef = useRef(false);
   const pendingVideoUpgradeRef = useRef(false);
   const connectionRecoveryCountRef = useRef(0);
+  const lastAlertAtRef = useRef(new Map());
 
   const supportsWebRTC =
     typeof window !== "undefined" && typeof window.RTCPeerConnection !== "undefined";
@@ -409,6 +443,14 @@ export function useSessionRealtime(sessionId) {
   function markNetworkReconnecting(detail = "Reconnecting to session...") {
     setNetworkQuality("reconnecting");
     setNetworkDetail(detail);
+  }
+
+  function notifyWithCooldown(key, payload, cooldownMs = 2500) {
+    const now = Date.now();
+    const previous = lastAlertAtRef.current.get(key) || 0;
+    if (now - previous < cooldownMs) return;
+    lastAlertAtRef.current.set(key, now);
+    emitRealtimeTextAlert(payload);
   }
 
   function clearOfferRetryTimer() {
@@ -801,6 +843,12 @@ export function useSessionRealtime(sessionId) {
     socket.on("connect_error", (error) => {
       setStatus(error?.message ?? "Socket connection failed");
       markNetworkSlow("Unable to reach signaling server. Retrying...");
+      notifyWithCooldown("socket_connect_error", {
+        title: "Connection Issue",
+        message: "Realtime connection is unstable. Retrying...",
+        type: "warning",
+        duration: 2800
+      });
     });
     socket.on("session.joined", (payload) => {
       if (!payload?.sid) return;
@@ -834,9 +882,19 @@ export function useSessionRealtime(sessionId) {
     socket.on("session.participant_left", () => {
       if (callStateRef.current === "connected") {
         setStatus("Participant connection changed. Waiting for reconnect...");
+        notifyWithCooldown("participant_link_changed", {
+          title: "Call Reconnecting",
+          message: "Participant connection changed. Trying to reconnect...",
+          type: "warning"
+        });
         return;
       }
       setStatus("Participant left");
+      notifyWithCooldown("participant_left", {
+        title: "Participant Left",
+        message: "The other participant left the session.",
+        type: "warning"
+      });
     });
 
     socket.on("webrtc.offer", async (payload) => {
@@ -850,6 +908,12 @@ export function useSessionRealtime(sessionId) {
           setIncomingCall({ pending: true, hasVideo: wantsVideo });
           setCallState("incoming");
           setStatus(wantsVideo ? "Incoming video call" : "Incoming audio call");
+          notifyWithCooldown("incoming_call", {
+            title: "Incoming Call",
+            message: wantsVideo ? "Homeowner is calling you (video)." : "Homeowner is calling you (audio).",
+            type: "info",
+            duration: 4000
+          });
           grantSessionCallAccess(sessionId, "incoming");
           return;
         }
@@ -908,6 +972,15 @@ export function useSessionRealtime(sessionId) {
       const incoming = normalizeMessage(payload);
       if (!incoming.mine) {
         playMessageNotificationSound();
+        notifyWithCooldown(
+          "incoming_message",
+          {
+            title: "New Message",
+            message: `${incoming.displayName}: ${incoming.text || "Sent a message"}`,
+            type: "info"
+          },
+          1200
+        );
       }
       setMessages((prev) => {
         const clientId = payload?.clientId;
@@ -996,6 +1069,12 @@ export function useSessionRealtime(sessionId) {
         })
       );
       setStatus("A message was delivered but not saved. Retry to persist.");
+      notifyWithCooldown("message_not_saved", {
+        title: "Message Not Saved",
+        message: "Delivered in realtime, but storage failed. Tap Retry.",
+        type: "warning",
+        duration: 4200
+      });
     });
 
     socket.on("session.control", (payload) => {
@@ -1011,10 +1090,20 @@ export function useSessionRealtime(sessionId) {
       }
       if (action === "end") {
         setStatus("Call ended by participant");
+        notifyWithCooldown("call_ended", {
+          title: "Call Ended",
+          message: "The participant ended the call.",
+          type: "warning"
+        });
         endCall(false);
       }
       if (action === "call_rejected") {
         setStatus("Call rejected by visitor");
+        notifyWithCooldown("call_rejected", {
+          title: "Call Rejected",
+          message: "The visitor rejected the call request.",
+          type: "warning"
+        });
         endCall(false);
       }
     });

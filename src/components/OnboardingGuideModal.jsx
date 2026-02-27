@@ -41,7 +41,7 @@ export default function OnboardingGuideModal({
 
   return (
     <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-950/50 p-4">
-      <div className="relative w-full max-w-sm rounded-[2rem] border border-slate-200 bg-white p-5 shadow-[0_18px_55px_rgba(15,23,42,0.24)]">
+      <div className="relative w-full max-w-sm overflow-y-auto rounded-[2rem] border border-slate-200 bg-white p-5 shadow-[0_18px_55px_rgba(15,23,42,0.24)] max-h-[90vh]">
         <div className="absolute -top-6 left-1/2 h-12 w-16 -translate-x-1/2 rounded-3xl bg-brand-600 shadow-soft" />
         <div className="pt-4 text-center">
           <p className="text-[11px] font-semibold tracking-wide text-slate-500">

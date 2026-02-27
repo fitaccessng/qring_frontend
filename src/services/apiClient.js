@@ -175,7 +175,8 @@ export async function apiRequest(path, options = {}, attempt = 0) {
       body: options.body
     });
   } catch (networkError) {
-    const message = `Network request failed. Verify backend availability and CORS for this app origin. API: ${env.apiBaseUrl}`;
+    const message =
+      "We couldn't connect right now. Please check your internet and try again in a moment.";
     emitFlash(message, "error");
     throw new ApiError(
       message,

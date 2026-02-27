@@ -89,7 +89,7 @@ export default function GoogleRolePage() {
       </AuthCard>
       {showSuccess ? (
         <div className="fixed inset-0 z-40 grid place-items-center bg-slate-900/50 p-4">
-          <div className="w-full max-w-sm rounded-2xl border border-emerald-200 bg-white p-5 shadow-2xl">
+          <div className="w-full max-w-sm max-h-[88vh] overflow-y-auto rounded-2xl border border-emerald-200 bg-white p-5 shadow-2xl">
             <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Success</p>
             <p className="mt-2 text-sm font-medium text-slate-800">
               Account setup complete. Redirecting to login...

@@ -31,7 +31,7 @@ export default function SessionModePickerModal({ open, sessionId, onClose, onSel
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/50 p-4">
-      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-soft dark:border-slate-700 dark:bg-slate-900">
+      <div className="w-full max-w-md overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-soft dark:border-slate-700 dark:bg-slate-900 max-h-[88vh]">
         <h3 className="font-heading text-lg font-bold">{heading}</h3>
         <p className="mt-1 text-sm text-slate-500">Pick where you want to enter this session.</p>
         <div className="mt-4 space-y-3">

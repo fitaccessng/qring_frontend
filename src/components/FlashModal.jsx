@@ -23,7 +23,7 @@ export default function FlashModal() {
         (type === "success"
           ? "Success"
           : type === "error"
-            ? "Action failed"
+            ? "Something went wrong"
             : type === "warning"
               ? "Attention"
               : "Notice");
@@ -48,7 +48,7 @@ export default function FlashModal() {
   if (!flash) return null;
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-50 flex items-start justify-center px-4 pt-6">
+    <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center px-4 sm:items-start sm:pt-6">
       <div
         className={`pointer-events-auto w-full max-w-md rounded-2xl border p-4 shadow-2xl backdrop-blur-sm transition-all duration-300 ${palette}`}
         role="status"

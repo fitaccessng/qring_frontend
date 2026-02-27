@@ -56,56 +56,46 @@ export default function SessionVideoPage() {
   }, [callLaunchStartedAt, showingCallProgress]);
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#0f172a_0%,_#0b1220_52%,_#020617_100%)] p-4 text-slate-100 sm:p-6">
-      <div className="mx-auto w-full max-w-6xl py-3">
-        <header className="mb-4 flex items-center justify-between rounded-3xl border border-cyan-400/20 bg-slate-900/50 p-4 shadow-soft backdrop-blur">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#10213f_0%,_#0a1428_46%,_#050b17_100%)] p-3 text-slate-100 sm:p-6">
+      <div className="mx-auto w-full max-w-6xl py-2 sm:py-4">
+        <header className="mb-4 flex items-center justify-between gap-3 rounded-3xl border border-white/10 bg-slate-900/55 p-4 shadow-soft backdrop-blur">
           <div>
-            <h1 className="font-heading text-2xl font-black tracking-tight">Video Call</h1>
-            <p className="text-xs text-slate-300/80">Session {sessionId}</p>
+            <h1 className="font-heading text-xl font-black tracking-tight sm:text-2xl">Video Session</h1>
+            <p className="mt-1 text-xs text-slate-300">{callState === "connected" ? "Connected" : "Ready to connect"}</p>
           </div>
-          <Link to={dashboardRoute} className="rounded-xl bg-brand-500 px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-600">
-            Home Dashboard
+          <Link to={dashboardRoute} className="rounded-xl bg-white/10 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/20">
+            Dashboard
           </Link>
         </header>
 
-        <section className="rounded-3xl border border-cyan-400/20 bg-slate-900/45 p-3 shadow-soft backdrop-blur">
+        <section className="rounded-3xl border border-white/10 bg-slate-900/50 p-3 shadow-soft backdrop-blur sm:p-4">
           <audio ref={remoteAudioRef} autoPlay playsInline />
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-black">
             <article className="relative overflow-hidden rounded-2xl bg-black">
               <video
                 ref={remoteVideoRef}
                 autoPlay
                 playsInline
-                className="h-[300px] w-full rounded-2xl bg-slate-950 object-cover sm:h-[420px]"
+                className="h-[340px] w-full rounded-2xl bg-slate-950 object-cover sm:h-[460px]"
               />
               <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-3 pb-2 pt-8">
                 <p className="text-xs font-semibold text-white">Visitor</p>
               </div>
             </article>
-            <article className="relative overflow-hidden rounded-2xl bg-black">
+            <article className="absolute bottom-3 right-3 w-28 overflow-hidden rounded-xl border border-white/20 bg-black shadow-lg sm:w-40">
               <video
                 ref={localVideoRef}
                 autoPlay
                 playsInline
-                className="h-[300px] w-full rounded-2xl bg-slate-900 object-cover sm:h-[420px]"
+                className="h-20 w-full bg-slate-900 object-cover sm:h-28"
               />
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-3 pb-2 pt-8">
-                <p className="text-xs font-semibold text-white">You</p>
-              </div>
             </article>
           </div>
 
-          <div className="mt-3 rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-xs text-slate-200">
-            {connected ? "Signaling Online" : "Connecting"} | {joined ? "Room Joined" : "Waiting Room"} | Call:{" "}
-            {callState} | {localStreamRef.current ? "Media ready" : "Media not started"} | Remote mic:{" "}
-            {remoteMuted ? "Muted" : "Active"}
+          <div className="mt-3 rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-center text-xs text-slate-200">
+            {callState === "ringing" ? "Calling..." : localStreamRef.current ? "Camera and mic active" : "Tap Start to begin"}
           </div>
-          <SessionNetworkBadge
-            quality={networkQuality}
-            detail={networkDetail}
-            detailClassName="text-slate-300"
-          />
-          <SessionDiagnosticsPanel diagnostics={callDiagnostics} networkQuality={networkQuality} />
+          <SessionNetworkBadge quality={networkQuality} detail={networkDetail} detailClassName="text-slate-300" />
 
           {featureError ? <p className="mt-2 text-sm text-rose-700">{featureError}</p> : null}
           {status ? <p className="mt-2 text-sm text-amber-700">{status}</p> : null}
@@ -165,7 +155,7 @@ export default function SessionVideoPage() {
             ) : null}
           </div>
 
-          <div className="mt-4 grid grid-cols-4 gap-3 rounded-2xl border border-white/10 bg-slate-950/50 p-3">
+          <div className="mt-4 grid grid-cols-2 gap-3 rounded-2xl border border-white/10 bg-slate-950/55 p-3 sm:grid-cols-4">
             <button
               type="button"
               onClick={startVideoCall}
@@ -198,6 +188,15 @@ export default function SessionVideoPage() {
               Retry
             </button>
           </div>
+          <details className="mt-3 rounded-2xl border border-white/10 bg-slate-950/45 p-3">
+            <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.12em] text-slate-300">
+              Connection Details
+            </summary>
+            <p className="mt-2 text-[11px] text-slate-400">
+              {connected ? "Signaling online" : "Connecting"} | {joined ? "Room joined" : "Waiting room"} | Call: {callState} | Remote mic: {remoteMuted ? "Muted" : "Active"}
+            </p>
+            <SessionDiagnosticsPanel diagnostics={callDiagnostics} networkQuality={networkQuality} />
+          </details>
         </section>
       </div>
 

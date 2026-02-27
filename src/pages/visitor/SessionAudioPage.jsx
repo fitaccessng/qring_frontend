@@ -54,21 +54,21 @@ export default function SessionAudioPage() {
   }, [callLaunchStartedAt, showingCallProgress]);
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#0f172a_0%,_#0b1220_52%,_#020617_100%)] p-4 text-slate-100 sm:p-6">
-      <div className="mx-auto w-full max-w-5xl py-3">
-        <header className="mb-4 flex items-center justify-between rounded-3xl border border-cyan-400/20 bg-slate-900/50 p-4 shadow-soft backdrop-blur">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#10213f_0%,_#0a1428_46%,_#050b17_100%)] p-3 text-slate-100 sm:p-6">
+      <div className="mx-auto w-full max-w-4xl py-2 sm:py-4">
+        <header className="mb-4 flex items-center justify-between gap-3 rounded-3xl border border-white/10 bg-slate-900/55 p-4 shadow-soft backdrop-blur">
           <div>
-            <h1 className="font-heading text-2xl font-black tracking-tight">Audio Call</h1>
-            <p className="text-xs text-slate-300/80">Session {sessionId}</p>
+            <h1 className="font-heading text-xl font-black tracking-tight sm:text-2xl">Audio Session</h1>
+            <p className="mt-1 text-xs text-slate-300">{callState === "connected" ? "Connected" : "Ready to connect"}</p>
           </div>
-          <Link to={dashboardRoute} className="rounded-xl bg-brand-500 px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-600">
-            Home Dashboard
+          <Link to={dashboardRoute} className="rounded-xl bg-white/10 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/20">
+            Dashboard
           </Link>
         </header>
 
-        <section className="rounded-3xl border border-cyan-400/20 bg-slate-900/45 p-6 shadow-soft backdrop-blur">
+        <section className="rounded-3xl border border-white/10 bg-slate-900/50 p-4 shadow-soft backdrop-blur sm:p-6">
           <audio ref={remoteAudioRef} autoPlay playsInline />
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-3 sm:gap-4 md:grid-cols-2">
             <ParticipantCard
               label="Visitor"
               state={callState === "connected" && !remoteMuted ? "Speaking" : "Listening"}
@@ -80,24 +80,13 @@ export default function SessionAudioPage() {
               muted={muted}
             />
           </div>
-          <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950/60 p-4 text-center text-white">
-            <p className="text-sm font-semibold">{callState === "ringing" ? "Calling..." : "In audio room"}</p>
-            <p className="mt-1 text-xs text-slate-300">
-              {localStreamRef.current ? "Audio stream connected" : "Start call to connect microphone"}
-            </p>
-            <p className="mt-1 text-xs text-slate-300">
-              {connected ? "Signaling Online" : "Connecting"} | {joined ? "Room Joined" : "Waiting Room"} | Call:{" "}
-              {callState}
-            </p>
+          <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950/65 px-4 py-3 text-center text-white">
+            <p className="text-sm font-semibold">{callState === "ringing" ? "Calling..." : "Voice channel"}</p>
+            <p className="mt-1 text-xs text-slate-300">{localStreamRef.current ? "Microphone active" : "Tap Start to connect mic"}</p>
           </div>
 
           {featureError ? <p className="mt-3 text-sm text-rose-400">{featureError}</p> : null}
-          <SessionNetworkBadge
-            quality={networkQuality}
-            detail={networkDetail}
-            detailClassName="text-slate-300"
-          />
-          <SessionDiagnosticsPanel diagnostics={callDiagnostics} networkQuality={networkQuality} />
+          <SessionNetworkBadge quality={networkQuality} detail={networkDetail} detailClassName="text-slate-300" />
           {status ? <p className="mt-2 text-sm text-amber-300">{status}</p> : null}
           {showingCallProgress ? (
             <section className="mt-3 rounded-2xl border border-[#00a884]/35 bg-[#0f2428] p-4">
@@ -155,7 +144,7 @@ export default function SessionAudioPage() {
             ) : null}
           </div>
 
-          <div className="mt-5 grid grid-cols-4 gap-3 rounded-2xl border border-white/10 bg-slate-950/50 p-3">
+          <div className="mt-5 grid grid-cols-2 gap-3 rounded-2xl border border-white/10 bg-slate-950/55 p-3 sm:grid-cols-4">
             <button
               type="button"
               onClick={startAudioCall}
@@ -188,6 +177,15 @@ export default function SessionAudioPage() {
               Retry
             </button>
           </div>
+          <details className="mt-3 rounded-2xl border border-white/10 bg-slate-950/45 p-3">
+            <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.12em] text-slate-300">
+              Connection Details
+            </summary>
+            <p className="mt-2 text-[11px] text-slate-400">
+              {connected ? "Signaling online" : "Connecting"} | {joined ? "Room joined" : "Waiting room"} | Call: {callState}
+            </p>
+            <SessionDiagnosticsPanel diagnostics={callDiagnostics} networkQuality={networkQuality} />
+          </details>
         </section>
       </div>
 
@@ -203,10 +201,10 @@ export default function SessionAudioPage() {
 
 function ParticipantCard({ label, state, muted }) {
   return (
-    <article className="rounded-2xl border border-white/10 bg-slate-900/45 p-6 text-center">
-      <div className="mx-auto h-28 w-28 rounded-full bg-brand-500/20 p-2">
+    <article className="rounded-2xl border border-white/10 bg-slate-900/45 p-5 text-center">
+      <div className="mx-auto h-24 w-24 rounded-full bg-brand-500/20 p-2 sm:h-28 sm:w-28">
         <div
-          className={`grid h-full place-items-center rounded-full text-lg font-bold text-white ${
+          className={`grid h-full place-items-center rounded-full text-sm font-bold text-white sm:text-lg ${
             muted ? "bg-slate-600" : "bg-brand-500 animate-pulse"
           }`}
         >
