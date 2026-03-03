@@ -11,6 +11,21 @@ export class ApiError extends Error {
 
 let refreshPromise = null;
 let capacitorRuntime = null;
+const GET_CACHE_TTL_MS = 20 * 1000;
+const GET_CACHE_STALE_TTL_MS = 2 * 60 * 1000;
+const REQUEST_TIMEOUT_MS = 15000;
+const getResponseCache = new Map();
+const protectedPathPrefixes = [
+  "/dashboard",
+  "/homeowner",
+  "/estate",
+  "/admin",
+  "/notifications"
+];
+
+function requiresAuthenticatedUser(path) {
+  return protectedPathPrefixes.some((prefix) => path.startsWith(prefix));
+}
 
 async function getCapacitorRuntime() {
   if (capacitorRuntime !== null) return capacitorRuntime;
@@ -60,8 +75,8 @@ async function performHttpRequest(url, options) {
       method: options.method ?? "GET",
       headers: options.headers ?? {},
       data: normalizeRequestData(options.body, options.headers),
-      connectTimeout: 30000,
-      readTimeout: 30000
+      connectTimeout: REQUEST_TIMEOUT_MS,
+      readTimeout: REQUEST_TIMEOUT_MS
     });
 
     const status = Number(response?.status ?? 0);
@@ -91,7 +106,10 @@ async function performHttpRequest(url, options) {
     return { ok, status, payload, raw };
   }
 
-  const response = await fetch(url, options);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const response = await fetch(url, { ...options, signal: controller.signal });
+  clearTimeout(timeoutId);
   const raw = await response.text();
   let payload = null;
   if (raw) {
@@ -102,6 +120,18 @@ async function performHttpRequest(url, options) {
     }
   }
   return { ok: response.ok, status: response.status, payload, raw };
+}
+
+function buildCacheKey(path, token) {
+  const scope = token ? token.slice(-8) : "anon";
+  return `${scope}:${path}`;
+}
+
+function readGetCache(cacheKey) {
+  const row = getResponseCache.get(cacheKey);
+  if (!row) return null;
+  const ageMs = Date.now() - row.at;
+  return { row, ageMs };
 }
 
 function emitFlash(message, type = "error") {
@@ -156,10 +186,42 @@ function clearAuthStorage() {
   localStorage.removeItem("qring_user");
 }
 
+function redirectToLogin() {
+  if (typeof window === "undefined") return;
+  const pathname = window.location.pathname || "";
+  const hash = window.location.hash || "";
+  const hashPath = hash.startsWith("#/") ? hash.slice(1).split("?")[0] : "";
+  const current = hashPath || pathname || "";
+  if (current === "/login") return;
+  const redirect = encodeURIComponent(`${current}${window.location.search || ""}`);
+  if (hashPath) {
+    window.location.hash = `/login?redirect=${redirect}`;
+    return;
+  }
+  window.location.assign(`/login?redirect=${redirect}`);
+}
+
 export async function apiRequest(path, options = {}, attempt = 0) {
   const token = localStorage.getItem("qring_access_token");
+  if (requiresAuthenticatedUser(path) && !token) {
+    clearAuthStorage();
+    redirectToLogin();
+    throw new ApiError("Missing access token. Please login again.", 401, { path });
+  }
+  const method = String(options.method ?? "GET").toUpperCase();
+  const isGet = method === "GET" && !options.body;
+  const cacheKey = isGet ? buildCacheKey(path, token) : "";
+
+  if (isGet) {
+    const cached = readGetCache(cacheKey);
+    if (cached && cached.ageMs < GET_CACHE_TTL_MS) {
+      return cached.row.payload;
+    }
+  }
+
   const headers = {
     "Content-Type": "application/json",
+    "X-DB-Access-Mode": method === "GET" || method === "HEAD" ? "read" : "write",
     ...(options.headers ?? {})
   };
 
@@ -175,6 +237,13 @@ export async function apiRequest(path, options = {}, attempt = 0) {
       body: options.body
     });
   } catch (networkError) {
+    if (isGet) {
+      const cached = readGetCache(cacheKey);
+      if (cached && cached.ageMs < GET_CACHE_STALE_TTL_MS) {
+        emitFlash("Network is slow. Showing recent cached data.", "warning");
+        return cached.row.payload;
+      }
+    }
     const message =
       "We couldn't connect right now. Please check your internet and try again in a moment.";
     emitFlash(message, "error");
@@ -209,6 +278,7 @@ export async function apiRequest(path, options = {}, attempt = 0) {
         return apiRequest(path, options, 1);
       }
       clearAuthStorage();
+      redirectToLogin();
     }
     const message = payload?.message ?? payload?.detail ?? `Request failed (${response.status})`;
     emitFlash(message, "error");
@@ -217,6 +287,10 @@ export async function apiRequest(path, options = {}, attempt = 0) {
       response.status,
       payload
     );
+  }
+
+  if (isGet) {
+    getResponseCache.set(cacheKey, { payload, at: Date.now() });
   }
 
   return payload;

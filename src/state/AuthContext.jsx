@@ -1,7 +1,8 @@
-import { createContext, useContext, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import * as authService from "../services/authService";
 
 const AuthContext = createContext(null);
+const protectedUiPrefixes = ["/dashboard"];
 
 function loadJson(key, fallback) {
   const raw = localStorage.getItem(key);
@@ -51,6 +52,20 @@ function normalizeAuthData(response) {
   };
 }
 
+function getCurrentRoutePath() {
+  if (typeof window === "undefined") return "/";
+  const hash = window.location.hash || "";
+  if (hash.startsWith("#/")) {
+    const hashPath = hash.slice(1).split("?")[0];
+    return hashPath || "/";
+  }
+  return window.location.pathname || "/";
+}
+
+function isProtectedUiRoute(pathname) {
+  return protectedUiPrefixes.some((prefix) => String(pathname || "").startsWith(prefix));
+}
+
 export function AuthProvider({ children }) {
   const [accessToken, setAccessToken] = useState(() => localStorage.getItem("qring_access_token") ?? "");
   const [user, setUser] = useState(() => {
@@ -60,22 +75,27 @@ export function AuthProvider({ children }) {
   });
   const [loading, setLoading] = useState(false);
 
+  function persistAuth(data) {
+    if (!data?.accessToken) {
+      throw new Error("Authentication succeeded but no access token was returned.");
+    }
+    localStorage.setItem("qring_access_token", data.accessToken);
+    setAccessToken(data.accessToken);
+    if (data.refreshToken) {
+      localStorage.setItem("qring_refresh_token", data.refreshToken);
+    }
+    if (data.user) {
+      localStorage.setItem("qring_user", JSON.stringify(data.user));
+      setUser(data.user);
+    }
+  }
+
   const login = async (credentials) => {
     setLoading(true);
     try {
       const response = await authService.login(credentials);
       const data = normalizeAuthData(response);
-      if (data.accessToken) {
-        localStorage.setItem("qring_access_token", data.accessToken);
-        setAccessToken(data.accessToken);
-      }
-      if (data.refreshToken) {
-        localStorage.setItem("qring_refresh_token", data.refreshToken);
-      }
-      if (data.user) {
-        localStorage.setItem("qring_user", JSON.stringify(data.user));
-        setUser(data.user);
-      }
+      persistAuth(data);
       return data;
     } finally {
       setLoading(false);
@@ -96,17 +116,7 @@ export function AuthProvider({ children }) {
     try {
       const response = await authService.googleSignIn();
       const data = normalizeAuthData(response);
-      if (data.accessToken) {
-        localStorage.setItem("qring_access_token", data.accessToken);
-        setAccessToken(data.accessToken);
-      }
-      if (data.refreshToken) {
-        localStorage.setItem("qring_refresh_token", data.refreshToken);
-      }
-      if (data.user) {
-        localStorage.setItem("qring_user", JSON.stringify(data.user));
-        setUser(data.user);
-      }
+      persistAuth(data);
       return data;
     } finally {
       setLoading(false);
@@ -121,17 +131,7 @@ export function AuthProvider({ children }) {
       if (!data.user?.role && data.accessToken) {
         data.user = { ...(data.user ?? {}), role };
       }
-      if (data.accessToken) {
-        localStorage.setItem("qring_access_token", data.accessToken);
-        setAccessToken(data.accessToken);
-      }
-      if (data.refreshToken) {
-        localStorage.setItem("qring_refresh_token", data.refreshToken);
-      }
-      if (data.user) {
-        localStorage.setItem("qring_user", JSON.stringify(data.user));
-        setUser(data.user);
-      }
+      persistAuth(data);
       return data;
     } finally {
       setLoading(false);
@@ -166,6 +166,44 @@ export function AuthProvider({ children }) {
       setUser(null);
     }
   };
+
+  useEffect(() => {
+    let active = true;
+
+    const refreshSession = async () => {
+      if (!accessToken || !user?.id) return;
+      if (!isProtectedUiRoute(getCurrentRoutePath())) return;
+      const refresh = localStorage.getItem("qring_refresh_token");
+      if (!refresh) return;
+      try {
+        const response = await authService.refreshToken({ refreshToken: refresh });
+        if (!active) return;
+        const data = normalizeAuthData(response);
+        if (!data?.accessToken) return;
+        localStorage.setItem("qring_access_token", data.accessToken);
+        setAccessToken(data.accessToken);
+        if (data?.refreshToken) {
+          localStorage.setItem("qring_refresh_token", data.refreshToken);
+        }
+      } catch {
+        // Keep non-blocking; api client still handles refresh on 401.
+      }
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        refreshSession();
+      }
+    };
+
+    const intervalId = window.setInterval(refreshSession, 20 * 60 * 1000);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [accessToken, user?.id]);
 
   const value = useMemo(
     () => ({

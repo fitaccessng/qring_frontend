@@ -6,6 +6,15 @@ import { getVisitorSessionStatus } from "../../services/homeownerService";
 const RETRYABLE_STATUSES = new Set([0, 502, 503, 504]);
 const MAX_SUBMIT_RETRIES = 2;
 const RETRY_BASE_DELAY_MS = 700;
+const DEVICE_STORAGE_KEY = "qring_visitor_device_id";
+
+function getOrCreateVisitorDeviceId() {
+  const existing = localStorage.getItem(DEVICE_STORAGE_KEY);
+  if (existing) return existing;
+  const next = `visitor-device-${Math.random().toString(36).slice(2, 11)}`;
+  localStorage.setItem(DEVICE_STORAGE_KEY, next);
+  return next;
+}
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -60,6 +69,7 @@ export default function ScanPage() {
   });
   const [seconds, setSeconds] = useState(0);
   const [requestLatencyMs, setRequestLatencyMs] = useState(0);
+  const visitorDeviceId = useMemo(() => getOrCreateVisitorDeviceId(), []);
   const [visitorForm, setVisitorForm] = useState({
     name: "",
     purpose: ""
@@ -146,7 +156,8 @@ export default function ScanPage() {
           qrId,
           doorId,
           name: visitorForm.name,
-          purpose: visitorForm.purpose
+          purpose: visitorForm.purpose,
+          deviceId: visitorDeviceId
         },
         ({ attempt }) => {
           setRequestState((prev) => ({

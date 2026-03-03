@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import AppShell from "../../layouts/AppShell";
 import { apiRequest, ApiError } from "../../services/apiClient";
 
@@ -67,7 +67,7 @@ export default function AdminUsersPage() {
         </div>
       ) : null}
 
-      <section className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-soft dark:border-slate-800 dark:bg-slate-900/80 sm:p-5">
+      <section className="rounded-3xl border border-slate-200 bg-white/95 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/90 sm:p-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-heading text-lg font-bold sm:text-xl">Users</h2>
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
@@ -142,4 +142,5 @@ function formatTime(value) {
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString();
 }
+
 

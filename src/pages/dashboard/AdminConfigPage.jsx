@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import AppShell from "../../layouts/AppShell";
 import { apiRequest, ApiError } from "../../services/apiClient";
 
@@ -41,7 +41,7 @@ export default function AdminConfigPage() {
         </div>
       ) : null}
 
-      <section className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-soft dark:border-slate-800 dark:bg-slate-900/80 sm:p-5">
+      <section className="rounded-3xl border border-slate-200 bg-white/95 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/90 sm:p-5">
         <h2 className="font-heading text-lg font-bold sm:text-xl">Runtime Config</h2>
         <p className="mt-1 text-sm text-slate-500">Read-only status of backend configuration.</p>
 
@@ -72,4 +72,5 @@ function ConfigRow({ label, value, mono }) {
     </div>
   );
 }
+
 

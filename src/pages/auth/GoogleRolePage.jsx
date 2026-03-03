@@ -8,6 +8,7 @@ const rolePath = {
   admin: "/dashboard/admin",
   estate: "/dashboard/estate"
 };
+const MOBILE_ONBOARDING_INTENT_KEY = "qring_mobile_onboarding_intent";
 
 export default function GoogleRolePage() {
   const { googleSignUp, loading } = useAuth();
@@ -25,21 +26,19 @@ export default function GoogleRolePage() {
     try {
       const data = await googleSignUp(role);
       if (intent === "signup") {
-        localStorage.removeItem("qring_access_token");
-        localStorage.removeItem("qring_refresh_token");
-        localStorage.removeItem("qring_user");
         setShowSuccess(true);
+        localStorage.setItem(MOBILE_ONBOARDING_INTENT_KEY, "1");
         window.dispatchEvent(
           new CustomEvent("qring:flash", {
             detail: {
               type: "success",
               title: "Signup Successful",
-              message: "Google account setup complete. Redirecting to login...",
+              message: "Google account setup complete. Opening onboarding...",
               duration: 2600
             }
           })
         );
-        window.setTimeout(() => window.location.assign("/login"), 1800);
+        window.setTimeout(() => navigate("/onboarding", { replace: true }), 1200);
         return;
       }
 
@@ -92,7 +91,7 @@ export default function GoogleRolePage() {
           <div className="w-full max-w-sm max-h-[88vh] overflow-y-auto rounded-2xl border border-emerald-200 bg-white p-5 shadow-2xl">
             <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Success</p>
             <p className="mt-2 text-sm font-medium text-slate-800">
-              Account setup complete. Redirecting to login...
+              Account setup complete. Opening onboarding...
             </p>
           </div>
         </div>

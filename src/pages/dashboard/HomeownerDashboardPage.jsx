@@ -1,32 +1,58 @@
-import AppShell from "../../layouts/AppShell";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { Activity, Bell, DoorOpen, Info, LogOut, MessageSquare, Phone, ShieldCheck, UserCircle2 } from "lucide-react";
+import AppShell from "../../layouts/AppShell";
 import { useDashboardData } from "../../hooks/useDashboardData";
-import { useEffect, useState } from "react";
 import { getHomeownerContext } from "../../services/homeownerService";
+import { useAuth } from "../../state/AuthContext";
 
 export default function HomeownerDashboardPage() {
+  const { user, logout } = useAuth();
   const [managedByEstate, setManagedByEstate] = useState(false);
-  const {
-    metrics,
-    activity,
-    waitingRoom,
-    session,
-    messages,
-    loading,
-    error,
-    connected
-  } = useDashboardData();
+  const { metrics, activity, waitingRoom, session, messages, loading, error, connected, realtimeEnabled } =
+    useDashboardData();
+  const homeownerName = user?.fullName?.trim() || "Homeowner";
+  const initials = homeownerName.slice(0, 1).toUpperCase();
+  const systemLabel = realtimeEnabled ? (connected ? "System Live" : loading ? "Connecting" : "Realtime Offline") : "Online";
+  const setupPercent = useMemo(() => {
+    if (loading) return 0;
+    const score =
+      Number(metrics.activeVisitors > 0) * 35 +
+      Number(metrics.pendingApprovals === 0) * 25 +
+      Number(metrics.unreadMessages === 0) * 20 +
+      Number(connected || !realtimeEnabled) * 20;
+    return Math.max(5, Math.min(95, score));
+  }, [metrics.activeVisitors, metrics.pendingApprovals, metrics.unreadMessages, connected, realtimeEnabled, loading]);
+  const totalSignals = useMemo(
+    () =>
+      (Number(metrics.activeVisitors) || 0) +
+      (Number(metrics.pendingApprovals) || 0) +
+      (Number(metrics.callsToday) || 0) +
+      (Number(metrics.unreadMessages) || 0),
+    [metrics.activeVisitors, metrics.pendingApprovals, metrics.callsToday, metrics.unreadMessages]
+  );
+  const queueLoadPercent = useMemo(() => {
+    const queue = Number(waitingRoom.length) || 0;
+    const active = Number(metrics.activeVisitors) || 0;
+    const denom = queue + active;
+    if (denom <= 0) return 0;
+    return Math.round((queue / denom) * 100);
+  }, [waitingRoom.length, metrics.activeVisitors]);
+  const conversationPercent = useMemo(() => {
+    const unread = Number(metrics.unreadMessages) || 0;
+    const total = unread + (messages.length > 0 ? 1 : 0);
+    if (total <= 0) return 0;
+    return Math.round((unread / total) * 100);
+  }, [metrics.unreadMessages, messages.length]);
 
   useEffect(() => {
     let active = true;
     async function loadContext() {
       try {
         const data = await getHomeownerContext();
-        if (!active) return;
-        setManagedByEstate(Boolean(data?.managedByEstate));
+        if (active) setManagedByEstate(Boolean(data?.managedByEstate));
       } catch {
-        if (!active) return;
-        setManagedByEstate(false);
+        if (active) setManagedByEstate(false);
       }
     }
     loadContext();
@@ -35,221 +61,204 @@ export default function HomeownerDashboardPage() {
     };
   }, []);
 
+  const taskGroups = [
+    {
+      label: "Visits",
+      subtitle: `${metrics.activeVisitors} active`,
+      to: "/dashboard/homeowner/visits",
+      icon: <Activity size={14} />,
+      percent: totalSignals > 0 ? Math.round(((Number(metrics.activeVisitors) || 0) / totalSignals) * 100) : 0
+    },
+    {
+      label: "Messages",
+      subtitle: `${metrics.unreadMessages} unread`,
+      to: "/dashboard/homeowner/messages",
+      icon: <MessageSquare size={14} />,
+      percent: totalSignals > 0 ? Math.round(((Number(metrics.unreadMessages) || 0) / totalSignals) * 100) : 0
+    },
+    {
+      label: "Doors",
+      subtitle: "Manage access",
+      to: "/dashboard/homeowner/doors",
+      icon: <DoorOpen size={14} />,
+      percent: connected || !realtimeEnabled ? 100 : loading ? 40 : 0
+    },
+    {
+      label: "Calls",
+      subtitle: `${metrics.callsToday} today`,
+      to: "/dashboard/homeowner/messages",
+      icon: <Phone size={14} />,
+      percent: totalSignals > 0 ? Math.round(((Number(metrics.callsToday) || 0) / totalSignals) * 100) : 0
+    }
+  ];
+
   return (
-    <AppShell className="text-sm" title="Homeowner">
-      {error ? (
-        <div className="mb-4 rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
-          {error}
-        </div>
-      ) : null}
-
-      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Metric
-          title="Active Visitors"
-          tip="Number of visitors currently waiting or interacting right now."
-          value={metrics.activeVisitors}
-          tone="success"
-          loading={loading}
-          sub="Live now"
-        />
-        <Metric
-          title="Pending Approvals"
-          tip="Requests that need you to allow or deny entry."
-          value={metrics.pendingApprovals}
-          tone="warning"
-          loading={loading}
-          sub="Needs action"
-        />
-        <Metric
-          title="Calls Today"
-          tip="Total audio and video calls completed today."
-          value={metrics.callsToday}
-          tone="brand"
-          loading={loading}
-          sub="Audio + video"
-        />
-        <Metric
-          title="Unread Messages"
-          tip="Messages in visitor threads you have not opened yet."
-          value={metrics.unreadMessages}
-          tone="danger"
-          loading={loading}
-          sub="Recent threads"
-        />
-      </section>
-
-      <section className="mt-4 rounded-2xl border border-brand-100 bg-brand-50/70 p-4 dark:border-brand-500/30 dark:bg-brand-500/10">
-        <div className="flex items-center gap-2">
-          <h2 className="font-heading text-base font-bold">How to use this dashboard</h2>
-          <HelpTip text="Use this quick guide to understand what each area does before taking actions." />
-        </div>
-        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-          Start with pending approvals, review activity for context, then open Realtime Interaction for call and message actions.
-        </p>
-      </section>
-
-      <section className="mt-4">
-        <Link
-          to="/dashboard/homeowner/doors"
-          className="inline-flex items-center rounded-xl bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600"
-        >
-          Create a Door
-        </Link>
-      </section>
-
-      <section className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-12">
-        <article className="xl:col-span-7 rounded-2xl border border-slate-200 bg-white/90 p-4 sm:p-6 shadow-soft dark:border-slate-800 dark:bg-slate-900/80">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-heading text-lg font-bold">Recent Visitor Activity</h2>
-            <span className={`rounded-full px-2 py-1 text-xs font-semibold ${connected ? "bg-success/20 text-success" : "bg-warning/20 text-warning"}`}>
-              {connected ? "LIVE" : "RECONNECTING"}
-            </span>
-          </div>
-          <div className="mb-4 rounded-xl bg-slate-100 p-4 dark:bg-slate-800">
-            <div className="mb-3 flex items-center justify-between text-xs text-slate-500">
-              <span>Weekly Traffic</span>
-              <span>Last 7 Days</span>
+    <AppShell title="Homeowner Overview" showTopBar={false}>
+      <div className="mx-auto w-full max-w-4xl space-y-8 px-2 py-3 sm:px-3 sm:py-4">
+        <section className="rounded-[1.6rem] border border-slate-200/70 bg-white/95 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/90 sm:p-5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="grid h-11 w-11 place-items-center rounded-full bg-sky-100 text-sm font-bold text-sky-700 dark:bg-sky-900/30 dark:text-sky-300">
+                {initials}
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-slate-500">Hello!</p>
+                <p className="text-xl font-black text-slate-900 dark:text-white">{homeownerName}</p>
+              </div>
             </div>
-            <MiniChart />
+            <div className="flex items-center gap-2">
+              <Link
+                to="/dashboard/notifications"
+                className="grid h-9 w-9 place-items-center rounded-full bg-slate-100 text-slate-500 transition-all active:scale-95 dark:bg-slate-800 dark:text-slate-300"
+                aria-label="Notifications"
+                title="Notifications"
+              >
+                <Bell size={16} />
+              </Link>
+              <Link
+                to="/dashboard/homeowner/settings"
+                className="grid h-9 w-9 place-items-center rounded-full bg-slate-100 text-slate-500 transition-all active:scale-95 dark:bg-slate-800 dark:text-slate-300"
+                aria-label="Profile"
+                title="Profile"
+              >
+                <UserCircle2 size={16} />
+              </Link>
+              <button
+                type="button"
+                onClick={logout}
+                className="grid h-9 w-9 place-items-center rounded-full bg-rose-100 text-rose-600 transition-all active:scale-95 dark:bg-rose-900/30 dark:text-rose-300"
+                aria-label="Logout"
+                title="Logout"
+              >
+                <LogOut size={15} />
+              </button>
+            </div>
           </div>
-          <div className="space-y-3">
-            {activity.length === 0 ? (
-              <Empty text="No activity yet." />
-            ) : (
-              activity.map((item) => (
-                <div key={item.id ?? `${item.event}-${item.time}`} className="rounded-xl border border-slate-200 bg-white p-4 text-sm transition hover:-translate-y-0.5 hover:shadow-soft dark:border-slate-800 dark:bg-slate-900">
-                  <div className="flex items-center justify-between">
-                    <p className="font-semibold">{item.event}</p>
-                    <span className="text-xs text-slate-500">{item.time}</span>
+        </section>
+
+        <section className="rounded-[2rem] border border-slate-200/70 bg-white/95 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/90 sm:p-7">
+          <article className="rounded-[1.4rem] bg-gradient-to-br from-violet-600 to-indigo-700 p-5 text-white shadow-lg shadow-violet-500/20 sm:p-6">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-2xl font-bold text-violet-100">Welcome {homeownerName}</p>
+                <p className="mt-1 text-xs font-semibold uppercase tracking-wider text-violet-200">{systemLabel}</p>
+              </div>
+              <ProgressRing value={loading ? 0 : setupPercent} />
+            </div>
+            <div className="mt-4 flex items-center gap-2">
+              <Link
+                to="/dashboard/homeowner/visits"
+                className="rounded-xl bg-white/90 px-4 py-2 text-sm font-bold text-indigo-700 transition-all hover:bg-white active:scale-95"
+              >
+                View Visit
+              </Link>
+              {managedByEstate ? (
+                <span className="rounded-xl bg-white/20 px-3 py-2 text-xs font-semibold text-white/90">Managed by estate</span>
+              ) : null}
+            </div>
+          </article>
+        </section>
+
+        {error ? (
+          <div className="flex items-center gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-rose-700 dark:border-rose-900/30 dark:bg-rose-900/20 dark:text-rose-400">
+            <Info size={18} />
+            <p className="text-sm font-medium">{error}</p>
+          </div>
+        ) : null}
+
+        <section className="space-y-4">
+          <h3 className="text-2xl font-black text-slate-900 dark:text-white">In Progress</h3>
+          <div className="-mx-1 flex snap-x gap-3 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            <div className="min-w-[17rem] snap-start rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/70">
+              <p className="text-[11px] font-semibold text-slate-500">Visitor Queue</p>
+              <p className="mt-1 text-base font-bold text-slate-900 dark:text-white">
+                {waitingRoom.length > 0 ? `${waitingRoom.length} waiting` : "No visitors waiting"}
+              </p>
+              <div className="mt-3 h-1.5 w-full rounded-full bg-slate-200 dark:bg-slate-700">
+                <div className="h-1.5 rounded-full bg-sky-500" style={{ width: `${queueLoadPercent}%` }} />
+              </div>
+            </div>
+            <div className="min-w-[17rem] snap-start rounded-2xl border border-slate-200 bg-[#fff6ef] p-4 dark:border-slate-700 dark:bg-[#422b23]">
+              <p className="text-[11px] font-semibold text-slate-500">Conversation</p>
+              <p className="mt-1 text-base font-bold text-slate-900 dark:text-white">
+                {messages[0]?.text ? "Message received" : "No active chat"}
+              </p>
+              <div className="mt-3 h-1.5 w-full rounded-full bg-orange-100 dark:bg-orange-900/40">
+                <div className="h-1.5 rounded-full bg-orange-400" style={{ width: `${conversationPercent}%` }} />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="space-y-4">
+          <h3 className="text-2xl font-black text-slate-900 dark:text-white">Action Items</h3>
+          <div className="space-y-4">
+            {taskGroups.map((group) => (
+              <Link
+                key={group.label}
+                to={group.to}
+                className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-4 transition-all active:scale-[0.99] dark:border-slate-700 dark:bg-slate-900/80"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="grid h-8 w-8 place-items-center rounded-xl bg-violet-100 text-violet-600 dark:bg-violet-500/20 dark:text-violet-300">
+                    {group.icon}
+                  </span>
+                  <div>
+                    <p className="text-sm font-bold text-slate-900 dark:text-white">{group.label}</p>
+                    <p className="text-xs text-slate-500">{group.subtitle}</p>
                   </div>
+                </div>
+                <PercentPill value={loading ? 0 : group.percent} />
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        <section className="space-y-3 pb-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xl font-black text-slate-900 dark:text-white">Recent Activity</h3>
+            <Link to="/dashboard/homeowner/visits" className="text-sm font-semibold text-indigo-600 dark:text-indigo-400">
+              See all
+            </Link>
+          </div>
+          <div className="space-y-2 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900/80 sm:p-5">
+            {activity.length === 0 ? (
+              <p className="px-2 py-4 text-sm text-slate-500">No recent visitor logs.</p>
+            ) : (
+              activity.slice(0, 4).map((item, idx) => (
+                <div key={`${item?.id ?? "activity"}-${idx}`} className="rounded-xl px-2 py-2">
+                  <p className="text-sm font-semibold text-slate-900 dark:text-white">{item?.event || "Activity"}</p>
+                  <p className="text-xs text-slate-500">{item?.time || "Just now"}</p>
                 </div>
               ))
             )}
           </div>
-        </article>
-
-        <article className="hidden md:block xl:col-span-5 rounded-2xl border border-slate-200 bg-white/90 p-4 sm:p-6 shadow-soft dark:border-slate-800 dark:bg-slate-900/80">
-          <h2 className="mb-4 font-heading text-lg font-bold">Realtime Interaction</h2>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Panel title="Waiting Room" value={`${waitingRoom.length} Visitors`} tone="warning" />
-            <Panel title="Active Session" value={session?.id ?? "No session"} tone="success" />
-            <Panel title="Latest Message" value={messages[0]?.text ?? "No unread messages"} tone="brand" />
-            <Panel title="Call Status" value={session?.state ?? "Idle"} tone="danger" />
-          </div>
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            <Control label="Audio" tone="success" />
-            <Control label="Video" tone="brand" />
-            <Control label="Mute" tone="warning" />
-            <Control label="End" tone="danger" />
-          </div>
-        </article>
-      </section>
-
-      {!managedByEstate ? (
-        <section className="mt-6 hidden md:block">
-          <article className="rounded-2xl border border-slate-200 bg-white/90 p-4 sm:p-6 shadow-soft dark:border-slate-800 dark:bg-slate-900/80">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h2 className="font-heading text-lg font-bold">Billing & Subscription</h2>
-                <p className="mt-1 text-sm text-slate-500">Upgrade your homeowner plan and pay securely with Paystack.</p>
-              </div>
-              <Link
-                to="/billing/paywall"
-                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white dark:bg-white dark:text-slate-900"
-              >
-                Open Billing
-              </Link>
-            </div>
-          </article>
+          {/* <p className="text-xs text-slate-500">Session: {session?.state || "Idle"}</p> */}
         </section>
-      ) : null}
+      </div>
     </AppShell>
   );
 }
 
-function Metric({ title, tip, value, tone, loading, sub }) {
-  const badge = {
-    success: "bg-success/20 text-success",
-    warning: "bg-warning/20 text-warning",
-    danger: "bg-danger/20 text-danger",
-    brand: "bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-100"
-  };
-
+function ProgressRing({ value }) {
   return (
-    <article className="rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-soft transition hover:-translate-y-0.5 dark:border-slate-800 dark:bg-slate-900/80">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <p className="text-sm text-slate-500">{title}</p>
-          <HelpTip text={tip} />
-        </div>
-        <span className={`rounded-full px-2 py-1 text-xs font-semibold ${badge[tone]}`}>Live</span>
-      </div>
-      <p className="mt-3 font-heading text-2xl font-extrabold sm:text-3xl">{loading ? "..." : value}</p>
-      <p className="mt-2 text-xs text-slate-500">{sub}</p>
-    </article>
-  );
-}
-
-function Panel({ title, value, tone }) {
-  const marker = {
-    success: "bg-success",
-    warning: "bg-warning",
-    danger: "bg-danger",
-    brand: "bg-brand-500"
-  };
-
-  return (
-    <div className="rounded-xl bg-slate-100 p-4 dark:bg-slate-800">
-      <div className="flex items-center gap-2">
-        <span className={`h-2 w-2 rounded-full ${marker[tone]}`} />
-        <p className="text-xs text-slate-500">{title}</p>
-      </div>
-      <p className="mt-1 text-sm font-semibold">{value}</p>
+    <div
+      className="grid h-14 w-14 place-items-center rounded-full bg-white/20 text-xs font-bold text-white"
+      style={{ background: `conic-gradient(#ffffff ${value * 3.6}deg, rgba(255,255,255,0.25) 0deg)` }}
+      aria-label={`${value}%`}
+    >
+      <span className="grid h-11 w-11 place-items-center rounded-full bg-indigo-700/90">{value}%</span>
     </div>
   );
 }
 
-function Control({ label, tone }) {
-  const styles = {
-    success: "bg-success hover:bg-success/90",
-    warning: "bg-warning hover:bg-warning/90",
-    danger: "bg-danger hover:bg-danger/90",
-    brand: "bg-brand-500 hover:bg-brand-600"
-  };
-
+function PercentPill({ value }) {
   return (
-    <button type="button" className={`rounded-xl px-4 py-3 text-sm font-semibold text-white transition ${styles[tone]}`}>
-      {label}
-    </button>
-  );
-}
-
-function MiniChart() {
-  return (
-    <svg viewBox="0 0 320 88" className="h-16 w-full" role="img" aria-label="Traffic trend">
-      <path d="M0 65 L40 58 L80 60 L120 42 L160 47 L200 35 L240 30 L280 38 L320 20" fill="none" stroke="#2456f5" strokeWidth="3" strokeLinecap="round" />
-      <path d="M0 88 L0 65 L40 58 L80 60 L120 42 L160 47 L200 35 L240 30 L280 38 L320 20 L320 88 Z" fill="rgba(36,86,245,0.15)" />
-    </svg>
-  );
-}
-
-function Empty({ text }) {
-  return <p className="rounded-xl bg-slate-100 p-4 text-sm text-slate-500 dark:bg-slate-800">{text}</p>;
-}
-
-function HelpTip({ text }) {
-  return (
-    <span className="group relative inline-flex">
-      <button
-        type="button"
-        className="grid h-5 w-5 place-items-center rounded-full bg-slate-200 text-[11px] font-bold text-slate-700 dark:bg-slate-700 dark:text-slate-100"
-        aria-label="More information"
-      >
-        ?
-      </button>
-      <span className="pointer-events-none absolute left-1/2 top-7 z-10 hidden w-56 -translate-x-1/2 rounded-lg bg-slate-900 px-2 py-1 text-xs text-white shadow-lg group-hover:block group-focus-within:block">
-        {text}
-      </span>
+    <span
+      className="grid h-10 w-10 place-items-center rounded-full text-[11px] font-bold text-violet-700"
+      style={{ background: `conic-gradient(#8b5cf6 ${value * 3.6}deg, #e5e7eb 0deg)` }}
+    >
+      <span className="grid h-8 w-8 place-items-center rounded-full bg-white dark:bg-slate-900">{value}%</span>
     </span>
   );
 }

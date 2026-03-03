@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AppShell from "../../layouts/AppShell";
 import { useAuth } from "../../state/AuthContext";
@@ -10,6 +10,66 @@ import {
   requestSubscription
 } from "../../services/paymentService";
 import { getHomeownerContext } from "../../services/homeownerService";
+
+const PLAN_FEATURES = {
+  estate_starter: [
+    "Up to 3 doors",
+    "Trial only - 60 days"
+  ],
+  estate_basic: [
+    "Realtime alerts",
+    "Visitor logs",
+    "Resident management",
+    "Mobile dashboard"
+  ],
+  estate_growth: [
+    "Chat + call access",
+    "Multi-admin roles",
+    "Visitor scheduling",
+    "Access windows",
+    "Analytics"
+  ],
+  estate_pro: [
+    "Advanced analytics",
+    "Security audit logs",
+    "Multi-location control",
+    "Role permissions",
+    "Priority support"
+  ],
+  estate_enterprise: [
+    "Unlimited doors",
+    "SLA + API access",
+    "Custom annual contract"
+  ],
+  free: [
+    "1 door",
+    "Basic notifications",
+    "Limited logs"
+  ],
+  home_pro: [
+    "Chat + call verification",
+    "Visitor history",
+    "Visitor scheduling",
+    "Advanced notifications"
+  ],
+  home_premium: [
+    "Multiple doors",
+    "Access time windows",
+    "Priority support",
+    "Advanced privacy controls"
+  ]
+};
+
+const PLAN_ORDER = [
+  "estate_starter",
+  "estate_basic",
+  "estate_growth",
+  "estate_pro",
+  "estate_enterprise",
+  "free",
+  "home_pro",
+  "home_premium"
+];
 
 export default function HomeownerPaywallPage() {
   const { user } = useAuth();
@@ -59,6 +119,14 @@ export default function HomeownerPaywallPage() {
     return plan?.name ?? subscription.plan;
   }, [plans, subscription]);
 
+  const visiblePlans = useMemo(() => {
+    const audience = user?.role === "estate" ? "estate" : "homeowner";
+    return plans
+      .filter((plan) => !plan.hidden)
+      .filter((plan) => (plan.audience || "homeowner") === audience)
+      .sort((a, b) => PLAN_ORDER.indexOf(a.id) - PLAN_ORDER.indexOf(b.id));
+  }, [plans, user?.role]);
+
   const backPath = user?.role === "estate" ? "/dashboard/estate" : "/dashboard/homeowner/overview";
   const dashboardLabel = user?.role === "estate" ? "Estate Dashboard" : "Homeowner Dashboard";
 
@@ -68,6 +136,10 @@ export default function HomeownerPaywallPage() {
     setNotice("");
 
     try {
+      if (!plan.selfServe) {
+        navigate("/contact");
+        return;
+      }
       if (plan.amount === 0) {
         const result = await requestSubscription(plan.id);
         setSubscription((prev) => ({
@@ -100,7 +172,7 @@ export default function HomeownerPaywallPage() {
   }
 
   return (
-    <AppShell title="Billing & Subscription">
+    <AppShell >
       {error ? (
         <div className="mb-4 rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
           {error}
@@ -112,7 +184,7 @@ export default function HomeownerPaywallPage() {
         </div>
       ) : null}
 
-      <section className="rounded-2xl border border-slate-200 bg-white/90 p-4 sm:p-5 shadow-soft dark:border-slate-800 dark:bg-slate-900/80">
+      <section className="rounded-3xl border border-slate-200 bg-white/95 p-4 sm:p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/90">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="font-heading text-xl font-bold">Current Plan</h2>
@@ -154,19 +226,34 @@ export default function HomeownerPaywallPage() {
       </section>
 
       <section className="mt-4 grid gap-3 sm:mt-6 sm:gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {plans.map((plan) => (
+        {visiblePlans.map((plan) => (
           <article
             key={plan.id}
-            className="rounded-2xl border border-slate-200 bg-white/90 p-4 sm:p-5 shadow-soft dark:border-slate-800 dark:bg-slate-900/80"
+            className="rounded-3xl border border-slate-200 bg-white/95 p-4 sm:p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/90"
           >
             <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">{plan.name}</p>
             <p className="mt-2 text-2xl font-bold">
-              {formatMoney(resolvePlanAmount(plan, billingCycle), plan.currency)}
-              <span className="ml-1 text-sm font-medium text-slate-500">/{billingCycle === "yearly" ? "year" : "month"}</span>
+              {!plan.selfServe
+                ? "Custom"
+                : formatMoney(resolvePlanAmount(plan, billingCycle), plan.currency)}
+              <span className="ml-1 text-sm font-medium text-slate-500">
+                {!plan.selfServe ? "annual contract" : `/${billingCycle === "yearly" ? "year" : "month"}`}
+              </span>
             </p>
             <p className="text-xs text-slate-500">{(plan.currency || "NGN").toUpperCase()}</p>
             <p className="mt-2 text-sm text-slate-500">Up to {plan.maxDoors} doors</p>
             <p className="text-sm text-slate-500">Up to {plan.maxQrCodes} QR codes</p>
+            {plan.trialDays ? (
+              <p className="mt-1 text-xs font-medium text-brand-700 dark:text-brand-300">Trial only - {plan.trialDays} days</p>
+            ) : null}
+            {plan.description ? <p className="mt-1 text-xs text-slate-500">{plan.description}</p> : null}
+            {Array.isArray(PLAN_FEATURES[plan.id]) ? (
+              <ul className="mt-3 space-y-1 text-xs text-slate-600 dark:text-slate-300">
+                {PLAN_FEATURES[plan.id].map((feature) => (
+                  <li key={feature}>- {feature}</li>
+                ))}
+              </ul>
+            ) : null}
 
             <button
               type="button"
@@ -178,7 +265,9 @@ export default function HomeownerPaywallPage() {
                 ? "Current plan"
                 : submitting === plan.id
                   ? "Processing..."
-                  : plan.amount === 0
+                  : !plan.selfServe
+                    ? "Contact sales"
+                    : plan.amount === 0
                     ? "Activate free"
                     : `Pay with Paystack (${billingCycle === "yearly" ? "Yearly" : "Monthly"})`}
             </button>
@@ -186,7 +275,7 @@ export default function HomeownerPaywallPage() {
         ))}
       </section>
 
-      <section className="mt-6 rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-soft dark:border-slate-800 dark:bg-slate-900/80">
+      <section className="mt-6 rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/90">
         <h3 className="font-heading text-lg font-bold">Manual Payment Instructions</h3>
         {purposes.length === 0 ? (
           <p className="mt-2 text-sm text-slate-500">No manual payment account configured.</p>

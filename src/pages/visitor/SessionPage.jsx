@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, useParams } from "react-router-dom";
 import { io } from "socket.io-client";
 import { env } from "../../config/env";
+import { realtimeTransportOptions } from "../../services/socketConfig";
 import { getVisitorSessionMessages } from "../../services/homeownerService";
 import {
   playIncomingCallNotificationSound,
@@ -271,8 +272,7 @@ export default function SessionPage({ mode = "message" }) {
   useEffect(() => {
     const socket = io(`${env.socketUrl}${env.signalingNamespace ?? "/realtime/signaling"}`, {
       path: env.socketPath,
-      transports: ["websocket"],
-      upgrade: false,
+      ...realtimeTransportOptions,
       reconnection: true,
       reconnectionAttempts: 10,
       reconnectionDelay: 400,

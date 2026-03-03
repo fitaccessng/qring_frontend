@@ -51,7 +51,7 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="grid min-h-screen place-items-center bg-slate-50 p-4 dark:bg-slate-950">
+    <div className="safe-content grid min-h-screen place-items-center bg-slate-50 p-4 dark:bg-slate-950">
       <AuthCard title="Forgot Password" subtitle="Verify your email and set a new password">
         {step === 1 ? (
           <form onSubmit={verifyEmail} className="space-y-4">

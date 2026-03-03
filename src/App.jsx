@@ -19,9 +19,11 @@ import AdminLoginPage from "./pages/auth/AdminLoginPage";
 import AdminSignupPage from "./pages/auth/AdminSignupPage";
 import SignupPage from "./pages/auth/SignupPage";
 import GoogleRolePage from "./pages/auth/GoogleRolePage";
+import OnboardingPage from "./pages/auth/OnboardingPage";
 import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
 import HomeownerDashboardPage from "./pages/dashboard/HomeownerDashboardPage";
 import HomeownerVisitsPage from "./pages/dashboard/HomeownerVisitsPage";
+import HomeownerAppointmentsPage from "./pages/dashboard/HomeownerAppointmentsPage";
 import HomeownerMessagesPage from "./pages/dashboard/HomeownerMessagesPage";
 import HomeownerDoorsPage from "./pages/dashboard/HomeownerDoorsPage";
 import HomeownerSettingsPage from "./pages/dashboard/HomeownerSettingsPage";
@@ -36,6 +38,8 @@ import EstateMappingsPage from "./pages/dashboard/EstateMappingsPage";
 import EstateLogsPage from "./pages/dashboard/EstateLogsPage";
 import EstatePlanPage from "./pages/dashboard/EstatePlanPage";
 import EstateHomesPage from "./pages/dashboard/EstateHomesPage";
+import EstateSettingsPage from "./pages/dashboard/EstateSettingsPage";
+import NotificationsPage from "./pages/dashboard/NotificationsPage";
 import AdminDashboardPage from "./pages/dashboard/AdminDashboardPage";
 import AdminPaymentsPage from "./pages/dashboard/AdminPaymentsPage";
 import AdminUsersPage from "./pages/dashboard/AdminUsersPage";
@@ -43,6 +47,7 @@ import AdminSessionsPage from "./pages/dashboard/AdminSessionsPage";
 import AdminConfigPage from "./pages/dashboard/AdminConfigPage";
 import AdminAuditPage from "./pages/dashboard/AdminAuditPage";
 import ScanPage from "./pages/visitor/ScanPage";
+import AppointmentPage from "./pages/visitor/AppointmentPage";
 import SessionMessagePage from "./pages/visitor/SessionMessagePage";
 import SessionAudioPage from "./pages/visitor/SessionAudioPage";
 import SessionVideoPage from "./pages/visitor/SessionVideoPage";
@@ -52,6 +57,7 @@ import LoaderPage from "./pages/common/LoaderPage";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import RoleRoute from "./routes/RoleRoute";
 import VisitorCallRoute from "./routes/VisitorCallRoute";
+import PublicOnlyRoute from "./routes/PublicOnlyRoute";
 import { AuthProvider } from "./state/AuthContext";
 import { ThemeProvider } from "./state/ThemeContext";
 import FlashModal from "./components/FlashModal";
@@ -71,13 +77,23 @@ export default function App() {
 
 function AppRoutes() {
   const location = useLocation();
-  const [showPreloader, setShowPreloader] = useState(true);
+  const [showPreloader, setShowPreloader] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return sessionStorage.getItem("qring_preloader_seen") !== "true";
+  });
 
   useEffect(() => {
-    setShowPreloader(true);
-    const timer = window.setTimeout(() => setShowPreloader(false), 800);
+    if (!showPreloader) return () => {};
+    const timer = window.setTimeout(() => {
+      setShowPreloader(false);
+      try {
+        sessionStorage.setItem("qring_preloader_seen", "true");
+      } catch {
+        // No-op if storage is unavailable.
+      }
+    }, 800);
     return () => window.clearTimeout(timer);
-  }, [location.pathname, location.search]);
+  }, [showPreloader]);
 
   return (
     <>
@@ -87,7 +103,7 @@ function AppRoutes() {
       ) : (
         <>
           <FlashModal />
-          <div key={location.pathname} className="animate-screen-enter">
+          <div className="animate-screen-enter">
             <Routes location={location}>
               <Route path="/" element={<LandingPage />} />
               <Route path="/about" element={<AboutPage />} />
@@ -103,15 +119,18 @@ function AppRoutes() {
               <Route path="/privacy" element={<PrivacyPage />} />
               <Route path="/terms" element={<TermsPage />} />
               <Route path="/compliance" element={<CompliancePage />} />
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/admin/login" element={<AdminLoginPage />} />
-              <Route path="/admin/signup" element={<AdminSignupPage />} />
-              <Route path="/signup" element={<SignupPage />} />
-              <Route path="/google-role" element={<GoogleRolePage />} />
-              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+              <Route element={<PublicOnlyRoute />}>
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/admin/login" element={<AdminLoginPage />} />
+                <Route path="/admin/signup" element={<AdminSignupPage />} />
+                <Route path="/signup" element={<SignupPage />} />
+                <Route path="/google-role" element={<GoogleRolePage />} />
+                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+              </Route>
               <Route path="/loader" element={<LoaderPage />} />
 
               <Route path="/scan/:qrId" element={<ScanPage />} />
+              <Route path="/appointment/:shareToken" element={<AppointmentPage />} />
               <Route path="/session/:sessionId" element={<Navigate to="message" replace />} />
               <Route path="/session/:sessionId/message" element={<SessionMessagePage />} />
               <Route
@@ -135,10 +154,13 @@ function AppRoutes() {
                 <Route element={<RoleRoute allowedRoles={["homeowner", "estate"]} />}>
                   <Route path="/billing/paywall" element={<HomeownerPaywallPage />} />
                   <Route path="/billing/callback" element={<BillingCallbackPage />} />
+                  <Route path="/onboarding" element={<OnboardingPage />} />
+                  <Route path="/dashboard/notifications" element={<NotificationsPage />} />
                 </Route>
                 <Route element={<RoleRoute allowedRoles={["homeowner"]} />}>
                   <Route path="/dashboard/homeowner" element={<Navigate to="/dashboard/homeowner/overview" replace />} />
                   <Route path="/dashboard/homeowner/overview" element={<HomeownerDashboardPage />} />
+                  <Route path="/dashboard/homeowner/appointments" element={<HomeownerAppointmentsPage />} />
                   <Route path="/dashboard/homeowner/visits" element={<HomeownerVisitsPage />} />
                   <Route path="/dashboard/homeowner/messages" element={<HomeownerMessagesPage />} />
                   <Route path="/dashboard/homeowner/doors" element={<HomeownerDoorsPage />} />
@@ -154,6 +176,7 @@ function AppRoutes() {
                   <Route path="/dashboard/estate/logs" element={<EstateLogsPage />} />
                   <Route path="/dashboard/estate/plan" element={<EstatePlanPage />} />
                   <Route path="/dashboard/estate/homes" element={<EstateHomesPage />} />
+                  <Route path="/dashboard/estate/settings" element={<EstateSettingsPage />} />
                 </Route>
                 <Route element={<RoleRoute allowedRoles={["admin"]} />}>
                   <Route path="/dashboard/admin" element={<AdminDashboardPage />} />

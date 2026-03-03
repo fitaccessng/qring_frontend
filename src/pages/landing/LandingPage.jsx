@@ -1,11 +1,7 @@
 import { Link } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useTheme } from "../../state/ThemeContext";
-import { useScrollReveal } from "../../hooks/useScrollReveal";
 import BrandMark from "../../components/BrandMark";
-import { getBillingPlans } from "../../services/paymentService";
-
-const NAIRA = "\u20A6";
 
 const navItems = [
   { title: "Home", href: "/" },
@@ -16,65 +12,87 @@ const navItems = [
 
 const testimonials = [
   {
-    name: "Aisha Mohammed",
-    role: "Estate Manager, Lekki Gardens",
-    quote: "Reduced unauthorized entries by 87%. Our residents feel safer and love the convenience."
-  },
-  {
     name: "Chukwudi Okafor",
     role: "Homeowner, Abuja",
     quote: "No more missed deliveries. I approve visitors from anywhere, anytime. Game changer."
   },
   {
+    name: "Aisha Mohammed",
+    role: "Estate Manager, Lekki",
+    quote: "Visitor flow is now fast and organized. Security and convenience improved immediately."
+  },
+  {
+    name: "Tunde Alabi",
+    role: "Facility Lead, Ibadan",
+    quote: "Qring made access control simple for both staff and residents. We see everything in real time."
+  },
+  {
     name: "Jennifer Adebayo",
-    role: "Property Developer",
-    quote: "Deployed across 15 properties. The ROI is undeniable and tenants now expect this."
+    role: "Property Developer, Lagos",
+    quote: "The rollout was smooth and residents adopted it quickly. Support has also been excellent."
+  }
+];
+
+const features = [
+  {
+    title: "Instant Alerts",
+    description: "Get notified the moment a visitor scans your QR code."
+  },
+  {
+    title: "Smart Routing",
+    description: "Send visitors to the right door or person automatically."
+  },
+  {
+    title: "Secure",
+    description: "Encrypted sessions and strict permissions keep your home safe."
+  },
+  {
+    title: "No App Needed",
+    description: "Visitors just use their browser."
+  },
+  {
+    title: "HD Video & Audio Calls",
+    description: "Connect instantly and securely."
+  },
+  {
+    title: "Complete Logs & Analytics",
+    description: "Track visitor activity and security events over time."
+  }
+];
+
+const workflow = [
+  {
+    number: "01",
+    title: "Visitor Scans",
+    description: "Visitor scans your unique QR code at the gate."
+  },
+  {
+    number: "02",
+    title: "System Validates",
+    description: "The system checks the QR code and routing permissions."
+  },
+  {
+    number: "03",
+    title: "You Approve",
+    description: "Get a notification and approve or deny the request instantly."
+  },
+  {
+    number: "04",
+    title: "Access Granted",
+    description: "Secure chat, voice, or video session starts immediately."
   }
 ];
 
 export default function LandingPage() {
   const { isDark, toggleTheme } = useTheme();
-  const [pricingMode, setPricingMode] = useState("monthly");
-  const [currentTestimonial, setCurrentTestimonial] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [pricingPlans, setPricingPlans] = useState([]);
-  const [pricingError, setPricingError] = useState("");
-
-  const hero = useScrollReveal();
-  const features = useScrollReveal();
-  const process = useScrollReveal();
-  const stats = useScrollReveal();
-  const testimonial = useScrollReveal();
-  const pricing = useScrollReveal();
-  const integration = useScrollReveal();
-  const cta = useScrollReveal();
+  const [currentTestimonial, setCurrentTestimonial] = useState(0);
 
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentTestimonial((prev) => (prev + 1) % testimonials.length);
     }, 5000);
     return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-    async function loadPlans() {
-      setPricingError("");
-      try {
-        const rows = await getBillingPlans();
-        if (!active) return;
-        const normalized = normalizeLandingPlans(rows);
-        setPricingPlans(normalized);
-      } catch (err) {
-        if (!active) return;
-        setPricingPlans([]);
-        setPricingError(err?.message ?? "Unable to load pricing plans.");
-      }
-    }
-    loadPlans();
-    return () => {
-      active = false;
-    };
   }, []);
 
   return (
@@ -151,156 +169,105 @@ export default function LandingPage() {
       </header>
 
       <main>
-        <section
-          ref={hero.ref}
-          className={`mx-auto w-full max-w-7xl px-4 py-12 transition-all duration-700 sm:px-6 sm:py-16 lg:px-10 lg:py-24 ${
-            hero.visible ? "translate-y-0 opacity-100" : "translate-y-8 opacity-0"
-          }`}
-        >
-          <div className="grid gap-10 lg:grid-cols-2 lg:gap-14 xl:gap-20">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
-                <span className="relative flex h-2 w-2">
-                  <span className="absolute inline-flex h-2 w-2 animate-ping rounded-full bg-slate-400" />
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-slate-900 dark:bg-white" />
-                </span>
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-200">Live System</span>
-              </div>
-
-              <h2 className="mt-6 text-4xl font-black leading-tight tracking-tight sm:text-5xl lg:mt-8 lg:text-6xl xl:text-7xl">
-                Modern Door
-                <br />
-                Access Control
-              </h2>
-
-              <p className="mt-5 text-base leading-relaxed text-slate-600 sm:text-lg lg:mt-6 lg:text-xl dark:text-slate-300">
-                Qring replaces outdated doorbells with QR-powered realtime communication, visitor verification, and secure video sessions.
+        <section className="relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-b from-cyan-50 to-white dark:from-slate-900 dark:to-slate-950" />
+          <div className="mx-auto grid w-full max-w-7xl gap-10 px-4 py-12 sm:px-6 sm:py-16 lg:grid-cols-2 lg:gap-14 lg:px-10 lg:py-24">
+            <div className="relative z-10">
+              <p className="text-sm font-semibold uppercase tracking-[0.15em] text-cyan-700 dark:text-cyan-300">Qring - Smart Door Access for Homes and Estates</p>
+              <h2 className="mt-4 text-4xl font-black leading-tight tracking-tight sm:text-5xl lg:text-6xl">Replace old doorbells with Qring</h2>
+              <p className="mt-5 max-w-2xl text-base leading-relaxed text-slate-600 sm:text-lg dark:text-slate-300">
+                Get QR-based visitor access, real-time alerts, and secure video calls - all without complicated hardware.
               </p>
 
-              <div className="mt-8 flex flex-wrap gap-3 sm:gap-4 lg:mt-10">
-                <Link to="/signup" className="rounded-lg bg-slate-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 sm:px-8 sm:py-4 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200">
+              <div className="mt-8 flex flex-wrap gap-3 sm:gap-4">
+                <Link to="/signup" className="rounded-lg bg-cyan-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-cyan-700 sm:px-8 sm:py-4">
                   Start Free Trial
                 </Link>
-                <Link to="/contact" className="rounded-lg border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 sm:px-8 sm:py-4 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-900">
-                  Book Demo
+                <Link to="/contact" className="rounded-lg border border-slate-300 bg-white px-6 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 sm:px-8 sm:py-4 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800">
+                  Book a Demo
                 </Link>
               </div>
 
-              <div className="mt-10 grid grid-cols-3 gap-4 sm:gap-6 lg:mt-12">
+              <div className="mt-10 grid grid-cols-3 gap-4 sm:gap-6">
                 <StatBadge value="99.9%" label="Uptime" />
                 <StatBadge value="<1s" label="Response" />
                 <StatBadge value="24/7" label="Support" />
               </div>
             </div>
 
-            <div className="relative">
-              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900">
-                <div className="border-b border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800">
-                  <div className="flex items-center gap-2">
-                    <div className="h-3 w-3 rounded-full bg-slate-300 dark:bg-slate-500" />
-                    <div className="h-3 w-3 rounded-full bg-slate-300 dark:bg-slate-500" />
-                    <div className="h-3 w-3 rounded-full bg-slate-300 dark:bg-slate-500" />
-                    <span className="ml-auto text-xs font-semibold text-slate-600 dark:text-slate-300">Live Activity</span>
+            <div className="relative z-10">
+              <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900">
+                <img
+                  src="https://images.unsplash.com/photo-1558002038-1055907df827?auto=format&fit=crop&w=1600&q=80"
+                  alt="Modern smart estate entrance"
+                  className="h-64 w-full object-cover sm:h-72"
+                />
+                <div className="p-5 sm:p-6">
+                  <h3 className="text-lg font-extrabold tracking-tight">Live Activity Example</h3>
+                  <div className="mt-4 space-y-3">
+                    <ActivityCard title="Visitor scanned QR at Gate A" time="just now" status="active" />
+                    <ActivityCard title="Access approved" time="2 min ago" status="success" />
+                    <ActivityCard title="Video call started" time="4 min ago" status="complete" />
+                    <ActivityCard title="Session ended" time="8 min ago" status="complete" />
                   </div>
-                </div>
-
-                <div className="p-4 sm:p-6">
-                  <div className="space-y-3">
-                    <ActivityCard title="Visitor request at Gate A" time="Just now" status="active" />
-                    <ActivityCard title="Access approved" time="2m ago" status="success" />
-                    <ActivityCard title="Video call established" time="4m ago" status="complete" />
-                    <ActivityCard title="Session ended" time="8m ago" status="complete" />
-                  </div>
-
-                  <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800">
-                    <div className="mb-3 flex items-center justify-between">
-                      <span className="text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300">Today's Activity</span>
-                      <span className="text-sm font-bold">+12%</span>
-                    </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
-                      <div className="h-full w-3/4 bg-slate-900 dark:bg-white" />
-                    </div>
-                  </div>
+                  <p className="mt-4 text-sm font-semibold text-emerald-600 dark:text-emerald-400">Today’s activity: +12%</p>
                 </div>
               </div>
             </div>
           </div>
         </section>
 
-        <section
-          ref={features.ref}
-          className={`border-y border-slate-200 bg-slate-50 py-12 transition-all duration-700 sm:py-16 lg:py-20 dark:border-slate-800 dark:bg-slate-900/40 ${
-            features.visible ? "translate-y-0 opacity-100" : "translate-y-8 opacity-0"
-          }`}
-        >
-          <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-10">
-            <div className="mb-10 text-center sm:mb-12 lg:mb-16">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300">Features</span>
-              <h2 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl lg:mt-4 lg:text-5xl">Everything You Need</h2>
-            </div>
-
-            <div className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
-              <FeatureBlock icon="Alert" title="Instant Notifications" description="Get realtime alerts the moment someone scans your QR code." />
-              <FeatureBlock icon="Route" title="Smart Routing" description="Automatically direct visitors to the right person and door." />
-              <FeatureBlock icon="Secure" title="Strong Security" description="JWT auth, encrypted sessions, and strict permission controls." />
-              <FeatureBlock icon="Web" title="No App Required" description="Visitors use their browser with zero friction." />
-              <FeatureBlock icon="Call" title="HD Video Calls" description="Reliable WebRTC video and audio visitor sessions." />
-              <FeatureBlock icon="Logs" title="Complete Analytics" description="Track visitor patterns and security events over time." />
-            </div>
-          </div>
-        </section>
-
-        <section
-          ref={process.ref}
-          className={`mx-auto w-full max-w-7xl px-4 py-12 transition-all duration-700 sm:px-6 sm:py-16 lg:px-10 lg:py-20 ${
-            process.visible ? "translate-y-0 opacity-100" : "translate-y-8 opacity-0"
-          }`}
-        >
-          <div className="mb-10 text-center sm:mb-12 lg:mb-16">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300">Process</span>
-            <h2 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl lg:mt-4 lg:text-5xl">How It Works</h2>
-          </div>
-
-          <div className="grid gap-6 sm:gap-8 md:grid-cols-2 lg:grid-cols-4">
-            <ProcessStep number="01" title="Visitor Scans" description="Visitor scans a unique QR code at the entry point." />
-            <ProcessStep number="02" title="System Validates" description="Backend verifies code and checks routing permissions." />
-            <ProcessStep number="03" title="You Approve" description="You receive an alert and approve or deny the request." />
-            <ProcessStep number="04" title="Access Granted" description="Secure chat, voice, or video session opens immediately." />
-          </div>
-        </section>
-
-        <section
-          ref={stats.ref}
-          className={`border-y border-slate-200 bg-slate-50 py-12 transition-all duration-700 sm:py-16 lg:py-20 dark:border-slate-800 dark:bg-slate-900/40 ${
-            stats.visible ? "translate-y-0 opacity-100" : "translate-y-8 opacity-0"
-          }`}
-        >
+        <section className="border-y border-slate-200 bg-slate-50 py-12 sm:py-16 lg:py-20 dark:border-slate-800 dark:bg-slate-900/40">
           <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-10">
             <div className="mb-10 text-center sm:mb-12">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300">Platform Statistics</span>
-              <h3 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl lg:mt-4">Trusted Worldwide</h3>
+              <h3 className="text-3xl font-black tracking-tight sm:text-4xl">Features You’ll Love</h3>
             </div>
-
-            <div className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-4">
-              <MetricCard value="24,000+" label="Active Users" />
-              <MetricCard value="1.2M" label="Monthly Scans" />
-              <MetricCard value="94%" label="Approval Rate" />
-              <MetricCard value="<1s" label="Avg Response" />
+            <div className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {features.map((item) => (
+                <FeatureCard key={item.title} title={item.title} description={item.description} />
+              ))}
             </div>
           </div>
         </section>
 
-        <section
-          ref={testimonial.ref}
-          className={`mx-auto w-full max-w-7xl px-4 py-12 transition-all duration-700 sm:px-6 sm:py-16 lg:px-10 lg:py-20 ${
-            testimonial.visible ? "translate-y-0 opacity-100" : "translate-y-8 opacity-0"
-          }`}
-        >
-          <div className="mb-10 text-center sm:mb-12">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300">Testimonials</span>
-            <h3 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl lg:mt-4">What Our Users Say</h3>
+        <section className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 sm:py-16 lg:px-10 lg:py-20">
+          <div className="grid gap-8 lg:grid-cols-2 lg:gap-12">
+            <div>
+              <h3 className="text-3xl font-black tracking-tight sm:text-4xl">How Qring Works</h3>
+              <div className="mt-8 space-y-4">
+                {workflow.map((step) => (
+                  <ProcessStep key={step.number} number={step.number} title={step.title} description={step.description} />
+                ))}
+              </div>
+            </div>
+            <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900">
+              <img
+                src="https://images.unsplash.com/photo-1496171367470-9ed9a91ea931?auto=format&fit=crop&w=1400&q=80"
+                alt="Mobile visitor approval workflow illustration"
+                className="h-full min-h-[320px] w-full object-cover"
+              />
+            </div>
           </div>
+        </section>
 
+        <section className="border-y border-slate-200 bg-slate-50 py-12 sm:py-16 lg:py-20 dark:border-slate-800 dark:bg-slate-900/40">
+          <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-10">
+            <div className="mb-10 text-center sm:mb-12">
+              <h3 className="text-3xl font-black tracking-tight sm:text-4xl">Platform Stats</h3>
+            </div>
+            <div className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-4">
+              <MetricCard value="100+" label="Active Users" />
+              <MetricCard value="100" label="Monthly Scans" />
+              <MetricCard value="94%" label="Approval Rate" />
+              <MetricCard value="<1s" label="Average Response Time" />
+            </div>
+          </div>
+        </section>
+
+        <section className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 sm:py-16 lg:px-10 lg:py-20">
+          <div className="mb-10 text-center sm:mb-12">
+            <h3 className="text-3xl font-black tracking-tight sm:text-4xl">What Our Users Say</h3>
+          </div>
           <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-lg sm:p-8 lg:p-12 dark:border-slate-700 dark:bg-slate-900">
             <div className="mx-auto max-w-3xl text-center">
               <p className="text-lg font-medium leading-relaxed text-slate-700 sm:text-xl lg:text-2xl dark:text-slate-200">
@@ -311,140 +278,25 @@ export default function LandingPage() {
                 <p className="mt-1 text-sm font-medium text-slate-600 dark:text-slate-300">{testimonials[currentTestimonial].role}</p>
               </div>
             </div>
-
             <div className="mt-8 flex justify-center gap-2 sm:mt-10">
               {testimonials.map((_, i) => (
                 <button
                   key={i}
                   type="button"
                   onClick={() => setCurrentTestimonial(i)}
-                  className={`h-2 rounded-full transition-all ${i === currentTestimonial ? "w-8 bg-slate-900 dark:bg-white" : "w-2 bg-slate-300 dark:bg-slate-600"}`}
+                  className={`h-2 rounded-full transition-all ${i === currentTestimonial ? "w-8 bg-cyan-600" : "w-2 bg-slate-300 dark:bg-slate-600"}`}
                 />
               ))}
             </div>
           </div>
         </section>
 
-        {/* <section
-          ref={pricing.ref}
-          className={`border-y border-slate-200 bg-slate-50 py-12 transition-all duration-700 sm:py-16 lg:py-20 dark:border-slate-800 dark:bg-slate-900/40 ${
-            pricing.visible ? "translate-y-0 opacity-100" : "translate-y-8 opacity-0"
-          }`}
-        >
-          <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-10">
-            <div className="mb-10 flex flex-col items-start justify-between gap-4 sm:mb-12 sm:flex-row sm:items-center sm:gap-6">
-              <div>
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300">Pricing</span>
-                <h3 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">Simple Pricing</h3>
-              </div>
-
-              <div className="flex gap-1 rounded-lg border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-900">
-                <button
-                  type="button"
-                  onClick={() => setPricingMode("monthly")}
-                  className={`rounded-md px-4 py-2 text-sm font-semibold transition sm:px-6 ${
-                    pricingMode === "monthly" ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900" : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
-                  }`}
-                >
-                  Monthly
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPricingMode("yearly")}
-                  className={`rounded-md px-4 py-2 text-sm font-semibold transition sm:px-6 ${
-                    pricingMode === "yearly" ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900" : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
-                  }`}
-                >
-                  Yearly
-                </button>
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {pricingError ? (
-                <div className="rounded-2xl border border-danger/30 bg-danger/10 p-5 text-sm text-danger dark:border-danger/30">
-                  {pricingError}
-                </div>
-              ) : pricingPlans.length === 0 ? (
-                <div className="rounded-2xl border border-slate-200 bg-white/80 p-5 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300">
-                  Loading pricing plans...
-                </div>
-              ) : (
-                pricingPlans.map((plan) => (
-                <PricingCard
-                  key={plan.id}
-                  name={plan.name}
-                  price={pricingMode === "monthly" ? plan.monthly : plan.yearly}
-                  period={pricingMode}
-                  note={plan.note}
-                  highlight={plan.highlight}
-                />
-                ))
-              )}
-            </div>
-          </div>
-        </section> */}
-
-        {/* <section
-          ref={integration.ref}
-          className={`mx-auto w-full max-w-7xl px-4 py-12 transition-all duration-700 sm:px-6 sm:py-16 lg:px-10 lg:py-20 ${
-            integration.visible ? "translate-y-0 opacity-100" : "translate-y-8 opacity-0"
-          }`}
-        >
-          <div className="grid gap-8 lg:grid-cols-2 lg:gap-12">
-            <div>
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300">Integration</span>
-              <h3 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl lg:mt-4">Developer Friendly</h3>
-              <p className="mt-4 text-base text-slate-600 sm:mt-6 sm:text-lg dark:text-slate-300">
-                Seamless integration with REST APIs, webhooks, and documentation built for fast shipping.
-              </p>
-
-              <div className="mt-6 space-y-3 sm:mt-8 sm:space-y-4 lg:mt-10">
-                <IntegrationItem icon="API" name="REST API" />
-                <IntegrationItem icon="Hook" name="Webhooks" />
-                <IntegrationItem icon="Socket" name="WebSocket Events" />
-                <IntegrationItem icon="OAuth" name="OAuth 2.0" />
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-slate-900 p-4 sm:p-6 lg:p-8 dark:border-slate-700">
-              <div className="rounded-lg bg-slate-950 p-4 font-mono text-sm sm:p-6">
-                <div className="mb-4 flex items-center gap-2">
-                  <div className="h-2 w-2 rounded-full bg-green-500" />
-                  <span className="text-slate-400">api.qring.com</span>
-                </div>
-                <pre className="overflow-x-auto text-xs leading-relaxed text-slate-300">
-{`POST /api/v1/sessions/approve
-{
-  "session_id": "sess_abc123",
-  "approved": true,
-  "access_duration": 300
-}
-
-Response: 200 OK
-{
-  "status": "approved",
-  "door_unlocked": true,
-  "expires_at": "2026-02-12T15:30:00Z"
-}`}
-                </pre>
-              </div>
-            </div>
-          </div>
-        </section> */}
-
-        <section
-          ref={cta.ref}
-          className={`border-y border-slate-200 bg-slate-900 py-12 transition-all duration-700 sm:py-16 lg:py-20 dark:border-slate-800 ${
-            cta.visible ? "translate-y-0 opacity-100" : "translate-y-8 opacity-0"
-          }`}
-        >
+        <section className="border-y border-slate-200 bg-slate-900 py-12 sm:py-16 lg:py-20 dark:border-slate-800">
           <div className="mx-auto w-full max-w-4xl px-4 text-center sm:px-6">
-            <h2 className="text-3xl font-black tracking-tight text-white sm:text-4xl lg:text-5xl">Ready To Get Started?</h2>
+            <h2 className="text-3xl font-black tracking-tight text-white sm:text-4xl lg:text-5xl">Get Started Today</h2>
             <p className="mt-4 text-base text-slate-300 sm:mt-6 sm:text-xl">
-              Join thousands using Qring. Start your free trial today with no credit card required.
+              Join thousands using Qring. Start your free trial - no credit card required.
             </p>
-
             <div className="mt-8 flex flex-wrap justify-center gap-3 sm:mt-10 sm:gap-4">
               <Link to="/signup" className="rounded-lg bg-white px-6 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-100 sm:px-10 sm:py-4">
                 Start Free Trial
@@ -453,10 +305,8 @@ Response: 200 OK
                 Contact Sales
               </Link>
             </div>
-
             <div className="mt-6 flex flex-wrap justify-center gap-4 text-xs text-slate-400 sm:mt-8 sm:gap-6 sm:text-sm">
-              <span>14-day free trial</span>
-              <span>No credit card needed</span>
+              <span>60-day free trial</span>
               <span>Cancel anytime</span>
             </div>
           </div>
@@ -468,12 +318,9 @@ Response: 200 OK
           <div className="grid gap-8 sm:gap-10 md:grid-cols-2 lg:grid-cols-4 lg:gap-12">
             <div>
               <div className="flex items-center gap-3">
-                {/* <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-900 dark:bg-white">
-                  <BrandMark tone="light" className="h-6 w-6 dark:invert-0" />
-                </div> */}
                 <span className="text-xl font-black">Qring</span>
               </div>
-              <p className="mt-4 text-sm text-slate-600 dark:text-slate-300">Modern door access control for homes and estates.</p>
+              <p className="mt-4 text-sm text-slate-600 dark:text-slate-300">Qring - Modern door access control for homes and estates.</p>
             </div>
 
             <FooterColumn
@@ -533,7 +380,7 @@ function FooterColumn({ title, links }) {
 
 function StatBadge({ value, label }) {
   return (
-    <div className="text-center">
+    <div className="rounded-xl border border-slate-200 bg-white p-3 text-center dark:border-slate-700 dark:bg-slate-900">
       <p className="text-2xl font-black sm:text-3xl">{value}</p>
       <p className="mt-1 text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300">{label}</p>
     </div>
@@ -542,8 +389,8 @@ function StatBadge({ value, label }) {
 
 function ActivityCard({ title, time, status }) {
   const statusColors = {
-    active: "border-slate-900 bg-slate-50 dark:border-slate-400 dark:bg-slate-800",
-    success: "border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-900",
+    active: "border-cyan-300 bg-cyan-50 dark:border-cyan-700 dark:bg-cyan-900/20",
+    success: "border-emerald-300 bg-emerald-50 dark:border-emerald-700 dark:bg-emerald-900/20",
     complete: "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"
   };
 
@@ -555,12 +402,9 @@ function ActivityCard({ title, time, status }) {
   );
 }
 
-function FeatureBlock({ icon, title, description }) {
+function FeatureCard({ title, description }) {
   return (
     <article className="rounded-xl border border-slate-200 bg-white p-6 transition hover:shadow-lg sm:p-8 dark:border-slate-700 dark:bg-slate-900">
-      <div className="mb-4 inline-flex rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-semibold uppercase tracking-wider dark:border-slate-700 dark:bg-slate-800">
-        {icon}
-      </div>
       <h4 className="text-xl font-bold">{title}</h4>
       <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{description}</p>
     </article>
@@ -569,9 +413,9 @@ function FeatureBlock({ icon, title, description }) {
 
 function ProcessStep({ number, title, description }) {
   return (
-    <article className="rounded-xl border border-slate-200 bg-white p-6 text-center dark:border-slate-700 dark:bg-slate-900">
-      <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border-2 border-slate-900 bg-white dark:border-white dark:bg-slate-900">
-        <span className="text-sm font-black sm:text-base">{number}</span>
+    <article className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
+      <div className="mb-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-cyan-600 text-sm font-black text-white">
+        {number}
       </div>
       <h4 className="text-lg font-bold">{title}</h4>
       <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{description}</p>
@@ -586,92 +430,4 @@ function MetricCard({ value, label }) {
       <p className="mt-2 text-sm font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300">{label}</p>
     </article>
   );
-}
-
-function PricingCard({ name, price, period, note, highlight }) {
-  return (
-    <article className={`rounded-xl border bg-white p-6 transition hover:shadow-xl sm:p-8 dark:bg-slate-900 ${highlight ? "border-slate-900 shadow-lg dark:border-white" : "border-slate-200 dark:border-slate-700"}`}>
-      {highlight ? (
-        <div className="mb-4 inline-block rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-white dark:bg-white dark:text-slate-900">
-          Popular
-        </div>
-      ) : null}
-
-      <p className="text-sm font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300">{name}</p>
-      <div className="mt-4 flex items-baseline gap-1">
-        <span className="text-4xl font-black sm:text-5xl">
-          {NAIRA}
-          {formatCurrency(price)}
-        </span>
-        <span className="text-sm text-slate-600 dark:text-slate-300">/{period === "monthly" ? "mo" : "yr"}</span>
-      </div>
-      <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">{note}</p>
-
-      <ul className="mt-6 space-y-3 text-sm text-slate-700 dark:text-slate-200">
-        <li className="flex items-center gap-2">- Realtime notifications</li>
-        <li className="flex items-center gap-2">- QR routing system</li>
-        <li className="flex items-center gap-2">- Video and audio calls</li>
-        <li className="flex items-center gap-2">- 24/7 support</li>
-      </ul>
-
-      <Link
-        to="/pricing"
-        className={`mt-8 block rounded-lg py-3 text-center text-sm font-semibold transition ${
-          highlight
-            ? "bg-slate-900 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
-            : "border border-slate-200 text-slate-900 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-800"
-        }`}
-      >
-        Get Started
-      </Link>
-    </article>
-  );
-}
-
-function IntegrationItem({ icon, name }) {
-  return (
-    <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
-      <div className="flex items-center gap-3">
-        <span className="rounded-md bg-slate-100 px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-          {icon}
-        </span>
-        <span className="font-semibold">{name}</span>
-      </div>
-      <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white dark:bg-white dark:text-slate-900">
-        Ready
-      </span>
-    </div>
-  );
-}
-
-function formatCurrency(amount) {
-  return new Intl.NumberFormat("en-NG").format(amount);
-}
-
-function normalizeLandingPlans(rows) {
-  const plans = Array.isArray(rows) ? rows : [];
-  const active = plans.filter((p) => p && p.active !== false);
-  const mapped = active.map((plan) => {
-    const monthly = Number(plan.amount || 0);
-    const yearly = monthly * 12;
-    const maxDoors = plan.maxDoors ?? null;
-    const maxQr = plan.maxQrCodes ?? null;
-    const noteParts = [];
-    if (typeof maxDoors === "number") noteParts.push(`Up to ${maxDoors} doors`);
-    if (typeof maxQr === "number") noteParts.push(`Up to ${maxQr} QR codes`);
-    return {
-      id: plan.id,
-      name: plan.name ?? plan.id,
-      monthly,
-      yearly,
-      note: noteParts.length ? noteParts.join(" • ") : "Flexible access control plan",
-      highlight: false
-    };
-  });
-
-  // Prefer a sensible default highlight if a common tier exists.
-  const highlightId = mapped.some((p) => p.id === "doors_40")
-    ? "doors_40"
-    : mapped.find((p) => p.monthly > 0)?.id;
-  return mapped.map((p) => ({ ...p, highlight: p.id === highlightId }));
 }

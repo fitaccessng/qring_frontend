@@ -24,6 +24,7 @@ function hasDashboardPayload(payload) {
 }
 
 export function useDashboardData() {
+  const realtimeEnabled = !import.meta.env.DEV;
   const [dashboard, setDashboard] = useState(initialData);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -43,6 +44,11 @@ export function useDashboardData() {
   }, []);
 
   useEffect(() => {
+    if (!realtimeEnabled) {
+      refresh();
+      return () => {};
+    }
+
     let mounted = true;
     const socket = getDashboardSocket();
 
@@ -91,7 +97,7 @@ export function useDashboardData() {
       socket.off("dashboard.error", onError);
       closeDashboardSocket();
     };
-  }, [refresh]);
+  }, [refresh, realtimeEnabled]);
 
   return useMemo(
     () => ({
@@ -99,8 +105,9 @@ export function useDashboardData() {
       loading,
       error,
       connected,
+      realtimeEnabled,
       refresh
     }),
-    [dashboard, loading, error, connected, refresh]
+    [dashboard, loading, error, connected, realtimeEnabled, refresh]
   );
 }

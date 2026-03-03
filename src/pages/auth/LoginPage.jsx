@@ -23,6 +23,15 @@ function resolveTargetPath(data, fromPath) {
   return fromPath ?? fallback;
 }
 
+function resolveLoginErrorMessage(submitError) {
+  const status = Number(submitError?.status ?? 0);
+  const message = String(submitError?.message || "");
+  if (status === 401 || message.toLowerCase().includes("invalid credential")) {
+    return "Invalid email or password.";
+  }
+  return message || "Login failed";
+}
+
 export default function LoginPage() {
   const { login, googleSignIn, loading } = useAuth();
   const [searchParams] = useSearchParams();
@@ -44,7 +53,7 @@ export default function LoginPage() {
       }
       navigate(target, { replace: true });
     } catch (submitError) {
-      setError(submitError.message ?? "Login failed");
+      setError(resolveLoginErrorMessage(submitError));
     }
   };
 
@@ -67,7 +76,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="grid min-h-screen place-items-center bg-slate-50 p-4 dark:bg-slate-950">
+    <div className="safe-content grid min-h-screen place-items-center bg-slate-50 p-4 dark:bg-slate-950">
       <AuthCard title="Login" subtitle="Access your secure Qring workspace">
         <form onSubmit={onSubmit} className="space-y-4">
           <Input

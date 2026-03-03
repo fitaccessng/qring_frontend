@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import AppShell from "../../layouts/AppShell";
 import { env } from "../../config/env";
 import {
@@ -271,19 +271,28 @@ export default function EstateDoorsPage() {
 
   return (
     <AppShell title="Estate Doors">
-      {error ? <div className="mb-4 rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</div> : null}
-      {notice ? <div className="mb-4 rounded-xl border border-success/30 bg-success/10 px-4 py-3 text-sm text-success">{notice}</div> : null}
+      <div className="mx-auto max-w-7xl space-y-6">
+        {error ? <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600 dark:border-red-900/20 dark:bg-red-900/10 dark:text-red-400">{error}</div> : null}
+        {notice ? <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-900/20 dark:bg-emerald-900/10 dark:text-emerald-400">{notice}</div> : null}
 
-      <section className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-soft dark:border-slate-800 dark:bg-slate-900/80 sm:p-5">
+        <section className="relative overflow-hidden rounded-[2.5rem] bg-slate-900 p-8 text-white dark:bg-indigo-600">
+          <div className="relative z-10">
+            <h2 style={{color: "white"}} className="text-2xl font-bold tracking-tight">Estate Doors</h2>
+            <p className="mt-2 text-sm text-slate-200 dark:text-indigo-100">Create doors, generate QR codes, and manage homeowner access in one place.</p>
+          </div>
+          <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/5 blur-3xl" />
+        </section>
+
+      <section className="rounded-[2rem] border border-slate-200/70 bg-white/95 p-5 shadow-[0_8px_30px_rgb(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-900/90 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="font-heading text-lg font-bold sm:text-xl">Create Door</h2>
+            <h2 className="font-heading text-lg font-bold sm:text-xl text-slate-900 dark:text-white">Create Door</h2>
             <p className="mt-1 text-sm text-slate-500">Create doors and provision homeowner login in one flow.</p>
           </div>
           <button
             type="button"
             onClick={() => setProvisionMode((prev) => !prev)}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold dark:border-slate-700"
+            className="rounded-2xl border border-slate-300 px-3 py-2 text-xs font-semibold transition-all active:scale-95 dark:border-slate-700"
           >
             {provisionMode ? "Use Existing Homeowner" : "Provision New Homeowner Login"}
           </button>
@@ -312,7 +321,7 @@ export default function EstateDoorsPage() {
               <input
                 value={form.homeName}
                 onChange={(event) => setForm((prev) => ({ ...prev, homeName: event.target.value }))}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
                 required
               />
             </label>
@@ -323,7 +332,7 @@ export default function EstateDoorsPage() {
             <input
               value={form.name}
               onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
               required
             />
           </label>
@@ -335,7 +344,7 @@ export default function EstateDoorsPage() {
                 <input
                   value={form.homeownerFullName}
                   onChange={(event) => setForm((prev) => ({ ...prev, homeownerFullName: event.target.value }))}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
                   required
                 />
               </label>
@@ -344,7 +353,7 @@ export default function EstateDoorsPage() {
                 <input
                   value={form.homeownerUsername}
                   onChange={(event) => setForm((prev) => ({ ...prev, homeownerUsername: event.target.value }))}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
                   required
                 />
               </label>
@@ -354,7 +363,7 @@ export default function EstateDoorsPage() {
                   type="password"
                   value={form.homeownerPassword}
                   onChange={(event) => setForm((prev) => ({ ...prev, homeownerPassword: event.target.value }))}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
                   required
                 />
               </label>
@@ -364,7 +373,7 @@ export default function EstateDoorsPage() {
           <button
             type="submit"
             disabled={busy}
-            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 dark:bg-white dark:text-slate-900"
+            className="rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition-all active:scale-95 disabled:opacity-50 dark:bg-white dark:text-slate-900"
           >
             {busy ? "Saving..." : "Create Door"}
           </button>
@@ -372,7 +381,7 @@ export default function EstateDoorsPage() {
       </section>
 
       {createdQr ? (
-        <section className="mt-4 rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-soft dark:border-slate-800 dark:bg-slate-900/80">
+        <section className="rounded-[2rem] border border-slate-200/70 bg-white/95 p-5 shadow-[0_8px_30px_rgb(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-900/90">
           <h3 className="font-heading text-base font-bold">Generated QR</h3>
           <p className="text-xs text-slate-500">{createdQr.doorName}</p>
           <div className="mt-3 inline-flex flex-col items-center rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800">
@@ -382,7 +391,7 @@ export default function EstateDoorsPage() {
         </section>
       ) : null}
 
-      <section className="mt-4 rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-soft dark:border-slate-800 dark:bg-slate-900/80">
+      <section className="rounded-[2rem] border border-slate-200/70 bg-white/95 p-5 shadow-[0_8px_30px_rgb(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-900/90">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="font-heading text-base font-bold">Estate Shared Entry QR</h3>
@@ -391,7 +400,7 @@ export default function EstateDoorsPage() {
           <button
             type="button"
             onClick={generateSharedQr}
-            className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white dark:bg-white dark:text-slate-900"
+            className="rounded-2xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition-all active:scale-95 dark:bg-white dark:text-slate-900"
           >
             Generate Shared QR
           </button>
@@ -404,7 +413,7 @@ export default function EstateDoorsPage() {
             <button
               type="button"
               onClick={printSharedEstateQr}
-              className="mt-3 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white dark:bg-white dark:text-slate-900"
+              className="mt-3 rounded-2xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition-all active:scale-95 dark:bg-white dark:text-slate-900"
             >
               Print Shared Estate QR
             </button>
@@ -412,14 +421,14 @@ export default function EstateDoorsPage() {
         ) : null}
       </section>
 
-      <section className="mt-4">
+      <section>
         <h3 className="mb-3 font-heading text-lg font-bold">Doors Created</h3>
         <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
           {doors.map((door) => {
             const firstQr = door.qr?.[0];
             const loginLink = `${door.loginLink}?email=${encodeURIComponent(door.homeownerEmail || "")}`;
             return (
-              <article key={door.id} className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-soft dark:border-slate-800 dark:bg-slate-900/80">
+              <article key={door.id} className="rounded-[2rem] border border-slate-200/70 bg-white/95 p-5 shadow-[0_8px_30px_rgb(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-900/90">
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <p className="font-heading text-lg font-bold">{door.name}</p>
@@ -428,7 +437,7 @@ export default function EstateDoorsPage() {
                   <button
                     type="button"
                     onClick={() => startEditDoor(door)}
-                    className="rounded-lg border border-slate-300 px-2 py-1 text-xs font-semibold dark:border-slate-700"
+                    className="rounded-2xl border border-slate-300 px-2.5 py-1.5 text-xs font-semibold transition-all active:scale-95 dark:border-slate-700"
                   >
                     Admin Profile
                   </button>
@@ -442,7 +451,7 @@ export default function EstateDoorsPage() {
                   <button
                     type="button"
                     onClick={() => copyLoginDetails(door)}
-                    className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-semibold dark:border-slate-700"
+                    className="rounded-2xl border border-slate-300 px-2.5 py-1.5 text-xs font-semibold transition-all active:scale-95 dark:border-slate-700"
                   >
                     Copy Login Details
                   </button>
@@ -453,7 +462,7 @@ export default function EstateDoorsPage() {
                       key={`${door.id}-${qrId}`}
                       type="button"
                       onClick={() => printDoorQr(door, qrId)}
-                      className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-semibold dark:border-slate-700 dark:bg-slate-800"
+                      className="rounded-2xl border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-semibold transition-all active:scale-95 dark:border-slate-700 dark:bg-slate-800"
                     >
                       Print {qrId}
                     </button>
@@ -476,13 +485,13 @@ export default function EstateDoorsPage() {
       </section>
 
       {editingDoorId ? (
-        <section className="mt-4 rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-soft dark:border-slate-800 dark:bg-slate-900/80 sm:p-5">
+        <section className="rounded-[2rem] border border-slate-200/70 bg-white/95 p-5 shadow-[0_8px_30px_rgb(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-900/90 sm:p-6">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="font-heading text-lg font-bold">Door Admin Profile</h3>
             <button
               type="button"
               onClick={() => setEditingDoorId("")}
-              className="rounded-lg border border-slate-300 px-2 py-1 text-xs font-semibold dark:border-slate-700"
+              className="rounded-2xl border border-slate-300 px-2.5 py-1.5 text-xs font-semibold transition-all active:scale-95 dark:border-slate-700"
             >
               Close
             </button>
@@ -493,7 +502,7 @@ export default function EstateDoorsPage() {
               <input
                 value={adminForm.doorName}
                 onChange={(event) => setAdminForm((prev) => ({ ...prev, doorName: event.target.value }))}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
               />
             </label>
             <label className="block">
@@ -501,7 +510,7 @@ export default function EstateDoorsPage() {
               <input
                 value={adminForm.homeownerName}
                 onChange={(event) => setAdminForm((prev) => ({ ...prev, homeownerName: event.target.value }))}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
               />
             </label>
             <label className="block">
@@ -510,7 +519,7 @@ export default function EstateDoorsPage() {
                 type="email"
                 value={adminForm.homeownerEmail}
                 onChange={(event) => setAdminForm((prev) => ({ ...prev, homeownerEmail: event.target.value }))}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
               />
             </label>
             <label className="block">
@@ -519,20 +528,21 @@ export default function EstateDoorsPage() {
                 type="password"
                 value={adminForm.newPassword}
                 onChange={(event) => setAdminForm((prev) => ({ ...prev, newPassword: event.target.value }))}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
                 placeholder="Leave empty to keep current password"
               />
             </label>
             <button
               type="submit"
               disabled={editingBusy}
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 dark:bg-white dark:text-slate-900"
+              className="rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition-all active:scale-95 disabled:opacity-50 dark:bg-white dark:text-slate-900"
             >
               {editingBusy ? "Updating..." : "Update Admin Profile"}
             </button>
           </form>
         </section>
       ) : null}
+      </div>
     </AppShell>
   );
 }
@@ -558,7 +568,7 @@ function Select({ label, value, onChange, options }) {
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
         required
       >
         {options.length === 0 ? <option value="">No options available</option> : null}
@@ -571,3 +581,4 @@ function Select({ label, value, onChange, options }) {
     </label>
   );
 }
+

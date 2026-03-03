@@ -41,6 +41,15 @@ function resolveSocketUrl(rawValue) {
   return defaultSocketUrl;
 }
 
+function originFromUrl(value) {
+  try {
+    const parsed = new URL(value);
+    return trimTrailingSlash(parsed.origin);
+  } catch {
+    return "";
+  }
+}
+
 function resolvePublicAppUrl(rawValue) {
   const value = (rawValue ?? "").trim();
   if (!value) return trimTrailingSlash(defaultPublicAppUrl);
@@ -100,9 +109,20 @@ function parseIceServers(rawValue) {
   ];
 }
 
+const resolvedApiBaseUrl = resolveApiBaseUrl(import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL);
+const resolvedSocketUrl = (() => {
+  const explicit = resolveSocketUrl(import.meta.env.VITE_SOCKET_URL);
+  if ((import.meta.env.VITE_SOCKET_URL ?? "").trim()) return explicit;
+  const apiOrigin = originFromUrl(resolvedApiBaseUrl);
+  if (apiOrigin && typeof window !== "undefined" && apiOrigin !== trimTrailingSlash(window.location.origin)) {
+    return apiOrigin;
+  }
+  return explicit;
+})();
+
 export const env = {
-  apiBaseUrl: resolveApiBaseUrl(import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL),
-  socketUrl: resolveSocketUrl(import.meta.env.VITE_SOCKET_URL),
+  apiBaseUrl: resolvedApiBaseUrl,
+  socketUrl: resolvedSocketUrl,
   publicAppUrl: resolvePublicAppUrl(import.meta.env.VITE_PUBLIC_APP_URL),
   socketPath: import.meta.env.VITE_SOCKET_PATH ?? "/socket.io",
   dashboardNamespace:

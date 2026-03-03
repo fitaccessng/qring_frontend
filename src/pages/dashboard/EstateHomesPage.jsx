@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import AppShell from "../../layouts/AppShell";
 import { addEstateHome, getEstateOverview } from "../../services/estateService";
+import PageSkeleton from "../../components/PageSkeleton";
 
 export default function EstateHomesPage() {
   const [overview, setOverview] = useState(null);
@@ -8,20 +9,29 @@ export default function EstateHomesPage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   async function load() {
-    const data = await getEstateOverview();
-    setOverview(data);
-    if (!form.estateId && data?.estates?.length) {
-      setForm((prev) => ({ ...prev, estateId: data.estates[0].id }));
-    }
-    if (!form.homeownerId && data?.homeowners?.length) {
-      setForm((prev) => ({ ...prev, homeownerId: data.homeowners[0].id }));
+    setLoading(true);
+    try {
+      const data = await getEstateOverview();
+      setOverview(data);
+      if (!form.estateId && data?.estates?.length) {
+        setForm((prev) => ({ ...prev, estateId: data.estates[0].id }));
+      }
+      if (!form.homeownerId && data?.homeowners?.length) {
+        setForm((prev) => ({ ...prev, homeownerId: data.homeowners[0].id }));
+      }
+    } finally {
+      setLoading(false);
     }
   }
 
   useEffect(() => {
-    load().catch((requestError) => setError(requestError.message ?? "Failed to load homes"));
+    load().catch((requestError) => {
+      setError(requestError.message ?? "Failed to load homes");
+      setLoading(false);
+    });
   }, []);
 
   async function onSubmit(event) {
@@ -43,53 +53,66 @@ export default function EstateHomesPage() {
 
   return (
     <AppShell title="Multi-Home Support">
-      {error ? <div className="mb-4 rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</div> : null}
-      {notice ? <div className="mb-4 rounded-xl border border-success/30 bg-success/10 px-4 py-3 text-sm text-success">{notice}</div> : null}
+      <div className="mx-auto max-w-7xl space-y-6">
+        {error ? <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600 dark:border-red-900/20 dark:bg-red-900/10 dark:text-red-400">{error}</div> : null}
+        {notice ? <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-900/20 dark:bg-emerald-900/10 dark:text-emerald-400">{notice}</div> : null}
 
-      <section className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-soft dark:border-slate-800 dark:bg-slate-900/80 sm:p-5">
-        <h2 className="font-heading text-lg font-bold sm:text-xl">Add Home</h2>
-        <p className="mt-1 text-sm text-slate-500">Built for multi-home estates with central control and audit-ready workflows.</p>
-        <form onSubmit={onSubmit} className="mt-4 grid gap-3 md:grid-cols-2">
-          <Select
-            label="Estate"
-            value={form.estateId}
-            onChange={(value) => setForm((prev) => ({ ...prev, estateId: value }))}
-            options={(overview?.estates ?? []).map((item) => ({ value: item.id, label: item.name }))}
-          />
-          <Select
-            label="Homeowner"
-            value={form.homeownerId}
-            onChange={(value) => setForm((prev) => ({ ...prev, homeownerId: value }))}
-            options={(overview?.homeowners ?? []).map((item) => ({ value: item.id, label: `${item.fullName} (${item.email})` }))}
-          />
-          <label className="block md:col-span-2">
-            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Home Name</span>
-            <input
-              value={form.name}
-              onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
-              required
-            />
-          </label>
-          <button
-            type="submit"
-            disabled={busy}
-            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 dark:bg-white dark:text-slate-900"
-          >
-            {busy ? "Saving..." : "Add Home"}
-          </button>
-        </form>
-      </section>
+        <section className="relative overflow-hidden rounded-[2.5rem] bg-slate-900 p-8 text-white dark:bg-indigo-600">
+          <div className="relative z-10">
+            <h2 style={{ color: "white" }} className="text-2xl font-bold tracking-tight">Multi-Home Support</h2>
+            <p className="mt-2 text-sm text-slate-200 dark:text-indigo-100">Add homes and attach the right homeowner records to each property.</p>
+          </div>
+          <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/5 blur-3xl" />
+        </section>
 
-      <section className="mt-4 grid gap-3 sm:grid-cols-2">
-        {(overview?.homes ?? []).map((home) => (
-          <article key={home.id} className="rounded-xl border border-slate-200 bg-white/90 p-4 shadow-soft dark:border-slate-800 dark:bg-slate-900/80">
-            <p className="font-semibold">{home.name}</p>
-            <p className="mt-1 text-xs text-slate-500">{home.homeownerName || "No homeowner assigned"}</p>
-            <p className="text-xs text-slate-500">{home.homeownerEmail}</p>
-          </article>
-        ))}
-      </section>
+        <section className="rounded-[2rem] border border-slate-200/70 bg-white/95 p-5 shadow-[0_8px_30px_rgb(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-900/90 sm:p-6">
+          {loading ? (
+            <PageSkeleton blocks={2} />
+          ) : (
+            <form onSubmit={onSubmit} className="grid gap-3 md:grid-cols-2">
+              <Select
+                label="Estate"
+                value={form.estateId}
+                onChange={(value) => setForm((prev) => ({ ...prev, estateId: value }))}
+                options={(overview?.estates ?? []).map((item) => ({ value: item.id, label: item.name }))}
+              />
+              <Select
+                label="Homeowner"
+                value={form.homeownerId}
+                onChange={(value) => setForm((prev) => ({ ...prev, homeownerId: value }))}
+                options={(overview?.homeowners ?? []).map((item) => ({ value: item.id, label: `${item.fullName} (${item.email})` }))}
+              />
+              <label className="block md:col-span-2">
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Home Name</span>
+                <input
+                  value={form.name}
+                  onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
+                  required
+                />
+              </label>
+              <button
+                type="submit"
+                disabled={busy}
+                className="rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition-all active:scale-95 disabled:opacity-50 dark:bg-white dark:text-slate-900"
+              >
+                {busy ? "Saving..." : "Add Home"}
+              </button>
+            </form>
+          )}
+        </section>
+
+        <section className="grid gap-3 sm:grid-cols-2">
+          {loading ? <PageSkeleton blocks={3} className="sm:col-span-2" /> : null}
+          {!loading && (overview?.homes ?? []).map((home) => (
+            <article key={home.id} className="rounded-[2rem] border border-slate-200/70 bg-white/95 p-5 shadow-[0_8px_30px_rgb(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-900/90">
+              <p className="font-semibold">{home.name}</p>
+              <p className="mt-1 text-xs text-slate-500">{home.homeownerName || "No homeowner assigned"}</p>
+              <p className="text-xs text-slate-500">{home.homeownerEmail}</p>
+            </article>
+          ))}
+        </section>
+      </div>
     </AppShell>
   );
 }
@@ -101,7 +124,7 @@ function Select({ label, value, onChange, options }) {
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
         required
       >
         {options.length === 0 ? <option value="">No options available</option> : null}
@@ -114,3 +137,4 @@ function Select({ label, value, onChange, options }) {
     </label>
   );
 }
+

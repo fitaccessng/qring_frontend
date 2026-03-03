@@ -5,6 +5,26 @@ export async function getHomeownerVisits() {
   return Array.isArray(response?.data) ? response.data : [];
 }
 
+export async function getHomeownerAppointments() {
+  const response = await apiRequest("/homeowner/appointments");
+  return Array.isArray(response?.data) ? response.data : [];
+}
+
+export async function createHomeownerAppointment(payload) {
+  const response = await apiRequest("/homeowner/appointments", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+  return response?.data ?? null;
+}
+
+export async function shareHomeownerAppointment(appointmentId) {
+  const response = await apiRequest(`/homeowner/appointments/${appointmentId}/share`, {
+    method: "POST"
+  });
+  return response?.data ?? null;
+}
+
 export async function getHomeownerContext() {
   const response = await apiRequest("/homeowner/settings");
   const data = response?.data ?? null;
@@ -95,4 +115,25 @@ export async function getVisitorSessionStatus(sessionId) {
 export async function getVisitorSessionMessages(sessionId) {
   const response = await apiRequest(`/visitor/sessions/${sessionId}/messages`);
   return Array.isArray(response?.data) ? response.data : [];
+}
+
+export async function resolveVisitorAppointment(shareToken) {
+  const response = await apiRequest(`/visitor/appointments/resolve/${encodeURIComponent(shareToken)}`);
+  return response?.data ?? null;
+}
+
+export async function acceptVisitorAppointment(appointmentId, payload) {
+  const response = await apiRequest(`/visitor/appointments/${appointmentId}/accept`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+  return response?.data ?? null;
+}
+
+export async function signalVisitorAppointmentArrival(appointmentId, payload) {
+  const response = await apiRequest(`/visitor/appointments/${appointmentId}/arrival`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+  return response?.data ?? null;
 }

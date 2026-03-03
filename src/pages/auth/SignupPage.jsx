@@ -3,8 +3,10 @@ import { useState } from "react";
 import AuthCard from "../../components/AuthCard";
 import { useAuth } from "../../state/AuthContext";
 
+const MOBILE_ONBOARDING_INTENT_KEY = "qring_mobile_onboarding_intent";
+
 export default function SignupPage() {
-  const { signup, beginGoogleSignUp } = useAuth();
+  const { signup, login, beginGoogleSignUp } = useAuth();
   const [form, setForm] = useState({
     fullName: "",
     email: "",
@@ -15,6 +17,9 @@ export default function SignupPage() {
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [continuing, setContinuing] = useState(false);
+  const [signupSuccess, setSignupSuccess] = useState(false);
+  const [pendingCredentials, setPendingCredentials] = useState(null);
   const navigate = useNavigate();
 
   const onSubmit = async (event) => {
@@ -23,11 +28,27 @@ export default function SignupPage() {
     setSubmitting(true);
     try {
       await signup(form);
-      navigate("/login");
+      setPendingCredentials({ email: form.email, password: form.password });
+      setSignupSuccess(true);
     } catch (submitError) {
       setError(submitError.message ?? "Signup failed");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const onContinueAfterSignup = async () => {
+    if (!pendingCredentials) return;
+    setError("");
+    setContinuing(true);
+    try {
+      await login(pendingCredentials);
+      localStorage.setItem(MOBILE_ONBOARDING_INTENT_KEY, "1");
+      navigate("/onboarding", { replace: true });
+    } catch (submitError) {
+      setError(submitError.message ?? "Login failed after signup");
+    } finally {
+      setContinuing(false);
     }
   };
 
@@ -47,7 +68,7 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="grid min-h-screen place-items-center bg-slate-50 p-4 dark:bg-slate-950">
+    <div className="safe-content grid min-h-screen place-items-center bg-slate-50 p-4 dark:bg-slate-950">
       <AuthCard title="Create Account" subtitle="Start with secure QR access">
         <form onSubmit={onSubmit} className="space-y-4">
           <Input label="Full name" type="text" value={form.fullName} onChange={(value) => setForm((prev) => ({ ...prev, fullName: value }))} />
@@ -120,6 +141,25 @@ export default function SignupPage() {
           </p>
         </form>
       </AuthCard>
+      {signupSuccess ? (
+        <div className="fixed inset-0 z-40 grid place-items-center bg-slate-900/55 p-4">
+          <div className="flex min-h-[22rem] w-full max-w-lg flex-col justify-center rounded-3xl border border-emerald-200 bg-white px-7 py-10 shadow-2xl sm:min-h-[24rem] sm:px-10">
+            <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Congratulations</p>
+            <h2 className="mt-2 text-2xl font-extrabold text-slate-900">Account Created</h2>
+            <p className="mt-3 text-sm font-medium text-slate-700">
+              Your account is ready. Click continue to start onboarding.
+            </p>
+            <button
+              type="button"
+              onClick={onContinueAfterSignup}
+              disabled={continuing}
+              className="mt-6 w-full rounded-xl bg-brand-500 px-4 py-3 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-60"
+            >
+              {continuing ? "Please wait..." : "Continue"}
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -1,5 +1,4 @@
-import { Link, NavLink, useNavigate } from "react-router-dom";
-import { useTheme } from "../state/ThemeContext";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../state/AuthContext";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getHomeownerContext } from "../services/homeownerService";
@@ -11,11 +10,12 @@ import {
   registerPushSubscription,
   requestBrowserNotificationPermission
 } from "../services/notificationService";
-import OnboardingGuideModal from "../components/OnboardingGuideModal";
+import { resolveNotificationRoute } from "../utils/notificationRouting";
 
 const navByRole = {
   homeowner: [
     { to: "/dashboard/homeowner/overview", label: "Overview", icon: "overview" },
+    { to: "/dashboard/homeowner/appointments", label: "Appointments", icon: "appointments" },
     { to: "/dashboard/homeowner/visits", label: "Visits", icon: "visits" },
     { to: "/dashboard/homeowner/messages", label: "Messages", icon: "messages" },
     { to: "/dashboard/homeowner/doors", label: "Doors", icon: "doors" },
@@ -32,7 +32,8 @@ const navByRole = {
     { to: "/dashboard/estate/logs", label: "Access Logs", icon: "logs" },
     { to: "/dashboard/estate/plan", label: "Plan Rules", icon: "plans" },
     { to: "/billing/paywall", label: "Billing", icon: "billing" },
-    { to: "/dashboard/estate/homes", label: "Multi-Home", icon: "homes" }
+    { to: "/dashboard/estate/homes", label: "Multi-Home", icon: "homes" },
+    { to: "/dashboard/estate/settings", label: "Settings", icon: "settings" }
   ],
   admin: [
     { to: "/dashboard/admin", label: "System", icon: "system" },
@@ -44,10 +45,22 @@ const navByRole = {
   ]
 };
 
-export default function AppShell({ title, children }) {
+const HOMEOWNER_CONTEXT_CACHE_TTL_MS = 2 * 60 * 1000;
+const NOTIFICATIONS_CACHE_TTL_MS = 20 * 1000;
+
+let homeownerContextCache = null;
+let homeownerContextCacheAt = 0;
+let notificationsCache = null;
+let notificationsCacheAt = 0;
+
+function isCacheFresh(cachedAt, ttlMs) {
+  return Number(cachedAt) > 0 && Date.now() - cachedAt < ttlMs;
+}
+
+export default function AppShell({ title, children, showTopBar = true }) {
   const { user, logout } = useAuth();
-  const { isDark, toggleTheme } = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [homeownerContext, setHomeownerContext] = useState(null);
@@ -58,9 +71,9 @@ export default function AppShell({ title, children }) {
   const [soundAlertsEnabled, setSoundAlertsEnabled] = useState(
     () => localStorage.getItem("qring_sound_alerts") !== "false"
   );
-  const [onboardingOpen, setOnboardingOpen] = useState(false);
-  const [onboardingDismissed, setOnboardingDismissed] = useState(false);
   const [muteVisitRing, setMuteVisitRing] = useState(true);
+  const notificationsPanelRef = useRef(null);
+  const notificationsButtonRef = useRef(null);
   const audioContextRef = useRef(null);
   const ringTimerRef = useRef(null);
   const prevVisitUnreadIdsRef = useRef([]);
@@ -85,24 +98,61 @@ export default function AppShell({ title, children }) {
     () => navItems.find((item) => item.to.endsWith("/settings")) ?? null,
     [navItems]
   );
+  const profileRoute = useMemo(() => {
+    if (settingsNavItem?.to) return settingsNavItem.to;
+    if (user?.role === "estate") return "/dashboard/estate/settings";
+    if (user?.role === "homeowner") return "/dashboard/homeowner/settings";
+    if (user?.role === "admin") return "/dashboard/admin/config";
+    return null;
+  }, [settingsNavItem, user?.role]);
+  const notificationsRoute = useMemo(
+    () => ((user?.role === "homeowner" || user?.role === "estate") ? "/dashboard/notifications" : "/dashboard/admin"),
+    [user?.role]
+  );
+  const profileName = useMemo(() => user?.fullName?.trim() || user?.email || "User", [user?.fullName, user?.email]);
+  const initials = useMemo(() => String(profileName).slice(0, 1).toUpperCase(), [profileName]);
   const mobileNavItems = useMemo(
     () => {
       if (user?.role === "homeowner") {
         return [
           { to: "/dashboard/homeowner/overview", label: "Home", icon: "overview" },
-          { to: "/dashboard/homeowner/doors", label: "Door", icon: "doors" },
+          { to: "/dashboard/homeowner/appointments", label: "Appointments", icon: "appointments" },
           { to: "/dashboard/homeowner/visits", label: "Visits", icon: "visits" },
           { to: "/dashboard/homeowner/messages", label: "Message", icon: "messages" },
+          { to: "/dashboard/homeowner/doors", label: "Doors", icon: "plus" },
           { to: "/dashboard/homeowner/settings", label: "Profile", icon: "settings" }
+        ];
+      }
+      if (user?.role === "estate") {
+        return [
+          { to: "/dashboard/estate", label: "Overview", icon: "estate" },
+          { to: "/dashboard/estate/doors", label: "Doors", icon: "doors" },
+          { to: "/dashboard/estate/create", label: "Estate", icon: "plus" },
+          { to: "/dashboard/estate/logs", label: "Logs", icon: "logs" },
+          { to: "/dashboard/estate/settings", label: "Settings", icon: "settings" }
         ];
       }
       return navItems.filter((item) => !item.to.endsWith("/settings")).slice(0, 4);
     },
     [navItems, user?.role]
   );
+  const isEstateMobileNav = user?.role === "estate";
   const showHelpButton = user?.role === "estate";
-  const onboardingSteps = useMemo(() => getOnboardingSteps(user?.role), [user?.role]);
   const canGoBack = typeof window !== "undefined" && window.history.length > 1;
+  const isNativeApp = useMemo(() => {
+    try {
+      return Boolean(window?.Capacitor?.isNativePlatform?.());
+    } catch {
+      return false;
+    }
+  }, []);
+
+  useEffect(() => {
+    homeownerContextCache = null;
+    homeownerContextCacheAt = 0;
+    notificationsCache = null;
+    notificationsCacheAt = 0;
+  }, [user?.id, user?.role]);
 
   useEffect(() => {
     let active = true;
@@ -112,10 +162,17 @@ export default function AppShell({ title, children }) {
         setHomeownerContextLoading(false);
         return;
       }
+      if (homeownerContextCache && isCacheFresh(homeownerContextCacheAt, HOMEOWNER_CONTEXT_CACHE_TTL_MS)) {
+        setHomeownerContext(homeownerContextCache);
+        setHomeownerContextLoading(false);
+        return;
+      }
       setHomeownerContextLoading(true);
       try {
         const data = await getHomeownerContext();
         if (!active) return;
+        homeownerContextCache = data;
+        homeownerContextCacheAt = Date.now();
         setHomeownerContext(data);
       } catch {
         if (!active) return;
@@ -131,15 +188,19 @@ export default function AppShell({ title, children }) {
   }, [user?.role]);
 
   useEffect(() => {
-    if (!showHelpButton || onboardingDismissed) return;
+    if (isNativeApp) return;
+    if (user?.role !== "homeowner" && user?.role !== "estate") return;
+    const atDashboardHome =
+      location.pathname === "/dashboard/homeowner/overview" ||
+      location.pathname === "/dashboard/estate";
+    if (!atDashboardHome) return;
     const identity = user?.email ?? user?.id ?? "anonymous";
-    const key = `qring_onboarding_seen_${user?.role}_${identity}`;
+    const key = `qring_dashboard_welcome_seen_${user?.role}_${identity}`;
     const seen = localStorage.getItem(key);
     if (!seen) {
-      setOnboardingOpen(true);
-      localStorage.setItem(key, "true");
+      navigate("/onboarding", { replace: true });
     }
-  }, [showHelpButton, onboardingDismissed, user?.role, user?.email, user?.id]);
+  }, [isNativeApp, user?.role, user?.email, user?.id, location.pathname, navigate]);
 
   useEffect(() => {
     let active = true;
@@ -149,18 +210,28 @@ export default function AppShell({ title, children }) {
       if (unauthorized) return;
       const token = localStorage.getItem("qring_access_token");
       if (!token) {
+        notificationsCache = [];
+        notificationsCacheAt = Date.now();
         setNotifications([]);
+        return;
+      }
+      if (notificationsCache && isCacheFresh(notificationsCacheAt, NOTIFICATIONS_CACHE_TTL_MS)) {
+        setNotifications(notificationsCache);
         return;
       }
       try {
         const items = await getNotifications();
         if (!active) return;
+        notificationsCache = items;
+        notificationsCacheAt = Date.now();
         setNotifications(items);
       } catch (requestError) {
         if (!active) return;
         if (requestError?.status === 401) {
           unauthorized = true;
         }
+        notificationsCache = [];
+        notificationsCacheAt = Date.now();
         setNotifications([]);
       }
     }
@@ -176,6 +247,29 @@ export default function AppShell({ title, children }) {
       window.removeEventListener("qring:notifications-updated", handleNotificationsUpdated);
     };
   }, []);
+
+  useEffect(() => {
+    if (!notificationsOpen) return;
+    const handleOutside = (event) => {
+      const target = event.target;
+      if (notificationsPanelRef.current?.contains(target)) return;
+      if (notificationsButtonRef.current?.contains(target)) return;
+      setNotificationsOpen(false);
+    };
+    const handleEscape = (event) => {
+      if (event.key === "Escape") setNotificationsOpen(false);
+    };
+    document.addEventListener("mousedown", handleOutside, true);
+    document.addEventListener("click", handleOutside, true);
+    document.addEventListener("touchstart", handleOutside, { passive: true });
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleOutside, true);
+      document.removeEventListener("click", handleOutside, true);
+      document.removeEventListener("touchstart", handleOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [notificationsOpen]);
 
   useEffect(() => {
     const handleStorage = (event) => {
@@ -321,6 +415,7 @@ export default function AppShell({ title, children }) {
 
     parsedNotifications.forEach((item) => {
       if (item.readAt) return;
+      if (item.kind === "system") return;
       if (browserAlertedIdsRef.current.has(item.id)) return;
       browserAlertedIdsRef.current.add(item.id);
       const body = item.payload?.message ?? "You have a new alert";
@@ -360,24 +455,28 @@ export default function AppShell({ title, children }) {
     if (item?.id && !item?.readAt) {
       try {
         await markNotificationRead(item.id);
-        setNotifications((prev) =>
-          prev.map((row) =>
+        setNotifications((prev) => {
+          const next = prev.map((row) =>
             row.id === item.id
               ? { ...row, readAt: row.readAt || new Date().toISOString() }
               : row
-          )
-        );
+          );
+          notificationsCache = next;
+          notificationsCacheAt = Date.now();
+          return next;
+        });
       } catch {
         // Keep UX responsive even if read API fails.
       }
     }
 
-    const kind = item?.kind ?? "";
-    if (kind.startsWith("visitor.")) {
-      navigate("/dashboard/homeowner/visits");
-    } else {
-      navigate(user?.role === "estate" ? "/dashboard/estate" : "/dashboard/homeowner/overview");
-    }
+    navigate(
+      resolveNotificationRoute({
+        role: user?.role,
+        kind: item?.kind,
+        payload: item?.payload
+      })
+    );
     setNotificationsOpen(false);
   }
 
@@ -385,12 +484,15 @@ export default function AppShell({ title, children }) {
     setMuteVisitRing(true);
     try {
       await clearNotifications();
-      setNotifications((prev) =>
-        prev.map((row) => ({
+      setNotifications((prev) => {
+        const next = prev.map((row) => ({
           ...row,
           readAt: row.readAt || new Date().toISOString()
-        }))
-      );
+        }));
+        notificationsCache = next;
+        notificationsCacheAt = Date.now();
+        return next;
+      });
     } catch {
       // No-op, keep existing list.
     }
@@ -426,11 +528,11 @@ export default function AppShell({ title, children }) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+    <div className="h-screen overflow-hidden bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_top_right,_rgba(36,86,245,0.16),_transparent_40%),radial-gradient(circle_at_bottom_left,_rgba(20,184,166,0.12),_transparent_35%)]" />
-      <div className="flex min-h-screen">
+      <div className="flex h-screen">
         <aside
-          className="hidden w-72 border-r border-slate-200/70 bg-white/90 p-6 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95 lg:block"
+          className="fixed inset-y-0 left-0 hidden w-72 overflow-y-auto border-r border-slate-200/70 bg-white/90 p-6 backdrop-blur [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden dark:border-slate-800 dark:bg-slate-900/95 lg:block"
         >
           <div className="mb-8 flex items-center gap-3">
             <div className="grid h-10 w-16 place-items-center rounded-xl  text-xs font-bold text-white shadow-soft">
@@ -465,10 +567,7 @@ export default function AppShell({ title, children }) {
             {showHelpButton ? (
               <button
                 type="button"
-                onClick={() => {
-                  setOnboardingDismissed(false);
-                  setOnboardingOpen(true);
-                }}
+                onClick={() => navigate("/onboarding")}
                 className="group relative flex w-full items-center gap-3 rounded-xl border border-transparent px-4 py-3 text-sm font-semibold text-slate-700 transition-all hover:border-slate-200 hover:bg-slate-100 dark:text-slate-200 dark:hover:border-slate-700 dark:hover:bg-slate-800"
               >
                 <span className="grid h-7 w-7 place-items-center rounded-lg border border-white/25 bg-white/20">
@@ -488,140 +587,119 @@ export default function AppShell({ title, children }) {
           </div>
         </aside>
 
-        <main className="flex-1 p-3 pb-[calc(5.25rem+env(safe-area-inset-bottom))] pt-16 sm:p-4 sm:pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pt-16 lg:p-8 lg:pb-8 lg:pt-8">
-          <header className="fixed inset-x-0 top-0 z-30 px-3 pt-2 sm:px-4 lg:static lg:px-0 lg:pt-0 lg:mb-6">
-            <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleBack}
-                className="rounded-lg border border-slate-300 bg-white/60 p-1.5 text-xs font-semibold backdrop-blur dark:border-slate-700 dark:bg-slate-900/60 sm:p-2"
-                aria-label="Go back"
-                title="Back"
-              >
-                <BackIcon />
-              </button>
-              <h1 className="font-heading text-sm font-bold sm:text-base lg:text-2xl">{title}</h1>
-            </div>
-            <div className="relative flex items-center gap-1.5 sm:gap-2">
-              <button
-                type="button"
-                onClick={() => setNotificationsOpen((prev) => !prev)}
-                className="relative rounded-lg border border-slate-300 bg-white/60 p-1.5 text-xs font-semibold backdrop-blur dark:border-slate-700 dark:bg-slate-900/60 sm:p-2"
-                aria-label="Notifications"
-              >
-                <BellIcon />
-                {unreadCount > 0 ? (
-                  <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-danger px-1 text-[10px] font-bold text-white">
-                    {unreadCount}
-                  </span>
-                ) : null}
-              </button>
-              {notificationsOpen ? (
-                <div className="absolute right-0 top-12 z-50 w-[min(20rem,calc(100vw-2rem))] rounded-2xl border border-slate-200 bg-white p-3 shadow-soft dark:border-slate-800 dark:bg-slate-900">
-                  <div className="flex items-center justify-between px-2 pb-2">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Notifications</p>
-                    <div className="flex items-center gap-2">
-                      {webAlertsPermission !== "granted" && webAlertsPermission !== "unsupported" ? (
-                        <button
-                          type="button"
-                          onClick={handleEnableWebAlerts}
-                          className="rounded-md border border-brand-300 px-2 py-1 text-[10px] font-semibold text-brand-700 dark:border-brand-500/50 dark:text-brand-200"
-                        >
-                          Enable Alerts
-                        </button>
-                      ) : null}
-                      <button
-                        type="button"
-                        onClick={handleClearNotifications}
-                        className="rounded-md border border-slate-300 px-2 py-1 text-[10px] font-semibold dark:border-slate-700"
-                      >
-                        Clear
-                      </button>
-                    </div>
+        <main className={`safe-content flex-1 overflow-y-auto px-4 pb-[calc(8.5rem+env(safe-area-inset-bottom))] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:px-5 sm:pb-[calc(8.75rem+env(safe-area-inset-bottom))] lg:ml-72 lg:px-10 lg:pb-8 ${showTopBar ? "pt-[calc(12.75rem+env(safe-area-inset-top))] sm:pt-[calc(7rem+env(safe-area-inset-top))] lg:pt-[7.35rem]" : "pt-[calc(1.1rem+env(safe-area-inset-top))] sm:pt-[calc(1.2rem+env(safe-area-inset-top))] lg:pt-6"}`}>
+          {showTopBar ? (
+          <header className="fixed inset-x-0 top-0 z-30 px-3 pt-[calc(0.95rem+env(safe-area-inset-top))] sm:px-4 lg:left-72 lg:px-8">
+            <div className="rounded-[1.4rem] border border-slate-200/70 bg-white/95 p-3 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/90 sm:p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={handleBack}
+                    className="grid h-9 w-9 place-items-center rounded-full bg-slate-100 text-slate-500 transition-all active:scale-95 dark:bg-slate-800 dark:text-slate-300"
+                    aria-label="Go back"
+                    title="Back"
+                  >
+                    <BackIcon />
+                  </button>
+                  {/* <div className="grid h-10 w-10 place-items-center rounded-full bg-violet-100 text-sm font-bold text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
+                    {initials}
                   </div>
-                  <div className="max-h-80 space-y-2 overflow-y-auto">
-                    {parsedNotifications.length === 0 ? (
-                      <div className="rounded-xl bg-slate-100 p-3 text-xs text-slate-500 dark:bg-slate-800">No notifications yet.</div>
-                    ) : (
-                      parsedNotifications.map((item) => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => openNotification(item)}
-                          className={`block w-full rounded-xl border p-3 text-left transition hover:bg-slate-50 dark:hover:bg-slate-800 ${
-                            item.readAt
-                              ? "border-slate-200 dark:border-slate-700"
-                              : "border-brand-300 bg-brand-50/60 dark:border-brand-500/50 dark:bg-brand-500/10"
-                          }`}
-                        >
-                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{item.kind}</p>
-                          <p className="mt-1 text-sm font-medium">{item.payload?.message ?? "New activity"}</p>
-                          <p className="mt-1 text-[11px] text-slate-500">{formatTime(item.createdAt)}</p>
-                        </button>
-                      ))
-                    )}
-                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-[11px] font-semibold text-slate-500">Hello!</p>
+                    <p className="truncate text-sm font-black text-slate-900 dark:text-white sm:text-base">{title || profileName}</p>
+                  </div> */}
                 </div>
-              ) : null}
-              <button
-                type="button"
-                onClick={toggleTheme}
-                className="hidden rounded-lg border border-slate-300 px-2 py-1.5 text-xs font-semibold dark:border-slate-700 sm:inline-flex">{isDark ? "LIGHT" : "DARK"}
-              </button>
-              {settingsNavItem ? (
-                <Link
-                  to={settingsNavItem.to}
-                  className="rounded-lg border border-slate-300 bg-white/60 p-1.5 text-xs font-semibold backdrop-blur dark:border-slate-700 dark:bg-slate-900/60 sm:p-2"
-                  aria-label="Settings"
-                  title="Settings"
-                >
-                  <SettingsIcon />
-                </Link>
-              ) : null}
-              <button
-                type="button"
-                onClick={logout}
-                className="rounded-lg border border-slate-300 bg-white/60 p-1.5 text-xs font-semibold backdrop-blur dark:border-slate-700 dark:bg-slate-900/60 sm:p-2"
-                aria-label="Logout"
-                title="Logout"
-              >
-                <LogoutIcon />
-              </button>
-            </div>
+                <div className="relative flex items-center gap-2">
+                  <button
+                    type="button"
+                    ref={notificationsButtonRef}
+                    onClick={() => {
+                      setNotificationsOpen(false);
+                      navigate(notificationsRoute);
+                    }}
+                    className="relative grid h-9 w-9 place-items-center rounded-full bg-slate-100 text-slate-500 transition-all active:scale-95 dark:bg-slate-800 dark:text-slate-300"
+                    aria-label="Notifications"
+                    title="Notifications"
+                  >
+                    <BellIcon />
+                    {unreadCount > 0 ? (
+                      <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-danger px-1 text-[10px] font-bold text-white">
+                        {unreadCount}
+                      </span>
+                    ) : null}
+                  </button>
+                  {/* {profileRoute ? (
+                    <Link
+                      to={profileRoute}
+                      className="grid h-9 w-9 place-items-center rounded-full bg-slate-100 text-slate-500 transition-all active:scale-95 dark:bg-slate-800 dark:text-slate-300"
+                      aria-label="Profile"
+                      title="Profile"
+                    >
+                      <ProfileIcon />
+                    </Link>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={logout}
+                    className="grid h-9 w-9 place-items-center rounded-full bg-rose-100 text-rose-600 transition-all active:scale-95 dark:bg-rose-900/30 dark:text-rose-300"
+                    aria-label="Logout"
+                    title="Logout"
+                  >
+                    <LogoutIcon />
+                  </button> */}
+                </div>
+              </div>
             </div>
           </header>
-          {children}
+          ) : null}
+          <div className={`dashboard-canvas ${showTopBar ? "pt-20 sm:pt-12 lg:pt-1" : "pt-0"}`}>
+            {children}
+            <div className="h-12 lg:hidden" aria-hidden="true" />
+          </div>
         </main>
       </div>
       {mobileNavItems.length > 0 ? (
-        <nav className="fixed inset-x-0 bottom-0 z-[9999] border-t border-slate-200 bg-white/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur supports-[backdrop-filter]:bg-white/85 dark:border-slate-800 dark:bg-slate-900/95 dark:supports-[backdrop-filter]:bg-slate-900/85 lg:hidden">
-          <div className="flex h-12 items-stretch gap-1 sm:h-14">
+        <nav className="fixed inset-x-0 bottom-3 z-[9999] px-3 pb-[max(0.2rem,env(safe-area-inset-bottom))] lg:hidden">
+          <div className="relative mx-auto max-w-md rounded-[1.35rem] border border-slate-200/60 bg-[#ebe8f8]/95 px-3 py-2 shadow-[0_12px_32px_rgba(76,29,149,0.16)] backdrop-blur-md dark:border-slate-700 dark:bg-slate-900/90">
+            <div className={`flex items-stretch gap-1 ${isEstateMobileNav ? "h-14 sm:h-14" : "h-12 sm:h-12"}`}>
             {mobileNavItems.map((item) => (
               <NavLink
                 key={`mobile-${item.to}`}
                 to={item.to}
+                end
                 className={({ isActive }) =>
-                  `flex min-w-0 flex-1 flex-col items-center justify-center rounded-xl px-1 py-1.5 text-[10px] font-semibold transition-transform duration-200 sm:text-[11px] ${
-                    isActive
-                      ? "scale-105 bg-brand-500 text-white shadow-sm"
-                      : "scale-95 bg-slate-100/70 text-slate-600 dark:bg-slate-800/70 dark:text-slate-300"
+                  `flex min-w-0 flex-1 items-center justify-center rounded-xl px-1 py-1 text-[10px] font-semibold transition-all duration-200 active:scale-95 sm:text-[11px] ${
+                    isActive ? "text-white" : "text-violet-700 dark:text-slate-300"
                   }`
                 }
               >
-                <span className="mb-1">
-                  <NavIcon name={item.icon} />
-                </span>
-                <span className="leading-none">{item.label}</span>
+                {({ isActive }) => (
+                  <div className="group relative flex items-center justify-center">
+                    <span
+                      className={`grid place-items-center rounded-full transition-all duration-200 ${
+                        isActive
+                          ? "h-10 w-10 bg-violet-600 text-white shadow-[0_10px_24px_rgba(124,58,237,0.45)]"
+                          : "h-8 w-8 text-violet-700 opacity-90 dark:text-slate-300"
+                      }`}
+                    >
+                      <NavIcon name={item.icon} />
+                    </span>
+                    <span
+                      className={`pointer-events-none absolute -top-7 whitespace-nowrap rounded-full bg-violet-600 px-2 py-0.5 text-[10px] font-semibold text-white transition-all ${
+                        isActive ? "opacity-100" : "opacity-0"
+                      } group-hover:opacity-100`}
+                    >
+                      {item.label}
+                    </span>
+                  </div>
+                )}
               </NavLink>
             ))}
-            {showHelpButton ? (
+            {showHelpButton && !isEstateMobileNav ? (
                 <button
                   type="button"
-                  onClick={() => {
-                    setOnboardingDismissed(false);
-                    setOnboardingOpen(true);
-                  }}
+                  onClick={() => navigate("/onboarding")}
                   className="flex min-w-0 flex-1 flex-col items-center justify-center rounded-xl px-1 py-1.5 text-[10px] font-semibold text-slate-600 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 sm:text-[11px]"
                 >
                   <span className="mb-1">
@@ -630,94 +708,12 @@ export default function AppShell({ title, children }) {
                 <span className="leading-none">Help</span>
               </button>
             ) : null}
+            </div>
           </div>
         </nav>
       ) : null}
-      <OnboardingGuideModal
-        open={onboardingOpen}
-        role={user?.role}
-        steps={onboardingSteps}
-        onClose={() => {
-          setOnboardingDismissed(true);
-          setOnboardingOpen(false);
-        }}
-        onComplete={() => {
-          setOnboardingDismissed(true);
-          setOnboardingOpen(false);
-        }}
-        onNavigate={(route) => {
-          navigate(route);
-          setOnboardingDismissed(true);
-          setOnboardingOpen(false);
-        }}
-      />
     </div>
   );
-}
-
-function getOnboardingSteps(role) {
-  const isEstate = role === "estate";
-  const dashboardRoute = isEstate ? "/dashboard/estate" : "/dashboard/homeowner/overview";
-  const visitRoute = isEstate ? "/dashboard/estate/logs" : "/dashboard/homeowner/visits";
-  const doorRoute = isEstate ? "/dashboard/estate/doors" : "/dashboard/homeowner/doors";
-  const actionRoute = isEstate ? "/dashboard/estate/assign" : "/dashboard/homeowner/messages";
-
-  return [
-    {
-      title: "What QRing Is",
-      description:
-        "QRing transforms physical doors into smart access points, giving homeowners and estate teams real-time visibility, control, and security over visits.",
-      points: [
-        "No expensive cameras or IoT hardware needed.",
-        "QR code + software creates a digital access layer.",
-        "Works for homes, estates, rentals, offices, and gated communities."
-      ],
-      route: dashboardRoute,
-      routeLabel: "Open Dashboard"
-    },
-    {
-      title: "How Visits Work",
-      description:
-        "When a visitor arrives, they scan your QR code, share identity and visit reason, and QRing instantly notifies you so you can approve or deny access.",
-      points: [
-        "Visitor scans QR at the door or gate.",
-        "Identity and intent are captured digitally.",
-        "You get instant alert and control access."
-      ],
-      route: visitRoute,
-      routeLabel: isEstate ? "View Access Logs" : "View Visits"
-    },
-    {
-      title: "Why It Matters",
-      description:
-        "QRing solves missed deliveries, unknown visitors, and manual logbooks by replacing reactive security with proactive, trackable, real-time access control.",
-      points: [
-        "Homeowners know who is at the door in real time.",
-        "Estates get centralized tracking instead of manual records.",
-        "Every visit is securely logged for follow-up and accountability."
-      ],
-      route: doorRoute,
-      routeLabel: isEstate ? "Set Up Doors" : "Manage Doors"
-    },
-    {
-      title: "Your Next Steps",
-      description:
-        "Start by setting up your access points, then monitor incoming requests and manage approvals through your dashboard. Use Help anytime from the sidebar.",
-      points: isEstate
-        ? [
-            "Create or review your estate setup.",
-            "Assign doors to homes and owners.",
-            "Track logs and enforce plan rules."
-          ]
-        : [
-            "Keep your door QR active.",
-            "Review visits and messages daily.",
-            "Control who enters even when away."
-          ],
-      route: actionRoute,
-      routeLabel: isEstate ? "Assign Doors" : "Open Messages"
-    }
-  ];
 }
 
 function formatTime(value) {
@@ -753,6 +749,15 @@ function SettingsIcon() {
   );
 }
 
+function ProfileIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 21a8 8 0 1 0-16 0" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  );
+}
+
 function LogoutIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -766,6 +771,7 @@ function LogoutIcon() {
 function NavIcon({ name }) {
   const paths = {
     overview: <path d="M3 3h8v8H3zM13 3h8v5h-8zM13 10h8v11h-8zM3 13h8v8H3z" />,
+    appointments: <path d="M7 2v3M17 2v3M4 8h16M5 5h14a1 1 0 0 1 1 1v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a1 1 0 0 1 1-1zM9 12h6M9 16h4" />,
     visits: <path d="M4 5h16M4 12h16M4 19h10" />,
     messages: <path d="M4 5h16v10H7l-3 3z" />,
     doors: <path d="M7 3h10v18H7zM10 12h.01" />,
@@ -782,6 +788,7 @@ function NavIcon({ name }) {
     ,
     user_admin: <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm10 0v-2m0 0V7m0 2h-2m2 0h2" />,
     sessions: <path d="M8 7h13M8 12h13M8 17h13M3 7h.01M3 12h.01M3 17h.01" />,
+    plus: <path d="M12 5v14M5 12h14" />,
     help: <path d="M12 17h.01M9.1 9a3 3 0 1 1 4.9 2.3c-.8.7-2 1.5-2 2.7v.5M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z" />,
     settings: <path d="M12 8.5A3.5 3.5 0 1 1 8.5 12 3.5 3.5 0 0 1 12 8.5zm0-6 1.2 2.4 2.7.4.4 2.7L18.8 9l-1.5 2.3 1.5 2.3-2.5 1.2-.4 2.7-2.7.4L12 21.5l-1.2-2.4-2.7-.4-.4-2.7L5.2 13.6 6.7 11.3 5.2 9l2.5-1.2.4-2.7 2.7-.4z" />
   };

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import AppShell from "../../layouts/AppShell";
 import { env } from "../../config/env";
 import { createEstate, createEstateSharedQr, getEstateOverview, listEstateSharedQrs } from "../../services/estateService";
@@ -89,35 +89,43 @@ export default function EstateCreatePage() {
 
   return (
     <AppShell title="Create Estate">
-      {error ? <div className="mb-4 rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</div> : null}
-      {notice ? <div className="mb-4 rounded-xl border border-success/30 bg-success/10 px-4 py-3 text-sm text-success">{notice}</div> : null}
-      <section className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-soft dark:border-slate-800 dark:bg-slate-900/80 sm:p-5">
-        <h2 className="font-heading text-lg font-bold sm:text-xl">Create Estate</h2>
-        <p className="mt-1 text-sm text-slate-500">Built for multi-home estates with central control and audit-ready workflows.</p>
-        <form className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]" onSubmit={onSubmit}>
-          <input
-            type="text"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder="Estate name"
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-brand-300 focus:ring-2 dark:border-slate-700 dark:bg-slate-900"
-            required
-          />
-          <button
-            type="submit"
-            disabled={busy}
-            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 dark:bg-white dark:text-slate-900"
-          >
-            {busy ? "Creating..." : "Create"}
-          </button>
-        </form>
-      </section>
+      <div className="mx-auto max-w-7xl space-y-6">
+        {error ? <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600 dark:border-red-900/20 dark:bg-red-900/10 dark:text-red-400">{error}</div> : null}
+        {notice ? <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-900/20 dark:bg-emerald-900/10 dark:text-emerald-400">{notice}</div> : null}
 
-      <section className="mt-4 rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-soft dark:border-slate-800 dark:bg-slate-900/80 sm:p-5">
-        <h2 className="font-heading text-lg font-bold sm:text-xl">Your Estates</h2>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <section className="relative overflow-hidden rounded-[2.5rem] bg-slate-900 p-8 text-white dark:bg-indigo-600">
+          <div className="relative z-10">
+            <h2 style={{color: "white"}} className="text-2xl font-bold tracking-tight">Create Estate</h2>
+            <p className="mt-2 text-sm text-slate-200 dark:text-indigo-100">Launch a new estate profile and manage shared access from one place.</p>
+          </div>
+          <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/5 blur-3xl" />
+        </section>
+
+        <section className="rounded-[2rem] border border-slate-200/70 bg-white/95 p-5 shadow-[0_8px_30px_rgb(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-900/90 sm:p-6">
+          <form className="grid gap-3 sm:grid-cols-[1fr_auto]" onSubmit={onSubmit}>
+            <input
+              type="text"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="Estate name"
+              className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none ring-brand-300 transition-all focus:ring-2 dark:border-slate-700 dark:bg-slate-800/70"
+              required
+            />
+            <button
+              type="submit"
+              disabled={busy}
+              className="rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition-all active:scale-95 disabled:opacity-50 dark:bg-white dark:text-slate-900"
+            >
+              {busy ? "Creating..." : "Create"}
+            </button>
+          </form>
+        </section>
+
+        <section className="rounded-[2rem] border border-slate-200/70 bg-white/95 p-5 shadow-[0_8px_30px_rgb(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-900/90 sm:p-6">
+          <h2 className="text-sm font-black uppercase tracking-wide text-slate-500">Your Estates</h2>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
           {estatesWithQr.map((estate) => (
-            <article key={estate.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800">
+            <article key={estate.id} className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:shadow-md dark:border-slate-700 dark:bg-slate-900/70">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="truncate font-semibold">{estate.name}</p>
@@ -127,13 +135,13 @@ export default function EstateCreatePage() {
                   type="button"
                   onClick={() => handleGenerateSharedQr(estate.id)}
                   disabled={qrBusyEstateId === estate.id}
-                  className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50 dark:bg-white dark:text-slate-900"
+                  className="rounded-2xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition-all active:scale-95 disabled:opacity-50 dark:bg-white dark:text-slate-900"
                 >
                   {qrBusyEstateId === estate.id ? "Generating..." : estate.sharedQr ? "Regenerate QR" : "Generate QR"}
                 </button>
               </div>
 
-              <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+              <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/70">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Estate QR (Shared)</p>
                 {estate.sharedQr ? (
                   <div className="mt-2 space-y-1">
@@ -142,14 +150,14 @@ export default function EstateCreatePage() {
                     <div className="mt-2 flex flex-wrap gap-2">
                       <a
                         href={estate.sharedQr.scanUrl}
-                        className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold dark:border-slate-700"
+                        className="rounded-2xl border border-slate-300 px-3 py-2 text-xs font-semibold transition-all active:scale-95 dark:border-slate-700"
                       >
                         Open Scan Page
                       </a>
                       <button
                         type="button"
                         onClick={() => copyText(toPublicUrl(estate.sharedQr.scanUrl))}
-                        className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold dark:border-slate-700"
+                        className="rounded-2xl border border-slate-300 px-3 py-2 text-xs font-semibold transition-all active:scale-95 dark:border-slate-700"
                       >
                         Copy Link
                       </button>
@@ -167,8 +175,9 @@ export default function EstateCreatePage() {
             </article>
           ))}
           {estatesWithQr.length === 0 ? <p className="text-sm text-slate-500">No estates created yet.</p> : null}
-        </div>
-      </section>
+          </div>
+        </section>
+      </div>
     </AppShell>
   );
 }
@@ -188,3 +197,4 @@ async function copyText(value) {
     // Ignore; clipboard may require HTTPS / user gesture on some browsers.
   }
 }
+

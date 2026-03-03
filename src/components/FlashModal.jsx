@@ -48,14 +48,30 @@ export default function FlashModal() {
   if (!flash) return null;
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center px-4 sm:items-start sm:pt-6">
+    <div className="pointer-events-none fixed inset-x-0 top-0 z-50 flex justify-center px-3 pt-[calc(0.65rem+env(safe-area-inset-top))] sm:px-4 sm:pt-5">
       <div
-        className={`pointer-events-auto w-full max-w-md rounded-2xl border p-4 shadow-2xl backdrop-blur-sm transition-all duration-300 ${palette}`}
+        className={`pointer-events-auto w-full max-w-md rounded-2xl border p-3 shadow-2xl backdrop-blur-sm transition-all duration-300 ${palette}`}
         role="status"
         aria-live="polite"
       >
-        <p className="text-xs font-semibold uppercase tracking-wide opacity-80">{flash.title}</p>
-        <p className="mt-1 text-sm font-medium">{flash.message}</p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide opacity-80">{flash.title}</p>
+            <p className="mt-1 text-sm font-medium">{flash.message}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              window.clearTimeout(timerRef.current);
+              setFlash(null);
+            }}
+            className="rounded-full p-1 text-xs font-bold opacity-70 transition hover:opacity-100 active:scale-95"
+            aria-label="Close alert"
+            title="Close"
+          >
+            x
+          </button>
+        </div>
       </div>
     </div>
   );

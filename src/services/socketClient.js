@@ -1,5 +1,6 @@
 import { io } from "socket.io-client";
 import { env } from "../config/env";
+import { realtimeTransportOptions } from "./socketConfig";
 
 let socket;
 
@@ -7,8 +8,7 @@ export function getDashboardSocket() {
   if (!socket) {
     socket = io(`${env.socketUrl}${env.dashboardNamespace}`, {
       path: env.socketPath,
-      transports: ["websocket"],
-      upgrade: false,
+      ...realtimeTransportOptions,
       reconnection: true,
       reconnectionAttempts: 10,
       reconnectionDelay: 400,

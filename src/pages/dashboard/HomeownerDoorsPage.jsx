@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import AppShell from "../../layouts/AppShell";
 import { env } from "../../config/env";
 import { createHomeownerDoor, generateDoorQr, getHomeownerContext, getHomeownerDoors } from "../../services/homeownerService";
 import QrPrintDesigner from "../../components/qr/QrPrintDesigner";
+import { useAuth } from "../../state/AuthContext";
 
 export default function HomeownerDoorsPage() {
+  const { user } = useAuth();
   const [doors, setDoors] = useState([]);
   const [subscription, setSubscription] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -20,6 +22,7 @@ export default function HomeownerDoorsPage() {
   const [estateName, setEstateName] = useState("");
   const [contextLoading, setContextLoading] = useState(true);
   const detailsSectionRef = useRef(null);
+  const homeownerName = user?.fullName?.trim() || "Homeowner";
 
   const planDoorLimitReached = Boolean(
     subscription &&
@@ -194,6 +197,27 @@ export default function HomeownerDoorsPage() {
     }
   }
 
+  async function handleShareQrBooking(qrId) {
+    const bookingUrl = `${toScanUrl(qrId)}?intent=appointment`;
+    const sharePayload = {
+      title: "Book appointment with QRing",
+      text: "Use this secure QRing link to book an appointment.",
+      url: bookingUrl
+    };
+
+    try {
+      if (navigator.share) {
+        await navigator.share(sharePayload);
+        setNotice("Appointment QR link shared.");
+        return;
+      }
+      await navigator.clipboard.writeText(bookingUrl);
+      setNotice(`Appointment link copied: ${bookingUrl}`);
+    } catch {
+      setError("Unable to share appointment link right now.");
+    }
+  }
+
   const activeDoor = doors.find((door) => String(door.id) === String(activeDoorId)) ?? null;
   const selectedPreview =
     activeDoor && selectedQrId
@@ -206,225 +230,215 @@ export default function HomeownerDoorsPage() {
       : null;
 
   return (
-    <AppShell title="Doors">
-      {error ? (
-        <div className="mb-4 rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
-          {error}
-        </div>
-      ) : null}
-      {notice ? (
-        <div className="mb-4 rounded-xl border border-success/30 bg-success/10 px-4 py-3 text-sm text-success">
-          {notice}
-        </div>
-      ) : null}
-      {managedByEstate ? (
-        <div className="mb-4 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning">
-          Door and QR creation are managed by your estate{estateName ? ` (${estateName})` : ""}.
-        </div>
-      ) : null}
+    <AppShell>
+      <div className="mx-auto max-w-6xl space-y-4 pb-14">
+        <section className="rounded-[2rem] border border-slate-200 bg-white/95 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/90 sm:p-6 lg:p-8">
+          <h2 className="text-2xl font-extrabold sm:text-3xl">Doors & QR</h2>
+          <p className="mt-1 text-sm text-slate-500">Manage door access, generate QR codes, and share booking links for {homeownerName}.</p>
 
-      {subscription ? (
-        <section className="mb-4 rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-soft dark:border-slate-800 dark:bg-slate-900/80">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Subscription</p>
-              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                Plan: {subscription.plan} ({subscription.status})
-              </p>
-            </div>
-            <div className="text-right text-xs text-slate-600 dark:text-slate-300">
-              <p>Doors: {subscription.usedDoors}/{subscription.maxDoors}</p>
-              <p>QR Codes: {subscription.usedQrCodes}/{subscription.maxQrCodes}</p>
-            </div>
-          </div>
-          {subscription.overDoorLimit ? (
-            <p className="mt-3 rounded-lg bg-warning/15 px-3 py-2 text-xs font-medium text-warning">
-              You are above your plan door limit. Upgrade your subscription.
-            </p>
-          ) : null}
-        </section>
-      ) : null}
-
-      {!contextLoading && !managedByEstate ? (
-        <section className="mb-4 rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-soft dark:border-slate-800 dark:bg-slate-900/80 sm:p-5">
-          <h2 className="font-heading text-lg font-bold sm:text-xl">Create Door</h2>
-          <p className="mt-1 text-xs text-slate-500 sm:text-sm">
-            Enter a new door name and create it with a QR code.
-          </p>
-          <form className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]" onSubmit={handleCreateDoorAndQr}>
-            <input
-              type="text"
-              value={newDoorName}
-              onChange={(event) => setNewDoorName(event.target.value)}
-              placeholder="e.g. Front Gate"
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-brand-300 focus:ring-2 dark:border-slate-700 dark:bg-slate-900"
-              required
-            />
-            <button
-              type="submit"
-              disabled={creatingDoor || planDoorLimitReached || planQrLimitReached}
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-900"
-            >
-              {creatingDoor ? "Creating..." : "Create Door + QR"}
-            </button>
-          </form>
-        </section>
-      ) : null}
-
-      {/* <section className="mb-4 rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-soft dark:border-slate-800 dark:bg-slate-900/80 sm:p-5">
-        <h2 className="font-heading text-lg font-bold sm:text-xl">Create QR Code For Door</h2>
-        <p className="mt-1 text-xs text-slate-500 sm:text-sm">
-          Select a door and generate a QR code. The scan link will be copied automatically.
-        </p>
-        <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
-          <select
-            value={selectedDoorId}
-            onChange={(event) => setSelectedDoorId(event.target.value)}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-brand-300 focus:ring-2 dark:border-slate-700 dark:bg-slate-900"
-          >
-            {doors.map((door) => (
-              <option key={door.id} value={door.id}>
-                {door.name} ({door.homeName})
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            disabled={!selectedDoorId || busyDoorId === selectedDoorId || (subscription?.remainingQrCodes ?? 1) <= 0}
-            onClick={handleGenerateFromSection}
-            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-900"
-          >
-            {busyDoorId === selectedDoorId ? "Generating..." : "Generate QR"}
-          </button>
-        </div>
-      </section> */}
-
-      {loading ? (
-        <div className="rounded-2xl border border-slate-200 bg-white/90 p-4 sm:p-5 text-sm text-slate-500 shadow-soft dark:border-slate-800 dark:bg-slate-900/80">
-          Loading doors...
-        </div>
-      ) : doors.length === 0 ? (
-        <div className="rounded-2xl border border-slate-200 bg-white/90 p-4 sm:p-5 text-sm text-slate-500 shadow-soft dark:border-slate-800 dark:bg-slate-900/80">
-          No doors configured yet.
-        </div>
-      ) : (
-        <section>
-          <h2 className="mb-3 font-heading text-lg font-bold sm:text-xl">Doors Created</h2>
-          <div className="grid gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {doors.map((door) => (
-              <article
-                key={door.id}
-                className="rounded-2xl border border-slate-200 bg-white/90 p-4 sm:p-5 shadow-soft dark:border-slate-800 dark:bg-slate-900/80"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h2 className="font-heading text-lg font-bold">{door.name}</h2>
-                    <p className="mt-1 text-xs text-slate-500">{door.homeName}</p>
-                  </div>
-                  <span
-                    className={`rounded-full px-2 py-1 text-xs font-semibold ${
-                      door.state === "Online" ? "bg-success/20 text-success" : "bg-danger/20 text-danger"
-                    }`}
-                  >
-                    {door.state}
-                  </span>
-                </div>
-
-                <p className="mt-4 text-xs uppercase tracking-wide text-slate-500">Linked QR Codes</p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {door.qr?.length ? (
-                    door.qr.map((qrId) => (
-                      <span
-                        key={`${door.id}-${qrId}`}
-                        className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-semibold transition hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800"
-                      >
-                        <img
-                          src={buildQrImageUrl(toScanUrl(qrId), 40)}
-                          alt={`QR ${qrId}`}
-                          className="h-5 w-5 rounded"
-                        />
-                        <span>{qrId}</span>
-                      </span>
-                    ))
-                  ) : (
-                    <span className="text-xs text-slate-500">No QR linked</span>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveDoorId(door.id);
-                    setSelectedQrId(door.qr?.[0] ?? "");
-                    setTimeout(() => {
-                      detailsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-                    }, 0);
-                  }}
-                  className="mt-4 w-full rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-900"
-                >
-                  View Door
-                </button>
-              </article>
-            ))}
+          <div className="mt-5 grid grid-cols-3 gap-2 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 p-2 text-white sm:gap-3 sm:p-3">
+            <StatTile label="Doors" value={doors.length} />
+            <StatTile label="QR Codes" value={doors.reduce((acc, door) => acc + (door.qr?.length || 0), 0)} />
+            <StatTile label="Plan" value={(subscription?.plan || "Free").toUpperCase()} />
           </div>
         </section>
-      )}
 
-      {activeDoor ? (
-        <section ref={detailsSectionRef} className="mt-4 rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-soft dark:border-slate-800 dark:bg-slate-900/80 sm:p-5">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="font-heading text-lg font-bold sm:text-xl">Door Details & QR Print</h2>
-            <button
-              type="button"
-              onClick={() => {
-                setActiveDoorId("");
-                setSelectedQrId("");
-              }}
-              className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold dark:border-slate-700"
-            >
-              Close
-            </button>
+        {error ? (
+          <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/30 dark:bg-rose-900/20 dark:text-rose-400">
+            {error}
           </div>
-          <p className="mt-1 text-xs text-slate-500 sm:text-sm">
-            Door: {activeDoor.name} | QR: {selectedQrId || "None selected"}
-          </p>
+        ) : null}
+        {notice ? (
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-900/30 dark:bg-emerald-900/20 dark:text-emerald-400">
+            {notice}
+          </div>
+        ) : null}
+        {managedByEstate ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-900/30 dark:bg-amber-900/20 dark:text-amber-400">
+            Door and QR creation are managed by your estate{estateName ? ` (${estateName})` : ""}.
+          </div>
+        ) : null}
 
-          <div className="mt-4 grid gap-4">
-            <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800">
-              <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                QR Codes Created
-              </label>
-              <div className="max-h-40 space-y-2 overflow-y-auto pr-1">
-                {activeDoor.qr?.length ? (
-                  activeDoor.qr.map((qrId) => (
-                    <button
-                      key={`${activeDoor.id}-pick-${qrId}`}
-                      type="button"
-                      onClick={() => setSelectedQrId(qrId)}
-                      className={`flex w-full items-center gap-2 rounded-lg border px-2 py-2 text-left text-xs font-semibold transition ${
-                        selectedQrId === qrId
-                          ? "border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-200"
-                          : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900"
-                      }`}
-                    >
-                      <img
-                        src={buildQrImageUrl(toScanUrl(qrId), 40)}
-                        alt={`QR ${qrId}`}
-                        className="h-8 w-8 rounded"
-                      />
-                      <span className="truncate">{qrId}</span>
-                    </button>
-                  ))
-                ) : (
-                  <p className="text-xs text-slate-500">No QR codes for this door yet.</p>
-                )}
+        {subscription ? (
+          <section className="rounded-[2rem] border border-slate-200 bg-white/95 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/90">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Subscription</p>
+                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Plan: {subscription.plan} ({subscription.status})</p>
+              </div>
+              <div className="text-right text-xs text-slate-600 dark:text-slate-300">
+                <p>Doors: {subscription.usedDoors}/{subscription.maxDoors}</p>
+                <p>QR Codes: {subscription.usedQrCodes}/{subscription.maxQrCodes}</p>
               </div>
             </div>
+            {subscription.overDoorLimit ? (
+              <p className="mt-3 rounded-lg bg-warning/15 px-3 py-2 text-xs font-medium text-warning">
+                You are above your plan door limit. Upgrade your subscription.
+              </p>
+            ) : null}
+          </section>
+        ) : null}
 
-            <QrPrintDesigner key={activeDoor.id} preview={selectedPreview} defaultLabel={activeDoor.homeName || ""} />
+        {!contextLoading && !managedByEstate ? (
+          <section className="rounded-[2rem] border border-slate-200 bg-white/95 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/90 sm:p-5">
+            <h2 className="text-lg font-bold sm:text-xl">Create Door</h2>
+            <p className="mt-1 text-sm text-slate-500">Enter a new door name and create it with a QR code.</p>
+            <form className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]" onSubmit={handleCreateDoorAndQr}>
+              <input
+                type="text"
+                value={newDoorName}
+                onChange={(event) => setNewDoorName(event.target.value)}
+                placeholder="e.g. Front Gate"
+                className="rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-900"
+                required
+              />
+              <button
+                type="submit"
+                disabled={creatingDoor || planDoorLimitReached || planQrLimitReached}
+                className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-900"
+              >
+                {creatingDoor ? "Creating..." : "Create Door + QR"}
+              </button>
+            </form>
+          </section>
+        ) : null}
+
+        {loading ? (
+          <div className="rounded-[2rem] border border-slate-200 bg-white/95 p-4 text-sm text-slate-500 shadow-sm dark:border-slate-800 dark:bg-slate-900/90 sm:p-5">
+            Loading doors...
           </div>
-        </section>
-      ) : null}
+        ) : doors.length === 0 ? (
+          <div className="rounded-[2rem] border border-slate-200 bg-white/95 p-4 text-sm text-slate-500 shadow-sm dark:border-slate-800 dark:bg-slate-900/90 sm:p-5">
+            No doors configured yet.
+          </div>
+        ) : (
+          <section className="space-y-3">
+            <h2 className="text-lg font-bold sm:text-xl">Doors Created</h2>
+            <div className="grid gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {doors.map((door) => (
+                <article key={door.id} className="rounded-[1.35rem] border border-slate-200 bg-white/95 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/90 sm:p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-lg font-bold">{door.name}</h3>
+                      <p className="mt-1 text-xs text-slate-500">{door.homeName}</p>
+                    </div>
+                    <span className={`rounded-full px-2 py-1 text-xs font-semibold ${door.state === "Online" ? "bg-success/20 text-success" : "bg-danger/20 text-danger"}`}>
+                      {door.state}
+                    </span>
+                  </div>
+
+                  <p className="mt-4 text-xs uppercase tracking-wide text-slate-500">Linked QR Codes</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {door.qr?.length ? (
+                      door.qr.map((qrId) => (
+                        <span key={`${door.id}-${qrId}`} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-semibold dark:border-slate-700 dark:bg-slate-800">
+                          <img src={buildQrImageUrl(toScanUrl(qrId), 40)} alt={`QR ${qrId}`} className="h-5 w-5 rounded" />
+                          <span>{qrId}</span>
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-xs text-slate-500">No QR linked</span>
+                    )}
+                  </div>
+
+                  <div className="mt-4 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveDoorId(door.id);
+                        setSelectedQrId(door.qr?.[0] ?? "");
+                        setTimeout(() => {
+                          detailsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                        }, 0);
+                      }}
+                      className="flex-1 rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white dark:bg-white dark:text-slate-900"
+                    >
+                      View Door
+                    </button>
+                    {!managedByEstate ? (
+                      <button
+                        type="button"
+                        onClick={() => handleGenerateQr(door.id)}
+                        disabled={busyDoorId === door.id}
+                        className="flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold disabled:opacity-60 dark:border-slate-700"
+                      >
+                        {busyDoorId === door.id ? "Generating..." : "New QR"}
+                      </button>
+                    ) : null}
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {activeDoor ? (
+          <section ref={detailsSectionRef} className="rounded-[2rem] border border-slate-200 bg-white/95 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/90 sm:p-5">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-lg font-bold sm:text-xl">Door Details & QR Print</h2>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveDoorId("");
+                  setSelectedQrId("");
+                }}
+                className="rounded-xl border border-slate-300 px-3 py-1.5 text-xs font-semibold dark:border-slate-700"
+              >
+                Close
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-slate-500 sm:text-sm">Door: {activeDoor.name} | QR: {selectedQrId || "None selected"}</p>
+
+            <div className="mt-4 grid gap-4">
+              <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800">
+                <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">QR Codes Created</label>
+                <div className="max-h-40 space-y-2 overflow-y-auto pr-1">
+                  {activeDoor.qr?.length ? (
+                    activeDoor.qr.map((qrId) => (
+                      <button
+                        key={`${activeDoor.id}-pick-${qrId}`}
+                        type="button"
+                        onClick={() => setSelectedQrId(qrId)}
+                        className={`flex w-full items-center gap-2 rounded-lg border px-2 py-2 text-left text-xs font-semibold transition ${
+                          selectedQrId === qrId
+                            ? "border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-200"
+                            : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900"
+                        }`}
+                      >
+                        <img src={buildQrImageUrl(toScanUrl(qrId), 40)} alt={`QR ${qrId}`} className="h-8 w-8 rounded" />
+                        <span className="truncate">{qrId}</span>
+                      </button>
+                    ))
+                  ) : (
+                    <p className="text-xs text-slate-500">No QR codes for this door yet.</p>
+                  )}
+                </div>
+              </div>
+
+              <QrPrintDesigner key={activeDoor.id} preview={selectedPreview} defaultLabel={activeDoor.homeName || ""} />
+              {selectedQrId ? (
+                <button
+                  type="button"
+                  onClick={() => handleShareQrBooking(selectedQrId)}
+                  className="rounded-xl bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-600"
+                >
+                  Share Appointment QR Link
+                </button>
+              ) : null}
+            </div>
+          </section>
+        ) : null}
+      </div>
     </AppShell>
+  );
+}
+
+function StatTile({ label, value }) {
+  return (
+    <div className="rounded-xl bg-white/15 px-2 py-2 text-center">
+      <p className="text-lg font-extrabold">{value}</p>
+      <p className="text-[11px] uppercase tracking-wide text-white/80">{label}</p>
+    </div>
   );
 }
 
@@ -436,3 +450,4 @@ function toScanUrl(qrId) {
   const base = (env.publicAppUrl || window.location.origin || "").replace(/\/+$/, "");
   return `${base}/scan/${qrId}`;
 }
+

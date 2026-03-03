@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import AppShell from "../../layouts/AppShell";
 import { getAdminOverview } from "../../services/adminService";
 import { ApiError } from "../../services/apiClient";
@@ -70,7 +70,7 @@ export default function AdminPaymentsPage() {
         <MetricCard label="Last Updated" value={loading ? "..." : "now"} />
       </section>
 
-      <section className="mt-4 rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-soft dark:border-slate-800 dark:bg-slate-900/80 sm:p-5">
+      <section className="mt-4 rounded-3xl border border-slate-200 bg-white/95 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/90 sm:p-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-heading text-lg font-bold sm:text-xl">Payment History</h2>
           <input
@@ -96,7 +96,7 @@ export default function AdminPaymentsPage() {
 
 function MetricCard({ label, value }) {
   return (
-    <article className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-soft dark:border-slate-800 dark:bg-slate-900/80">
+    <article className="rounded-3xl border border-slate-200 bg-white/95 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/90">
       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
       <p className="mt-2 text-2xl font-black">{value ?? 0}</p>
     </article>
@@ -152,4 +152,5 @@ function formatTime(value) {
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString();
 }
+
 

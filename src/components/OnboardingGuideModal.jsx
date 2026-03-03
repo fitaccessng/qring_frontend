@@ -41,41 +41,51 @@ export default function OnboardingGuideModal({
 
   return (
     <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-950/50 p-4">
-      <div className="relative w-full max-w-sm overflow-y-auto rounded-[2rem] border border-slate-200 bg-white p-5 shadow-[0_18px_55px_rgba(15,23,42,0.24)] max-h-[90vh]">
-        <div className="absolute -top-6 left-1/2 h-12 w-16 -translate-x-1/2 rounded-3xl bg-brand-600 shadow-soft" />
+      <div className="relative w-full max-w-xl overflow-y-auto rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_18px_55px_rgba(15,23,42,0.24)] max-h-[102vh] min-h-[34rem] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:p-8">
+        {/* <div className="absolute -top-6 left-1/2 h-12 w-16 -translate-x-1/2 rounded-3xl bg-brand-600 shadow-soft" /> */}
         <div className="pt-4 text-center">
-          <p className="text-[11px] font-semibold tracking-wide text-slate-500">
+          {/* <p className="text-[11px] font-semibold tracking-wide text-slate-500">
             QRING
-          </p>
-          <p className="mt-1 text-xs font-medium text-slate-500">{roleTitle}</p>
+          </p> */}
+          {/* <p className="mt-1 text-xs font-medium text-slate-500">{roleTitle}</p> */}
         </div>
 
         <div className="mt-6 flex justify-center">
-          <div className="grid h-24 w-24 place-items-center rounded-3xl bg-brand-50 text-brand-600">
-            <svg viewBox="0 0 24 24" className="h-10 w-10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="7" height="7" rx="1.5" />
-              <rect x="14" y="3" width="7" height="7" rx="1.5" />
-              <rect x="3" y="14" width="7" height="7" rx="1.5" />
-              <path d="M14 14h3M14 18h7M18 14v7" />
-            </svg>
-          </div>
+          {currentStep.image ? (
+            <div className="relative h-48 w-48 overflow-hidden rounded-3xl shadow-md">
+              <img
+                src={currentStep.image}
+                alt={currentStep.title}
+                className="h-full w-full object-cover"
+              />
+            </div>
+          ) : (
+            <div className="grid h-28 w-28 place-items-center rounded-3xl bg-brand-50 text-brand-600">
+              <svg viewBox="0 0 24 24" className="h-10 w-10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="7" height="7" rx="1.5" />
+                <rect x="14" y="3" width="7" height="7" rx="1.5" />
+                <rect x="3" y="14" width="7" height="7" rx="1.5" />
+                <path d="M14 14h3M14 18h7M18 14v7" />
+              </svg>
+            </div>
+          )}
         </div>
 
-        <div className="mt-6 text-center">
-          <h2 className="text-3xl font-extrabold text-slate-900">{currentStep.title}</h2>
+        <div className="mt-4 text-center">
+          <h2 className="text-3xl font-extrabold text-slate-900 sm:text-4xl">{currentStep.title}</h2>
           <p className="mt-2 text-lg font-semibold text-brand-600">Smart Access Communication</p>
-          <p className="mx-auto mt-3 max-w-[18rem] text-base leading-relaxed text-slate-500">
+          <p className="mx-auto mt-2 max-w-[18rem] text-base leading-relaxed text-slate-500">
             {currentStep.description}
           </p>
         </div>
 
         {currentStep.points?.length ? (
-          <div className="mx-auto mt-4 max-w-[18rem] text-center text-sm text-slate-600">
+          <div className="mx-auto mt-2 max-w-[18rem] text-center text-sm text-slate-600">
             {currentStep.points[0]}
           </div>
         ) : null}
 
-        <div className="mt-6 flex justify-center gap-2">
+        <div className="mt-4 flex justify-center gap-2">
           {steps.map((step, stepIndex) => (
             <button
               key={step.title}
@@ -89,7 +99,7 @@ export default function OnboardingGuideModal({
           ))}
         </div>
 
-        <div className="mt-6 space-y-3">
+        <div className="mt-2 space-y-3">
           <button
             type="button"
             onClick={handleNext}

@@ -24,10 +24,15 @@ const emptyState = {
 
 export function normalizeDashboard(payload) {
   if (!payload || typeof payload !== "object") return emptyState;
+  const normalizedActivity = Array.isArray(payload.activity)
+    ? [...payload.activity]
+        .sort((a, b) => Date.parse(b?.time || "") - Date.parse(a?.time || ""))
+        .slice(0, 4)
+    : [];
 
   return {
     metrics: { ...metricTemplate, ...(payload.metrics ?? {}) },
-    activity: Array.isArray(payload.activity) ? payload.activity : [],
+    activity: normalizedActivity,
     waitingRoom: Array.isArray(payload.waitingRoom) ? payload.waitingRoom : [],
     session: payload.session ?? null,
     messages: Array.isArray(payload.messages) ? payload.messages : [],
