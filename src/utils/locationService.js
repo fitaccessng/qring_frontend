@@ -158,9 +158,9 @@ export async function getCurrentDeviceLocation(options = {}) {
   if (geolocationPlugin?.getCurrentPosition) {
     try {
       const position = await geolocationPlugin.getCurrentPosition({
-        enableHighAccuracy,
-        timeout,
-        maximumAge
+        enableHighAccuracy: true,
+        timeout: Math.max(timeout, 20000),
+        maximumAge: 0
       });
       const coords = {
         latitude: Number(position?.coords?.latitude),
@@ -171,8 +171,30 @@ export async function getCurrentDeviceLocation(options = {}) {
         saveLocation(coords);
         return { ok: true, coords, source: "native" };
       }
-      return { ok: false, reason: "unavailable" };
     } catch {
+      // Retry with a looser, coarse-favoring option set for unstable GPS environments.
+      try {
+        const fallback = await geolocationPlugin.getCurrentPosition({
+          enableHighAccuracy: Boolean(enableHighAccuracy),
+          timeout: Math.max(timeout, 25000),
+          maximumAge: Math.max(maximumAge, 180000)
+        });
+        const coords = {
+          latitude: Number(fallback?.coords?.latitude),
+          longitude: Number(fallback?.coords?.longitude),
+          accuracy: Number(fallback?.coords?.accuracy || 0)
+        };
+        if (Number.isFinite(coords.latitude) && Number.isFinite(coords.longitude)) {
+          saveLocation(coords);
+          return { ok: true, coords, source: "native-fallback" };
+        }
+      } catch {
+        // fallback handled below
+      }
+      const stale = readJSON(LAST_LOCATION_KEY);
+      if (stale?.coords?.latitude && stale?.coords?.longitude) {
+        return { ok: true, coords: stale.coords, source: "stale-cache" };
+      }
       return { ok: false, reason: "service_off" };
     }
   }
@@ -196,6 +218,65 @@ export async function getCurrentDeviceLocation(options = {}) {
       { enableHighAccuracy, timeout, maximumAge }
     );
   });
+}
+
+export async function watchDeviceLocation(onPosition, onError, options = {}) {
+  const settings = {
+    enableHighAccuracy: Boolean(options.enableHighAccuracy ?? true),
+    timeout: Number(options.timeout ?? 20000),
+    maximumAge: Number(options.maximumAge ?? 30000),
+  };
+
+  const geolocationPlugin = await getNativeGeolocation();
+  if (geolocationPlugin?.watchPosition) {
+    try {
+      const watchId = await geolocationPlugin.watchPosition(settings, (position, err) => {
+        if (err) {
+          onError?.(err);
+          return;
+        }
+        const coords = position?.coords;
+        if (!coords) return;
+        saveLocation(coords);
+        onPosition?.(coords);
+      });
+      return { type: "capacitor", id: watchId };
+    } catch {
+      // Browser fallback below.
+    }
+  }
+
+  if (!navigator?.geolocation) {
+    return null;
+  }
+
+  const id = navigator.geolocation.watchPosition(
+    (position) => {
+      const coords = position?.coords;
+      if (!coords) return;
+      saveLocation(coords);
+      onPosition?.(coords);
+    },
+    (error) => onError?.(error),
+    settings
+  );
+  return { type: "browser", id };
+}
+
+export async function clearDeviceLocationWatch(watchHandle) {
+  if (!watchHandle?.type) return;
+  if (watchHandle.type === "browser" && navigator?.geolocation && watchHandle.id != null) {
+    navigator.geolocation.clearWatch(watchHandle.id);
+    return;
+  }
+  if (watchHandle.type === "capacitor" && watchHandle.id != null) {
+    const geolocationPlugin = await getNativeGeolocation();
+    try {
+      await geolocationPlugin?.clearWatch?.({ id: watchHandle.id });
+    } catch {
+      // no-op
+    }
+  }
 }
 
 export async function openLocationSettings() {

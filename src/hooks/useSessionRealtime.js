@@ -890,11 +890,12 @@ export function useSessionRealtime(sessionId) {
 
   async function acceptIncomingCall() {
     if (!incomingCall.pending) return;
+    setIncomingCall({ pending: false, hasVideo: false });
+    setCallState("connecting");
     if (!livekitEnabled) {
       const pendingOffer = pendingOfferRef.current;
       if (!pendingOffer?.sdp) {
         setStatus("Incoming call data is no longer available. Ask homeowner to call again.");
-        setIncomingCall({ pending: false, hasVideo: false });
         setCallState("idle");
         return;
       }
@@ -918,31 +919,33 @@ export function useSessionRealtime(sessionId) {
         setCallLaunchStartedAt(null);
         grantSessionCallAccess(sessionId, "connected");
         setAcceptedCallMode(allowVideo ? "video" : "audio");
-        setIncomingCall({ pending: false, hasVideo: false });
         pendingOfferRef.current = null;
       } catch (error) {
         setStatus(error?.message ?? "Failed to accept incoming call");
+        setCallState("incoming");
+        setIncomingCall({ pending: true, hasVideo: incomingCall.hasVideo });
       }
       return;
     }
     try {
       setStatus("");
       const allowVideo = incomingCall.hasVideo && !lowBandwidthMode;
+      socketRef.current?.emit("call.accepted", {
+        sessionId,
+        hasVideo: allowVideo
+      });
       await connectLivekitRoom({ video: allowVideo });
       setCallState("connected");
       setCallLaunchStage("idle");
       setCallLaunchStartedAt(null);
       grantSessionCallAccess(sessionId, "connected");
       setAcceptedCallMode(allowVideo ? "video" : "audio");
-      setIncomingCall({ pending: false, hasVideo: false });
       pendingOfferRef.current = null;
-      socketRef.current?.emit("call.accepted", {
-        sessionId,
-        hasVideo: allowVideo
-      });
     } catch (error) {
       setStatus(error?.message ?? "Failed to accept incoming call");
       disconnectLivekitRoom();
+      setCallState("incoming");
+      setIncomingCall({ pending: true, hasVideo: incomingCall.hasVideo });
     }
   }
 

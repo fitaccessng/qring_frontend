@@ -6,6 +6,7 @@ import { getEstateOverview } from "../../services/estateService";
 import { useAuth } from "../../state/AuthContext";
 
 const modules = [
+  { title: "Estate Alerts", to: "/dashboard/estate/alerts", subtitle: "Send notices and payment requests" },
   { title: "Assign Doors", to: "/dashboard/estate/assign", subtitle: "Link entries to owners" },
   { title: "Invite Owners", to: "/dashboard/estate/invites", subtitle: "Send resident access links" },
   { title: "Mappings", to: "/dashboard/estate/mappings", subtitle: "Review home-to-door map" },

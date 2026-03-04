@@ -2,14 +2,20 @@ import { initializeApp } from "firebase/app";
 import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAg0TIlKOOk3AcDn-VGh9HlDQi2eDjk088",
-  authDomain: "qring-7ced9.firebaseapp.com",
-  projectId: "qring-7ced9",
-  storageBucket: "qring-7ced9.firebasestorage.app",
-  messagingSenderId: "103048317220",
-  appId: "1:103048317220:web:72f9667db6daae62504bb1",
-  measurementId: "G-3B48QKGTH7"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "",
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || ""
 };
+
+if (!firebaseConfig.apiKey || !firebaseConfig.authDomain || !firebaseConfig.projectId || !firebaseConfig.appId) {
+  throw new Error(
+    "Missing Firebase configuration. Set VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_PROJECT_ID, and VITE_FIREBASE_APP_ID."
+  );
+}
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);

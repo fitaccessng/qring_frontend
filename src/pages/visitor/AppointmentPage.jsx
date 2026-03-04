@@ -6,10 +6,12 @@ import {
   signalVisitorAppointmentArrival
 } from "../../services/homeownerService";
 import {
+  clearDeviceLocationWatch,
   checkLocationPermission,
   getCurrentDeviceLocation,
   openLocationSettings,
-  requestLocationPermission
+  requestLocationPermission,
+  watchDeviceLocation
 } from "../../utils/locationService";
 
 const DEVICE_STORAGE_KEY = "qring_visitor_device_id";
@@ -59,16 +61,6 @@ function distanceMeters(lat1, lng1, lat2, lng2) {
   return 2 * earth * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-async function getNativeGeolocation() {
-  try {
-    const moduleName = "@capacitor/geolocation";
-    const mod = await import(/* @vite-ignore */ moduleName);
-    return mod?.Geolocation ?? null;
-  } catch {
-    return null;
-  }
-}
-
 async function ensureLocationPermission() {
   const permission = await requestLocationPermission();
   return permission.granted;
@@ -112,12 +104,7 @@ export default function AppointmentPage() {
     }
     const watch = watchRef.current;
     if (watch?.id == null) return;
-    if (watch.type === "browser" && navigator.geolocation) {
-      navigator.geolocation.clearWatch(watch.id);
-    }
-    if (watch.type === "capacitor") {
-      getNativeGeolocation().then((plugin) => plugin?.clearWatch?.({ id: watch.id }).catch(() => {}));
-    }
+    clearDeviceLocationWatch(watch);
     watchRef.current = { type: null, id: null };
   }
 
@@ -241,55 +228,22 @@ export default function AppointmentPage() {
       await sendArrivalSignal(currentLat, currentLng);
     };
 
-    const geolocationPlugin = await getNativeGeolocation();
-    if (geolocationPlugin) {
-      try {
-        const permission = await requestLocationPermission();
-        if (!permission.granted) {
-          setLocationBlocked(true);
-          setArrivalStatus("Location permission is off. Turn on location to continue.");
+    watchRef.current = (await watchDeviceLocation(
+      (coords) => onPosition(coords),
+      (watchError) => {
+        setLocationBlocked(true);
+        if (Number(watchError?.code) === 1) {
+          setArrivalStatus("Location permission denied. Enable location access to continue.");
           return;
         }
-        const nativeWatchId = await geolocationPlugin.watchPosition(
-          {
-            enableHighAccuracy: false,
-            timeout: 20000,
-            maximumAge: 45000
-          },
-          (position, nativeError) => {
-            if (nativeError) {
-              setLocationBlocked(true);
-              setArrivalStatus("Location is unavailable. Please enable device location.");
-              return;
-            }
-            onPosition(position?.coords);
-          }
-        );
-        watchRef.current = { type: "capacitor", id: nativeWatchId };
-      } catch {
-        // Fallback to browser geolocation below.
+        setArrivalStatus("Location is unavailable. Please enable device GPS and internet.");
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 30000,
+        timeout: 20000
       }
-    }
-
-    if (watchRef.current.id == null && navigator.geolocation) {
-      const browserWatchId = navigator.geolocation.watchPosition(
-        (position) => onPosition(position?.coords),
-        (browserError) => {
-          setLocationBlocked(true);
-          if (Number(browserError?.code) === 1) {
-            setArrivalStatus("Location permission denied. Enable location access to continue.");
-            return;
-          }
-          setArrivalStatus("Location is unavailable. Please enable device location.");
-        },
-        {
-          enableHighAccuracy: false,
-          maximumAge: 45000,
-          timeout: 20000
-        }
-      );
-      watchRef.current = { type: "browser", id: browserWatchId };
-    }
+    )) || { type: null, id: null };
 
     if (watchRef.current.id == null) {
       setLocationBlocked(true);
@@ -303,9 +257,9 @@ export default function AppointmentPage() {
         (position) => onPosition(position?.coords),
         () => {},
         {
-          enableHighAccuracy: false,
-          maximumAge: 60000,
-          timeout: 15000
+          enableHighAccuracy: true,
+          maximumAge: 30000,
+          timeout: 20000
         }
       );
     };
@@ -334,9 +288,9 @@ export default function AppointmentPage() {
         return;
       }
       const quickLocationCheck = await getCurrentDeviceLocation({
-        enableHighAccuracy: false,
-        timeout: 10000,
-        maximumAge: 120000,
+        enableHighAccuracy: true,
+        timeout: 20000,
+        maximumAge: 60000,
         maxCachedAgeMs: 10 * 60 * 1000
       });
       if (!quickLocationCheck.ok && quickLocationCheck.reason === "service_off") {

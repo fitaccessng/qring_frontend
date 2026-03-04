@@ -8,7 +8,7 @@ import { useSessionRealtime } from "../../hooks/useSessionRealtime";
 
 export default function SessionVideoPage() {
   const { sessionId } = useParams();
-  const dashboardRoute = getDashboardRoute();
+  const exitRoute = getExitRoute(sessionId);
   const {
     connected,
     joined,
@@ -84,7 +84,7 @@ export default function SessionVideoPage() {
               </span>
             </div>
             <Link
-              to={dashboardRoute}
+              to={exitRoute}
               className="rounded-full bg-white/20 px-3 py-1.5 text-[11px] font-semibold backdrop-blur transition-all hover:bg-white/30 active:scale-95"
             >
               Exit
@@ -222,13 +222,14 @@ function ControlIconButton({ label, icon, onClick, disabled = false, variant = "
   );
 }
 
-function getDashboardRoute() {
+function getExitRoute(sessionId) {
   try {
     const user = JSON.parse(localStorage.getItem("qring_user") || "null");
+    if (user?.role === "visitor") return `/session/${sessionId}/message`;
     if (user?.role === "admin") return "/dashboard/admin";
     if (user?.role === "estate") return "/dashboard/estate";
     return "/dashboard/homeowner/overview";
   } catch {
-    return "/dashboard/homeowner/overview";
+    return `/session/${sessionId}/message`;
   }
 }

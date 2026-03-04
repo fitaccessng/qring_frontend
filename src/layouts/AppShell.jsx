@@ -15,6 +15,7 @@ import { resolveNotificationRoute } from "../utils/notificationRouting";
 const navByRole = {
   homeowner: [
     { to: "/dashboard/homeowner/overview", label: "Overview", icon: "overview" },
+    { to: "/dashboard/homeowner/alerts", label: "Alerts", icon: "bell_ring" },
     { to: "/dashboard/homeowner/appointments", label: "Appointments", icon: "appointments" },
     { to: "/dashboard/homeowner/visits", label: "Visits", icon: "visits" },
     { to: "/dashboard/homeowner/messages", label: "Messages", icon: "messages" },
@@ -24,6 +25,7 @@ const navByRole = {
   ],
   estate: [
     { to: "/dashboard/estate", label: "Overview", icon: "estate" },
+    { to: "/dashboard/estate/alerts", label: "Alerts", icon: "bell_ring" },
     { to: "/dashboard/estate/create", label: "Create Estate", icon: "estate_create" },
     { to: "/dashboard/estate/doors", label: "Add Doors", icon: "doors" },
     { to: "/dashboard/estate/assign", label: "Assign Doors", icon: "assign" },
@@ -116,20 +118,17 @@ export default function AppShell({ title, children, showTopBar = true }) {
       if (user?.role === "homeowner") {
         return [
           { to: "/dashboard/homeowner/overview", label: "Home", icon: "overview" },
-          { to: "/dashboard/homeowner/appointments", label: "Appointments", icon: "appointments" },
-          { to: "/dashboard/homeowner/visits", label: "Visits", icon: "visits" },
-          { to: "/dashboard/homeowner/messages", label: "Message", icon: "messages" },
-          { to: "/dashboard/homeowner/doors", label: "Doors", icon: "plus" },
-          { to: "/dashboard/homeowner/settings", label: "Profile", icon: "settings" }
+          { to: "/dashboard/homeowner/alerts", label: "Alerts", icon: "bell_ring" },
+          { to: "/dashboard/homeowner/messages", label: "Messages", icon: "messages" },
+          { to: "/dashboard/homeowner/doors", label: "Doors", icon: "doors" }
         ];
       }
       if (user?.role === "estate") {
         return [
           { to: "/dashboard/estate", label: "Overview", icon: "estate" },
+          { to: "/dashboard/estate/alerts", label: "Alerts", icon: "bell_ring" },
           { to: "/dashboard/estate/doors", label: "Doors", icon: "doors" },
-          { to: "/dashboard/estate/create", label: "Estate", icon: "plus" },
-          { to: "/dashboard/estate/logs", label: "Logs", icon: "logs" },
-          { to: "/dashboard/estate/settings", label: "Settings", icon: "settings" }
+          { to: "/dashboard/estate/logs", label: "Logs", icon: "logs" }
         ];
       }
       return navItems.filter((item) => !item.to.endsWith("/settings")).slice(0, 4);
@@ -786,6 +785,7 @@ function NavIcon({ name }) {
     system: <path d="M12 1v4M12 19v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M1 12h4M19 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8" />,
     plans: <path d="M4 20V8l8-4 8 4v12M4 12h16" />
     ,
+    bell_ring: <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5M9 17a3 3 0 0 0 6 0M18 3l2 2M6 3L4 5" />,
     user_admin: <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm10 0v-2m0 0V7m0 2h-2m2 0h2" />,
     sessions: <path d="M8 7h13M8 12h13M8 17h13M3 7h.01M3 12h.01M3 17h.01" />,
     plus: <path d="M12 5v14M5 12h14" />,

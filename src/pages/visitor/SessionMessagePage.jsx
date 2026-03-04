@@ -35,12 +35,9 @@ export default function SessionMessagePage() {
   }
 
   async function handleAcceptIncomingCall() {
-    try {
-      await acceptIncomingCall();
-      navigate(`/session/${sessionId}/${incomingCall.hasVideo ? "video" : "audio"}`);
-    } catch {
-      // keep user on message page if accept fails
-    }
+    const route = `/session/${sessionId}/${incomingCall.hasVideo ? "video" : "audio"}`;
+    acceptIncomingCall();
+    navigate(route);
   }
 
   function handleRejectIncomingCall() {

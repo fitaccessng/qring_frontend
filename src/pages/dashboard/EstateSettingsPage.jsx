@@ -61,6 +61,7 @@ export default function EstateSettingsPage() {
   const [changingPassword, setChangingPassword] = useState(false);
   const [editProfileOpen, setEditProfileOpen] = useState(false);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+  const [confirmLeaveOpen, setConfirmLeaveOpen] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
 
@@ -146,6 +147,11 @@ export default function EstateSettingsPage() {
   }
 
   async function openWebsiteAndEndSession() {
+    setConfirmLeaveOpen(true);
+  }
+
+  async function confirmLeaveApp() {
+    setConfirmLeaveOpen(false);
     try {
       await logout();
     } catch {
@@ -260,6 +266,28 @@ export default function EstateSettingsPage() {
             {changingPassword ? "Updating..." : "Update Password"}
           </button>
         </form>
+      </ActionModal>
+
+      <ActionModal open={confirmLeaveOpen} title="Leave Qring?" onClose={() => setConfirmLeaveOpen(false)}>
+        <p className="text-sm text-slate-600 dark:text-slate-300">
+          You are about to open an external page. Continue?
+        </p>
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => setConfirmLeaveOpen(false)}
+            className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold dark:border-slate-700"
+          >
+            Stay
+          </button>
+          <button
+            type="button"
+            onClick={confirmLeaveApp}
+            className="rounded-xl bg-indigo-600 px-3 py-2 text-sm font-semibold text-white"
+          >
+            Continue
+          </button>
+        </div>
       </ActionModal>
     </AppShell>
   );

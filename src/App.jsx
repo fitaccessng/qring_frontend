@@ -27,9 +27,11 @@ import HomeownerAppointmentsPage from "./pages/dashboard/HomeownerAppointmentsPa
 import HomeownerMessagesPage from "./pages/dashboard/HomeownerMessagesPage";
 import HomeownerDoorsPage from "./pages/dashboard/HomeownerDoorsPage";
 import HomeownerSettingsPage from "./pages/dashboard/HomeownerSettingsPage";
+import HomeownerAlertsPage from "./pages/dashboard/HomeownerAlertsPage";
 import HomeownerPaywallPage from "./pages/dashboard/HomeownerPaywallPage";
 import BillingCallbackPage from "./pages/dashboard/BillingCallbackPage";
 import EstateDashboardPage from "./pages/dashboard/EstateDashboardPage";
+import EstateAlertsPage from "./pages/dashboard/EstateAlertsPage";
 import EstateCreatePage from "./pages/dashboard/EstateCreatePage";
 import EstateDoorsPage from "./pages/dashboard/EstateDoorsPage";
 import EstateAssignPage from "./pages/dashboard/EstateAssignPage";
@@ -164,10 +166,12 @@ function AppRoutes() {
                   <Route path="/dashboard/homeowner/visits" element={<HomeownerVisitsPage />} />
                   <Route path="/dashboard/homeowner/messages" element={<HomeownerMessagesPage />} />
                   <Route path="/dashboard/homeowner/doors" element={<HomeownerDoorsPage />} />
+                  <Route path="/dashboard/homeowner/alerts" element={<HomeownerAlertsPage />} />
                   <Route path="/dashboard/homeowner/settings" element={<HomeownerSettingsPage />} />
                 </Route>
                 <Route element={<RoleRoute allowedRoles={["estate"]} />}>
                   <Route path="/dashboard/estate" element={<EstateDashboardPage />} />
+                  <Route path="/dashboard/estate/alerts" element={<EstateAlertsPage />} />
                   <Route path="/dashboard/estate/create" element={<EstateCreatePage />} />
                   <Route path="/dashboard/estate/doors" element={<EstateDoorsPage />} />
                   <Route path="/dashboard/estate/assign" element={<EstateAssignPage />} />
@@ -204,6 +208,15 @@ function SpaRedirectRecovery() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    const hash = typeof window !== "undefined" ? window.location.hash || "" : "";
+    if (hash.startsWith("#/")) {
+      const hashRoute = hash.slice(1);
+      const routeOnly = hashRoute.split("?")[0] || "/";
+      if (routeOnly.startsWith("/")) {
+        navigate(hashRoute, { replace: true });
+        return;
+      }
+    }
     const params = new URLSearchParams(location.search);
     const redirect = params.get("redirect");
     if (!redirect) return;

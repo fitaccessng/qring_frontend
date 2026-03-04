@@ -95,3 +95,37 @@ export async function listEstateSharedQrs(estateId) {
   const response = await apiRequest(`/estate/shared-qr?estateId=${encodeURIComponent(estateId)}`);
   return Array.isArray(response?.data) ? response.data : [];
 }
+
+export async function createEstateAlert(payload) {
+  const response = await apiRequest("/estate/alerts", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+  return response?.data ?? null;
+}
+
+export async function listEstateAlerts(estateId, alertType = "") {
+  const params = new URLSearchParams();
+  if (alertType) params.set("alertType", alertType);
+  const query = params.toString();
+  const response = await apiRequest(`/estate/${encodeURIComponent(estateId)}/alerts${query ? `?${query}` : ""}`);
+  return Array.isArray(response?.data) ? response.data : [];
+}
+
+export async function listMyEstateAlerts() {
+  const response = await apiRequest("/estate/alerts/me");
+  return Array.isArray(response?.data) ? response.data : [];
+}
+
+export async function payEstateAlert(alertId, payload = { paymentMethod: "paystack" }) {
+  const response = await apiRequest(`/alert/${encodeURIComponent(alertId)}/pay`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+  return response?.data ?? null;
+}
+
+export async function listEstateAlertPayments(estateId) {
+  const response = await apiRequest(`/estate/${encodeURIComponent(estateId)}/alerts/payments`);
+  return Array.isArray(response?.data) ? response.data : [];
+}

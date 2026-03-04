@@ -80,6 +80,8 @@ export default function HomeownerPaywallPage() {
   const [billingCycle, setBillingCycle] = useState("monthly");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [checkoutUrl, setCheckoutUrl] = useState("");
+  const [confirmCheckoutOpen, setConfirmCheckoutOpen] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -162,13 +164,22 @@ export default function HomeownerPaywallPage() {
         if (!initialized?.authorization_url) {
           throw new Error("Unable to start Paystack checkout");
         }
-        window.location.href = initialized.authorization_url;
+        setCheckoutUrl(initialized.authorization_url);
+        setConfirmCheckoutOpen(true);
       }
     } catch (requestError) {
       setError(requestError.message ?? "Failed to process plan request");
     } finally {
       setSubmitting("");
     }
+  }
+
+  function confirmCheckoutRedirect() {
+    if (!checkoutUrl) return;
+    const target = checkoutUrl;
+    setCheckoutUrl("");
+    setConfirmCheckoutOpen(false);
+    window.location.href = target;
   }
 
   return (
@@ -297,6 +308,14 @@ export default function HomeownerPaywallPage() {
           Need help? <Link to="/contact" className="font-semibold text-brand-600 dark:text-brand-300">Contact support</Link>.
         </p>
       </section>
+
+      <ConfirmLeaveModal
+        open={confirmCheckoutOpen}
+        title="Continue to Paystack?"
+        message="You are about to leave Qring and continue payment in an external checkout page."
+        onClose={() => setConfirmCheckoutOpen(false)}
+        onConfirm={confirmCheckoutRedirect}
+      />
     </AppShell>
   );
 }
@@ -320,3 +339,30 @@ function resolvePlanAmount(plan, cycle) {
   return cycle === "yearly" ? base * 12 : base;
 }
 
+function ConfirmLeaveModal({ open, title, message, onClose, onConfirm }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/50 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+        <h3 className="text-lg font-extrabold">{title}</h3>
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{message}</p>
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold dark:border-slate-700"
+          >
+            Stay
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white dark:bg-white dark:text-slate-900"
+          >
+            Continue
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
