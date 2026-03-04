@@ -119,6 +119,7 @@ export default function AppShell({ title, children, showTopBar = true }) {
         return [
           { to: "/dashboard/homeowner/overview", label: "Home", icon: "overview" },
           { to: "/dashboard/homeowner/alerts", label: "Alerts", icon: "bell_ring" },
+          { to: "/dashboard/homeowner/appointments", label: "Appointments", icon: "appointments" },
           { to: "/dashboard/homeowner/messages", label: "Messages", icon: "messages" },
           { to: "/dashboard/homeowner/doors", label: "Doors", icon: "doors" }
         ];
@@ -483,15 +484,13 @@ export default function AppShell({ title, children, showTopBar = true }) {
     setMuteVisitRing(true);
     try {
       await clearNotifications();
-      setNotifications((prev) => {
-        const next = prev.map((row) => ({
-          ...row,
-          readAt: row.readAt || new Date().toISOString()
-        }));
+      setNotifications(() => {
+        const next = [];
         notificationsCache = next;
         notificationsCacheAt = Date.now();
         return next;
       });
+      browserAlertedIdsRef.current.clear();
     } catch {
       // No-op, keep existing list.
     }

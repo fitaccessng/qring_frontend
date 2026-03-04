@@ -79,7 +79,7 @@ export default function NotificationsPage() {
     setBusy(true);
     try {
       await clearNotifications();
-      setItems((prev) => prev.map((row) => ({ ...row, readAt: row.readAt || new Date().toISOString() })));
+      setItems([]);
     } catch (requestError) {
       setError(requestError?.message ?? "Failed to clear notifications.");
     } finally {

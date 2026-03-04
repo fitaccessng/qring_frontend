@@ -24,9 +24,18 @@ export async function markNotificationRead(notificationId) {
 }
 
 export async function clearNotifications() {
-  const response = await apiRequest("/notifications/read-all", {
-    method: "POST"
-  });
+  let response;
+  try {
+    response = await apiRequest("/notifications/clear-all", {
+      method: "DELETE"
+    });
+  } catch (error) {
+    // Backward compatibility for older backend nodes that don't have clear-all yet.
+    if (error?.status !== 404) throw error;
+    response = await apiRequest("/notifications/read-all", {
+      method: "POST"
+    });
+  }
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event("qring:notifications-updated"));
   }

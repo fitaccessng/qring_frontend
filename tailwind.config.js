@@ -16,8 +16,8 @@ export default {
         danger: "#dc2626"
       },
       fontFamily: {
-        heading: ["Sora", "ui-sans-serif", "sans-serif"],
-        body: ["Manrope", "ui-sans-serif", "sans-serif"]
+        heading: ["Sora", "Manrope", "Segoe UI", "Roboto", "Noto Sans", "ui-sans-serif", "sans-serif"],
+        body: ["Manrope", "Segoe UI", "Roboto", "Noto Sans", "ui-sans-serif", "sans-serif"]
       },
       boxShadow: {
         soft: "0 10px 30px -15px rgba(12, 23, 62, 0.25)"
