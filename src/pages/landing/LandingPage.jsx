@@ -96,7 +96,7 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_12%_10%,rgba(34,211,238,0.14),transparent_34%),radial-gradient(circle_at_88%_92%,rgba(59,130,246,0.12),transparent_40%),#f8fafc] text-slate-900 dark:bg-[radial-gradient(circle_at_12%_10%,rgba(34,211,238,0.16),transparent_34%),radial-gradient(circle_at_88%_92%,rgba(59,130,246,0.16),transparent_40%),#020617] dark:text-slate-100">
       <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur-sm dark:border-slate-800 dark:bg-slate-950/95">
         <nav className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-10">
           <div className="flex items-center gap-3 sm:gap-4">
