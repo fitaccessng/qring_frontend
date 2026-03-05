@@ -11,21 +11,26 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || ""
 };
 
-if (!firebaseConfig.apiKey || !firebaseConfig.authDomain || !firebaseConfig.projectId || !firebaseConfig.appId) {
-  throw new Error(
-    "Missing Firebase configuration. Set VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_PROJECT_ID, and VITE_FIREBASE_APP_ID."
-  );
-}
+export const isFirebaseConfigured = Boolean(
+  firebaseConfig.apiKey &&
+  firebaseConfig.authDomain &&
+  firebaseConfig.projectId &&
+  firebaseConfig.appId
+);
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+export const firebaseConfigError = isFirebaseConfigured
+  ? ""
+  : "Missing Firebase configuration. Set VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_PROJECT_ID, and VITE_FIREBASE_APP_ID.";
 
-// Initialize Auth
-export const auth = getAuth(app);
+// Initialize Firebase only when env is present so the app does not white-screen.
+const app = isFirebaseConfigured ? initializeApp(firebaseConfig) : null;
+export const auth = app ? getAuth(app) : null;
 
 // Set persistence to LOCAL so user stays logged in
-setPersistence(auth, browserLocalPersistence).catch((error) => {
-  console.error("Error setting Firebase persistence:", error);
-});
+if (auth) {
+  setPersistence(auth, browserLocalPersistence).catch((error) => {
+    console.error("Error setting Firebase persistence:", error);
+  });
+}
 
 export default app;

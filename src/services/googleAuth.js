@@ -4,7 +4,7 @@ import {
   getRedirectResult,
   GoogleAuthProvider,
 } from "firebase/auth";
-import { auth } from "../config/firebase";
+import { auth, isFirebaseConfigured, firebaseConfigError } from "../config/firebase";
 import { apiRequest } from "./apiClient";
 
 const googleProvider = new GoogleAuthProvider();
@@ -14,6 +14,12 @@ googleProvider.addScope("profile");
 googleProvider.addScope("email");
 const PENDING_GOOGLE_SIGNUP_KEY = "qring_pending_google_signup";
 const GOOGLE_REDIRECT_INTENT_KEY = "qring_google_redirect_intent";
+
+function ensureFirebaseReady() {
+  if (!isFirebaseConfigured || !auth) {
+    throw new Error(firebaseConfigError || "Google auth is not configured for this environment.");
+  }
+}
 
 function savePendingGoogleSignup(payload) {
   sessionStorage.setItem(PENDING_GOOGLE_SIGNUP_KEY, JSON.stringify(payload));
@@ -58,6 +64,7 @@ function getRedirectIntent() {
 }
 
 async function getGoogleUserFromAuth(intent = "signin") {
+  ensureFirebaseReady();
   if (isNativeCapacitor()) {
     const redirectResult = await getRedirectResult(auth);
     if (redirectResult?.user) {
@@ -84,6 +91,7 @@ function buildGoogleProfile(user, referralCode = undefined) {
 }
 
 export async function resumeGoogleRedirectAuth() {
+  ensureFirebaseReady();
   if (!isNativeCapacitor()) return null;
 
   const intent = getRedirectIntent();
@@ -245,6 +253,7 @@ export async function signUpWithGoogle(role = "homeowner") {
  */
 export async function signOutFromGoogle() {
   try {
+    ensureFirebaseReady();
     await auth.signOut();
   } catch (error) {
     console.error("Error signing out:", error);
@@ -256,5 +265,6 @@ export async function signOutFromGoogle() {
  * Get current Firebase user
  */
 export function getCurrentGoogleUser() {
+  if (!auth) return null;
   return auth.currentUser;
 }
