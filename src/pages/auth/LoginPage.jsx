@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import AuthCard from "../../components/AuthCard";
 import { useAuth } from "../../state/AuthContext";
 
@@ -33,7 +33,7 @@ function resolveLoginErrorMessage(submitError) {
 }
 
 export default function LoginPage() {
-  const { login, googleSignIn, loading } = useAuth();
+  const { login, googleSignIn, resumeGoogleRedirect, loading } = useAuth();
   const [searchParams] = useSearchParams();
   const initialLogin = searchParams.get("email") ?? searchParams.get("username") ?? "";
   const [form, setForm] = useState({ email: initialLogin, password: "" });
@@ -41,6 +41,40 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const navigate = useNavigate();
   const location = useLocation();
+
+  useEffect(() => {
+    let active = true;
+
+    const resumeNativeGoogleAuth = async () => {
+      try {
+        const resumed = await resumeGoogleRedirect();
+        if (!active || !resumed) return;
+
+        if (resumed.intent === "signup") {
+          navigate("/google-role", { replace: true, state: { intent: "signup" } });
+          return;
+        }
+
+        const target = resolveTargetPath(resumed.data, location.state?.from?.pathname);
+        if (!target) {
+          navigate("/google-role", {
+            replace: true,
+            state: { from: location.state?.from?.pathname }
+          });
+          return;
+        }
+        navigate(target, { replace: true });
+      } catch (resumeError) {
+        if (!active) return;
+        setError(resumeError.message ?? "Google sign-in failed");
+      }
+    };
+
+    resumeNativeGoogleAuth();
+    return () => {
+      active = false;
+    };
+  }, [location.state?.from?.pathname, navigate, resumeGoogleRedirect]);
 
   const onSubmit = async (event) => {
     event.preventDefault();

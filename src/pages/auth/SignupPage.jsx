@@ -1,12 +1,12 @@
 import { Link, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import AuthCard from "../../components/AuthCard";
 import { useAuth } from "../../state/AuthContext";
 
 const MOBILE_ONBOARDING_INTENT_KEY = "qring_mobile_onboarding_intent";
 
 export default function SignupPage() {
-  const { signup, login, beginGoogleSignUp } = useAuth();
+  const { signup, login, beginGoogleSignUp, resumeGoogleRedirect } = useAuth();
   const [form, setForm] = useState({
     fullName: "",
     email: "",
@@ -21,6 +21,31 @@ export default function SignupPage() {
   const [signupSuccess, setSignupSuccess] = useState(false);
   const [pendingCredentials, setPendingCredentials] = useState(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    let active = true;
+
+    const resumeNativeGoogleSignup = async () => {
+      try {
+        const resumed = await resumeGoogleRedirect();
+        if (!active || !resumed) return;
+        if (resumed.intent === "signup") {
+          navigate("/google-role", {
+            replace: true,
+            state: { intent: "signup" }
+          });
+        }
+      } catch (resumeError) {
+        if (!active) return;
+        setError(resumeError.message ?? "Google sign-up failed");
+      }
+    };
+
+    resumeNativeGoogleSignup();
+    return () => {
+      active = false;
+    };
+  }, [navigate, resumeGoogleRedirect]);
 
   const onSubmit = async (event) => {
     event.preventDefault();

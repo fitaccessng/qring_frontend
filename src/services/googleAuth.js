@@ -53,6 +53,10 @@ function clearRedirectIntent() {
   sessionStorage.removeItem(GOOGLE_REDIRECT_INTENT_KEY);
 }
 
+function getRedirectIntent() {
+  return sessionStorage.getItem(GOOGLE_REDIRECT_INTENT_KEY) ?? "";
+}
+
 async function getGoogleUserFromAuth(intent = "signin") {
   if (isNativeCapacitor()) {
     const redirectResult = await getRedirectResult(auth);
@@ -67,6 +71,61 @@ async function getGoogleUserFromAuth(intent = "signin") {
 
   const result = await signInWithPopup(auth, googleProvider);
   return result.user;
+}
+
+function buildGoogleProfile(user, referralCode = undefined) {
+  return {
+    idToken: undefined,
+    email: user?.email ?? "",
+    displayName: user?.displayName ?? "",
+    photoURL: user?.photoURL ?? "",
+    referralCode: String(referralCode || "").trim() || undefined,
+  };
+}
+
+export async function resumeGoogleRedirectAuth() {
+  if (!isNativeCapacitor()) return null;
+
+  const intent = getRedirectIntent();
+  if (!intent) return null;
+
+  const redirectResult = await getRedirectResult(auth);
+  if (!redirectResult?.user) return null;
+
+  clearRedirectIntent();
+  const user = redirectResult.user;
+  const idToken = await user.getIdToken(true);
+
+  if (intent === "signin") {
+    const response = await apiRequest("/auth/google-signin", {
+      method: "POST",
+      body: JSON.stringify({
+        idToken,
+        email: user.email,
+        displayName: user.displayName,
+        photoURL: user.photoURL,
+      }),
+    });
+    return {
+      intent: "signin",
+      response,
+    };
+  }
+
+  if (intent === "signup") {
+    const pending = readPendingGoogleSignup();
+    const merged = {
+      ...buildGoogleProfile(user, pending?.referralCode),
+      idToken,
+    };
+    savePendingGoogleSignup(merged);
+    return {
+      intent: "signup",
+      pending: merged,
+    };
+  }
+
+  return null;
 }
 
 /**

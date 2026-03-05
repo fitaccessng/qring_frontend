@@ -3,6 +3,9 @@ import * as authService from "../services/authService";
 
 const AuthContext = createContext(null);
 const protectedUiPrefixes = ["/dashboard"];
+const SESSION_TIMEOUT_EVENT = "qring:session-timeout";
+const TOKEN_REFRESH_LEEWAY_MS = 60 * 1000;
+const MIN_REFRESH_DELAY_MS = 15 * 1000;
 
 function loadJson(key, fallback) {
   const raw = localStorage.getItem(key);
@@ -66,6 +69,13 @@ function isProtectedUiRoute(pathname) {
   return protectedUiPrefixes.some((prefix) => String(pathname || "").startsWith(prefix));
 }
 
+function getTokenExpiryMs(token) {
+  const payload = decodeJwtPayload(token);
+  const expSeconds = Number(payload?.exp ?? 0);
+  if (!Number.isFinite(expSeconds) || expSeconds <= 0) return null;
+  return expSeconds * 1000;
+}
+
 export function AuthProvider({ children }) {
   const [accessToken, setAccessToken] = useState(() => localStorage.getItem("qring_access_token") ?? "");
   const [user, setUser] = useState(() => {
@@ -74,6 +84,14 @@ export function AuthProvider({ children }) {
     return loadJson("qring_user", null);
   });
   const [loading, setLoading] = useState(false);
+
+  function clearLocalAuthState() {
+    localStorage.removeItem("qring_access_token");
+    localStorage.removeItem("qring_refresh_token");
+    localStorage.removeItem("qring_user");
+    setAccessToken("");
+    setUser(null);
+  }
 
   function persistAuth(data) {
     if (!data?.accessToken) {
@@ -152,6 +170,22 @@ export function AuthProvider({ children }) {
       email
     });
 
+  const resumeGoogleRedirect = async () => {
+    setLoading(true);
+    try {
+      const result = await authService.resumeGoogleRedirectAuth();
+      if (!result) return null;
+      if (result.intent === "signin") {
+        const data = normalizeAuthData(result.response);
+        persistAuth(data);
+        return { intent: "signin", data };
+      }
+      return result;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const logout = async () => {
     try {
       const refresh = localStorage.getItem("qring_refresh_token");
@@ -159,22 +193,24 @@ export function AuthProvider({ children }) {
         await authService.logout({ refreshToken: refresh });
       }
     } finally {
-      localStorage.removeItem("qring_access_token");
-      localStorage.removeItem("qring_refresh_token");
-      localStorage.removeItem("qring_user");
-      setAccessToken("");
-      setUser(null);
+      clearLocalAuthState();
     }
   };
 
   useEffect(() => {
     let active = true;
+    let timeoutId = null;
 
-    const refreshSession = async () => {
-      if (!accessToken || !user?.id) return;
-      if (!isProtectedUiRoute(getCurrentRoutePath())) return;
+    const refreshSession = async (reason = "timer") => {
+      if (!accessToken) return;
       const refresh = localStorage.getItem("qring_refresh_token");
-      if (!refresh) return;
+      if (!refresh) {
+        if (reason === "timer") {
+          clearLocalAuthState();
+          window.dispatchEvent(new Event(SESSION_TIMEOUT_EVENT));
+        }
+        return;
+      }
       try {
         const response = await authService.refreshToken({ refreshToken: refresh });
         if (!active) return;
@@ -185,25 +221,51 @@ export function AuthProvider({ children }) {
         if (data?.refreshToken) {
           localStorage.setItem("qring_refresh_token", data.refreshToken);
         }
+        if (data?.user) {
+          localStorage.setItem("qring_user", JSON.stringify(data.user));
+          setUser(data.user);
+        }
       } catch {
-        // Keep non-blocking; api client still handles refresh on 401.
+        const tokenExpiryMs = getTokenExpiryMs(accessToken) ?? 0;
+        if (Date.now() >= tokenExpiryMs) {
+          clearLocalAuthState();
+          window.dispatchEvent(new Event(SESSION_TIMEOUT_EVENT));
+        }
       }
     };
 
     const onVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        refreshSession();
+      if (document.visibilityState === "visible" && isProtectedUiRoute(getCurrentRoutePath())) {
+        refreshSession("visibility");
       }
     };
 
-    const intervalId = window.setInterval(refreshSession, 20 * 60 * 1000);
+    const scheduleRefresh = () => {
+      if (!accessToken) return;
+      const tokenExpiryMs = getTokenExpiryMs(accessToken);
+      if (!tokenExpiryMs) return;
+      const delay = Math.max(tokenExpiryMs - Date.now() - TOKEN_REFRESH_LEEWAY_MS, MIN_REFRESH_DELAY_MS);
+      timeoutId = window.setTimeout(() => refreshSession("timer"), delay);
+    };
+
+    scheduleRefresh();
     document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       active = false;
-      window.clearInterval(intervalId);
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [accessToken, user?.id]);
+  }, [accessToken]);
+
+  useEffect(() => {
+    const onSessionTimeout = () => {
+      clearLocalAuthState();
+    };
+    window.addEventListener(SESSION_TIMEOUT_EVENT, onSessionTimeout);
+    return () => window.removeEventListener(SESSION_TIMEOUT_EVENT, onSessionTimeout);
+  }, []);
 
   const value = useMemo(
     () => ({
@@ -215,6 +277,7 @@ export function AuthProvider({ children }) {
       googleSignIn,
       googleSignUp,
       beginGoogleSignUp,
+      resumeGoogleRedirect,
       forgotPassword,
       logout
     }),

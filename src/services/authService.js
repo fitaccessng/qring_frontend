@@ -20,6 +20,10 @@ export async function beginGoogleSignUp(referralCode = "") {
   return googleAuth.beginGoogleSignup(referralCode);
 }
 
+export async function resumeGoogleRedirectAuth() {
+  return googleAuth.resumeGoogleRedirectAuth();
+}
+
 export async function googleAdminSignIn() {
   return googleAuth.signInWithGoogle();
 }

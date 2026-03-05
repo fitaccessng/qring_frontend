@@ -184,6 +184,9 @@ function clearAuthStorage() {
   localStorage.removeItem("qring_access_token");
   localStorage.removeItem("qring_refresh_token");
   localStorage.removeItem("qring_user");
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("qring:session-timeout"));
+  }
 }
 
 function redirectToLogin() {
@@ -206,7 +209,7 @@ export async function apiRequest(path, options = {}, attempt = 0) {
   if (requiresAuthenticatedUser(path) && !token) {
     clearAuthStorage();
     redirectToLogin();
-    throw new ApiError("Missing access token. Please login again.", 401, { path });
+    throw new ApiError("Session timeout. Please login again.", 401, { path });
   }
   const method = String(options.method ?? "GET").toUpperCase();
   const isGet = method === "GET" && !options.body;
@@ -272,15 +275,19 @@ export async function apiRequest(path, options = {}, attempt = 0) {
   }
 
   if (!response.ok) {
-    if (response.status === 401 && attempt === 0) {
+    const shouldHandleSessionTimeout = response.status === 401 && (Boolean(token) || requiresAuthenticatedUser(path));
+    if (shouldHandleSessionTimeout && attempt === 0) {
       const newToken = await refreshAccessToken();
       if (newToken) {
         return apiRequest(path, options, 1);
       }
       clearAuthStorage();
+      emitFlash("Session timeout. Please login again.", "warning");
       redirectToLogin();
     }
-    const message = payload?.message ?? payload?.detail ?? `Request failed (${response.status})`;
+    const message = shouldHandleSessionTimeout
+      ? "Session timeout. Please login again."
+      : payload?.message ?? payload?.detail ?? `Request failed (${response.status})`;
     emitFlash(message, "error");
     throw new ApiError(
       message,
