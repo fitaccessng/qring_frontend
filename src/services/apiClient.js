@@ -13,7 +13,7 @@ let refreshPromise = null;
 let capacitorRuntime = null;
 const GET_CACHE_TTL_MS = 20 * 1000;
 const GET_CACHE_STALE_TTL_MS = 2 * 60 * 1000;
-const REQUEST_TIMEOUT_MS = 15000;
+const REQUEST_TIMEOUT_MS = 30000;
 const getResponseCache = new Map();
 const protectedPathPrefixes = [
   "/dashboard",
@@ -248,7 +248,7 @@ export async function apiRequest(path, options = {}, attempt = 0) {
       }
     }
     const message =
-      "We couldn't connect right now. Please check your internet and try again in a moment.";
+      "We couldn't connect right now. Please check your internet and try again in a moment. If this is your first request, the server may still be waking up.";
     emitFlash(message, "error");
     throw new ApiError(
       message,
