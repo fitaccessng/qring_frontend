@@ -10,7 +10,8 @@ const modes = [
 export default function SessionModeNav({
   sessionId,
   disableCallModes = false,
-  disabledCallTooltip = "Audio and Video are disabled until the homeowner starts a call."
+  disabledCallTooltip = "Audio and Video are disabled until the homeowner starts a call.",
+  modeLabels = {}
 }) {
   const [tooltipMode, setTooltipMode] = useState("");
   const tooltipTimerRef = useRef(null);
@@ -53,6 +54,10 @@ export default function SessionModeNav({
     return disableCallModes && isCallMode(modeKey);
   }
 
+  function getModeLabel(modeKey, fallback) {
+    return modeLabels?.[modeKey] || fallback;
+  }
+
   return (
     <>
       <aside className="hidden lg:col-span-3 lg:block">
@@ -67,7 +72,7 @@ export default function SessionModeNav({
                   onClick={() => showTooltip(item.key)}
                   className="block w-full rounded-xl bg-slate-100 px-3 py-2 text-left text-sm font-semibold text-slate-400"
                 >
-                  {item.label}
+                  {getModeLabel(item.key, item.label)}
                 </button>
               ) : (
                 <NavLink
@@ -75,7 +80,7 @@ export default function SessionModeNav({
                   to={`/session/${sessionId}/${item.key}`}
                   className={({ isActive }) => itemClassName(isActive)}
                 >
-                  {item.label}
+                  {getModeLabel(item.key, item.label)}
                 </NavLink>
               )
             )}
@@ -96,7 +101,7 @@ export default function SessionModeNav({
                 onClick={() => showTooltip(item.key)}
                 className="rounded-xl bg-slate-100 px-2 py-2 text-center text-xs font-semibold text-slate-400"
               >
-                {item.label}
+                {getModeLabel(item.key, item.label)}
               </button>
             ) : (
               <NavLink
@@ -104,7 +109,7 @@ export default function SessionModeNav({
                 to={`/session/${sessionId}/${item.key}`}
                 className={({ isActive }) => mobileItemClassName(isActive)}
               >
-                {item.label}
+                {getModeLabel(item.key, item.label)}
               </NavLink>
             )
           )}

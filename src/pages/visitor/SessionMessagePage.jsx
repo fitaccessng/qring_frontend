@@ -55,13 +55,43 @@ export default function SessionMessagePage() {
     messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
   }, [messages]);
 
+  function resolveServerCallState(value) {
+    if (value === "ringing") return "ringing";
+    if (value === "connected") return "active";
+    if (value === "ended") return "ended";
+    if (value === "failed") return "failed";
+    return "pending";
+  }
+
+  const serverCallState = resolveServerCallState(callState);
+  const callModeLabels =
+    serverCallState === "ringing"
+      ? { audio: "Audio (Ringing)", video: "Video (Ringing)" }
+      : serverCallState === "active"
+        ? { audio: "Audio (Active)", video: "Video (Active)" }
+        : serverCallState === "ended"
+          ? { audio: "Audio (Ended)", video: "Video (Ended)" }
+          : serverCallState === "failed"
+            ? { audio: "Audio (Failed)", video: "Video (Failed)" }
+          : { audio: "Audio (Pending)", video: "Video (Pending)" };
+  const disabledCallTooltip =
+    serverCallState === "ringing"
+      ? "Server call session state: ringing. Waiting for join confirmation."
+      : serverCallState === "active"
+        ? "Server call session state: active. Open audio or video to continue."
+        : serverCallState === "ended"
+          ? "Server call session state: ended. Ask homeowner to start a new call."
+          : serverCallState === "failed"
+            ? "Server call session state: failed. Check network/permissions and retry."
+          : "Server call session state: pending. Audio and video unlock once homeowner starts a call.";
+
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_#f8fafc_0,_#eef2ff_42%,_#e0f2fe_78%,_#dbeafe_100%)] p-4 text-slate-900">
       <div className="mx-auto w-full max-w-7xl py-6">
         <header className="mb-4 rounded-3xl border border-slate-200/80 bg-white/90 p-5 shadow-soft backdrop-blur">
           <h1 className="font-heading text-2xl font-black md:text-3xl">Session Messages</h1>
           <p className="mt-1 text-xs text-slate-500">
-            Session {sessionId} | {connected ? "Signaling Online" : "Connecting"} | {joined ? "Room Joined" : "Waiting Room"} | Call: {callState}
+            Session {sessionId} | {connected ? "Signaling Online" : "Connecting"} | {joined ? "Room Joined" : "Waiting Room"} | Server Call Session: {serverCallState}
           </p>
           <SessionNetworkBadge quality={networkQuality} detail={networkDetail} />
           {featureError ? <p className="mt-2 text-sm text-rose-700">{featureError}</p> : null}
@@ -72,6 +102,8 @@ export default function SessionMessagePage() {
           <SessionModeNav
             sessionId={sessionId}
             disableCallModes={!canStartCall && !incomingCall.pending && callState !== "connected"}
+            disabledCallTooltip={disabledCallTooltip}
+            modeLabels={callModeLabels}
           />
 
           <section className="lg:col-span-9">

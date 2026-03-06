@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Bell, Building2, ChevronRight, DoorClosed, Home, LogOut, Plus, UserCircle2, Users } from "lucide-react";
+import { Building2, ChevronRight, DoorClosed, Home, LogOut, Plus, UserCircle2, Users } from "lucide-react";
 import AppShell from "../../layouts/AppShell";
 import { getEstateOverview } from "../../services/estateService";
 import { useAuth } from "../../state/AuthContext";
 
 const modules = [
-  { title: "Estate Alerts", to: "/dashboard/estate/alerts", subtitle: "Send notices and payment requests" },
+  { title: "Access Logs", to: "/dashboard/estate/logs", subtitle: "Review recent estate activity" },
   { title: "Assign Doors", to: "/dashboard/estate/assign", subtitle: "Link entries to owners" },
   { title: "Invite Owners", to: "/dashboard/estate/invites", subtitle: "Send resident access links" },
   { title: "Mappings", to: "/dashboard/estate/mappings", subtitle: "Review home-to-door map" },
@@ -89,14 +89,6 @@ export default function EstateDashboardPage() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Link
-                to="/dashboard/notifications"
-                className="grid h-9 w-9 place-items-center rounded-full bg-slate-100 text-slate-500 transition-all active:scale-95 dark:bg-slate-800 dark:text-slate-300"
-                aria-label="Notifications"
-                title="Notifications"
-              >
-                <Bell size={16} />
-              </Link>
               <Link
                 to="/dashboard/estate/settings"
                 className="grid h-9 w-9 place-items-center rounded-full bg-slate-100 text-slate-500 transition-all active:scale-95 dark:bg-slate-800 dark:text-slate-300"

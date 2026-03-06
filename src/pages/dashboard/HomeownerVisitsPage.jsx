@@ -77,7 +77,7 @@ export default function HomeownerVisitsPage() {
   }, [loadVisits]);
 
   const dateScopedRows = useMemo(
-    () => rows.filter((row) => toDateKey(row?.time) === selectedDate),
+    () => rows.filter((row) => toDateKey(row?.time || row?.startedAt || row?.createdAt) === selectedDate),
     [rows, selectedDate]
   );
   const dateScopedAppointments = useMemo(
@@ -108,8 +108,18 @@ export default function HomeownerVisitsPage() {
     setBusyId(sessionId);
     setError("");
     try {
+      window.dispatchEvent(new Event("qring:mute-visit-ring"));
+    } catch {
+      // Keep decision flow non-blocking.
+    }
+    try {
       const updated = await decideVisit(sessionId, action);
       await markVisitRequestNotificationsRead(sessionId);
+      try {
+        window.dispatchEvent(new Event("qring:notifications-updated"));
+      } catch {
+        // Keep decision flow non-blocking.
+      }
       setRows((prev) =>
         prev.map((row) =>
           row.id === sessionId
@@ -132,6 +142,11 @@ export default function HomeownerVisitsPage() {
   async function handleEndSession(sessionId) {
     setEndingId(sessionId);
     setError("");
+    try {
+      window.dispatchEvent(new Event("qring:mute-visit-ring"));
+    } catch {
+      // Keep end flow non-blocking.
+    }
     try {
       await endHomeownerSession(sessionId);
       setRows((prev) =>
@@ -262,7 +277,7 @@ export default function HomeownerVisitsPage() {
                 <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-500 sm:text-xs">
                   <span className="inline-flex items-center gap-1.5 leading-none">
                     <Clock3 className="h-3.5 w-3.5 shrink-0 text-violet-500" />
-                    {formatTime(row.time)}
+                    {formatTime(row.time || row.startedAt || row.createdAt)}
                   </span>
                   <span className="inline-flex items-center gap-1.5 leading-none">
                     <CalendarDays className="h-3.5 w-3.5 shrink-0 text-violet-500" />
@@ -342,7 +357,12 @@ function normalizeVisitState(row) {
   const status = String(row?.status || "").toLowerCase();
   const sessionStatus = String(row?.sessionStatus || "").toLowerCase();
   if (status === "rejected") return "reject";
-  if (status === "completed" || status === "approved" || sessionStatus === "closed" || sessionStatus === "approved" || sessionStatus === "active") return "accepted";
+  if (status === "completed" || status === "approved" || sessionStatus === "closed" || sessionStatus === "completed" || sessionStatus === "approved") {
+    return "accepted";
+  }
+  if (status === "pending" || status === "active" || sessionStatus === "pending" || sessionStatus === "active") {
+    return "inprogress";
+  }
   return "inprogress";
 }
 
@@ -413,7 +433,7 @@ function buildMonthDateTiles(rows, appointments) {
   const month = now.getMonth();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const counts = rows.reduce((acc, row) => {
-    const key = toDateKey(row?.time);
+    const key = toDateKey(row?.time || row?.startedAt || row?.createdAt);
     if (!key) return acc;
     acc[key] = (acc[key] || 0) + 1;
     return acc;

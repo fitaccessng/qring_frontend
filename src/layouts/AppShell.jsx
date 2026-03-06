@@ -15,7 +15,6 @@ import { resolveNotificationRoute } from "../utils/notificationRouting";
 const navByRole = {
   homeowner: [
     { to: "/dashboard/homeowner/overview", label: "Overview", icon: "overview" },
-    { to: "/dashboard/homeowner/alerts", label: "Alerts", icon: "bell_ring" },
     { to: "/dashboard/homeowner/appointments", label: "Appointments", icon: "appointments" },
     { to: "/dashboard/homeowner/visits", label: "Visits", icon: "visits" },
     { to: "/dashboard/homeowner/messages", label: "Messages", icon: "messages" },
@@ -25,7 +24,6 @@ const navByRole = {
   ],
   estate: [
     { to: "/dashboard/estate", label: "Overview", icon: "estate" },
-    { to: "/dashboard/estate/alerts", label: "Alerts", icon: "bell_ring" },
     { to: "/dashboard/estate/create", label: "Create Estate", icon: "estate_create" },
     { to: "/dashboard/estate/doors", label: "Add Doors", icon: "doors" },
     { to: "/dashboard/estate/assign", label: "Assign Doors", icon: "assign" },
@@ -107,10 +105,6 @@ export default function AppShell({ title, children, showTopBar = true }) {
     if (user?.role === "admin") return "/dashboard/admin/config";
     return null;
   }, [settingsNavItem, user?.role]);
-  const notificationsRoute = useMemo(
-    () => ((user?.role === "homeowner" || user?.role === "estate") ? "/dashboard/notifications" : "/dashboard/admin"),
-    [user?.role]
-  );
   const profileName = useMemo(() => user?.fullName?.trim() || user?.email || "User", [user?.fullName, user?.email]);
   const initials = useMemo(() => String(profileName).slice(0, 1).toUpperCase(), [profileName]);
   const mobileNavItems = useMemo(
@@ -118,7 +112,7 @@ export default function AppShell({ title, children, showTopBar = true }) {
       if (user?.role === "homeowner") {
         return [
           { to: "/dashboard/homeowner/overview", label: "Home", icon: "overview" },
-          { to: "/dashboard/homeowner/alerts", label: "Alerts", icon: "bell_ring" },
+          { to: "/dashboard/homeowner/visits", label: "Visits", icon: "visits" },
           { to: "/dashboard/homeowner/appointments", label: "Appointments", icon: "appointments" },
           { to: "/dashboard/homeowner/messages", label: "Messages", icon: "messages" },
           { to: "/dashboard/homeowner/doors", label: "Doors", icon: "doors" }
@@ -127,8 +121,8 @@ export default function AppShell({ title, children, showTopBar = true }) {
       if (user?.role === "estate") {
         return [
           { to: "/dashboard/estate", label: "Overview", icon: "estate" },
-          { to: "/dashboard/estate/alerts", label: "Alerts", icon: "bell_ring" },
           { to: "/dashboard/estate/doors", label: "Doors", icon: "doors" },
+          { to: "/dashboard/estate/assign", label: "Assign", icon: "assign" },
           { to: "/dashboard/estate/logs", label: "Logs", icon: "logs" }
         ];
       }
@@ -282,9 +276,12 @@ export default function AppShell({ title, children, showTopBar = true }) {
     };
     window.addEventListener("storage", handleStorage);
     window.addEventListener("qring:sound-alerts-updated", handleSoundUpdated);
+    const handleMuteVisitRing = () => setMuteVisitRing(true);
+    window.addEventListener("qring:mute-visit-ring", handleMuteVisitRing);
     return () => {
       window.removeEventListener("storage", handleStorage);
       window.removeEventListener("qring:sound-alerts-updated", handleSoundUpdated);
+      window.removeEventListener("qring:mute-visit-ring", handleMuteVisitRing);
     };
   }, []);
 
@@ -610,11 +607,11 @@ export default function AppShell({ title, children, showTopBar = true }) {
                 </div>
                 <div className="relative flex items-center gap-2">
                   <button
-                    type="button"
                     ref={notificationsButtonRef}
+                    type="button"
                     onClick={() => {
-                      setNotificationsOpen(false);
-                      navigate(notificationsRoute);
+                      setMuteVisitRing(true);
+                      setNotificationsOpen((prev) => !prev);
                     }}
                     className="relative grid h-9 w-9 place-items-center rounded-full bg-slate-100 text-slate-500 transition-all active:scale-95 dark:bg-slate-800 dark:text-slate-300"
                     aria-label="Notifications"
@@ -622,11 +619,52 @@ export default function AppShell({ title, children, showTopBar = true }) {
                   >
                     <BellIcon />
                     {unreadCount > 0 ? (
-                      <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-danger px-1 text-[10px] font-bold text-white">
-                        {unreadCount}
+                      <span className="absolute -right-0.5 -top-0.5 min-w-[1rem] rounded-full bg-rose-600 px-1 text-[10px] font-bold text-white">
+                        {unreadCount > 9 ? "9+" : unreadCount}
                       </span>
                     ) : null}
                   </button>
+                  {notificationsOpen ? (
+                    <div
+                      ref={notificationsPanelRef}
+                      className="absolute right-0 top-11 z-40 w-[min(22rem,90vw)] rounded-2xl border border-slate-200 bg-white p-3 shadow-xl dark:border-slate-700 dark:bg-slate-900"
+                    >
+                      <div className="mb-2 flex items-center justify-between">
+                        <p className="text-sm font-bold text-slate-900 dark:text-slate-100">Notifications</p>
+                        <button
+                          type="button"
+                          onClick={handleClearNotifications}
+                          className="text-xs font-semibold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
+                        >
+                          Clear all
+                        </button>
+                      </div>
+                      <div className="max-h-72 space-y-2 overflow-y-auto">
+                        {parsedNotifications.length === 0 ? (
+                          <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                            No notifications yet.
+                          </p>
+                        ) : (
+                          parsedNotifications.map((item) => (
+                            <button
+                              key={item.id}
+                              type="button"
+                              onClick={() => openNotification(item)}
+                              className={`w-full rounded-xl border px-3 py-2 text-left text-xs transition ${
+                                item.readAt
+                                  ? "border-slate-200 bg-slate-50 text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400"
+                                  : "border-indigo-200 bg-indigo-50 text-indigo-900 dark:border-indigo-800/50 dark:bg-indigo-900/30 dark:text-indigo-100"
+                              }`}
+                            >
+                              <p className="font-semibold">{item.kind?.replace(".", " ") || "Alert"}</p>
+                              <p className="mt-1">{item.payload?.message || "You have a new alert."}</p>
+                              <p className="mt-1 text-[10px] opacity-70">{formatTime(item.createdAt)}</p>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  ) : null}
                   {/* {profileRoute ? (
                     <Link
                       to={profileRoute}

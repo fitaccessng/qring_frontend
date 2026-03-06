@@ -7,13 +7,20 @@ const RETRYABLE_STATUSES = new Set([0, 502, 503, 504]);
 const MAX_SUBMIT_RETRIES = 2;
 const RETRY_BASE_DELAY_MS = 700;
 const DEVICE_STORAGE_KEY = "qring_visitor_device_id";
+let runtimeVisitorDeviceId = "";
 
 function getOrCreateVisitorDeviceId() {
-  const existing = localStorage.getItem(DEVICE_STORAGE_KEY);
-  if (existing) return existing;
   const next = `visitor-device-${Math.random().toString(36).slice(2, 11)}`;
-  localStorage.setItem(DEVICE_STORAGE_KEY, next);
-  return next;
+  try {
+    const existing = localStorage.getItem(DEVICE_STORAGE_KEY);
+    if (existing) return existing;
+    localStorage.setItem(DEVICE_STORAGE_KEY, next);
+    return next;
+  } catch {
+    if (runtimeVisitorDeviceId) return runtimeVisitorDeviceId;
+    runtimeVisitorDeviceId = next;
+    return runtimeVisitorDeviceId;
+  }
 }
 
 function sleep(ms) {
@@ -140,6 +147,10 @@ export default function ScanPage() {
   const onSubmit = async (event) => {
     event.preventDefault();
     setError("");
+    if (!doorId) {
+      setError("Please select a door before submitting.");
+      return;
+    }
     const startedAt = Date.now();
     setRequestLatencyMs(0);
     setRequestState((prev) => ({
@@ -154,9 +165,9 @@ export default function ScanPage() {
       const response = await submitVisitorRequestWithRetry(
         {
           qrId,
-          doorId,
-          name: visitorForm.name,
-          purpose: visitorForm.purpose,
+          doorId: doorId || undefined,
+          name: visitorForm.name.trim(),
+          purpose: visitorForm.purpose.trim(),
           deviceId: visitorDeviceId
         },
         ({ attempt }) => {

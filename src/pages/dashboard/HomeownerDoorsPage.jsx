@@ -197,27 +197,6 @@ export default function HomeownerDoorsPage() {
     }
   }
 
-  async function handleShareQrBooking(qrId) {
-    const bookingUrl = `${toScanUrl(qrId)}?intent=appointment`;
-    const sharePayload = {
-      title: "Book appointment with QRing",
-      text: "Use this secure QRing link to book an appointment.",
-      url: bookingUrl
-    };
-
-    try {
-      if (navigator.share) {
-        await navigator.share(sharePayload);
-        setNotice("Appointment QR link shared.");
-        return;
-      }
-      await navigator.clipboard.writeText(bookingUrl);
-      setNotice(`Appointment link copied: ${bookingUrl}`);
-    } catch {
-      setError("Unable to share appointment link right now.");
-    }
-  }
-
   const activeDoor = doors.find((door) => String(door.id) === String(activeDoorId)) ?? null;
   const selectedPreview =
     activeDoor && selectedQrId
@@ -234,7 +213,7 @@ export default function HomeownerDoorsPage() {
       <div className="mx-auto max-w-6xl space-y-4 pb-14">
         <section className="rounded-[2rem] border border-slate-200 bg-white/95 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/90 sm:p-6 lg:p-8">
           <h2 className="text-2xl font-extrabold sm:text-3xl">Doors & QR</h2>
-          <p className="mt-1 text-sm text-slate-500">Manage door access, generate QR codes, and share booking links for {homeownerName}.</p>
+          <p className="mt-1 text-sm text-slate-500">Manage door access and generate QR codes for {homeownerName}.</p>
 
           <div className="mt-5 grid grid-cols-3 gap-2 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 p-2 text-white sm:gap-3 sm:p-3">
             <StatTile label="Doors" value={doors.length} />
@@ -416,15 +395,6 @@ export default function HomeownerDoorsPage() {
               </div>
 
               <QrPrintDesigner key={activeDoor.id} preview={selectedPreview} defaultLabel={activeDoor.homeName || ""} />
-              {selectedQrId ? (
-                <button
-                  type="button"
-                  onClick={() => handleShareQrBooking(selectedQrId)}
-                  className="rounded-xl bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-600"
-                >
-                  Share Appointment QR Link
-                </button>
-              ) : null}
             </div>
           </section>
         ) : null}
@@ -450,4 +420,3 @@ function toScanUrl(qrId) {
   const base = (env.publicAppUrl || window.location.origin || "").replace(/\/+$/, "");
   return `${base}/scan/${qrId}`;
 }
-

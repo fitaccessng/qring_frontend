@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Activity, Bell, Clock3, DoorOpen, Info, LogOut, MessageSquare, Phone, UserCircle2 } from "lucide-react";
+import { Activity, Clock3, DoorOpen, Info, LogOut, MessageSquare, Phone, UserCircle2 } from "lucide-react";
 import AppShell from "../../layouts/AppShell";
 import { useDashboardData } from "../../hooks/useDashboardData";
 import { getHomeownerContext } from "../../services/homeownerService";
@@ -9,7 +9,19 @@ import { useAuth } from "../../state/AuthContext";
 export default function HomeownerDashboardPage() {
   const { user, logout } = useAuth();
   const [managedByEstate, setManagedByEstate] = useState(false);
-  const { metrics, activity, waitingRoom, session, messages, loading, error, connected, realtimeEnabled } =
+  const {
+    metrics,
+    activity,
+    waitingRoom,
+    session,
+    messages,
+    loading,
+    error,
+    connected,
+    incomingCall,
+    clearIncomingCall,
+    realtimeEnabled
+  } =
     useDashboardData();
   const homeownerName = user?.fullName?.trim() || "Homeowner";
   const initials = homeownerName.slice(0, 1).toUpperCase();
@@ -63,10 +75,10 @@ export default function HomeownerDashboardPage() {
 
   const taskGroups = [
     {
-      label: "Alerts",
-      subtitle: "Estate updates",
-      to: "/dashboard/homeowner/alerts",
-      icon: <Bell size={14} />,
+      label: "Approvals",
+      subtitle: `${metrics.pendingApprovals} pending`,
+      to: "/dashboard/homeowner/visits",
+      icon: <Activity size={14} />,
       percent: totalSignals > 0 ? Math.round(((Number(metrics.pendingApprovals) || 0) / totalSignals) * 100) : 0
     },
     {
@@ -114,14 +126,6 @@ export default function HomeownerDashboardPage() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Link
-                to="/dashboard/notifications"
-                className="grid h-9 w-9 place-items-center rounded-full bg-slate-100 text-slate-500 transition-all active:scale-95 dark:bg-slate-800 dark:text-slate-300"
-                aria-label="Notifications"
-                title="Notifications"
-              >
-                <Bell size={16} />
-              </Link>
               <Link
                 to="/dashboard/homeowner/settings"
                 className="grid h-9 w-9 place-items-center rounded-full bg-slate-100 text-slate-500 transition-all active:scale-95 dark:bg-slate-800 dark:text-slate-300"
@@ -171,6 +175,38 @@ export default function HomeownerDashboardPage() {
             <Info size={18} />
             <p className="text-sm font-medium">{error}</p>
           </div>
+        ) : null}
+        {incomingCall?.sessionId ? (
+          <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/30 dark:bg-emerald-900/20">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+                  Incoming Call
+                </p>
+                <p className="mt-1 text-sm font-semibold text-emerald-900 dark:text-emerald-100">
+                  {incomingCall?.visitorName || "Visitor"} is at your door.
+                </p>
+                <p className="mt-1 text-xs text-emerald-700/90 dark:text-emerald-200/90">
+                  Session ID: {incomingCall.sessionId}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Link
+                  to={`/session/${incomingCall.sessionId}/audio`}
+                  className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
+                >
+                  Open Call
+                </Link>
+                <button
+                  type="button"
+                  onClick={clearIncomingCall}
+                  className="rounded-lg border border-emerald-300 px-3 py-2 text-xs font-semibold text-emerald-700 dark:border-emerald-700 dark:text-emerald-200"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          </section>
         ) : null}
 
         <section className="space-y-4">

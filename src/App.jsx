@@ -27,11 +27,9 @@ import HomeownerAppointmentsPage from "./pages/dashboard/HomeownerAppointmentsPa
 import HomeownerMessagesPage from "./pages/dashboard/HomeownerMessagesPage";
 import HomeownerDoorsPage from "./pages/dashboard/HomeownerDoorsPage";
 import HomeownerSettingsPage from "./pages/dashboard/HomeownerSettingsPage";
-import HomeownerAlertsPage from "./pages/dashboard/HomeownerAlertsPage";
 import HomeownerPaywallPage from "./pages/dashboard/HomeownerPaywallPage";
 import BillingCallbackPage from "./pages/dashboard/BillingCallbackPage";
 import EstateDashboardPage from "./pages/dashboard/EstateDashboardPage";
-import EstateAlertsPage from "./pages/dashboard/EstateAlertsPage";
 import EstateCreatePage from "./pages/dashboard/EstateCreatePage";
 import EstateDoorsPage from "./pages/dashboard/EstateDoorsPage";
 import EstateAssignPage from "./pages/dashboard/EstateAssignPage";
@@ -41,7 +39,6 @@ import EstateLogsPage from "./pages/dashboard/EstateLogsPage";
 import EstatePlanPage from "./pages/dashboard/EstatePlanPage";
 import EstateHomesPage from "./pages/dashboard/EstateHomesPage";
 import EstateSettingsPage from "./pages/dashboard/EstateSettingsPage";
-import NotificationsPage from "./pages/dashboard/NotificationsPage";
 import AdminDashboardPage from "./pages/dashboard/AdminDashboardPage";
 import AdminPaymentsPage from "./pages/dashboard/AdminPaymentsPage";
 import AdminUsersPage from "./pages/dashboard/AdminUsersPage";
@@ -157,7 +154,6 @@ function AppRoutes() {
                   <Route path="/billing/paywall" element={<HomeownerPaywallPage />} />
                   <Route path="/billing/callback" element={<BillingCallbackPage />} />
                   <Route path="/onboarding" element={<OnboardingPage />} />
-                  <Route path="/dashboard/notifications" element={<NotificationsPage />} />
                 </Route>
                 <Route element={<RoleRoute allowedRoles={["homeowner"]} />}>
                   <Route path="/dashboard/homeowner" element={<Navigate to="/dashboard/homeowner/overview" replace />} />
@@ -166,12 +162,10 @@ function AppRoutes() {
                   <Route path="/dashboard/homeowner/visits" element={<HomeownerVisitsPage />} />
                   <Route path="/dashboard/homeowner/messages" element={<HomeownerMessagesPage />} />
                   <Route path="/dashboard/homeowner/doors" element={<HomeownerDoorsPage />} />
-                  <Route path="/dashboard/homeowner/alerts" element={<HomeownerAlertsPage />} />
                   <Route path="/dashboard/homeowner/settings" element={<HomeownerSettingsPage />} />
                 </Route>
                 <Route element={<RoleRoute allowedRoles={["estate"]} />}>
                   <Route path="/dashboard/estate" element={<EstateDashboardPage />} />
-                  <Route path="/dashboard/estate/alerts" element={<EstateAlertsPage />} />
                   <Route path="/dashboard/estate/create" element={<EstateCreatePage />} />
                   <Route path="/dashboard/estate/doors" element={<EstateDoorsPage />} />
                   <Route path="/dashboard/estate/assign" element={<EstateAssignPage />} />

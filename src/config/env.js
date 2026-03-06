@@ -111,6 +111,10 @@ function parseIceServers(rawValue) {
 
 const resolvedApiBaseUrl = resolveApiBaseUrl(import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL);
 const resolvedSocketUrl = (() => {
+  if (isDev && typeof window !== "undefined" && !(import.meta.env.VITE_SOCKET_URL ?? "").trim()) {
+    // Keep Socket.IO same-origin in local dev so Vite proxy handles upstream CORS safely.
+    return trimTrailingSlash(window.location.origin);
+  }
   const explicit = resolveSocketUrl(import.meta.env.VITE_SOCKET_URL);
   if ((import.meta.env.VITE_SOCKET_URL ?? "").trim()) return explicit;
   const apiOrigin = originFromUrl(resolvedApiBaseUrl);
@@ -130,5 +134,7 @@ export const env = {
   signalingNamespace:
     import.meta.env.VITE_SIGNALING_NAMESPACE ?? "/realtime/signaling",
   webRtcIceServers: parseIceServers(import.meta.env.VITE_WEBRTC_ICE_SERVERS),
-  livekitUrl: resolveLivekitUrl(import.meta.env.VITE_LIVEKIT_URL)
+  livekitUrl: resolveLivekitUrl(import.meta.env.VITE_LIVEKIT_URL),
+  enableRealtimeInDev: String(import.meta.env.VITE_ENABLE_REALTIME_IN_DEV ?? "true").toLowerCase() !== "false",
+  enableLegacyWebrtc: String(import.meta.env.VITE_ENABLE_LEGACY_WEBRTC ?? "false").toLowerCase() === "true"
 };

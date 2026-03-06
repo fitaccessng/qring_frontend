@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { Camera, Mic, PhoneOff, RefreshCw, Signal, Video } from "lucide-react";
-import SessionNetworkBadge from "../../components/SessionNetworkBadge";
-import SessionDiagnosticsPanel from "../../components/SessionDiagnosticsPanel";
+import { useParams } from "react-router-dom";
+import { Mic, MicOff, PhoneOff, Video, VideoOff, RotateCw } from "lucide-react";
 import VisitorIncomingCallModal from "../../components/VisitorIncomingCallModal";
 import { useSessionRealtime } from "../../hooks/useSessionRealtime";
 
@@ -10,19 +8,10 @@ export default function SessionVideoPage() {
   const { sessionId } = useParams();
   const exitRoute = getExitRoute(sessionId);
   const {
-    connected,
-    joined,
     callState,
     muted,
     cameraOn,
-    remoteMuted,
     localStreamRef,
-    status,
-    networkQuality,
-    networkDetail,
-    callDiagnostics,
-    featureError,
-    callLaunchStage,
     callLaunchStartedAt,
     localVideoRef,
     remoteVideoRef,
@@ -30,173 +19,159 @@ export default function SessionVideoPage() {
     incomingCall,
     canStartCall,
     remoteVideoActive,
-    lowBandwidthMode,
-    autoLowBandwidthActive,
-    isMobileWebView,
-    setLowBandwidthMode,
     toggleMute,
     endCall,
     startVideoCall,
-    retryCallConnection,
     acceptIncomingCall,
-    rejectIncomingCall
+    rejectIncomingCall,
   } = useSessionRealtime(sessionId);
+
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const showingCallProgress = canStartCall && (callLaunchStage !== "idle" || callState === "ringing");
-  const startButtonBusy = showingCallProgress || callState === "connected";
   const showRemoteAsPrimary = callState === "connected" && remoteVideoActive;
 
   useEffect(() => {
-    if (!showingCallProgress || !callLaunchStartedAt) {
+    if (callState !== "connected" || !callLaunchStartedAt) {
       setElapsedSeconds(0);
       return;
     }
-    const tick = () => {
+    const tick = () =>
       setElapsedSeconds(Math.max(0, Math.floor((Date.now() - callLaunchStartedAt) / 1000)));
-    };
-    tick();
     const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
-  }, [callLaunchStartedAt, showingCallProgress]);
+  }, [callLaunchStartedAt, callState]);
+
+  const formatTime = (s) => {
+    const mins = Math.floor(s / 60);
+    const secs = s % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  const isConnected = callState === "connected";
 
   return (
-    <div className="min-h-screen bg-[#b7ccdf] p-3 text-white sm:p-5">
-      <div className="mx-auto w-full max-w-md">
-        <section className="relative min-h-[86vh] overflow-hidden rounded-[2.2rem] border border-white/30 bg-black shadow-[0_30px_60px_rgba(15,23,42,0.45)]">
-          <audio ref={remoteAudioRef} autoPlay playsInline />
+    <div className="fixed inset-0 flex flex-col bg-[#07090b] text-white overflow-hidden">
+      {/* Google Font + keyframes */}
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@500;600;700&family=DM+Sans:wght@300;400;500&display=swap');
+        .font-syne { font-family: 'Syne', sans-serif; }
+        .font-dm   { font-family: 'DM Sans', sans-serif; }
+        @keyframes live-pulse {
+          0%,100% { opacity:1; transform:scale(1); }
+          50%      { opacity:.35; transform:scale(.65); }
+        }
+        .live-dot { animation: live-pulse 2s ease-in-out infinite; }
+        @keyframes fade-up {
+          from { opacity:0; transform:translateY(10px); }
+          to   { opacity:1; transform:translateY(0); }
+        }
+        .fade-up { animation: fade-up .45s ease both; }
+      `}</style>
 
+      <audio ref={remoteAudioRef} autoPlay playsInline />
+
+      {/* ── PRIMARY VIDEO SURFACE ── */}
+      <div className="relative flex-1 overflow-hidden bg-[#0c0e11]">
+
+        {/* Primary Feed */}
+        <video
+          ref={showRemoteAsPrimary ? remoteVideoRef : localVideoRef}
+          autoPlay
+          playsInline
+          muted={!showRemoteAsPrimary}
+          className="h-full w-full object-cover"
+        />
+
+        {/* Top vignette */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-black/70 via-black/20 to-transparent" />
+
+        {/* Bottom vignette */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-black/60 to-transparent" />
+
+        {/* ── TOP IDENTITY BAR ── */}
+        <div className="absolute inset-x-0 top-0 flex flex-col items-center pt-14 fade-up">
+          <h2 className="font-syne text-[22px] font-semibold tracking-[0.22em] text-white/95 uppercase">
+            {showRemoteAsPrimary ? "Visitor" : "Connecting"}
+          </h2>
+
+          <div className="font-dm mt-2 flex items-center gap-2 text-[11px] font-medium tracking-[0.18em] uppercase text-white/45">
+            {isConnected && (
+              <span className="live-dot inline-block h-[6px] w-[6px] rounded-full bg-emerald-400" />
+            )}
+            <span>
+              {isConnected ? formatTime(elapsedSeconds) : "Video Call"}
+            </span>
+          </div>
+        </div>
+
+        {/* ── MINI PREVIEW ── */}
+        <div className="absolute top-[88px] right-4 w-[104px] h-[148px] rounded-[18px] overflow-hidden border border-white/10 shadow-[0_8px_40px_rgba(0,0,0,0.65)] bg-[#12151a]">
           <video
-            ref={showRemoteAsPrimary ? remoteVideoRef : localVideoRef}
+            ref={showRemoteAsPrimary ? localVideoRef : remoteVideoRef}
             autoPlay
             playsInline
-            muted={!showRemoteAsPrimary}
-            className="absolute inset-0 h-full w-full object-cover"
+            muted={showRemoteAsPrimary}
+            className="h-full w-full object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/35 via-black/5 to-black/55" />
-
-          <header className="relative z-10 flex items-center justify-between px-4 pb-2 pt-4">
-            <div className="flex items-center gap-2">
-              <span className="rounded-full bg-rose-500/90 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">
-                Live
-              </span>
-              <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
-                {callState}
-              </span>
+          {!cameraOn && (
+            <div className="absolute inset-0 flex items-center justify-center bg-[#1a1d24]">
+              <VideoOff size={18} className="text-white/30" />
             </div>
-            <Link
-              to={exitRoute}
-              className="rounded-full bg-white/20 px-3 py-1.5 text-[11px] font-semibold backdrop-blur transition-all hover:bg-white/30 active:scale-95"
-            >
-              Exit
-            </Link>
-          </header>
+          )}
+        </div>
 
-          <div className="relative z-10 px-4">
-            <p className="text-xs font-semibold text-white/85">
-              {showRemoteAsPrimary ? "Visitor" : "You"}
-            </p>
-            <SessionNetworkBadge quality={networkQuality} detail={networkDetail} detailClassName="text-white/80" />
-            {status ? <p className="mt-1 text-[11px] text-amber-200">{status}</p> : null}
-            {featureError ? <p className="mt-1 text-[11px] text-rose-200">{featureError}</p> : null}
-          </div>
-
-          <article className="absolute right-4 top-20 z-20 w-24 overflow-hidden rounded-2xl border border-white/45 bg-black/35 shadow-xl backdrop-blur sm:w-28">
-            <video
-              ref={showRemoteAsPrimary ? localVideoRef : remoteVideoRef}
-              autoPlay
-              playsInline
-              muted={showRemoteAsPrimary}
-              className="h-32 w-full object-cover sm:h-36"
-            />
-            <p className="bg-black/45 px-2 py-1 text-[10px] font-semibold text-white/90">
-              {showRemoteAsPrimary ? "You" : "Visitor"}
-            </p>
-          </article>
-
-          <div className="absolute inset-x-0 bottom-0 z-20 px-3 pb-3 pt-14">
-            {showingCallProgress ? (
-              <div className="mb-3 rounded-2xl border border-emerald-300/35 bg-emerald-950/35 px-3 py-2 text-xs backdrop-blur">
-                {callState === "ringing"
-                  ? "Calling participant..."
-                  : "Preparing camera and connection..."}{" "}
-                <span className="font-semibold">{elapsedSeconds}s</span>
-              </div>
-            ) : null}
-
-            <div className="mb-3 rounded-2xl border border-white/25 bg-white/15 px-3 py-2 text-[11px] backdrop-blur">
-              <button
-                type="button"
-                onClick={() => setLowBandwidthMode(!lowBandwidthMode)}
-                className="flex w-full items-center justify-between gap-3 text-left transition-all active:scale-[0.99]"
-              >
-                <span>
-                  <span className="block font-semibold">Low Bandwidth</span>
-                  <span className="text-white/80">
-                    {autoLowBandwidthActive ? "Active" : "Off"} {isMobileWebView ? "| Mobile mode" : ""}
-                  </span>
-                </span>
-                <span className={`h-2.5 w-2.5 rounded-full ${lowBandwidthMode ? "bg-emerald-300" : "bg-white/55"}`} />
-              </button>
-            </div>
-
-            <div className="rounded-2xl border border-white/25 bg-[#42a5ff]/90 p-2.5 shadow-[0_16px_30px_rgba(2,6,23,0.35)] backdrop-blur">
-              <div className="grid grid-cols-2 gap-2">
-                <ControlIconButton
-                  label={startButtonBusy ? "Starting" : lowBandwidthMode ? "Audio" : "Video"}
-                  onClick={startVideoCall}
-                  disabled={Boolean(featureError) || !canStartCall || startButtonBusy}
-                  icon={<Video size={16} />}
-                />
-                <ControlIconButton
-                  label={muted ? "Unmute" : "Mute"}
-                  onClick={toggleMute}
-                  disabled={!localStreamRef.current}
-                  icon={<Mic size={16} />}
-                />
-              </div>
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                <ControlIconButton
-                  label="Retry"
-                  onClick={retryCallConnection}
-                  disabled={!canStartCall}
-                  icon={<RefreshCw size={16} />}
-                />
-                <ControlIconButton
-                  label={cameraOn ? "Camera On" : "Camera"}
-                  onClick={() => {}}
-                  disabled
-                  icon={<Camera size={16} />}
-                />
-              </div>
-              <div className="mt-2">
-                <ControlIconButton
-                  label="End Call"
-                  onClick={endCall}
-                  variant="danger"
-                  icon={<PhoneOff size={18} />}
-                  large
-                />
-              </div>
-            </div>
-
-            <details className="mt-3 rounded-2xl border border-white/20 bg-black/35 p-3 backdrop-blur">
-              <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-wider text-white/85">
-                Connection Details
-              </summary>
-              <p className="mt-2 text-[11px] text-white/75">
-                {connected ? "Signaling online" : "Connecting"} | {joined ? "Room joined" : "Waiting room"} | Remote mic:{" "}
-                {remoteMuted ? "Muted" : "Active"}
-              </p>
-              <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-1 text-[10px]">
-                <Signal size={12} />
-                {networkQuality}
-              </div>
-              <SessionDiagnosticsPanel diagnostics={callDiagnostics} networkQuality={networkQuality} />
-            </details>
-          </div>
-        </section>
       </div>
 
+      {/* ── CONTROL BAR ── */}
+      <div className="relative z-10 bg-[#0d1014]/95 backdrop-blur-2xl border-t border-white/[0.06] px-8 pt-7 pb-10">
+
+        {/* Ambient bloom */}
+        <div className="pointer-events-none absolute inset-x-0 -top-10 flex justify-center">
+          <div className="h-20 w-56 rounded-full bg-sky-500/[0.06] blur-3xl" />
+        </div>
+
+        <div className="relative mx-auto flex max-w-[300px] items-end justify-between">
+
+          {/* Flip */}
+          <ControlButton icon={<RotateCw size={21} />} label="Flip" onClick={() => {}} />
+
+          {/* Camera */}
+          <ControlButton
+            icon={cameraOn ? <Video size={21} /> : <VideoOff size={21} />}
+            label="Camera"
+            active={!cameraOn}
+            onClick={() => {}}
+          />
+
+          {/* Mute */}
+          <ControlButton
+            icon={muted ? <MicOff size={21} /> : <Mic size={21} />}
+            label="Mute"
+            active={muted}
+            onClick={toggleMute}
+          />
+
+          {/* End Call */}
+          <div className="flex flex-col items-center gap-[10px]">
+            <button
+              onClick={endCall}
+              className="flex h-[60px] w-[60px] items-center justify-center rounded-full bg-gradient-to-br from-rose-500 to-red-600 shadow-[0_6px_28px_rgba(244,63,94,0.45)] transition-all duration-150 active:scale-90 hover:shadow-[0_8px_36px_rgba(244,63,94,0.55)] focus:outline-none"
+            >
+              <PhoneOff size={24} className="text-white" />
+            </button>
+            <span className="font-dm text-[10px] font-medium uppercase tracking-[0.14em] text-white/30">
+              End
+            </span>
+          </div>
+
+        </div>
+
+        {/* Handle pill */}
+        <div className="mt-5 flex justify-center">
+          <div className="h-[5px] w-10 rounded-full bg-white/10" />
+        </div>
+      </div>
+
+      {/* ── MODALS ── */}
       <VisitorIncomingCallModal
         open={incomingCall.pending && !canStartCall}
         hasVideo={incomingCall.hasVideo}
@@ -207,27 +182,32 @@ export default function SessionVideoPage() {
   );
 }
 
-function ControlIconButton({ label, icon, onClick, disabled = false, variant = "default", large = false }) {
-  const base =
-    "grid place-items-center rounded-xl text-white transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-45";
-  const tone = variant === "danger" ? "bg-rose-500 hover:bg-rose-400" : "bg-white/25 hover:bg-white/35";
-  const sizeClass = large ? "h-12 w-full rounded-2xl" : "h-11";
+/* ── Reusable Control Button ── */
+function ControlButton({ icon, label, onClick, active = false }) {
   return (
-    <button type="button" onClick={onClick} disabled={disabled} className={`${base} ${tone} ${sizeClass}`}>
-      <span className="flex flex-col items-center gap-0.5">
+    <div className="flex flex-col items-center gap-[10px]">
+      <button
+        onClick={onClick}
+        className={`flex h-[52px] w-[52px] items-center justify-center rounded-full border transition-all duration-150 focus:outline-none active:scale-90 ${
+          active
+            ? "border-white/20 bg-white text-[#07090b] shadow-[0_4px_20px_rgba(255,255,255,0.15)]"
+            : "border-white/[0.08] bg-white/[0.07] text-white hover:bg-white/[0.13] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+        }`}
+      >
         {icon}
-        <span className={`${large ? "text-[10px]" : "text-[9px]"} font-semibold`}>{label}</span>
+      </button>
+      <span className="font-dm text-[10px] font-medium uppercase tracking-[0.14em] text-white/30">
+        {label}
       </span>
-    </button>
+    </div>
   );
 }
 
+/* ── Helpers ── */
 function getExitRoute(sessionId) {
   try {
     const user = JSON.parse(localStorage.getItem("qring_user") || "null");
     if (user?.role === "visitor") return `/session/${sessionId}/message`;
-    if (user?.role === "admin") return "/dashboard/admin";
-    if (user?.role === "estate") return "/dashboard/estate";
     return "/dashboard/homeowner/overview";
   } catch {
     return `/session/${sessionId}/message`;
