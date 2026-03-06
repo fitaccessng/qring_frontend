@@ -331,6 +331,17 @@ export function useSessionRealtime(sessionId) {
     return Math.abs(currentTs - nextTs) < 12000;
   }
 
+  function mergeMessages(currentRows, nextRows) {
+    const merged = [...(currentRows || [])];
+    (nextRows || []).forEach((incoming) => {
+      if (!incoming) return;
+      if (incoming.id && merged.some((item) => item?.id && item.id === incoming.id)) return;
+      if (merged.some((item) => isLikelyDuplicateMessage(item, incoming))) return;
+      merged.push(incoming);
+    });
+    return merged.sort((a, b) => Date.parse(a?.at || "") - Date.parse(b?.at || ""));
+  }
+
   function setLowBandwidthMode(nextValue) {
     const normalized = Boolean(nextValue);
     setLowBandwidthModeState(normalized);
@@ -1305,21 +1316,30 @@ export function useSessionRealtime(sessionId) {
 
   useEffect(() => {
     let active = true;
-    const loadHistory = async () => {
+    const syncHistory = async () => {
       try {
         const rows = await getVisitorSessionMessages(sessionId);
         if (!active) return;
-        setMessages(rows.map((row) => normalizeMessage(row)));
+        const normalized = rows.map((row) => normalizeMessage(row));
+        setMessages((prev) => mergeMessages(prev, normalized));
       } catch {
         if (active) setStatus((prev) => prev || "Unable to load message history");
       }
     };
-    loadHistory();
+
+    syncHistory();
+    const intervalMs = connected ? 12000 : 4500;
+    const timer = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      syncHistory();
+    }, intervalMs);
+
     return () => {
       active = false;
+      clearInterval(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId]);
+  }, [sessionId, connected]);
 
   useEffect(() => {
     const socket = acquireSignalingSocket(sessionId);

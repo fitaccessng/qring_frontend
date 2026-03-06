@@ -134,6 +134,34 @@ export default function HomeownerMessagesPage() {
   }, [selectedId]);
 
   useEffect(() => {
+    if (!selectedId) return;
+    let active = true;
+    const syncConversation = async () => {
+      try {
+        const [rows, latestThreads] = await Promise.all([
+          getHomeownerSessionMessages(selectedId),
+          getHomeownerMessages()
+        ]);
+        if (!active) return;
+        setMessagesByThread((prev) => ({ ...prev, [selectedId]: rows }));
+        setThreads(latestThreads.map((item) => (item.id === selectedId ? { ...item, unread: 0 } : item)));
+      } catch {
+        // Keep live view resilient when network/sockets are unstable.
+      }
+    };
+
+    const timer = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      syncConversation();
+    }, 4500);
+
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [selectedId]);
+
+  useEffect(() => {
     if (!token) return () => {};
     const socket = io(`${env.socketUrl}${env.signalingNamespace ?? "/realtime/signaling"}`, {
       path: env.socketPath,
