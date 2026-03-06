@@ -27,6 +27,7 @@ const DIAGNOSTICS_POLL_MS = 3000;
 const CONNECTION_RECOVERY_LIMIT = 2;
 const CALL_INVITE_RETRY_MS = 1800;
 const DEVICE_STORAGE_KEY = "qring_visitor_device_id";
+const CALL_ACCEPT_INTENT_KEY = "qring_call_accept_intent";
 
 function currentPathname() {
   if (typeof window === "undefined") return "/";
@@ -212,6 +213,8 @@ export function useSessionRealtime(sessionId) {
   const localAudioTrackRef = useRef(null);
   const localVideoTrackRef = useRef(null);
   const livekitDisconnectingRef = useRef(false);
+  const livekitConnectingRef = useRef(false);
+  const acceptingCallRef = useRef(false);
   const remoteLivekitTracksRef = useRef(new Set());
   const callSessionRef = useRef("");
   const callVisitorIdRef = useRef("");
@@ -276,6 +279,43 @@ export function useSessionRealtime(sessionId) {
       callSessionId: callSessionRef.current || undefined,
       visitorId: callVisitorIdRef.current || incomingCall.visitorId || undefined
     });
+  }
+
+  function consumeCallAcceptIntent() {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = sessionStorage.getItem(CALL_ACCEPT_INTENT_KEY);
+      if (!raw) return null;
+      sessionStorage.removeItem(CALL_ACCEPT_INTENT_KEY);
+      const parsed = JSON.parse(raw);
+      if (parsed?.sessionId !== sessionId) return null;
+      return {
+        pending: true,
+        hasVideo: Boolean(parsed?.hasVideo),
+        callSessionId: String(parsed?.callSessionId || ""),
+        visitorId: String(parsed?.visitorId || ""),
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  function saveCallAcceptIntent(intent) {
+    if (typeof window === "undefined") return;
+    try {
+      sessionStorage.setItem(CALL_ACCEPT_INTENT_KEY, JSON.stringify(intent || {}));
+    } catch {
+      // Keep storage failures non-blocking.
+    }
+  }
+
+  function clearCallAcceptIntent() {
+    if (typeof window === "undefined") return;
+    try {
+      sessionStorage.removeItem(CALL_ACCEPT_INTENT_KEY);
+    } catch {
+      // Keep storage failures non-blocking.
+    }
   }
 
   function startInviteRetryLoop(hasVideo) {
@@ -626,102 +666,110 @@ export function useSessionRealtime(sessionId) {
     if (!livekitEnabled) {
       throw new Error("LiveKit is not enabled. Configure VITE_LIVEKIT_URL.");
     }
-    if (livekitRoomRef.current) {
-      disconnectLivekitRoom();
-    }
+    if (livekitConnectingRef.current) return;
+    livekitConnectingRef.current = true;
     try {
-      await ensureCallMediaPermissions({ video: Boolean(video) });
-    } catch {
-      throw new Error("Camera/Microphone access required for calls");
-    }
-
-    const { Room, RoomEvent, createLocalTracks } = await getLivekitModule();
-    const effectiveAuth = auth || (await fetchLivekitToken());
-    const room = new Room({
-      adaptiveStream: true,
-      dynacast: true
-    });
-
-    room.on(RoomEvent.TrackSubscribed, (track) => {
-      remoteLivekitTracksRef.current.add(track);
-      attachTrackToElements(track);
-      if (track.kind === "audio") setRemoteMuted(false);
-    });
-    room.on(RoomEvent.TrackUnsubscribed, (track) => {
+      if (livekitRoomRef.current) {
+        disconnectLivekitRoom();
+      }
       try {
-        track.detach?.();
+        await ensureCallMediaPermissions({ video: Boolean(video) });
       } catch {
-        // Non-blocking detach.
+        throw new Error("Camera/Microphone access required for calls");
       }
-      remoteLivekitTracksRef.current.delete(track);
-      if (track.kind === "video") {
-        setRemoteVideoActive(false);
-        if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
-      }
-      if (track.kind === "audio") {
-        setRemoteMuted(true);
-        if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
-      }
-    });
-    room.on(RoomEvent.ConnectionStateChanged, (state) => {
-      if (state === "connected") {
-        markNetworkGood("LiveKit room connected.");
-        setStatus("Call connected");
-        setCallState("connected");
-      } else if (state === "reconnecting") {
-        markNetworkReconnecting("LiveKit reconnecting...");
-      } else if (state === "disconnected" && !livekitDisconnectingRef.current) {
-        markNetworkSlow("LiveKit disconnected.");
-        setStatus("Call connection dropped. Retry connection.");
-        setCallState("failed");
-      }
-    });
 
-    await room.connect(effectiveAuth.url || env.livekitUrl, effectiveAuth.token);
+      const { Room, RoomEvent, createLocalTracks } = await getLivekitModule();
+      const effectiveAuth = auth || (await fetchLivekitToken());
+      const room = new Room({
+        adaptiveStream: true,
+        dynacast: true
+      });
 
-    const tracks = await createLocalTracks({
-      audio: true,
-      video: Boolean(video)
-        ? autoLowBandwidthActive
-          ? {
-              width: 640,
-              height: 360,
-              frameRate: 15,
-              facingMode: "user"
-            }
-          : {
-              width: 960,
-              height: 540,
-              frameRate: 24,
-              facingMode: "user"
-            }
-        : false
-    });
+      room.on(RoomEvent.TrackSubscribed, (track) => {
+        remoteLivekitTracksRef.current.add(track);
+        attachTrackToElements(track);
+        if (track.kind === "audio") setRemoteMuted(false);
+      });
+      room.on(RoomEvent.TrackUnsubscribed, (track) => {
+        try {
+          track.detach?.();
+        } catch {
+          // Non-blocking detach.
+        }
+        remoteLivekitTracksRef.current.delete(track);
+        if (track.kind === "video") {
+          setRemoteVideoActive(false);
+          if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
+        }
+        if (track.kind === "audio") {
+          setRemoteMuted(true);
+          if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
+        }
+      });
+      room.on(RoomEvent.ConnectionStateChanged, (state) => {
+        if (state === "connected") {
+          markNetworkGood("LiveKit room connected.");
+          setStatus("Call connected");
+          setCallState("connected");
+        } else if (state === "reconnecting") {
+          markNetworkReconnecting("LiveKit reconnecting...");
+        } else if (state === "disconnected" && !livekitDisconnectingRef.current) {
+          markNetworkSlow("LiveKit disconnected.");
+          setStatus("Call connection dropped. Retry connection.");
+          setCallState("failed");
+        }
+      });
 
-    for (const track of tracks) {
-      await room.localParticipant.publishTrack(track);
-      if (track.kind === "audio") localAudioTrackRef.current = track;
-      if (track.kind === "video") localVideoTrackRef.current = track;
+      await room.connect(effectiveAuth.url || env.livekitUrl, effectiveAuth.token);
+
+      const tracks = await createLocalTracks({
+        audio: true,
+        video: Boolean(video)
+          ? autoLowBandwidthActive
+            ? {
+                width: 640,
+                height: 360,
+                frameRate: 15,
+                facingMode: "user"
+              }
+            : {
+                width: 960,
+                height: 540,
+                frameRate: 24,
+                facingMode: "user"
+              }
+          : false
+      });
+
+      for (const track of tracks) {
+        await room.localParticipant.publishTrack(track);
+        if (track.kind === "audio") localAudioTrackRef.current = track;
+        if (track.kind === "video") localVideoTrackRef.current = track;
+      }
+
+      livekitRoomRef.current = room;
+      localStreamRef.current = new MediaStream(tracks.map((track) => track.mediaStreamTrack));
+      if (localVideoRef.current && localVideoTrackRef.current?.mediaStreamTrack) {
+        localVideoRef.current.srcObject = new MediaStream([localVideoTrackRef.current.mediaStreamTrack]);
+        localVideoRef.current.muted = true;
+        localVideoRef.current.play().catch(() => {});
+      }
+      setCameraOn(Boolean(video));
+    } finally {
+      livekitConnectingRef.current = false;
     }
-
-    livekitRoomRef.current = room;
-    localStreamRef.current = new MediaStream(tracks.map((track) => track.mediaStreamTrack));
-    if (localVideoRef.current && localVideoTrackRef.current?.mediaStreamTrack) {
-      localVideoRef.current.srcObject = new MediaStream([localVideoTrackRef.current.mediaStreamTrack]);
-      localVideoRef.current.muted = true;
-      localVideoRef.current.play().catch(() => {});
-    }
-    setCameraOn(Boolean(video));
   }
 
   function disconnectLivekitRoom() {
     livekitDisconnectingRef.current = true;
+    livekitConnectingRef.current = false;
     try {
       if (localAudioTrackRef.current) localAudioTrackRef.current.stop();
       if (localVideoTrackRef.current) localVideoTrackRef.current.stop();
       localAudioTrackRef.current = null;
       localVideoTrackRef.current = null;
       if (livekitRoomRef.current) {
+        livekitRoomRef.current.removeAllListeners?.();
         livekitRoomRef.current.disconnect();
       }
       for (const track of remoteLivekitTracksRef.current) {
@@ -1025,9 +1073,14 @@ export function useSessionRealtime(sessionId) {
     startAudioCall();
   }
 
-  async function acceptIncomingCall() {
-    if (!incomingCall.pending) return;
-    const incomingSnapshot = incomingCall;
+  async function acceptIncomingCall(snapshotOverride = null) {
+    const incomingSnapshot =
+      snapshotOverride && typeof snapshotOverride === "object"
+        ? snapshotOverride
+        : incomingCall;
+    if (!incomingSnapshot?.pending) return;
+    if (acceptingCallRef.current) return;
+    acceptingCallRef.current = true;
     clearIncomingCall();
     setCallState("connecting");
     if (legacyWebrtcEnabled) {
@@ -1035,6 +1088,7 @@ export function useSessionRealtime(sessionId) {
       if (!pendingOffer?.sdp) {
         setStatus("Incoming call data is no longer available. Ask homeowner to call again.");
         setCallState("idle");
+        acceptingCallRef.current = false;
         return;
       }
       try {
@@ -1056,6 +1110,12 @@ export function useSessionRealtime(sessionId) {
         setCallLaunchStage("idle");
         setCallLaunchStartedAt(null);
         grantSessionCallAccess(sessionId, "connected");
+        saveCallAcceptIntent({
+          sessionId,
+          hasVideo: allowVideo,
+          callSessionId: incomingSnapshot.callSessionId || "",
+          visitorId: incomingSnapshot.visitorId || "",
+        });
         setAcceptedCallMode(allowVideo ? "video" : "audio");
         pendingOfferRef.current = null;
       } catch (error) {
@@ -1068,11 +1128,13 @@ export function useSessionRealtime(sessionId) {
           visitorId: incomingSnapshot.visitorId || ""
         });
       }
+      acceptingCallRef.current = false;
       return;
     }
     if (!livekitEnabled) {
       setStatus("Call service is unavailable. LiveKit URL is not configured.");
       setCallState("idle");
+      acceptingCallRef.current = false;
       return;
     }
     try {
@@ -1101,8 +1163,15 @@ export function useSessionRealtime(sessionId) {
       setCallLaunchStage("idle");
       setCallLaunchStartedAt(null);
       grantSessionCallAccess(sessionId, "connected");
+      saveCallAcceptIntent({
+        sessionId,
+        hasVideo: allowVideo,
+        callSessionId,
+        visitorId: incomingSnapshot.visitorId || getVisitorIdentity(),
+      });
       setAcceptedCallMode(allowVideo ? "video" : "audio");
       pendingOfferRef.current = null;
+      acceptingCallRef.current = false;
     } catch (error) {
       setStatus(error?.message ?? "Failed to accept incoming call");
       disconnectLivekitRoom();
@@ -1115,6 +1184,7 @@ export function useSessionRealtime(sessionId) {
         callSessionId: incomingSnapshot.callSessionId || "",
         visitorId: incomingSnapshot.visitorId || ""
       });
+      acceptingCallRef.current = false;
     }
   }
 
@@ -1130,6 +1200,7 @@ export function useSessionRealtime(sessionId) {
       setCallLaunchStage("idle");
       setCallLaunchStartedAt(null);
       setAcceptedCallMode("");
+      clearCallAcceptIntent();
       clearIncomingCall();
       pendingOfferRef.current = null;
       clearSessionCallAccess(sessionId);
@@ -1139,6 +1210,7 @@ export function useSessionRealtime(sessionId) {
       setStatus("Call service is unavailable. LiveKit URL is not configured.");
       setCallState("idle");
       clearIncomingCall();
+      clearCallAcceptIntent();
       clearSessionCallAccess(sessionId);
       return;
     }
@@ -1164,6 +1236,7 @@ export function useSessionRealtime(sessionId) {
     setCallLaunchStage("idle");
     setCallLaunchStartedAt(null);
     setAcceptedCallMode("");
+    clearCallAcceptIntent();
     clearIncomingCall();
     pendingOfferRef.current = null;
     callSessionRef.current = "";
@@ -1285,6 +1358,7 @@ export function useSessionRealtime(sessionId) {
       setMuted(false);
       setRemoteMuted(false);
       setAcceptedCallMode("");
+      clearCallAcceptIntent();
       setRemoteVideoActive(false);
       connectionRecoveryCountRef.current = 0;
       clearIncomingCall();
@@ -1324,6 +1398,7 @@ export function useSessionRealtime(sessionId) {
     setMuted(false);
     setRemoteMuted(false);
     setAcceptedCallMode("");
+    clearCallAcceptIntent();
     setRemoteVideoActive(false);
     forceRelayRef.current = false;
     pendingVideoUpgradeRef.current = false;
@@ -1453,6 +1528,8 @@ export function useSessionRealtime(sessionId) {
     socket.on("call.invite", (payload) => {
       if (payload?.sessionId !== sessionId) return;
       if (isHomeowner) return;
+      if (callStateRef.current === "connecting" || callStateRef.current === "connected") return;
+      if (callSessionRef.current && payload?.callSessionId && callSessionRef.current === payload.callSessionId) return;
       const hasVideo = Boolean(payload?.hasVideo);
       callVisitorIdRef.current = payload?.visitorId || "";
       playIncomingCallNotificationSound();
@@ -1790,6 +1867,17 @@ export function useSessionRealtime(sessionId) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, displayName, token, isHomeowner, lowBandwidthMode]);
+
+  useEffect(() => {
+    if (isHomeowner) return;
+    const intent = consumeCallAcceptIntent();
+    if (!intent) return;
+    setIncomingCall(intent);
+    setTimeout(() => {
+      acceptIncomingCall(intent);
+    }, 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId, isHomeowner]);
 
   return {
     connected,
