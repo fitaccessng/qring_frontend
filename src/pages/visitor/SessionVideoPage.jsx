@@ -6,8 +6,6 @@ import { useSessionRealtime } from "../../hooks/useSessionRealtime";
 
 export default function SessionVideoPage() {
   const { sessionId } = useParams();
-  const sessionRole = getSessionRole();
-  const peerLabel = sessionRole === "homeowner" ? "Visitor" : "Homeowner";
   const exitRoute = getExitRoute(sessionId);
   const {
     callState,
@@ -92,7 +90,7 @@ export default function SessionVideoPage() {
         {/* ── TOP IDENTITY BAR ── */}
         <div className="absolute inset-x-0 top-0 flex flex-col items-center pt-14 fade-up">
           <h2 className="font-syne text-[22px] font-semibold tracking-[0.22em] text-white/95 uppercase">
-            {showRemoteAsPrimary ? peerLabel : "Connecting"}
+            {showRemoteAsPrimary ? "Visitor" : "Connecting"}
           </h2>
 
           <div className="font-dm mt-2 flex items-center gap-2 text-[11px] font-medium tracking-[0.18em] uppercase text-white/45">
@@ -213,14 +211,5 @@ function getExitRoute(sessionId) {
     return "/dashboard/homeowner/overview";
   } catch {
     return `/session/${sessionId}/message`;
-  }
-}
-
-function getSessionRole() {
-  try {
-    const user = JSON.parse(localStorage.getItem("qring_user") || "null");
-    return (user?.role || "").toLowerCase();
-  } catch {
-    return "";
   }
 }

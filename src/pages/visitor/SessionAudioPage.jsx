@@ -6,8 +6,6 @@ import { useSessionRealtime } from "../../hooks/useSessionRealtime";
 
 export default function SessionAudioPage() {
   const { sessionId } = useParams();
-  const sessionRole = getSessionRole();
-  const peerLabel = sessionRole === "homeowner" ? "Visitor" : "Homeowner";
   const exitRoute = getExitRoute(sessionId);
   const {
     callState,
@@ -117,7 +115,7 @@ export default function SessionAudioPage() {
 
         {/* Identity */}
         <h1 className="font-syne text-[24px] font-semibold tracking-[0.18em] uppercase text-white/95 mb-3">
-          {peerLabel}
+          Visitor
         </h1>
 
         {/* Status / timer */}
@@ -130,7 +128,7 @@ export default function SessionAudioPage() {
         {remoteMuted && (
           <div className="mt-7 flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.05] px-4 py-1.5 font-dm text-[11px] tracking-[0.10em] uppercase text-white/40">
             <MicOff size={11} className="text-white/30" />
-            {peerLabel} is muted
+            Visitor is muted
           </div>
         )}
       </main>
@@ -221,14 +219,5 @@ function getExitRoute(sessionId) {
       : "/dashboard/homeowner/overview";
   } catch {
     return `/session/${sessionId}/message`;
-  }
-}
-
-function getSessionRole() {
-  try {
-    const user = JSON.parse(localStorage.getItem("qring_user") || "null");
-    return (user?.role || "").toLowerCase();
-  } catch {
-    return "";
   }
 }

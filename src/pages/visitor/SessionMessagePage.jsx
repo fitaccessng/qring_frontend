@@ -8,9 +8,6 @@ import { useSessionRealtime } from "../../hooks/useSessionRealtime";
 export default function SessionMessagePage() {
   const { sessionId } = useParams();
   const navigate = useNavigate();
-  const sessionRole = getSessionRole();
-  const isHomeowner = sessionRole === "homeowner";
-  const peerLabel = isHomeowner ? "Visitor" : "Homeowner";
   const [text, setText] = useState("");
   const messagesRef = useRef(null);
   const {
@@ -45,7 +42,7 @@ export default function SessionMessagePage() {
 
   function handleRejectIncomingCall() {
     rejectIncomingCall();
-    navigate(isHomeowner ? "/dashboard/homeowner/overview" : `/session/${sessionId}/message`, { replace: true });
+    navigate(`/session/${sessionId}/message`, { replace: true });
   }
 
   useEffect(() => {
@@ -94,7 +91,7 @@ export default function SessionMessagePage() {
         <header className="mb-4 rounded-3xl border border-slate-200/80 bg-white/90 p-5 shadow-soft backdrop-blur">
           <h1 className="font-heading text-2xl font-black md:text-3xl">Session Messages</h1>
           <p className="mt-1 text-xs text-slate-500">
-            {isHomeowner ? "Homeowner View" : "Visitor View"} | Session {sessionId} | {connected ? "Signaling Online" : "Connecting"} | {joined ? "Room Joined" : "Waiting Room"} | Server Call Session: {serverCallState}
+            Session {sessionId} | {connected ? "Signaling Online" : "Connecting"} | {joined ? "Room Joined" : "Waiting Room"} | Server Call Session: {serverCallState}
           </p>
           <SessionNetworkBadge quality={networkQuality} detail={networkDetail} />
           {featureError ? <p className="mt-2 text-sm text-rose-700">{featureError}</p> : null}
@@ -113,7 +110,7 @@ export default function SessionMessagePage() {
             <article className="min-h-[74vh] overflow-hidden rounded-[2rem] border border-slate-200 bg-slate-100/70 shadow-sm">
               <header className="border-b border-slate-200 bg-white/85 px-4 py-3">
                 <h2 className="text-lg font-black">Conversation</h2>
-                <p className="text-xs text-slate-500">Live chat with {peerLabel} for this session.</p>
+                <p className="text-xs text-slate-500">Live chat for this session.</p>
               </header>
 
               <div ref={messagesRef} className="h-[58vh] space-y-3 overflow-y-auto p-4 sm:h-[60vh]">
@@ -177,13 +174,4 @@ export default function SessionMessagePage() {
       />
     </div>
   );
-}
-
-function getSessionRole() {
-  try {
-    const user = JSON.parse(localStorage.getItem("qring_user") || "null");
-    return (user?.role || "").toLowerCase();
-  } catch {
-    return "";
-  }
 }
