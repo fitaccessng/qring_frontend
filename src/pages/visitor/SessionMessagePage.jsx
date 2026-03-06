@@ -39,9 +39,7 @@ export default function SessionMessagePage() {
   }
 
   async function handleAcceptIncomingCall() {
-    const route = `/session/${sessionId}/${incomingCall.hasVideo ? "video" : "audio"}`;
-    acceptIncomingCall();
-    navigate(route);
+    await acceptIncomingCall();
   }
 
   function handleRejectIncomingCall() {
