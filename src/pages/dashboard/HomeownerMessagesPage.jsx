@@ -461,7 +461,7 @@ export default function HomeownerMessagesPage() {
                 })}
               </div>
 
-              <form onSubmit={handleSend} className="border-t border-slate-200 bg-white/90 p-3 dark:border-slate-800 dark:bg-slate-900/80">
+              <form onSubmit={handleSend} className="mb-20 border-t border-slate-200 bg-white/90 p-3 dark:border-slate-800 dark:bg-slate-900/80 lg:mb-0">
                 <div className="flex items-center gap-2">
                   <input
                     value={draft}

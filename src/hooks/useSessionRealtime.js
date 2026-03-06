@@ -1394,21 +1394,11 @@ export function useSessionRealtime(sessionId) {
       }
     });
     socket.on("session.participant_left", () => {
-      if (callStateRef.current === "connected") {
-        setStatus("Participant connection changed. Waiting for reconnect...");
-        notifyWithCooldown("participant_link_changed", {
-          title: "Call Reconnecting",
-          message: "Participant connection changed. Trying to reconnect...",
-          type: "warning"
-        });
-        return;
+      // Do not auto-end or mark session as left when users navigate across pages.
+      // Session should remain active until homeowner explicitly ends it.
+      if (callStateRef.current === "connected" || callStateRef.current === "ringing") {
+        setStatus("Participant disconnected. Session remains active.");
       }
-      setStatus("Participant left");
-      notifyWithCooldown("participant_left", {
-        title: "Participant Left",
-        message: "The other participant left the session.",
-        type: "warning"
-      });
     });
 
     socket.on("call.invite", (payload) => {

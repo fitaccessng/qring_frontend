@@ -229,7 +229,7 @@ function getExitRoute(sessionId) {
     if (user?.role === "visitor") return `/session/${sessionId}/message`;
     if (user?.role === "admin") return "/dashboard/admin";
     if (user?.role === "estate") return "/dashboard/estate";
-    return "/dashboard/homeowner/overview";
+    return "/dashboard/homeowner/visits";
   } catch {
     return `/session/${sessionId}/message`;
   }
