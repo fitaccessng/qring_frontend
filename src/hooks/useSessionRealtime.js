@@ -929,7 +929,8 @@ export function useSessionRealtime(sessionId) {
           method: "POST",
           body: JSON.stringify({
             sessionId,
-            visitorId: visitorIdentity
+            visitorId: visitorIdentity,
+            hasVideo: Boolean(requestVideo)
           })
         });
         const startedCall = startResponse?.data ?? startResponse;
