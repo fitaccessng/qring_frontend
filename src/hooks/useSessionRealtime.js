@@ -282,7 +282,7 @@ export function useSessionRealtime(sessionId) {
     clearInviteRetryTimer();
     emitCallInvite(hasVideo);
     inviteRetryTimerRef.current = setInterval(() => {
-      if (callStateRef.current !== "ringing") {
+      if (!["ringing", "connecting"].includes(callStateRef.current)) {
         clearInviteRetryTimer();
         return;
       }
