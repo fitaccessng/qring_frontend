@@ -214,12 +214,34 @@ export default function ScanPage() {
     () => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`,
     [seconds]
   );
+  const qrMeta = useMemo(() => {
+    const raw = String(qrId || "").trim();
+    const isSecureToken = raw.startsWith("qt1.") || raw.startsWith("qt2.");
+    if (isSecureToken) {
+      return {
+        label: "Secure Access Token",
+        value: `Protected token (${raw.length} chars)`,
+        reveal: false,
+      };
+    }
+    if (raw.length <= 28) {
+      return { label: "QR ID", value: raw, reveal: true };
+    }
+    return {
+      label: "QR ID",
+      value: `${raw.slice(0, 12)}...${raw.slice(-10)}`,
+      reveal: true,
+    };
+  }, [qrId]);
 
   return (
-    <div className="grid min-h-screen place-items-center bg-slate-50 p-4 dark:bg-slate-950">
-      <article className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white/90 p-7 shadow-soft dark:border-slate-800 dark:bg-slate-900/80">
-        <h1 className="font-heading text-3xl font-bold">Qring Visitor Access</h1>
-        <p className="mt-2 text-sm text-slate-500">QR ID: {qrId}</p>
+    <div className="min-h-[100dvh] bg-slate-50 px-3 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 dark:bg-slate-950 sm:grid sm:place-items-center sm:p-4">
+      <article className="mx-auto w-full max-w-lg rounded-3xl border border-slate-200 bg-white/95 p-4 shadow-soft dark:border-slate-800 dark:bg-slate-900/90 sm:p-7">
+        <h1 className="font-heading text-2xl font-bold sm:text-3xl">Qring Visitor Access</h1>
+        <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-300">
+          <p className="font-semibold">{qrMeta.label}</p>
+          <p className="mt-1 break-all wrap-anywhere font-mono">{qrMeta.value}</p>
+        </div>
 
         {loading ? <p className="mt-5 text-sm">Resolving secure QR route...</p> : null}
         {error ? <p className="mt-5 text-sm text-danger">{error}</p> : null}
