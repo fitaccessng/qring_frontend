@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { io } from "socket.io-client";
 import { ChevronLeft, MoreVertical, Search, SendHorizontal, SlidersHorizontal, Trash2 } from "lucide-react";
 import AppShell from "../../layouts/AppShell";
@@ -13,6 +14,8 @@ import {
 } from "../../services/homeownerService";
 
 export default function HomeownerMessagesPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const preferredSessionId = (searchParams.get("sessionId") || "").trim();
   const [threads, setThreads] = useState([]);
   const [selectedId, setSelectedId] = useState("");
   const [messagesByThread, setMessagesByThread] = useState({});
@@ -73,7 +76,12 @@ export default function HomeownerMessagesPage() {
         if (!active) return;
         setThreads(data);
         const isDesktop = typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches;
-        setSelectedId((prev) => prev || (isDesktop ? data[0]?.id || "" : ""));
+        const preferredExists = preferredSessionId && data.some((item) => item.id === preferredSessionId);
+        setSelectedId((prev) => {
+          if (prev) return prev;
+          if (preferredExists) return preferredSessionId;
+          return isDesktop ? data[0]?.id || "" : "";
+        });
       } catch (requestError) {
         if (!active) return;
         setError(requestError.message ?? "Failed to load messages");
@@ -85,7 +93,19 @@ export default function HomeownerMessagesPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [preferredSessionId]);
+
+  useEffect(() => {
+    if (!preferredSessionId) return;
+    const exists = threads.some((thread) => thread.id === preferredSessionId);
+    if (!exists) return;
+    setSelectedId(preferredSessionId);
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.delete("sessionId");
+      return next;
+    }, { replace: true });
+  }, [preferredSessionId, setSearchParams, threads]);
 
   useEffect(() => {
     if (!selectedId) return;

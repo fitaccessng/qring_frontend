@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Navigate, useNavigate, useParams } from "react-router-dom";
 import SessionNetworkBadge from "../../components/SessionNetworkBadge";
 import SessionModeNav from "../../components/SessionModeNav";
 import VisitorIncomingCallModal from "../../components/VisitorIncomingCallModal";
@@ -8,6 +8,10 @@ import { useSessionRealtime } from "../../hooks/useSessionRealtime";
 export default function SessionMessagePage() {
   const { sessionId } = useParams();
   const navigate = useNavigate();
+  const isHomeowner = getStoredUserRole() === "homeowner";
+  if (isHomeowner) {
+    return <Navigate to={`/dashboard/homeowner/messages?sessionId=${encodeURIComponent(sessionId || "")}`} replace />;
+  }
   const [text, setText] = useState("");
   const messagesRef = useRef(null);
   const {
@@ -174,4 +178,12 @@ export default function SessionMessagePage() {
       />
     </div>
   );
+}
+
+function getStoredUserRole() {
+  try {
+    return (JSON.parse(localStorage.getItem("qring_user") || "null")?.role || "").toLowerCase();
+  } catch {
+    return "";
+  }
 }
