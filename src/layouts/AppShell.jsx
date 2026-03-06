@@ -582,7 +582,13 @@ export default function AppShell({ title, children, showTopBar = true }) {
           </div>
         </aside>
 
-        <main className={`safe-content flex-1 overflow-y-auto px-4 pb-[calc(8.5rem+env(safe-area-inset-bottom))] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:px-5 sm:pb-[calc(8.75rem+env(safe-area-inset-bottom))] lg:ml-72 lg:px-10 lg:pb-8 ${showTopBar ? "pt-[calc(12.75rem+env(safe-area-inset-top))] sm:pt-[calc(7rem+env(safe-area-inset-top))] lg:pt-[7.35rem]" : "pt-[calc(1.1rem+env(safe-area-inset-top))] sm:pt-[calc(1.2rem+env(safe-area-inset-top))] lg:pt-6"}`}>
+        <main className={`safe-content relative flex-1 overflow-y-auto px-4 pb-[calc(8.5rem+env(safe-area-inset-bottom))] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:px-5 sm:pb-[calc(8.75rem+env(safe-area-inset-bottom))] lg:ml-72 lg:px-10 lg:pb-8 ${showTopBar ? "pt-[calc(12.75rem+env(safe-area-inset-top))] sm:pt-[calc(7rem+env(safe-area-inset-top))] lg:pt-[7.35rem]" : "pt-[calc(1.1rem+env(safe-area-inset-top))] sm:pt-[calc(1.2rem+env(safe-area-inset-top))] lg:pt-6"}`}>
+          {showTopBar ? (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none fixed inset-x-0 top-0 z-20 h-[calc(6.2rem+env(safe-area-inset-top))] bg-gradient-to-b from-slate-100/92 via-slate-100/72 to-transparent backdrop-blur-md dark:from-slate-950/92 dark:via-slate-950/72 lg:left-72"
+            />
+          ) : null}
           {showTopBar ? (
           <header className="fixed inset-x-0 top-0 z-30 px-3 pt-[calc(0.95rem+env(safe-area-inset-top))] sm:px-4 lg:left-72 lg:px-8">
             <div className="rounded-[1.4rem] border border-slate-200/70 bg-white/95 p-3 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/90 sm:p-4">
@@ -695,6 +701,12 @@ export default function AppShell({ title, children, showTopBar = true }) {
           </div>
         </main>
       </div>
+      {mobileNavItems.length > 0 ? (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-x-0 bottom-0 z-[9998] h-[calc(6.8rem+env(safe-area-inset-bottom))] bg-gradient-to-t from-slate-100/95 via-slate-100/75 to-transparent backdrop-blur-md dark:from-slate-950/95 dark:via-slate-950/75 lg:hidden"
+        />
+      ) : null}
       {mobileNavItems.length > 0 ? (
         <nav className="fixed inset-x-0 bottom-3 z-[9999] px-3 pb-[max(0.2rem,env(safe-area-inset-bottom))] lg:hidden">
           <div className="relative mx-auto max-w-md rounded-[1.35rem] border border-slate-200/60 bg-[#ebe8f8]/95 px-3 py-2 shadow-[0_12px_32px_rgba(76,29,149,0.16)] backdrop-blur-md dark:border-slate-700 dark:bg-slate-900/90">

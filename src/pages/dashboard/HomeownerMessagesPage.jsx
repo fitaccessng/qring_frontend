@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { io } from "socket.io-client";
 import { ChevronLeft, MoreVertical, Search, SendHorizontal, SlidersHorizontal, Trash2 } from "lucide-react";
 import AppShell from "../../layouts/AppShell";
@@ -25,7 +25,7 @@ export default function HomeownerMessagesPage() {
   const [sending, setSending] = useState(false);
   const [deletingMessageId, setDeletingMessageId] = useState("");
   const [query, setQuery] = useState("");
-  const [threadFilter, setThreadFilter] = useState("archived");
+  const [threadFilter, setThreadFilter] = useState("all");
   const [error, setError] = useState("");
   const messagesRef = useRef(null);
   const selectedIdRef = useRef("");
@@ -75,12 +75,13 @@ export default function HomeownerMessagesPage() {
         const data = await getHomeownerMessages();
         if (!active) return;
         setThreads(data);
+        const sortedThreads = sortThreadsForInbox(data);
         const isDesktop = typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches;
-        const preferredExists = preferredSessionId && data.some((item) => item.id === preferredSessionId);
+        const preferredExists = preferredSessionId && sortedThreads.some((item) => item.id === preferredSessionId);
         setSelectedId((prev) => {
           if (prev) return prev;
           if (preferredExists) return preferredSessionId;
-          return isDesktop ? data[0]?.id || "" : "";
+          return isDesktop ? sortedThreads[0]?.id || "" : "";
         });
       } catch (requestError) {
         if (!active) return;
@@ -207,7 +208,7 @@ export default function HomeownerMessagesPage() {
   }, [selectedId, messagesByThread]);
 
   const filteredThreads = useMemo(() => {
-    let list = threads;
+    let list = sortThreadsForInbox(threads);
     if (threadFilter === "archived") {
       list = list.filter((thread) => Number(thread.unread || 0) === 0);
     } else if (threadFilter === "unread") {
@@ -229,9 +230,9 @@ export default function HomeownerMessagesPage() {
 
   function cycleFilter() {
     setThreadFilter((prev) => {
-      if (prev === "archived") return "all";
-      if (prev === "all") return "unread";
-      return "archived";
+      if (prev === "all") return "archived";
+      if (prev === "archived") return "unread";
+      return "all";
     });
   }
 
@@ -311,7 +312,7 @@ export default function HomeownerMessagesPage() {
               type="button"
               onClick={cycleFilter}
               className="rounded-full p-2 text-slate-500 hover:bg-slate-200/70 dark:hover:bg-slate-800"
-              title="Cycle filter: Archived, All, Unread"
+              title="Cycle filter: All, Archived, Unread"
               aria-label="Cycle thread filter"
             >
               <SlidersHorizontal className="h-4 w-4" />
@@ -401,9 +402,27 @@ export default function HomeownerMessagesPage() {
                     <p className="text-xs text-slate-500">{selectedThread.door || "Door chat"}</p>
                   </div>
                 </div>
-                <button type="button" className="rounded-full p-1.5 text-slate-500 hover:bg-slate-200/70 dark:hover:bg-slate-800">
-                  <MoreVertical className="h-4 w-4" />
-                </button>
+                <div className="flex items-center gap-1.5">
+                  {selectedId ? (
+                    <>
+                      <Link
+                        to={`/session/${selectedId}/audio`}
+                        className="rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+                      >
+                        Audio
+                      </Link>
+                      <Link
+                        to={`/session/${selectedId}/video`}
+                        className="rounded-full bg-indigo-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-indigo-500"
+                      >
+                        Video
+                      </Link>
+                    </>
+                  ) : null}
+                  <button type="button" className="rounded-full p-1.5 text-slate-500 hover:bg-slate-200/70 dark:hover:bg-slate-800">
+                    <MoreVertical className="h-4 w-4" />
+                  </button>
+                </div>
               </header>
 
               <div ref={messagesRef} className="flex-1 space-y-3 overflow-y-auto p-4">
@@ -476,4 +495,22 @@ function formatClockTime(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
+function getSessionPriority(status) {
+  const normalized = String(status || "").toLowerCase();
+  if (normalized === "active") return 0;
+  if (normalized === "approved") return 1;
+  if (normalized === "pending") return 2;
+  return 3;
+}
+
+function sortThreadsForInbox(rows) {
+  return [...(rows || [])].sort((a, b) => {
+    const priorityDelta = getSessionPriority(a?.sessionStatus) - getSessionPriority(b?.sessionStatus);
+    if (priorityDelta !== 0) return priorityDelta;
+    const aTime = new Date(a?.time || 0).getTime();
+    const bTime = new Date(b?.time || 0).getTime();
+    return bTime - aTime;
+  });
 }
