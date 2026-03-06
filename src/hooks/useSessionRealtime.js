@@ -163,6 +163,7 @@ export function useSessionRealtime(sessionId) {
   const [muted, setMuted] = useState(false);
   const [remoteMuted, setRemoteMuted] = useState(false);
   const [cameraOn, setCameraOn] = useState(false);
+  const [speakerOn, setSpeakerOn] = useState(true);
   const [messages, setMessages] = useState([]);
   const [status, setStatus] = useState("");
   const [networkQuality, setNetworkQuality] = useState("reconnecting");
@@ -350,6 +351,26 @@ export function useSessionRealtime(sessionId) {
     }
   }
 
+  async function applyAudioOutputPreference() {
+    const audioEl = remoteAudioRef.current;
+    if (!audioEl) return;
+    audioEl.muted = false;
+    audioEl.volume = 1;
+    if (typeof audioEl.setSinkId === "function") {
+      const preferredSink = speakerOn ? "default" : "communications";
+      try {
+        await audioEl.setSinkId(preferredSink);
+      } catch {
+        // Keep playback working even when sink selection is unsupported.
+      }
+    }
+    try {
+      await audioEl.play();
+    } catch {
+      // Playback can still start later after a user interaction.
+    }
+  }
+
   function ensurePeer() {
     if (peerRef.current) return peerRef.current;
     const peerConfig = {
@@ -370,9 +391,7 @@ export function useSessionRealtime(sessionId) {
       }
       if (remoteAudioRef.current) {
         remoteAudioRef.current.srcObject = stream;
-        remoteAudioRef.current.muted = false;
-        remoteAudioRef.current.volume = 1;
-        remoteAudioRef.current.play().catch(() => {});
+        applyAudioOutputPreference();
       }
     };
     pc.onicecandidate = (event) => {
@@ -592,9 +611,7 @@ export function useSessionRealtime(sessionId) {
       const mediaTrack = track.mediaStreamTrack ?? track;
       if (remoteAudioRef.current && mediaTrack) {
         remoteAudioRef.current.srcObject = new MediaStream([mediaTrack]);
-        remoteAudioRef.current.muted = false;
-        remoteAudioRef.current.volume = 1;
-        remoteAudioRef.current.play().catch(() => {});
+        applyAudioOutputPreference();
       }
     }
   }
@@ -649,6 +666,8 @@ export function useSessionRealtime(sessionId) {
     room.on(RoomEvent.ConnectionStateChanged, (state) => {
       if (state === "connected") {
         markNetworkGood("LiveKit room connected.");
+        setStatus("Call connected");
+        setCallState("connected");
       } else if (state === "reconnecting") {
         markNetworkReconnecting("LiveKit reconnecting...");
       } else if (state === "disconnected" && !livekitDisconnectingRef.current) {
@@ -1225,6 +1244,10 @@ export function useSessionRealtime(sessionId) {
     });
   }
 
+  function toggleSpeaker() {
+    setSpeakerOn((prev) => !prev);
+  }
+
   async function endCall(broadcast = true) {
     clearInviteRetryTimer();
     if (livekitEnabled) {
@@ -1328,7 +1351,7 @@ export function useSessionRealtime(sessionId) {
     };
 
     syncHistory();
-    const intervalMs = connected ? 12000 : 4500;
+    const intervalMs = 2500;
     const timer = setInterval(() => {
       if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
       syncHistory();
@@ -1340,6 +1363,11 @@ export function useSessionRealtime(sessionId) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, connected]);
+
+  useEffect(() => {
+    applyAudioOutputPreference();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [speakerOn, callState]);
 
   useEffect(() => {
     const socket = acquireSignalingSocket(sessionId);
@@ -1767,6 +1795,7 @@ export function useSessionRealtime(sessionId) {
     joined,
     callState,
     muted,
+    speakerOn,
     cameraOn,
     messages,
     status,
@@ -1792,6 +1821,7 @@ export function useSessionRealtime(sessionId) {
     sendMessage,
     retryFailedMessage,
     toggleMute,
+    toggleSpeaker,
     endCall,
     startAudioCall,
     startVideoCall,

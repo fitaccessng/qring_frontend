@@ -134,6 +134,32 @@ export default function HomeownerMessagesPage() {
   }, [selectedId]);
 
   useEffect(() => {
+    let active = true;
+    const syncThreads = async () => {
+      try {
+        const latestThreads = await getHomeownerMessages();
+        if (!active) return;
+        setThreads((prev) => {
+          const selected = selectedIdRef.current;
+          return latestThreads.map((item) => (item.id === selected ? { ...item, unread: 0 } : item));
+        });
+      } catch {
+        // Keep realtime UX resilient to intermittent network errors.
+      }
+    };
+
+    const timer = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      syncThreads();
+    }, 2500);
+
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!selectedId) return;
     let active = true;
     const syncConversation = async () => {
@@ -153,7 +179,7 @@ export default function HomeownerMessagesPage() {
     const timer = setInterval(() => {
       if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
       syncConversation();
-    }, 4500);
+    }, 2500);
 
     return () => {
       active = false;

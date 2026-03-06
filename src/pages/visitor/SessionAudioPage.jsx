@@ -14,6 +14,7 @@ export default function SessionAudioPage() {
     joined,
     callState,
     muted,
+    speakerOn,
     remoteMuted,
     localStreamRef,
     status,
@@ -28,6 +29,7 @@ export default function SessionAudioPage() {
     canStartCall,
     startAudioCall,
     toggleMute,
+    toggleSpeaker,
     endCall,
     retryCallConnection,
     acceptIncomingCall,
@@ -116,16 +118,25 @@ export default function SessionAudioPage() {
               </div>
               <div className="mt-2 grid grid-cols-2 gap-2">
                 <ControlIconButton
+                  label={speakerOn ? "Speaker On" : "Speaker Off"}
+                  onClick={toggleSpeaker}
+                  disabled={callState !== "connected"}
+                  icon={<Volume2 size={16} />}
+                />
+                <ControlIconButton
                   label="Retry"
                   onClick={retryCallConnection}
                   disabled={!canStartCall}
                   icon={<RefreshCw size={16} />}
                 />
+              </div>
+              <div className="mt-2">
                 <ControlIconButton
                   label="End Call"
                   onClick={endCall}
                   variant="danger"
                   icon={<PhoneOff size={18} />}
+                  large
                 />
               </div>
             </div>
@@ -135,7 +146,8 @@ export default function SessionAudioPage() {
                 Connection Details
               </summary>
               <p className="mt-2 text-[11px] text-white/75">
-                {connected ? "Signaling online" : "Connecting"} | {joined ? "Room joined" : "Waiting room"} | Remote mic:{" "}
+                {callState === "connected" ? "Call connected" : connected ? "Signaling online" : "Connecting"} |{" "}
+                {joined ? "Room joined" : "Waiting room"} | Remote mic:{" "}
                 {remoteMuted ? "Muted" : "Active"}
               </p>
               <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-1 text-[10px]">
@@ -158,15 +170,16 @@ export default function SessionAudioPage() {
   );
 }
 
-function ControlIconButton({ label, icon, onClick, disabled = false, variant = "default" }) {
+function ControlIconButton({ label, icon, onClick, disabled = false, variant = "default", large = false }) {
   const base =
-    "grid h-11 place-items-center rounded-xl text-white transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-45";
+    "grid place-items-center rounded-xl text-white transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-45";
   const tone = variant === "danger" ? "bg-rose-500 hover:bg-rose-400" : "bg-white/25 hover:bg-white/35";
+  const sizeClass = large ? "h-12 w-full rounded-2xl" : "h-11";
   return (
-    <button type="button" onClick={onClick} disabled={disabled} className={`${base} ${tone}`}>
+    <button type="button" onClick={onClick} disabled={disabled} className={`${base} ${tone} ${sizeClass}`}>
       <span className="flex flex-col items-center gap-0.5">
         {icon}
-        <span className="text-[9px] font-semibold">{label}</span>
+        <span className={`${large ? "text-[10px]" : "text-[9px]"} font-semibold`}>{label}</span>
       </span>
     </button>
   );

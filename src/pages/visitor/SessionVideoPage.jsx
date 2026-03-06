@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Camera, Mic, PhoneOff, RefreshCw, Signal, Video } from "lucide-react";
+import { Mic, PhoneOff, RefreshCw, Signal, Video, Volume2 } from "lucide-react";
 import SessionNetworkBadge from "../../components/SessionNetworkBadge";
 import SessionDiagnosticsPanel from "../../components/SessionDiagnosticsPanel";
 import VisitorIncomingCallModal from "../../components/VisitorIncomingCallModal";
@@ -14,6 +14,7 @@ export default function SessionVideoPage() {
     joined,
     callState,
     muted,
+    speakerOn,
     cameraOn,
     remoteMuted,
     localStreamRef,
@@ -35,6 +36,7 @@ export default function SessionVideoPage() {
     isMobileWebView,
     setLowBandwidthMode,
     toggleMute,
+    toggleSpeaker,
     endCall,
     startVideoCall,
     retryCallConnection,
@@ -157,16 +159,16 @@ export default function SessionVideoPage() {
               </div>
               <div className="mt-2 grid grid-cols-2 gap-2">
                 <ControlIconButton
+                  label={speakerOn ? "Speaker On" : "Speaker Off"}
+                  onClick={toggleSpeaker}
+                  disabled={callState !== "connected"}
+                  icon={<Volume2 size={16} />}
+                />
+                <ControlIconButton
                   label="Retry"
                   onClick={retryCallConnection}
                   disabled={!canStartCall}
                   icon={<RefreshCw size={16} />}
-                />
-                <ControlIconButton
-                  label={cameraOn ? "Camera On" : "Camera"}
-                  onClick={() => {}}
-                  disabled
-                  icon={<Camera size={16} />}
                 />
               </div>
               <div className="mt-2">
@@ -185,7 +187,8 @@ export default function SessionVideoPage() {
                 Connection Details
               </summary>
               <p className="mt-2 text-[11px] text-white/75">
-                {connected ? "Signaling online" : "Connecting"} | {joined ? "Room joined" : "Waiting room"} | Remote mic:{" "}
+                {callState === "connected" ? "Call connected" : connected ? "Signaling online" : "Connecting"} |{" "}
+                {joined ? "Room joined" : "Waiting room"} | Remote mic:{" "}
                 {remoteMuted ? "Muted" : "Active"}
               </p>
               <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-1 text-[10px]">
