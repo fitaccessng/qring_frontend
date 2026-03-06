@@ -145,7 +145,7 @@ export default function SessionMessagePage() {
                 {messages.length === 0 ? <p className="text-sm text-slate-500">No messages yet.</p> : null}
               </div>
 
-              <form onSubmit={onSubmit} className="border-t border-slate-200 bg-white/90 p-3">
+              <form onSubmit={onSubmit} className="mb-20 border-t border-slate-200 bg-white/90 p-3 lg:mb-0">
                 <div className="flex items-center gap-2">
                   <input
                     value={text}
