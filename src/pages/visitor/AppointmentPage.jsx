@@ -315,9 +315,9 @@ export default function AppointmentPage() {
   }
 
   return (
-    <div className="grid min-h-screen place-items-center bg-slate-50 p-4 dark:bg-slate-950">
-      <article className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white/90 p-7 shadow-soft dark:border-slate-800 dark:bg-slate-900/85">
-        <h1 className="font-heading text-3xl font-bold">Appointment Access</h1>
+    <div className="min-h-[100dvh] bg-slate-50 px-3 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 dark:bg-slate-950 sm:grid sm:place-items-center sm:p-4">
+      <article className="mx-auto w-full max-w-lg rounded-3xl border border-slate-200 bg-white/95 p-4 shadow-soft dark:border-slate-800 dark:bg-slate-900/90 sm:p-7">
+        <h1 className="font-heading text-2xl font-bold sm:text-3xl">Appointment Access</h1>
         {loading ? <p className="mt-4 text-sm text-slate-500">Loading appointment...</p> : null}
         {error ? <p className="mt-4 text-sm text-danger">{error}</p> : null}
         {!loading && appointment ? (
@@ -338,7 +338,7 @@ export default function AppointmentPage() {
               <input
                 value={visitorName}
                 onChange={(event) => setVisitorName(event.target.value)}
-                className="w-full rounded-xl border border-slate-300 px-3 py-3 dark:border-slate-700 dark:bg-slate-900"
+                className="w-full rounded-xl border border-slate-300 px-3 py-3 text-base dark:border-slate-700 dark:bg-slate-900"
                 placeholder="Enter your name"
                 required
               />
@@ -348,7 +348,7 @@ export default function AppointmentPage() {
               type="button"
               onClick={handleAccept}
               disabled={accepting}
-              className="w-full rounded-xl bg-brand-500 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"
+              className="w-full rounded-xl bg-brand-500 px-4 py-3.5 text-sm font-semibold text-white disabled:opacity-50"
             >
               {accepting ? "Accepting..." : "Accept Appointment and Continue"}
             </button>
@@ -358,7 +358,7 @@ export default function AppointmentPage() {
                 type="button"
                 onClick={handleOpenLocationSettings}
                 disabled={openingLocationSettings}
-                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 {openingLocationSettings ? "Opening Settings..." : "Turn On Location"}
               </button>
@@ -372,7 +372,7 @@ export default function AppointmentPage() {
                     type="button"
                     onClick={handleOpenLocationSettings}
                     disabled={openingLocationSettings}
-                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                    className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                   >
                     {openingLocationSettings ? "Opening Settings..." : "Turn On Location"}
                   </button>

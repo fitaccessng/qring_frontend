@@ -433,8 +433,8 @@ function toLocalInputValue(date) {
 
 async function shareAppointmentLink(shareUrl) {
   const payload = {
-    title: "Qring Appointment",
-    text: "Open this appointment link to accept and receive secure QR access.",
+    title: "Qring Secure Appointment Invitation",
+    text: "You are invited for a scheduled visit. Open this secure link to confirm your appointment and receive QR access.",
     url: shareUrl
   };
 
