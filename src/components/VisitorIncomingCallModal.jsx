@@ -1,39 +1,45 @@
+import { Phone, PhoneOff, Video } from "lucide-react";
+
 export default function VisitorIncomingCallModal({ open, hasVideo, onAccept, onReject }) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-start justify-center bg-slate-950/65 px-4 pt-[calc(0.7rem+env(safe-area-inset-top))] backdrop-blur-sm sm:pt-6">
-      <section className="w-full max-w-md rounded-3xl border border-white/15 bg-[#111b21] p-4 text-white shadow-soft">
-        <div className="flex items-start justify-between gap-3">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#00a884]">Incoming Call</p>
-          <button
-            type="button"
-            onClick={onReject}
-            className="rounded-full px-2 py-1 text-xs font-bold text-slate-300 transition hover:bg-white/10 hover:text-white active:scale-95"
-            aria-label="Dismiss incoming call"
-            title="Dismiss"
-          >
-            x
-          </button>
-        </div>
-        <h2 className="mt-1 font-heading text-xl font-black leading-tight sm:text-2xl">
-          {hasVideo ? "Homeowner calling (Video)" : "Homeowner calling (Audio)"}
+    <div className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/82 px-5 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-6 backdrop-blur-md sm:items-center">
+      <section className="w-full max-w-sm rounded-[28px] border border-white/15 bg-[#0f1720] p-6 text-white shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-300">Incoming call</p>
+        <h2 className="mt-2 text-[28px] font-semibold leading-tight tracking-tight">
+          {hasVideo ? "Homeowner Video Call" : "Homeowner Audio Call"}
         </h2>
-        <p className="mt-2 text-sm text-slate-300">Join now or decline and stay in chat.</p>
-        <div className="mt-5 grid grid-cols-2 gap-3">
+        <p className="mt-1.5 text-[13px] text-white/70">Tap to answer quickly or decline to stay in chat.</p>
+
+        <div className="mt-5 grid place-items-center">
+          <div className="grid h-24 w-24 place-items-center rounded-full bg-white/12">
+            {hasVideo ? <Video size={34} className="text-emerald-300" /> : <Phone size={34} className="text-emerald-300" />}
+          </div>
+        </div>
+
+        <div className="mt-7 space-y-3.5">
           <button
             type="button"
             onClick={onAccept}
-            className="rounded-xl bg-[#00a884] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#019575]"
+            className="flex h-14 w-full items-center justify-between rounded-2xl bg-emerald-500 px-4 text-left text-white transition-all hover:bg-emerald-400 active:scale-[0.99]"
           >
-            Accept
+            <span>
+              <span className="block text-[14px] font-semibold">Accept</span>
+              <span className="text-[11px] text-emerald-50/90">Swipe/tap to join now</span>
+            </span>
+            <Phone size={18} />
           </button>
           <button
             type="button"
             onClick={onReject}
-            className="rounded-xl bg-[#e53935] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#cd2f2b]"
+            className="flex h-14 w-full items-center justify-between rounded-2xl bg-rose-500 px-4 text-left text-white transition-all hover:bg-rose-400 active:scale-[0.99]"
           >
-            Reject
+            <span>
+              <span className="block text-[14px] font-semibold">Decline</span>
+              <span className="text-[11px] text-rose-50/90">Stay in chat</span>
+            </span>
+            <PhoneOff size={18} />
           </button>
         </div>
       </section>

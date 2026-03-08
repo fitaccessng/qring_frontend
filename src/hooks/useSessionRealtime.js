@@ -28,6 +28,41 @@ const CONNECTION_RECOVERY_LIMIT = 2;
 const CALL_INVITE_RETRY_MS = 1800;
 const DEVICE_STORAGE_KEY = "qring_visitor_device_id";
 const CALL_ACCEPT_INTENT_KEY = "qring_call_accept_intent";
+const LIVEKIT_PEER_CONNECT_TIMEOUT_MS = 30000;
+const LIVEKIT_WEBSOCKET_TIMEOUT_MS = 15000;
+const LIVEKIT_CONNECT_MAX_RETRIES = 6;
+const LIVEKIT_MANUAL_RECONNECT_DELAY_MS = 1500;
+const LIVEKIT_MANUAL_RECONNECT_MAX_ATTEMPTS = 3;
+
+function normalizeIceServerList(servers = []) {
+  const fallback = [
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun1.l.google.com:19302" }
+  ];
+  const list = Array.isArray(servers) ? servers : [];
+  const normalized = list
+    .map((entry) => {
+      if (!entry) return null;
+      if (typeof entry === "string") return { urls: [entry] };
+      if (typeof entry !== "object") return null;
+      const urls = Array.isArray(entry.urls) ? entry.urls : [entry.urls].filter(Boolean);
+      if (urls.length === 0) return null;
+      return {
+        urls,
+        username: entry.username,
+        credential: entry.credential
+      };
+    })
+    .filter(Boolean);
+  const merged = [...normalized, ...fallback];
+  const seen = new Set();
+  return merged.filter((entry) => {
+    const key = `${entry.urls.join(",")}|${entry.username || ""}|${entry.credential || ""}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
 
 function currentPathname() {
   if (typeof window === "undefined") return "/";
@@ -164,6 +199,7 @@ export function useSessionRealtime(sessionId) {
   const [muted, setMuted] = useState(false);
   const [remoteMuted, setRemoteMuted] = useState(false);
   const [cameraOn, setCameraOn] = useState(false);
+  const [cameraFacing, setCameraFacing] = useState("user");
   const [speakerOn, setSpeakerOn] = useState(true);
   const [messages, setMessages] = useState([]);
   const [status, setStatus] = useState("");
@@ -214,6 +250,8 @@ export function useSessionRealtime(sessionId) {
   const localVideoTrackRef = useRef(null);
   const livekitDisconnectingRef = useRef(false);
   const livekitConnectingRef = useRef(false);
+  const livekitReconnectTimerRef = useRef(null);
+  const livekitReconnectAttemptsRef = useRef(0);
   const acceptingCallRef = useRef(false);
   const remoteLivekitTracksRef = useRef(new Set());
   const callSessionRef = useRef("");
@@ -244,6 +282,14 @@ export function useSessionRealtime(sessionId) {
     return "";
   }, [isSecureOrigin, supportsUserMedia, supportsWebRTC, livekitEnabled, legacyWebrtcEnabled]);
   const autoLowBandwidthActive = lowBandwidthMode || networkQuality === "slow";
+  const livekitIceServers = useMemo(() => normalizeIceServerList(env.webRtcIceServers), []);
+
+  function clearLivekitReconnectTimer() {
+    if (livekitReconnectTimerRef.current) {
+      clearTimeout(livekitReconnectTimerRef.current);
+      livekitReconnectTimerRef.current = null;
+    }
+  }
 
   function clearInviteRetryTimer() {
     if (inviteRetryTimerRef.current) {
@@ -662,6 +708,74 @@ export function useSessionRealtime(sessionId) {
     if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
   }
 
+  function queueLivekitReconnect(room) {
+    if (livekitDisconnectingRef.current) return;
+    if (!room || livekitRoomRef.current !== room) return;
+    if (livekitReconnectAttemptsRef.current >= LIVEKIT_MANUAL_RECONNECT_MAX_ATTEMPTS) {
+      setStatus("Connection dropped and reconnect failed. Retry call connection.");
+      markNetworkSlow("LiveKit reconnect limit reached.");
+      setCallState("failed");
+      return;
+    }
+    clearLivekitReconnectTimer();
+    livekitReconnectTimerRef.current = setTimeout(() => {
+      if (livekitDisconnectingRef.current) return;
+      if (!livekitRoomRef.current || livekitRoomRef.current !== room) return;
+      livekitReconnectAttemptsRef.current += 1;
+      setStatus(`Reconnecting call (${livekitReconnectAttemptsRef.current}/${LIVEKIT_MANUAL_RECONNECT_MAX_ATTEMPTS})...`);
+      room.reconnect().catch(() => {
+        queueLivekitReconnect(room);
+      });
+    }, LIVEKIT_MANUAL_RECONNECT_DELAY_MS);
+  }
+
+  async function publishLivekitLocalVideoTrack({ createLocalTracks, room, lowBandwidth }) {
+    if (!room || localVideoTrackRef.current) return;
+    const [videoTrack] = await createLocalTracks({
+      audio: false,
+      video: lowBandwidth
+        ? {
+            width: 320,
+            height: 240,
+            frameRate: 12,
+            facingMode: "user"
+          }
+        : {
+            width: 640,
+            height: 360,
+            frameRate: 15,
+            facingMode: "user"
+          }
+    });
+    if (!videoTrack) return;
+    await room.localParticipant.publishTrack(videoTrack);
+    localVideoTrackRef.current = videoTrack;
+    const existingTracks = localStreamRef.current ? localStreamRef.current.getTracks() : [];
+    localStreamRef.current = new MediaStream([
+      ...existingTracks.filter((track) => track.id !== videoTrack.mediaStreamTrack?.id),
+      videoTrack.mediaStreamTrack
+    ]);
+    if (localVideoRef.current && videoTrack.mediaStreamTrack) {
+      localVideoRef.current.srcObject = new MediaStream([videoTrack.mediaStreamTrack]);
+      localVideoRef.current.muted = true;
+      localVideoRef.current.play().catch(() => {});
+    }
+    setCameraOn(true);
+  }
+
+  async function upgradeLivekitToVideo() {
+    const room = livekitRoomRef.current;
+    if (!room) return;
+    if (localVideoTrackRef.current) return;
+    const { createLocalTracks } = await getLivekitModule();
+    await publishLivekitLocalVideoTrack({
+      createLocalTracks,
+      room,
+      lowBandwidth: autoLowBandwidthActive
+    });
+    setStatus("Video connected");
+  }
+
   async function connectLivekitRoom({ video, auth = null }) {
     if (!livekitEnabled) {
       throw new Error("LiveKit is not enabled. Configure VITE_LIVEKIT_URL.");
@@ -682,8 +796,20 @@ export function useSessionRealtime(sessionId) {
       const effectiveAuth = auth || (await fetchLivekitToken());
       const room = new Room({
         adaptiveStream: true,
-        dynacast: true
+        dynacast: true,
+        rtcConfig: {
+          iceServers: livekitIceServers,
+          iceCandidatePoolSize: 8
+        },
+        publishDefaults: {
+          simulcast: true,
+          videoEncoding: {
+            maxBitrate: autoLowBandwidthActive ? 250_000 : 500_000,
+            maxFramerate: autoLowBandwidthActive ? 12 : 15
+          }
+        }
       });
+      livekitRoomRef.current = room;
 
       room.on(RoomEvent.TrackSubscribed, (track) => {
         remoteLivekitTracksRef.current.add(track);
@@ -708,47 +834,63 @@ export function useSessionRealtime(sessionId) {
       });
       room.on(RoomEvent.ConnectionStateChanged, (state) => {
         if (state === "connected") {
+          livekitReconnectAttemptsRef.current = 0;
+          clearLivekitReconnectTimer();
           markNetworkGood("LiveKit room connected.");
           setStatus("Call connected");
           setCallState("connected");
+          if (pendingVideoUpgradeRef.current && !localVideoTrackRef.current) {
+            pendingVideoUpgradeRef.current = false;
+            setStatus("Call connected. Upgrading to video...");
+            upgradeLivekitToVideo().catch((error) => {
+              setStatus(error?.message || "Video upgrade failed. Staying on audio.");
+            });
+          }
         } else if (state === "reconnecting") {
           markNetworkReconnecting("LiveKit reconnecting...");
         } else if (state === "disconnected" && !livekitDisconnectingRef.current) {
           markNetworkSlow("LiveKit disconnected.");
-          setStatus("Call connection dropped. Retry connection.");
-          setCallState("failed");
+          queueLivekitReconnect(room);
+        }
+      });
+      room.localParticipant?.on?.("connectionQualityChanged", (quality) => {
+        const level = Number(quality ?? 0);
+        if (level <= 1) {
+          markNetworkSlow("Poor network quality detected.");
+        } else if (level >= 3) {
+          markNetworkGood("Network quality is stable.");
         }
       });
 
-      await room.connect(effectiveAuth.url || env.livekitUrl, effectiveAuth.token);
-
-      const tracks = await createLocalTracks({
-        audio: true,
-        video: Boolean(video)
-          ? autoLowBandwidthActive
-            ? {
-                width: 640,
-                height: 360,
-                frameRate: 15,
-                facingMode: "user"
-              }
-            : {
-                width: 960,
-                height: 540,
-                frameRate: 24,
-                facingMode: "user"
-              }
-          : false
+      await room.connect(effectiveAuth.url || env.livekitUrl, effectiveAuth.token, {
+        maxRetries: LIVEKIT_CONNECT_MAX_RETRIES,
+        websocketTimeout: LIVEKIT_WEBSOCKET_TIMEOUT_MS,
+        peerConnectionTimeout: LIVEKIT_PEER_CONNECT_TIMEOUT_MS
       });
 
-      for (const track of tracks) {
-        await room.localParticipant.publishTrack(track);
-        if (track.kind === "audio") localAudioTrackRef.current = track;
-        if (track.kind === "video") localVideoTrackRef.current = track;
+      const audioTracks = await createLocalTracks({
+        audio: true,
+        video: false
+      });
+      const localAudioTrack = audioTracks.find((track) => track.kind === "audio");
+      if (!localAudioTrack) {
+        throw new Error("Microphone track failed to initialize.");
+      }
+      await room.localParticipant.publishTrack(localAudioTrack);
+      localAudioTrackRef.current = localAudioTrack;
+
+      if (video) {
+        await publishLivekitLocalVideoTrack({
+          createLocalTracks,
+          room,
+          lowBandwidth: autoLowBandwidthActive
+        });
       }
 
-      livekitRoomRef.current = room;
-      localStreamRef.current = new MediaStream(tracks.map((track) => track.mediaStreamTrack));
+      const localTracks = [localAudioTrackRef.current, localVideoTrackRef.current]
+        .map((track) => track?.mediaStreamTrack)
+        .filter(Boolean);
+      localStreamRef.current = new MediaStream(localTracks);
       if (localVideoRef.current && localVideoTrackRef.current?.mediaStreamTrack) {
         localVideoRef.current.srcObject = new MediaStream([localVideoTrackRef.current.mediaStreamTrack]);
         localVideoRef.current.muted = true;
@@ -763,6 +905,8 @@ export function useSessionRealtime(sessionId) {
   function disconnectLivekitRoom() {
     livekitDisconnectingRef.current = true;
     livekitConnectingRef.current = false;
+    clearLivekitReconnectTimer();
+    livekitReconnectAttemptsRef.current = 0;
     try {
       if (localAudioTrackRef.current) localAudioTrackRef.current.stop();
       if (localVideoTrackRef.current) localVideoTrackRef.current.stop();
@@ -1035,6 +1179,7 @@ export function useSessionRealtime(sessionId) {
       setStatus("Call service is unavailable. LiveKit URL is not configured.");
       return;
     }
+    pendingVideoUpgradeRef.current = false;
     startLivekitCall(false);
   }
 
@@ -1051,7 +1196,12 @@ export function useSessionRealtime(sessionId) {
       setStatus("Call service is unavailable. LiveKit URL is not configured.");
       return;
     }
-    startLivekitCall(!lowBandwidthMode);
+    const startWithVideo = !autoLowBandwidthActive;
+    pendingVideoUpgradeRef.current = !startWithVideo;
+    if (!startWithVideo) {
+      setStatus("Weak network detected. Starting audio first, video will connect after stabilization.");
+    }
+    startLivekitCall(startWithVideo);
   }
 
   function retryCallConnection() {
@@ -1139,7 +1289,11 @@ export function useSessionRealtime(sessionId) {
     }
     try {
       setStatus("");
-      const allowVideo = incomingSnapshot.hasVideo && !lowBandwidthMode;
+      const allowVideo = incomingSnapshot.hasVideo && !autoLowBandwidthActive;
+      pendingVideoUpgradeRef.current = Boolean(incomingSnapshot.hasVideo) && !allowVideo;
+      if (pendingVideoUpgradeRef.current) {
+        setStatus("Weak network detected. Joining audio first, then upgrading to video.");
+      }
       const callSessionId = incomingSnapshot.callSessionId;
       if (!callSessionId) {
         throw new Error("Call session was not provided.");
@@ -1203,6 +1357,7 @@ export function useSessionRealtime(sessionId) {
       clearCallAcceptIntent();
       clearIncomingCall();
       pendingOfferRef.current = null;
+      pendingVideoUpgradeRef.current = false;
       clearSessionCallAccess(sessionId);
       return;
     }
@@ -1239,6 +1394,7 @@ export function useSessionRealtime(sessionId) {
     clearCallAcceptIntent();
     clearIncomingCall();
     pendingOfferRef.current = null;
+    pendingVideoUpgradeRef.current = false;
     callSessionRef.current = "";
     callVisitorIdRef.current = "";
     clearSessionCallAccess(sessionId);
@@ -1322,6 +1478,51 @@ export function useSessionRealtime(sessionId) {
     setSpeakerOn((prev) => !prev);
   }
 
+  function toggleCamera() {
+    if (livekitEnabled && localVideoTrackRef.current) {
+      const nextCameraOn = !cameraOn;
+      if (nextCameraOn) {
+        localVideoTrackRef.current.unmute?.();
+      } else {
+        localVideoTrackRef.current.mute?.();
+      }
+      setCameraOn(nextCameraOn);
+      return;
+    }
+    if (!localStreamRef.current) return;
+    const videoTracks = localStreamRef.current.getVideoTracks();
+    if (videoTracks.length === 0) return;
+    const nextCameraOn = !cameraOn;
+    videoTracks.forEach((track) => {
+      track.enabled = nextCameraOn;
+    });
+    setCameraOn(nextCameraOn);
+  }
+
+  async function switchCamera() {
+    const nextFacing = cameraFacing === "user" ? "environment" : "user";
+    if (livekitEnabled && localVideoTrackRef.current?.mediaStreamTrack) {
+      try {
+        await localVideoTrackRef.current.mediaStreamTrack.applyConstraints({
+          facingMode: nextFacing
+        });
+        setCameraFacing(nextFacing);
+      } catch {
+        // Keep current facing mode if browser/device does not support switch.
+      }
+      return;
+    }
+    const stream = localStreamRef.current;
+    const track = stream?.getVideoTracks?.()[0];
+    if (!track) return;
+    try {
+      await track.applyConstraints({ facingMode: nextFacing });
+      setCameraFacing(nextFacing);
+    } catch {
+      // Keep current facing mode if browser/device does not support switch.
+    }
+  }
+
   async function endCall(broadcast = true) {
     clearInviteRetryTimer();
     if (livekitEnabled) {
@@ -1360,6 +1561,7 @@ export function useSessionRealtime(sessionId) {
       setAcceptedCallMode("");
       clearCallAcceptIntent();
       setRemoteVideoActive(false);
+      pendingVideoUpgradeRef.current = false;
       connectionRecoveryCountRef.current = 0;
       clearIncomingCall();
       callSessionRef.current = "";
@@ -1886,6 +2088,7 @@ export function useSessionRealtime(sessionId) {
     muted,
     speakerOn,
     cameraOn,
+    cameraFacing,
     messages,
     status,
     networkQuality,
@@ -1911,6 +2114,8 @@ export function useSessionRealtime(sessionId) {
     retryFailedMessage,
     toggleMute,
     toggleSpeaker,
+    toggleCamera,
+    switchCamera,
     endCall,
     startAudioCall,
     startVideoCall,
