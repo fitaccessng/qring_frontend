@@ -1,4 +1,5 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import AppShell from "../../layouts/AppShell";
 import { assignDoorToHomeowner, getEstateOverview } from "../../services/estateService";
 
@@ -36,6 +37,9 @@ export default function EstateAssignPage() {
     }
   }
 
+  const hasHomeowners = (overview?.homeowners?.length ?? 0) > 0;
+  const hasDoors = (overview?.doors?.length ?? 0) > 0;
+
   return (
     <AppShell title="Assign Doors">
       <div className="mx-auto max-w-7xl space-y-6">
@@ -44,11 +48,27 @@ export default function EstateAssignPage() {
 
         <section className="relative overflow-hidden rounded-[2.5rem] bg-slate-900 p-8 text-white dark:bg-indigo-600">
           <div className="relative z-10">
-            <h2 style={{color: "white"}} className="text-2xl font-bold tracking-tight">Assign Doors To Homeowners</h2>
+            <h2 style={{ color: "white" }} className="text-2xl font-bold tracking-tight">Assign Doors To Homeowners</h2>
             <p className="mt-2 text-sm text-slate-200 dark:text-indigo-100">Map each door to the right resident with a clean one-step workflow.</p>
           </div>
           <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/5 blur-3xl" />
         </section>
+
+        {!hasHomeowners || !hasDoors ? (
+          <section className="rounded-[2rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/30 dark:bg-amber-900/20 dark:text-amber-100">
+            {!hasHomeowners ? (
+              <>
+                No homeowners yet. Create one in <Link to="/dashboard/estate/invites" className="font-semibold underline">Create / Invite Homeowners</Link>.
+              </>
+            ) : null}
+            {!hasHomeowners && !hasDoors ? " " : null}
+            {!hasDoors ? (
+              <>
+                No doors yet. Add one in <Link to="/dashboard/estate/doors" className="font-semibold underline">Estate Doors</Link>.
+              </>
+            ) : null}
+          </section>
+        ) : null}
 
         <section className="rounded-[2rem] border border-slate-200/70 bg-white/95 p-5 shadow-[0_8px_30px_rgb(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-900/90 sm:p-6">
           <form onSubmit={onSubmit} className="grid gap-3 md:grid-cols-2">
@@ -69,7 +89,7 @@ export default function EstateAssignPage() {
             />
             <button
               type="submit"
-              disabled={busy}
+              disabled={busy || !hasHomeowners || !hasDoors}
               className="rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition-all active:scale-95 disabled:opacity-50 dark:bg-white dark:text-slate-900"
             >
               {busy ? "Assigning..." : "Assign Door"}
@@ -101,4 +121,3 @@ function Select({ label, value, onChange, options }) {
     </label>
   );
 }
-

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import AppShell from "../../layouts/AppShell";
 import { addEstateHome, getEstateOverview } from "../../services/estateService";
 import PageSkeleton from "../../components/PageSkeleton";
@@ -64,6 +65,15 @@ export default function EstateHomesPage() {
           </div>
           <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/5 blur-3xl" />
         </section>
+        {!loading && (overview?.homeowners?.length ?? 0) === 0 ? (
+          <section className="rounded-[2rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/30 dark:bg-amber-900/20 dark:text-amber-100">
+            You need at least one homeowner first. Create one in{" "}
+            <Link to="/dashboard/estate/invites" className="font-semibold underline">
+              Create / Invite Homeowners
+            </Link>
+            .
+          </section>
+        ) : null}
 
         <section className="rounded-[2rem] border border-slate-200/70 bg-white/95 p-5 shadow-[0_8px_30px_rgb(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-900/90 sm:p-6">
           {loading ? (
@@ -93,7 +103,7 @@ export default function EstateHomesPage() {
               </label>
               <button
                 type="submit"
-                disabled={busy}
+                disabled={busy || (overview?.homeowners?.length ?? 0) === 0}
                 className="rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition-all active:scale-95 disabled:opacity-50 dark:bg-white dark:text-slate-900"
               >
                 {busy ? "Saving..." : "Add Home"}
@@ -137,4 +147,3 @@ function Select({ label, value, onChange, options }) {
     </label>
   );
 }
-

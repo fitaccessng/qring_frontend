@@ -8,9 +8,36 @@ import { useAuth } from "../../state/AuthContext";
 const modules = [
   { title: "Access Logs", to: "/dashboard/estate/logs", subtitle: "Review recent estate activity" },
   { title: "Assign Doors", to: "/dashboard/estate/assign", subtitle: "Link entries to owners" },
-  { title: "Invite Owners", to: "/dashboard/estate/invites", subtitle: "Send resident access links" },
+  { title: "Create / Invite Homeowners", to: "/dashboard/estate/invites", subtitle: "Create homeowner accounts and send access links" },
   { title: "Mappings", to: "/dashboard/estate/mappings", subtitle: "Review home-to-door map" },
   { title: "Plan Rules", to: "/dashboard/estate/plan", subtitle: "Monitor usage limits" }
+];
+
+const guidedSetup = [
+  {
+    step: "Step 1",
+    title: "Create Estate",
+    detail: "Start by creating your estate profile.",
+    to: "/dashboard/estate/create"
+  },
+  {
+    step: "Step 2",
+    title: "Create Homeowner",
+    detail: "Go to Create / Invite Homeowners to add resident accounts.",
+    to: "/dashboard/estate/invites"
+  },
+  {
+    step: "Step 3",
+    title: "Add Home + Doors",
+    detail: "Create home units, then add doors for access.",
+    to: "/dashboard/estate/homes"
+  },
+  {
+    step: "Step 4",
+    title: "Assign Doors",
+    detail: "Link each door to the right homeowner.",
+    to: "/dashboard/estate/assign"
+  }
 ];
 
 export default function EstateDashboardPage() {
@@ -127,6 +154,13 @@ export default function EstateDashboardPage() {
                 <Plus size={14} />
                 Create Estate
               </Link>
+              <Link
+                to="/dashboard/estate/invites"
+                className="inline-flex items-center gap-2 rounded-xl bg-white/20 px-4 py-2 text-sm font-bold text-white transition-all hover:bg-white/30 active:scale-95"
+              >
+                <Users size={14} />
+                Create Homeowner
+              </Link>
             </div>
           </article>
         </section>
@@ -149,6 +183,23 @@ export default function EstateDashboardPage() {
                   <div className={`h-1.5 rounded-full ${item.tone}`} style={{ width: `${item.bar}%` }} />
                 </div>
               </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="space-y-4">
+          <h3 className="text-2xl font-black text-slate-900 dark:text-white">Start Here</h3>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {guidedSetup.map((item) => (
+              <Link
+                key={item.title}
+                to={item.to}
+                className="rounded-2xl border border-slate-200 bg-white p-4 transition-all hover:border-indigo-300 hover:shadow-sm active:scale-[0.99] dark:border-slate-700 dark:bg-slate-900/80 dark:hover:border-indigo-700/60"
+              >
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-indigo-600 dark:text-indigo-300">{item.step}</p>
+                <p className="mt-1 text-sm font-bold text-slate-900 dark:text-white">{item.title}</p>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">{item.detail}</p>
+              </Link>
             ))}
           </div>
         </section>

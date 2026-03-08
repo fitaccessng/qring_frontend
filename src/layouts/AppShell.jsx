@@ -152,6 +152,10 @@ export default function AppShell({ title, children, showTopBar = true }) {
   );
   const isEstateMobileNav = user?.role === "estate";
   const showHelpButton = user?.role === "estate";
+  const mobileContentBottomPaddingClass = isEstateMobileNav
+    ? "pb-[calc(10.75rem+env(safe-area-inset-bottom))] sm:pb-[calc(9.5rem+env(safe-area-inset-bottom))]"
+    : "pb-[calc(9.5rem+env(safe-area-inset-bottom))] sm:pb-[calc(9rem+env(safe-area-inset-bottom))]";
+  const mobileBottomSpacerClass = isEstateMobileNav ? "h-28 lg:hidden" : "h-20 lg:hidden";
   const canGoBack = typeof window !== "undefined" && window.history.length > 1;
   const isNativeApp = useMemo(() => {
     try {
@@ -540,9 +544,9 @@ export default function AppShell({ title, children, showTopBar = true }) {
   }
 
   return (
-    <div className="h-screen overflow-hidden bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+    <div className="min-h-[100dvh] overflow-hidden bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_top_right,_rgba(36,86,245,0.16),_transparent_40%),radial-gradient(circle_at_bottom_left,_rgba(20,184,166,0.12),_transparent_35%)]" />
-      <div className="flex h-screen">
+      <div className="flex h-[100dvh]">
         <aside
           className="fixed inset-y-0 left-0 hidden w-72 overflow-y-auto border-r border-slate-200/70 bg-white/90 p-6 backdrop-blur [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden dark:border-slate-800 dark:bg-slate-900/95 lg:block"
         >
@@ -599,7 +603,7 @@ export default function AppShell({ title, children, showTopBar = true }) {
           </div>
         </aside>
 
-        <main className={`safe-content relative flex-1 overflow-y-auto px-4 pb-[calc(8.5rem+env(safe-area-inset-bottom))] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:px-5 sm:pb-[calc(8.75rem+env(safe-area-inset-bottom))] lg:ml-72 lg:px-10 lg:pb-8 ${showTopBar ? "pt-[calc(12.75rem+env(safe-area-inset-top))] sm:pt-[calc(7rem+env(safe-area-inset-top))] lg:pt-[7.35rem]" : "pt-[calc(1.1rem+env(safe-area-inset-top))] sm:pt-[calc(1.2rem+env(safe-area-inset-top))] lg:pt-6"}`}>
+        <main className={`safe-content relative flex-1 overflow-y-auto px-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:px-5 lg:ml-72 lg:px-10 lg:pb-8 ${mobileContentBottomPaddingClass} ${showTopBar ? "pt-[calc(12.75rem+env(safe-area-inset-top))] sm:pt-[calc(7rem+env(safe-area-inset-top))] lg:pt-[7.35rem]" : "pt-[calc(1.1rem+env(safe-area-inset-top))] sm:pt-[calc(1.2rem+env(safe-area-inset-top))] lg:pt-6"}`}>
           {showTopBar ? (
             <div
               aria-hidden="true"
@@ -714,7 +718,7 @@ export default function AppShell({ title, children, showTopBar = true }) {
           ) : null}
           <div className={`dashboard-canvas ${showTopBar ? "pt-20 sm:pt-12 lg:pt-1" : "pt-0"}`}>
             {children}
-            <div className="h-12 lg:hidden" aria-hidden="true" />
+            <div className={mobileBottomSpacerClass} aria-hidden="true" />
           </div>
         </main>
       </div>
