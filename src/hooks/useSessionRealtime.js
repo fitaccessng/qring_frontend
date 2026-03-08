@@ -36,8 +36,8 @@ const LIVEKIT_MANUAL_RECONNECT_MAX_ATTEMPTS = 3;
 
 function normalizeIceServerList(servers = []) {
   const fallback = [
-    { urls: "stun:stun.l.google.com:19302" },
-    { urls: "stun:stun1.l.google.com:19302" }
+    { urls: ["stun:stun.l.google.com:19302"] },
+    { urls: ["stun:stun1.l.google.com:19302"] }
   ];
   const list = Array.isArray(servers) ? servers : [];
   const normalized = list
@@ -57,9 +57,12 @@ function normalizeIceServerList(servers = []) {
   const merged = [...normalized, ...fallback];
   const seen = new Set();
   return merged.filter((entry) => {
-    const key = `${entry.urls.join(",")}|${entry.username || ""}|${entry.credential || ""}`;
+    const urls = Array.isArray(entry.urls) ? entry.urls : [entry.urls].filter(Boolean);
+    if (!urls.length) return false;
+    const key = `${urls.join(",")}|${entry.username || ""}|${entry.credential || ""}`;
     if (seen.has(key)) return false;
     seen.add(key);
+    entry.urls = urls;
     return true;
   });
 }

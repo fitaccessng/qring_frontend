@@ -21,6 +21,7 @@ export const realtimeTransportOptions = shouldForceWebsocketInDev()
       upgrade: true
     }
   : {
-      transports: ["websocket", "polling"],
+      // In production, polling-first avoids early websocket close noise on some proxies/CDNs.
+      transports: ["polling", "websocket"],
       upgrade: true
     };
