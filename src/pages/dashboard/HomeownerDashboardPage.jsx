@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Activity, Clock3, DoorOpen, Info, LogOut, MessageSquare, Phone, UserCircle2 } from "lucide-react";
+import { Activity, ChevronRight, Clock3, DoorOpen, Info, LogOut, MessageSquare, Phone, UserCircle2 } from "lucide-react";
 import AppShell from "../../layouts/AppShell";
 import { useDashboardData } from "../../hooks/useDashboardData";
 import { getHomeownerContext } from "../../services/homeownerService";
@@ -110,6 +110,33 @@ export default function HomeownerDashboardPage() {
       percent: totalSignals > 0 ? Math.round(((Number(metrics.callsToday) || 0) / totalSignals) * 100) : 0
     }
   ];
+  const quickActions = useMemo(() => {
+    const base = [
+      {
+        title: "Live Queue",
+        subtitle: "Monitor live visitor queue",
+        to: "/dashboard/homeowner/live-queue"
+      },
+      {
+        title: "Receipts",
+        subtitle: "View your payment history",
+        to: "/dashboard/homeowner/receipts"
+      },
+      {
+        title: "Settings",
+        subtitle: "Profile, alerts, and preferences",
+        to: "/dashboard/homeowner/settings"
+      }
+    ];
+    if (!managedByEstate) {
+      base.splice(2, 0, {
+        title: "Billing",
+        subtitle: "Manage subscription and plan",
+        to: "/billing/paywall"
+      });
+    }
+    return base;
+  }, [managedByEstate]);
 
   return (
     <AppShell title="Homeowner Overview" showTopBar={false}>
@@ -252,6 +279,28 @@ export default function HomeownerDashboardPage() {
                   </div>
                 </div>
                 <PercentPill value={loading ? 0 : group.percent} />
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xl font-black text-slate-900 dark:text-white">Quick Actions</h3>
+            <span className="text-xs font-semibold text-slate-500">More tools</span>
+          </div>
+          <div className="space-y-2 rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900/80 sm:p-4">
+            {quickActions.map((action) => (
+              <Link
+                key={action.title}
+                to={action.to}
+                className="flex items-center justify-between rounded-xl px-2 py-2 transition-all hover:bg-slate-50 active:scale-[0.99] dark:hover:bg-slate-800/60"
+              >
+                <div>
+                  <p className="text-sm font-bold text-slate-900 dark:text-white">{action.title}</p>
+                  <p className="text-xs text-slate-500">{action.subtitle}</p>
+                </div>
+                <ChevronRight size={16} className="text-slate-400" />
               </Link>
             ))}
           </div>
