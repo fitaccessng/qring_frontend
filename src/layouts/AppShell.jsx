@@ -60,6 +60,23 @@ function isCacheFresh(cachedAt, ttlMs) {
   return Number(cachedAt) > 0 && Date.now() - cachedAt < ttlMs;
 }
 
+function onboardingSeenForUser(user) {
+  const role = user?.role;
+  if (role !== "homeowner" && role !== "estate") return true;
+  const keys = [];
+  if (user?.id) {
+    keys.push(`qring_dashboard_welcome_seen_${role}_id:${user.id}`);
+    keys.push(`qring_dashboard_welcome_seen_${role}_${user.id}`);
+  }
+  if (user?.email) {
+    const email = String(user.email).trim().toLowerCase();
+    keys.push(`qring_dashboard_welcome_seen_${role}_email:${email}`);
+    keys.push(`qring_dashboard_welcome_seen_${role}_${email}`);
+  }
+  keys.push(`qring_dashboard_welcome_seen_${role}_anonymous`);
+  return keys.some((key) => localStorage.getItem(key) === "true");
+}
+
 export default function AppShell({ title, children, showTopBar = true }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -191,10 +208,7 @@ export default function AppShell({ title, children, showTopBar = true }) {
       location.pathname === "/dashboard/homeowner/overview" ||
       location.pathname === "/dashboard/estate";
     if (!atDashboardHome) return;
-    const identity = user?.email ?? user?.id ?? "anonymous";
-    const key = `qring_dashboard_welcome_seen_${user?.role}_${identity}`;
-    const seen = localStorage.getItem(key);
-    if (!seen) {
+    if (!onboardingSeenForUser(user)) {
       navigate("/onboarding", { replace: true });
     }
   }, [isNativeApp, user?.role, user?.email, user?.id, location.pathname, navigate]);

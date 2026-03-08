@@ -46,7 +46,9 @@ function getDashboardRoute(role) {
 }
 
 function getIdentity(user) {
-  return user?.email ?? user?.id ?? "anonymous";
+  if (user?.id) return `id:${user.id}`;
+  if (user?.email) return `email:${String(user.email).trim().toLowerCase()}`;
+  return "anonymous";
 }
 
 export default function OnboardingPage() {
@@ -62,6 +64,16 @@ export default function OnboardingPage() {
     const identity = getIdentity(user);
     localStorage.setItem(`qring_dashboard_welcome_seen_${role}_${identity}`, "true");
     localStorage.setItem(`qring_onboarding_seen_${role}_${identity}`, "true");
+    // Backward-compatible keys to avoid re-showing onboarding for existing users.
+    if (user?.email) {
+      const email = String(user.email).trim().toLowerCase();
+      localStorage.setItem(`qring_dashboard_welcome_seen_${role}_${email}`, "true");
+      localStorage.setItem(`qring_onboarding_seen_${role}_${email}`, "true");
+    }
+    if (user?.id) {
+      localStorage.setItem(`qring_dashboard_welcome_seen_${role}_${user.id}`, "true");
+      localStorage.setItem(`qring_onboarding_seen_${role}_${user.id}`, "true");
+    }
   }
 
   function completeOnboarding() {

@@ -21,7 +21,7 @@ export const realtimeTransportOptions = shouldForceWebsocketInDev()
       upgrade: true
     }
   : {
-      // In production, polling-first avoids early websocket close noise on some proxies/CDNs.
-      transports: ["polling", "websocket"],
+      // On Render-like multi-instance hosts, polling can trigger 400 due to non-sticky sessions.
+      transports: ["websocket"],
       upgrade: true
     };
