@@ -175,10 +175,10 @@ export default function AppointmentPage() {
     };
   }, []);
 
-  async function armGeofenceAndSignal(arrivalConfig, appointmentId) {
-    if (!arrivalConfig) return;
+  async function armGeofenceAndSignal(arrivalConfig, appointmentId, onArrived) {
+    if (!arrivalConfig) return false;
     const { lat, lng, radiusMeters } = arrivalConfig;
-    if (typeof lat !== "number" || typeof lng !== "number") return;
+    if (typeof lat !== "number" || typeof lng !== "number") return false;
     const radius = Number(radiusMeters || 120);
     setArrivalArmed(true);
     setLocationBlocked(false);
@@ -212,6 +212,9 @@ export default function AppointmentPage() {
           createdAt: new Date().toISOString()
         });
         setArrivalStatus(requestError.message || "Arrival queued. Will retry when network improves.");
+      }
+      if (typeof onArrived === "function") {
+        onArrived();
       }
     };
 
@@ -265,6 +268,7 @@ export default function AppointmentPage() {
     };
     pollTimerRef.current = setInterval(pollPosition, 45000);
     pollPosition();
+    return true;
   }
 
   async function handleOpenLocationSettings() {
@@ -303,9 +307,21 @@ export default function AppointmentPage() {
         deviceId,
         visitorName: visitorName.trim() || appointment.visitorName
       });
-      await armGeofenceAndSignal(data?.geofence, appointment.id);
-      if (data?.scanQrToken) {
-        navigate(`/scan/${data.scanQrToken}`);
+      const scanToken = String(data?.scanQrToken || "").trim();
+      const geofence = data?.geofence;
+      const armed = await armGeofenceAndSignal(geofence, appointment.id, () => {
+        if (scanToken) {
+          navigate(`/scan/${scanToken}`);
+        }
+      });
+      if (!armed) {
+        setArrivalArmed(false);
+        setArrivalStatus("");
+        setError(
+          "Geofence is not configured for this appointment. Ask homeowner to share a link with location enabled."
+        );
+      } else {
+        setArrivalStatus("Geofence armed. We will continue when you are near the property.");
       }
     } catch (requestError) {
       setError(requestError.message || "Unable to accept appointment.");

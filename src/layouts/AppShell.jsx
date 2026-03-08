@@ -19,6 +19,8 @@ const navByRole = {
     { to: "/dashboard/homeowner/visits", label: "Visits", icon: "visits" },
     { to: "/dashboard/homeowner/messages", label: "Messages", icon: "messages" },
     { to: "/dashboard/homeowner/doors", label: "Doors", icon: "doors" },
+    { to: "/dashboard/homeowner/live-queue", label: "Live Queue", icon: "queue" },
+    { to: "/dashboard/homeowner/receipts", label: "Receipts", icon: "receipt" },
     { to: "/billing/paywall", label: "Billing", icon: "billing" },
     { to: "/dashboard/homeowner/settings", label: "Settings", icon: "settings" }
   ],
@@ -31,6 +33,7 @@ const navByRole = {
     { to: "/dashboard/estate/mappings", label: "Mappings", icon: "mappings" },
     { to: "/dashboard/estate/logs", label: "Access Logs", icon: "logs" },
     { to: "/dashboard/estate/plan", label: "Plan Rules", icon: "plans" },
+    { to: "/dashboard/estate/community", label: "Community", icon: "community" },
     { to: "/billing/paywall", label: "Billing", icon: "billing" },
     { to: "/dashboard/estate/homes", label: "Multi-Home", icon: "homes" },
     { to: "/dashboard/estate/settings", label: "Settings", icon: "settings" }
@@ -834,6 +837,9 @@ function NavIcon({ name }) {
     system: <path d="M12 1v4M12 19v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M1 12h4M19 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8" />,
     plans: <path d="M4 20V8l8-4 8 4v12M4 12h16" />
     ,
+    queue: <path d="M4 7h14M4 12h10M4 17h8M18 7v10M15 14l3 3 3-3" />,
+    receipt: <path d="M6 3h12v18l-2-1-2 1-2-1-2 1-2-1-2 1zM9 8h6M9 12h6M9 16h4" />,
+    community: <path d="M4 5h16v10H8l-4 4zM9 9h6M9 12h4" />,
     bell_ring: <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5M9 17a3 3 0 0 0 6 0M18 3l2 2M6 3L4 5" />,
     user_admin: <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm10 0v-2m0 0V7m0 2h-2m2 0h2" />,
     sessions: <path d="M8 7h13M8 12h13M8 17h13M3 7h.01M3 12h.01M3 17h.01" />,
