@@ -10,6 +10,7 @@ import {
   registerPushSubscription,
   requestBrowserNotificationPermission
 } from "../services/notificationService";
+import { registerFcmPushSubscription, setupForegroundMessageListener } from "../services/pushMessagingService";
 import { resolveNotificationRoute } from "../utils/notificationRouting";
 
 const navByRole = {
@@ -460,6 +461,42 @@ export default function AppShell({ title, children, showTopBar = true }) {
   }, [parsedNotifications]);
 
   useEffect(() => {
+    let unsub = () => {};
+    setupForegroundMessageListener((payload) => {
+      const title = payload?.notification?.title || payload?.data?.title || "Qring Alert";
+      const message = payload?.notification?.body || payload?.data?.body || "You have a new notification.";
+      try {
+        window.dispatchEvent(
+          new CustomEvent("qring:flash", {
+            detail: {
+              type: "info",
+              title,
+              message,
+              duration: 3600
+            }
+          })
+        );
+      } catch {
+        // Keep foreground push non-blocking.
+      }
+    }).then((dispose) => {
+      unsub = typeof dispose === "function" ? dispose : () => {};
+    });
+    return () => {
+      try {
+        unsub();
+      } catch {
+        // Ignore cleanup errors.
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (webAlertsPermission !== "granted") return;
+    registerFcmPushSubscription().catch(() => {});
+  }, [webAlertsPermission]);
+
+  useEffect(() => {
     return () => {
       if (ringTimerRef.current) {
         clearInterval(ringTimerRef.current);
@@ -520,10 +557,13 @@ export default function AppShell({ title, children, showTopBar = true }) {
     setWebAlertsPermission(permission);
     if (permission === "granted") {
       try {
-        await registerPushSubscription({
-          endpoint: "browser-notification",
-          keys: { ua: navigator.userAgent }
-        });
+        const registration = await registerFcmPushSubscription();
+        if (registration?.status !== "registered") {
+          await registerPushSubscription({
+            endpoint: "browser-notification",
+            keys: { ua: navigator.userAgent }
+          });
+        }
       } catch {
         // Keep running even if registration fails.
       }

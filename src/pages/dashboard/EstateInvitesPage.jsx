@@ -47,7 +47,8 @@ export default function EstateInvitesPage() {
     setNotice("");
     try {
       const sent = await inviteHomeowner(homeownerId);
-      setNotice(`Invite sent. Token: ${sent?.inviteToken ?? "-"}`);
+      const emailStatus = sent?.emailStatus ? ` Email: ${sent.emailStatus}.` : "";
+      setNotice(`Invite sent. Token: ${sent?.inviteToken ?? "-"}${emailStatus}`);
     } catch (requestError) {
       setError(requestError.message ?? "Failed to send invite");
     } finally {

@@ -30,7 +30,7 @@ export default function EstateDoorsPage() {
   });
   const [form, setForm] = useState({
     estateId: "",
-    homeId: "",
+    homeownerId: "",
     name: ""
   });
 
@@ -39,9 +39,6 @@ export default function EstateDoorsPage() {
     setOverview(data);
     if (!form.estateId && data?.estates?.length) {
       setForm((prev) => ({ ...prev, estateId: data.estates[0].id }));
-    }
-    if (!form.homeId && data?.homes?.length) {
-      setForm((prev) => ({ ...prev, homeId: data.homes[0].id }));
     }
   }
 
@@ -53,7 +50,30 @@ export default function EstateDoorsPage() {
     () => (overview?.homes ?? []).filter((home) => !form.estateId || home.estateId === form.estateId),
     [overview, form.estateId]
   );
-  const hasHomesInEstate = homesByEstate.length > 0;
+  const homeownerOptions = useMemo(() => {
+    const byHomeowner = new Map();
+    homesByEstate.forEach((home) => {
+      if (!home?.homeownerId) return;
+      if (!byHomeowner.has(home.homeownerId)) {
+        byHomeowner.set(home.homeownerId, {
+          homeownerId: home.homeownerId,
+          homeownerName: home.homeownerName || "Homeowner",
+          homeownerEmail: home.homeownerEmail || "",
+          homeId: home.id,
+          homeName: home.name || "Home",
+        });
+      }
+    });
+    return Array.from(byHomeowner.values());
+  }, [homesByEstate]);
+  const hasHomeownersInEstate = homeownerOptions.length > 0;
+
+  useEffect(() => {
+    if (homeownerOptions.length === 0) return;
+    const hasSelected = homeownerOptions.some((row) => row.homeownerId === form.homeownerId);
+    if (hasSelected) return;
+    setForm((prev) => ({ ...prev, homeownerId: homeownerOptions[0].homeownerId }));
+  }, [form.homeownerId, homeownerOptions]);
 
   const doors = useMemo(() => overview?.doors ?? [], [overview]);
 
@@ -64,9 +84,13 @@ export default function EstateDoorsPage() {
     setNotice("");
     setCreatedQr(null);
     try {
+      const selectedHomeowner = homeownerOptions.find((row) => row.homeownerId === form.homeownerId);
+      if (!selectedHomeowner?.homeId) {
+        throw new Error("Select a homeowner linked to a home before creating a door.");
+      }
       const data = await addEstateDoor({
         estateId: form.estateId,
-        homeId: form.homeId,
+        homeId: selectedHomeowner.homeId,
         name: form.name,
         generateQr: true,
         mode: "direct",
@@ -82,17 +106,17 @@ export default function EstateDoorsPage() {
       if (data?.door?.id) {
         setOverview((prev) => {
           if (!prev) return prev;
-          const home = (prev.homes ?? []).find((row) => String(row.id) === String(form.homeId));
+          const home = (prev.homes ?? []).find((row) => String(row.id) === String(selectedHomeowner.homeId));
           const nextDoor = {
             id: data.door.id,
             name: data.door.name ?? form.name,
-            homeId: form.homeId,
+            homeId: selectedHomeowner.homeId,
             homeName: home?.name || "",
             homeownerId: home?.homeownerId || "",
             homeownerName: home?.homeownerName || "",
             homeownerEmail: home?.homeownerEmail || "",
             loginLink: `${getPublicBaseUrl()}/login`,
-            state: data?.door?.isActive === "online" ? "Online" : "Offline",
+            state: data?.door?.state || "Online",
             qr: data?.qr?.qrId ? [data.qr.qrId] : []
           };
           return {
@@ -285,9 +309,17 @@ export default function EstateDoorsPage() {
             Flow: create homeowner, assign homeowner to a home, then create a door for that home.
           </p>
         </div>
-        {!hasHomesInEstate ? (
+        {!hasHomeownersInEstate ? (
           <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/30 dark:bg-amber-900/20 dark:text-amber-200">
-            No homes found for this estate yet. Create homeowner in{" "}<Link to="/dashboard/estate/invites" className="font-semibold underline">Create / Invite Homeowners</Link>{" "}and then add a home in{" "}<Link to="/dashboard/estate/homes" className="font-semibold underline">Multi-Home</Link>.
+            No homeowner record is available for this estate yet. Create homeowner in{" "}
+            <Link to="/dashboard/estate/invites" className="font-semibold underline">
+              Create / Invite Homeowners
+            </Link>
+            {" "}and then add or confirm a home in{" "}
+            <Link to="/dashboard/estate/homes" className="font-semibold underline">
+              Multi-Home
+            </Link>
+            .
           </div>
         ) : null}
 
@@ -299,12 +331,12 @@ export default function EstateDoorsPage() {
             options={(overview?.estates ?? []).map((item) => ({ value: item.id, label: item.name }))}
           />
           <Select
-            label="Home"
-            value={form.homeId}
-            onChange={(value) => setForm((prev) => ({ ...prev, homeId: value }))}
-            options={homesByEstate.map((item) => ({
-              value: item.id,
-              label: `${item.name} (${item.homeownerName || "No homeowner"})`
+            label="Homeowner"
+            value={form.homeownerId}
+            onChange={(value) => setForm((prev) => ({ ...prev, homeownerId: value }))}
+            options={homeownerOptions.map((item) => ({
+              value: item.homeownerId,
+              label: `${item.homeownerName} (${item.homeName})`
             }))}
           />
 
@@ -320,7 +352,7 @@ export default function EstateDoorsPage() {
 
           <button
             type="submit"
-            disabled={busy || !hasHomesInEstate}
+            disabled={busy || !hasHomeownersInEstate}
             className="rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition-all active:scale-95 disabled:opacity-50 dark:bg-white dark:text-slate-900"
           >
             {busy ? "Saving..." : "Create Door"}
