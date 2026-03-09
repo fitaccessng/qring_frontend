@@ -1,11 +1,11 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import AppShell from "../../layouts/AppShell";
 import { env } from "../../config/env";
 import {
   addEstateDoor,
   createEstateSharedQr,
   getEstateOverview,
-  provisionEstateDoor,
   updateEstateDoorAdminProfile
 } from "../../services/estateService";
 
@@ -18,7 +18,6 @@ export default function EstateDoorsPage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
-  const [provisionMode, setProvisionMode] = useState(false);
   const [createdQr, setCreatedQr] = useState(null);
   const [sharedQr, setSharedQr] = useState(null);
   const [editingDoorId, setEditingDoorId] = useState("");
@@ -32,11 +31,7 @@ export default function EstateDoorsPage() {
   const [form, setForm] = useState({
     estateId: "",
     homeId: "",
-    name: "",
-    homeName: "",
-    homeownerFullName: "",
-    homeownerUsername: "",
-    homeownerPassword: ""
+    name: ""
   });
 
   async function load() {
@@ -58,6 +53,7 @@ export default function EstateDoorsPage() {
     () => (overview?.homes ?? []).filter((home) => !form.estateId || home.estateId === form.estateId),
     [overview, form.estateId]
   );
+  const hasHomesInEstate = homesByEstate.length > 0;
 
   const doors = useMemo(() => overview?.doors ?? [], [overview]);
 
@@ -68,50 +64,49 @@ export default function EstateDoorsPage() {
     setNotice("");
     setCreatedQr(null);
     try {
-      if (provisionMode) {
-        const data = await provisionEstateDoor({
-          estateId: form.estateId,
-          homeName: form.homeName,
-          doorName: form.name,
-          homeownerFullName: form.homeownerFullName,
-          homeownerUsername: form.homeownerUsername,
-          homeownerPassword: form.homeownerPassword
+      const data = await addEstateDoor({
+        estateId: form.estateId,
+        homeId: form.homeId,
+        name: form.name,
+        generateQr: true,
+        mode: "direct",
+        plan: "single"
+      });
+      if (data?.qr?.qrId) {
+        setCreatedQr({
+          qrId: data.qr.qrId,
+          scanUrl: toScanUrl(data.qr.qrId),
+          doorName: data?.door?.name ?? form.name
         });
-        if (data?.qr?.qrId) {
-          setCreatedQr({
-            qrId: data.qr.qrId,
-            scanUrl: toScanUrl(data.qr.qrId),
-            doorName: data?.door?.name ?? form.name
-          });
-        }
-        setNotice(`Door created and linked to ${data?.homeowner?.username ?? "homeowner"}.`);
-      } else {
-        const data = await addEstateDoor({
-          estateId: form.estateId,
-          homeId: form.homeId,
-          name: form.name,
-          generateQr: true,
-          mode: "direct",
-          plan: "single"
-        });
-        if (data?.qr?.qrId) {
-          setCreatedQr({
-            qrId: data.qr.qrId,
-            scanUrl: toScanUrl(data.qr.qrId),
-            doorName: data?.door?.name ?? form.name
-          });
-        }
-        setNotice("Door created successfully.");
       }
+      if (data?.door?.id) {
+        setOverview((prev) => {
+          if (!prev) return prev;
+          const home = (prev.homes ?? []).find((row) => String(row.id) === String(form.homeId));
+          const nextDoor = {
+            id: data.door.id,
+            name: data.door.name ?? form.name,
+            homeId: form.homeId,
+            homeName: home?.name || "",
+            homeownerId: home?.homeownerId || "",
+            homeownerName: home?.homeownerName || "",
+            homeownerEmail: home?.homeownerEmail || "",
+            loginLink: `${getPublicBaseUrl()}/login`,
+            state: data?.door?.isActive === "online" ? "Online" : "Offline",
+            qr: data?.qr?.qrId ? [data.qr.qrId] : []
+          };
+          return {
+            ...prev,
+            doors: [nextDoor, ...(prev.doors ?? []).filter((row) => row.id !== nextDoor.id)]
+          };
+        });
+      }
+      setNotice("Door created successfully.");
       setForm((prev) => ({
         ...prev,
-        name: "",
-        homeName: "",
-        homeownerFullName: "",
-        homeownerUsername: "",
-        homeownerPassword: ""
+        name: ""
       }));
-      await load();
+      load().catch(() => {});
     } catch (requestError) {
       setError(requestError.message ?? "Failed to create door");
     } finally {
@@ -278,25 +273,23 @@ export default function EstateDoorsPage() {
         <section className="relative overflow-hidden rounded-[2.5rem] bg-slate-900 p-8 text-white dark:bg-indigo-600">
           <div className="relative z-10">
             <h2 style={{color: "white"}} className="text-2xl font-bold tracking-tight">Estate Doors</h2>
-            <p className="mt-2 text-sm text-slate-200 dark:text-indigo-100">Create doors, generate QR codes, and manage homeowner access in one place.</p>
+            <p className="mt-2 text-sm text-slate-200 dark:text-indigo-100">Create doors for existing homeowners. Each door gets a QR code automatically.</p>
           </div>
           <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/5 blur-3xl" />
         </section>
 
       <section className="rounded-[2rem] border border-slate-200/70 bg-white/95 p-5 shadow-[0_8px_30px_rgb(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-900/90 sm:p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="font-heading text-lg font-bold sm:text-xl text-slate-900 dark:text-white">Create Door</h2>
-            <p className="mt-1 text-sm text-slate-500">Create doors and provision homeowner login in one flow.</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setProvisionMode((prev) => !prev)}
-            className="rounded-2xl border border-slate-300 px-3 py-2 text-xs font-semibold transition-all active:scale-95 dark:border-slate-700"
-          >
-            {provisionMode ? "Use Existing Homeowner" : "Provision New Homeowner Login"}
-          </button>
+        <div>
+          <h2 className="font-heading text-lg font-bold sm:text-xl text-slate-900 dark:text-white">Create Door</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Flow: create homeowner, assign homeowner to a home, then create a door for that home.
+          </p>
         </div>
+        {!hasHomesInEstate ? (
+          <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/30 dark:bg-amber-900/20 dark:text-amber-200">
+            No homes found for this estate yet. Create homeowner in{" "}<Link to="/dashboard/estate/invites" className="font-semibold underline">Create / Invite Homeowners</Link>{" "}and then add a home in{" "}<Link to="/dashboard/estate/homes" className="font-semibold underline">Multi-Home</Link>.
+          </div>
+        ) : null}
 
         <form onSubmit={onSubmit} className="mt-4 grid gap-3 md:grid-cols-2">
           <Select
@@ -305,27 +298,15 @@ export default function EstateDoorsPage() {
             onChange={(value) => setForm((prev) => ({ ...prev, estateId: value }))}
             options={(overview?.estates ?? []).map((item) => ({ value: item.id, label: item.name }))}
           />
-          {!provisionMode ? (
-            <Select
-              label="Home"
-              value={form.homeId}
-              onChange={(value) => setForm((prev) => ({ ...prev, homeId: value }))}
-              options={homesByEstate.map((item) => ({
-                value: item.id,
-                label: `${item.name} (${item.homeownerName || "No homeowner"})`
-              }))}
-            />
-          ) : (
-            <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Home Name</span>
-              <input
-                value={form.homeName}
-                onChange={(event) => setForm((prev) => ({ ...prev, homeName: event.target.value }))}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
-                required
-              />
-            </label>
-          )}
+          <Select
+            label="Home"
+            value={form.homeId}
+            onChange={(value) => setForm((prev) => ({ ...prev, homeId: value }))}
+            options={homesByEstate.map((item) => ({
+              value: item.id,
+              label: `${item.name} (${item.homeownerName || "No homeowner"})`
+            }))}
+          />
 
           <label className="block">
             <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Door Name</span>
@@ -337,42 +318,9 @@ export default function EstateDoorsPage() {
             />
           </label>
 
-          {provisionMode ? (
-            <>
-              <label className="block">
-                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Homeowner Full Name</span>
-                <input
-                  value={form.homeownerFullName}
-                  onChange={(event) => setForm((prev) => ({ ...prev, homeownerFullName: event.target.value }))}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
-                  required
-                />
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Username</span>
-                <input
-                  value={form.homeownerUsername}
-                  onChange={(event) => setForm((prev) => ({ ...prev, homeownerUsername: event.target.value }))}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
-                  required
-                />
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Password</span>
-                <input
-                  type="password"
-                  value={form.homeownerPassword}
-                  onChange={(event) => setForm((prev) => ({ ...prev, homeownerPassword: event.target.value }))}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
-                  required
-                />
-              </label>
-            </>
-          ) : null}
-
           <button
             type="submit"
-            disabled={busy}
+            disabled={busy || !hasHomesInEstate}
             className="rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition-all active:scale-95 disabled:opacity-50 dark:bg-white dark:text-slate-900"
           >
             {busy ? "Saving..." : "Create Door"}
@@ -581,4 +529,8 @@ function Select({ label, value, onChange, options }) {
     </label>
   );
 }
+
+
+
+
 

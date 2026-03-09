@@ -86,7 +86,7 @@ export default function HomeownerAppointmentsPage() {
     setCreating(true);
     setError("");
     try {
-      await createHomeownerAppointment({
+      const created = await createHomeownerAppointment({
         doorId: form.doorId,
         visitorName: form.visitorName,
         visitorContact: form.visitorContact,
@@ -97,13 +97,18 @@ export default function HomeownerAppointmentsPage() {
         geofenceLng: form.geofenceLng ? Number(form.geofenceLng) : null,
         geofenceRadiusMeters: form.geofenceRadiusMeters ? Number(form.geofenceRadiusMeters) : 50
       });
+      if (created?.id) {
+        setAppointments((prev) => [created, ...prev.filter((row) => row.id !== created.id)]);
+        if (created?.startsAt) {
+          setSelectedDate(toDateKey(created.startsAt));
+        }
+      }
       setForm((prev) => ({
         ...prev,
         visitorName: "",
         visitorContact: "",
         purpose: ""
       }));
-      await loadData();
     } catch (requestError) {
       setError(requestError.message ?? "Failed to create appointment.");
     } finally {

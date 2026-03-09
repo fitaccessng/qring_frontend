@@ -52,8 +52,17 @@ export default function EstateCreatePage() {
     try {
       const created = await createEstate({ name });
       setNotice(`Estate created: ${created?.name ?? name}`);
+      if (created?.id) {
+        setEstates((prev) => {
+          const nextRow = {
+            id: created.id,
+            name: created.name ?? name,
+            createdAt: new Date().toISOString()
+          };
+          return [nextRow, ...prev.filter((row) => row.id !== created.id)];
+        });
+      }
       setName("");
-      await load();
     } catch (requestError) {
       setError(requestError.message ?? "Failed to create estate");
     } finally {
@@ -197,4 +206,3 @@ async function copyText(value) {
     // Ignore; clipboard may require HTTPS / user gesture on some browsers.
   }
 }
-

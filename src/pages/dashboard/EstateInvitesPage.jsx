@@ -63,13 +63,23 @@ export default function EstateInvitesPage() {
     try {
       const created = await createEstateHomeowner(createForm);
       setNotice(`Homeowner created: ${created?.fullName || createForm.fullName}. Send invite from the list below.`);
+      if (created?.id) {
+        setHomeowners((prev) => {
+          const nextRow = {
+            id: created.id,
+            fullName: created.fullName || createForm.fullName,
+            email: created.email || (createForm.username.includes("@") ? createForm.username : `${createForm.username}@estate.useqring.online`),
+            active: true
+          };
+          return [nextRow, ...prev.filter((row) => row.id !== created.id)];
+        });
+      }
       setCreateForm((prev) => ({
         ...prev,
         fullName: "",
         username: "",
         password: ""
       }));
-      await load();
     } catch (requestError) {
       setError(requestError.message ?? "Failed to create homeowner");
     } finally {

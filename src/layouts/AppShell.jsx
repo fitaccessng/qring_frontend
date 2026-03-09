@@ -141,9 +141,10 @@ export default function AppShell({ title, children, showTopBar = true }) {
       if (user?.role === "estate") {
         return [
           { to: "/dashboard/estate", label: "Overview", icon: "estate" },
+          { to: "/dashboard/estate/invites", label: "Owners", icon: "invite" },
+          { to: "/dashboard/estate/homes", label: "Homes", icon: "homes" },
           { to: "/dashboard/estate/doors", label: "Doors", icon: "doors" },
-          { to: "/dashboard/estate/assign", label: "Assign", icon: "assign" },
-          { to: "/dashboard/estate/logs", label: "Logs", icon: "logs" }
+          { to: "/dashboard/estate/assign", label: "Assign", icon: "assign" }
         ];
       }
       return navItems.filter((item) => !item.to.endsWith("/settings")).slice(0, 4);
@@ -624,13 +625,13 @@ export default function AppShell({ title, children, showTopBar = true }) {
                   >
                     <BackIcon />
                   </button>
-                  {/* <div className="grid h-10 w-10 place-items-center rounded-full bg-violet-100 text-sm font-bold text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
+                  <div className="grid h-10 w-10 place-items-center rounded-full bg-violet-100 text-sm font-bold text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
                     {initials}
                   </div>
                   <div className="min-w-0">
                     <p className="truncate text-[11px] font-semibold text-slate-500">Hello!</p>
                     <p className="truncate text-sm font-black text-slate-900 dark:text-white sm:text-base">{title || profileName}</p>
-                  </div> */}
+                  </div>
                 </div>
                 <div className="relative flex items-center gap-2">
                   <button
@@ -717,6 +718,7 @@ export default function AppShell({ title, children, showTopBar = true }) {
           </header>
           ) : null}
           <div className={`dashboard-canvas ${showTopBar ? "pt-20 sm:pt-12 lg:pt-1" : "pt-0"}`}>
+            {user?.role === "estate" ? <EstateQuickNav currentPath={location.pathname} /> : null}
             {children}
             <div className={mobileBottomSpacerClass} aria-hidden="true" />
           </div>
@@ -870,5 +872,40 @@ function NavIcon({ name }) {
     <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       {paths[name] ?? <circle cx="12" cy="12" r="9" />}
     </svg>
+  );
+}
+
+function EstateQuickNav({ currentPath }) {
+  const items = [
+    { to: "/dashboard/estate", label: "Overview" },
+    { to: "/dashboard/estate/invites", label: "Homeowners" },
+    { to: "/dashboard/estate/homes", label: "Homes" },
+    { to: "/dashboard/estate/doors", label: "Doors" },
+    { to: "/dashboard/estate/assign", label: "Assign" },
+    { to: "/dashboard/estate/logs", label: "Logs" },
+    { to: "/dashboard/estate/settings", label: "Settings" }
+  ];
+
+  const isActive = (path) => {
+    if (path === "/dashboard/estate") return currentPath === path;
+    return currentPath === path || currentPath.startsWith(`${path}/`);
+  };
+
+  return (
+    <div className="mb-4 -mx-1 flex gap-2 overflow-x-auto px-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:mb-5 lg:mb-6">
+      {items.map((item) => (
+        <Link
+          key={`estate-quick-nav-${item.to}`}
+          to={item.to}
+          className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all ${
+            isActive(item.to)
+              ? "border-indigo-500 bg-indigo-600 text-white shadow-sm"
+              : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-300"
+          }`}
+        >
+          {item.label}
+        </Link>
+      ))}
+    </div>
   );
 }

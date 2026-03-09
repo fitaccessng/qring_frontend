@@ -41,10 +41,27 @@ export default function EstateHomesPage() {
     setError("");
     setNotice("");
     try {
-      await addEstateHome(form);
+      const created = await addEstateHome(form);
       setNotice("Home added successfully.");
+      if (created?.id) {
+        setOverview((prev) => {
+          if (!prev) return prev;
+          const homeowner = (prev.homeowners ?? []).find((row) => String(row.id) === String(form.homeownerId));
+          const nextHome = {
+            id: created.id,
+            name: created.name ?? form.name,
+            estateId: form.estateId,
+            homeownerId: form.homeownerId,
+            homeownerName: homeowner?.fullName || "",
+            homeownerEmail: homeowner?.email || ""
+          };
+          return {
+            ...prev,
+            homes: [nextHome, ...(prev.homes ?? [])]
+          };
+        });
+      }
       setForm((prev) => ({ ...prev, name: "" }));
-      await load();
     } catch (requestError) {
       setError(requestError.message ?? "Failed to add home");
     } finally {
