@@ -462,8 +462,18 @@ export function useSessionRealtime(sessionId) {
   }
 
   function showAudioOnlyModal(key) {
+    if (isHomeowner) return;
     const modalKey = String(key || sessionId || "").trim();
     if (audioOnlyModalShownRef.current && audioOnlyModalKeyRef.current === modalKey) return;
+    if (typeof window !== "undefined") {
+      const storageKey = `qring_audio_only_modal_${modalKey}`;
+      if (sessionStorage.getItem(storageKey) === "true") {
+        audioOnlyModalShownRef.current = true;
+        audioOnlyModalKeyRef.current = modalKey;
+        return;
+      }
+      sessionStorage.setItem(storageKey, "true");
+    }
     audioOnlyModalShownRef.current = true;
     audioOnlyModalKeyRef.current = modalKey;
     emitBlockingModal({
@@ -1896,10 +1906,6 @@ export function useSessionRealtime(sessionId) {
         setCallConnectedAt(payload.joinedAt);
       } else {
         setCallConnectedAt(Date.now());
-      }
-      if (pendingHomeownerVideoRef.current && payload?.hasVideo === false) {
-        const modalKey = `${sessionId}:${callSessionRef.current || "legacy"}`;
-        showAudioOnlyModal(modalKey);
       }
       if (livekitEnabled) {
         const allowVideo = Boolean(pendingHomeownerVideoRef.current) && payload?.hasVideo !== false;

@@ -658,7 +658,7 @@ export default function AppShell({ title, children, showTopBar = true }) {
           {showTopBar ? (
           <header className="fixed inset-x-0 top-0 z-30 px-3 pt-[calc(0.95rem+env(safe-area-inset-top))] sm:px-4 lg:left-72 lg:px-8">
             <div className="rounded-[1.4rem] border border-slate-200/70 bg-white/95 p-3 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/90 sm:p-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
                 {showProfileHeader ? (
                   <div className="flex items-center gap-2.5">
                     <button
@@ -679,7 +679,7 @@ export default function AppShell({ title, children, showTopBar = true }) {
                     </div>
                   </div>
                 ) : null}
-                <div className="relative flex items-center gap-2">
+                <div className="relative ml-auto flex items-center gap-2">
                   <button
                     ref={notificationsButtonRef}
                     type="button"
