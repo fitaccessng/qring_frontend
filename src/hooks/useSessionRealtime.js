@@ -639,7 +639,7 @@ export function useSessionRealtime(sessionId) {
     setNetworkDetail(detail);
   }
 
-  function markNetworkSlow(detail = "Network is unstable. Trying to keep the session active.") {
+  function markNetworkSlow(detail = "Connection unstable. Trying to keep the session active.") {
     setNetworkQuality("slow");
     setNetworkDetail(detail);
   }
@@ -814,12 +814,18 @@ export function useSessionRealtime(sessionId) {
       });
       livekitRoomRef.current = room;
 
-      room.on(RoomEvent.TrackSubscribed, (track) => {
+      room.on(RoomEvent.TrackSubscribed, (track, _publication, participant) => {
+        if (livekitDisconnectingRef.current) return;
+        if (livekitRoomRef.current !== room) return;
+        if (participant && !room.remoteParticipants.has(participant.sid)) return;
         remoteLivekitTracksRef.current.add(track);
         attachTrackToElements(track);
         if (track.kind === "audio") setRemoteMuted(false);
       });
-      room.on(RoomEvent.TrackUnsubscribed, (track) => {
+      room.on(RoomEvent.TrackUnsubscribed, (track, _publication, participant) => {
+        if (livekitDisconnectingRef.current) return;
+        if (livekitRoomRef.current !== room) return;
+        if (participant && !room.remoteParticipants.has(participant.sid)) return;
         try {
           track.detach?.();
         } catch {
@@ -859,7 +865,7 @@ export function useSessionRealtime(sessionId) {
       room.localParticipant?.on?.("connectionQualityChanged", (quality) => {
         const level = Number(quality ?? 0);
         if (level <= 1) {
-          markNetworkSlow("Poor network quality detected.");
+          markNetworkSlow("Connection unstable detected.");
         } else if (level >= 3) {
           markNetworkGood("Network quality is stable.");
         }
@@ -959,7 +965,7 @@ export function useSessionRealtime(sessionId) {
       if (callStateRef.current !== "ringing") return;
       if (!lastOfferRef.current || !socketRef.current) return;
       if (offerRetryCountRef.current >= CALL_RETRY_LIMIT) {
-        setStatus("Network looks slow. Keep this page open while we continue trying.");
+        setStatus("Connection unstable. Keep this page open while we continue trying.");
         markNetworkSlow("Signaling is delayed. Keeping call setup in progress.");
         return;
       }
@@ -970,7 +976,7 @@ export function useSessionRealtime(sessionId) {
         retryAttempt: offerRetryCountRef.current
       });
       markNetworkSlow("Retrying call request due to network delay.");
-      setStatus(`Network is slow. Retrying call request (${offerRetryCountRef.current}/${CALL_RETRY_LIMIT})...`);
+      setStatus(`Connection unstable. Retrying call request (${offerRetryCountRef.current}/${CALL_RETRY_LIMIT})...`);
       scheduleOfferRetry();
     }, CALL_RETRY_DELAY_MS);
   }
@@ -1294,7 +1300,7 @@ export function useSessionRealtime(sessionId) {
       setStatus("");
       const allowVideo = incomingSnapshot.hasVideo && !autoLowBandwidthActive;
       pendingVideoUpgradeRef.current = Boolean(incomingSnapshot.hasVideo) && !allowVideo;
-      if (pendingVideoUpgradeRef.current) {
+      if (incomingSnapshot.hasVideo && !allowVideo) {
         setStatus("Weak network detected. Joining audio first, then upgrading to video.");
       }
       const callSessionId = incomingSnapshot.callSessionId;

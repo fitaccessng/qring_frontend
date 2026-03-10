@@ -61,7 +61,7 @@ export default function SessionAudioPage() {
             <p className="mt-0.5 text-[13px] font-medium text-white/85">
               {callState === "connected" ? formatDuration(connectedSeconds) : callState}
             </p>
-            <p className="mt-0.5 text-[12px] text-white/70">{networkQuality}</p>
+            <p className="mt-0.5 text-[12px] text-white/70">{formatNetworkLabel(networkQuality)}</p>
           </div>
           <Link to={exitRoute} className="rounded-full bg-white/20 px-3 py-1.5 text-[11px] font-semibold backdrop-blur">
             Back
@@ -70,7 +70,7 @@ export default function SessionAudioPage() {
 
         {showReconnectBanner ? (
           <div className="relative z-20 mx-5 rounded-xl bg-amber-500/25 px-3 py-2 text-[12px] text-amber-100 backdrop-blur">
-            {networkQuality === "reconnecting" ? "Reconnecting..." : "Poor connection"} {status ? `| ${status}` : ""}
+            {networkQuality === "reconnecting" ? "Reconnecting..." : "Connection unstable"} {status ? `| ${status}` : ""}
           </div>
         ) : null}
 
@@ -155,11 +155,18 @@ function CallControl({ label, icon, onClick, disabled }) {
 function getExitRoute(sessionId) {
   try {
     const user = JSON.parse(localStorage.getItem("qring_user") || "null");
-    if (user?.role === "visitor") return `/session/${sessionId}/message`;
-    if (user?.role === "admin") return "/dashboard/admin";
-    if (user?.role === "estate") return "/dashboard/estate";
+    if (!user?.role || user.role === "visitor") return `/session/${sessionId}/message`;
+    if (user.role === "admin") return "/dashboard/admin";
+    if (user.role === "estate") return "/dashboard/estate";
     return "/dashboard/homeowner/visits";
   } catch {
     return `/session/${sessionId}/message`;
   }
+}
+
+function formatNetworkLabel(quality) {
+  if (quality === "good") return "Connection stable";
+  if (quality === "slow") return "Connection unstable";
+  if (quality === "reconnecting") return "Reconnecting";
+  return quality || "Reconnecting";
 }

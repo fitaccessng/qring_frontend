@@ -243,7 +243,7 @@ export async function apiRequest(path, options = {}, attempt = 0) {
     if (isGet) {
       const cached = readGetCache(cacheKey);
       if (cached && cached.ageMs < GET_CACHE_STALE_TTL_MS) {
-        emitFlash("Network is slow. Showing recent cached data.", "warning");
+        emitFlash("Connection unstable. Showing recent cached data.", "warning");
         return cached.row.payload;
       }
     }

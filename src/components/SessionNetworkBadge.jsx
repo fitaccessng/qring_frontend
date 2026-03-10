@@ -5,8 +5,8 @@ const badgeStyles = {
 };
 
 const labels = {
-  good: "Good",
-  slow: "Slow",
+  good: "Connection stable",
+  slow: "Connection unstable",
   reconnecting: "Reconnecting"
 };
 

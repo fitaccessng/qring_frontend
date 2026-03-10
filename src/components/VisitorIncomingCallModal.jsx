@@ -4,7 +4,7 @@ export default function VisitorIncomingCallModal({ open, hasVideo, onAccept, onR
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/82 px-5 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-6 backdrop-blur-md sm:items-center">
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/82 px-5 py-6 backdrop-blur-md">
       <section className="w-full max-w-sm rounded-[28px] border border-white/15 bg-[#0f1720] p-6 text-white shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-300">Incoming call</p>
         <h2 className="mt-2 text-[28px] font-semibold leading-tight tracking-tight">

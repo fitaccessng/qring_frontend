@@ -313,7 +313,7 @@ export default function ScanPage() {
             ) : null}
             {requestState.retrying ? (
               <p className="text-xs text-amber-600 dark:text-amber-300">
-                Network is unstable. Retrying your request automatically...
+                Connection unstable. Retrying your request automatically...
               </p>
             ) : null}
           </form>

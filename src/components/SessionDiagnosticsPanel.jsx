@@ -50,7 +50,7 @@ export default function SessionDiagnosticsPanel({ diagnostics, networkQuality = 
         </div>
       ) : (
         <p className="mt-3 rounded-lg bg-emerald-500/15 px-2 py-1 text-[11px] text-emerald-200">
-          Connection quality is healthy.
+          Connection stable.
         </p>
       )}
     </section>
@@ -92,7 +92,7 @@ function buildHints({ diagnostics, networkQuality, rttRisk, jitterRisk, lossRisk
   if (rttRisk === "critical" || jitterRisk === "critical" || lossRisk === "critical") {
     hints.push("Media quality is poor. Switch to audio-only and keep low-bandwidth mode enabled.");
   } else if (rttRisk === "risky" || jitterRisk === "risky" || lossRisk === "risky") {
-    hints.push("Network is degrading. Reduce video quality or move closer to a stronger connection.");
+    hints.push("Connection is degrading. Reduce video quality or move closer to a stronger connection.");
   }
   if (networkQuality === "slow" && diagnostics.remoteCandidateType === "relay") {
     hints.push("Relay path is active. Expect higher latency but more stable connectivity.");
