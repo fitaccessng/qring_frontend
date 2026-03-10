@@ -204,6 +204,7 @@ export function useSessionRealtime(sessionId) {
   const [cameraOn, setCameraOn] = useState(false);
   const [cameraFacing, setCameraFacing] = useState("user");
   const [speakerOn, setSpeakerOn] = useState(true);
+  const [audioPlaybackBlocked, setAudioPlaybackBlocked] = useState(false);
   const [messages, setMessages] = useState([]);
   const [status, setStatus] = useState("");
   const [networkQuality, setNetworkQuality] = useState("reconnecting");
@@ -455,8 +456,22 @@ export function useSessionRealtime(sessionId) {
     }
     try {
       await audioEl.play();
+      setAudioPlaybackBlocked(false);
     } catch {
-      // Playback can still start later after a user interaction.
+      setAudioPlaybackBlocked(true);
+    }
+  }
+
+  async function retryAudioPlayback() {
+    const audioEl = remoteAudioRef.current;
+    if (!audioEl) return false;
+    try {
+      await audioEl.play();
+      setAudioPlaybackBlocked(false);
+      return true;
+    } catch {
+      setAudioPlaybackBlocked(true);
+      return false;
     }
   }
 
@@ -887,6 +902,11 @@ export function useSessionRealtime(sessionId) {
       }
       await room.localParticipant.publishTrack(localAudioTrack);
       localAudioTrackRef.current = localAudioTrack;
+      if (muted) {
+        localAudioTrackRef.current.mute();
+      } else {
+        localAudioTrackRef.current.unmute?.();
+      }
 
       if (video) {
         await publishLivekitLocalVideoTrack({
@@ -1207,9 +1227,14 @@ export function useSessionRealtime(sessionId) {
     }
     const startWithVideo = !autoLowBandwidthActive;
     pendingVideoUpgradeRef.current = !startWithVideo;
-    if (!startWithVideo) {
-      setStatus("Weak network detected. Starting audio first, video will connect after stabilization.");
-    }
+  if (!startWithVideo) {
+    setStatus("Weak network detected. Starting audio first, video will connect after stabilization.");
+    emitRealtimeTextAlert({
+      title: "Connection unstable",
+      message: "Network is weak. Starting audio-only to keep the call stable.",
+      type: "warning"
+    });
+  }
     startLivekitCall(startWithVideo);
   }
 
@@ -1258,13 +1283,28 @@ export function useSessionRealtime(sessionId) {
         const allowVideo = wantsVideo && !lowBandwidthMode;
         if (wantsVideo && !allowVideo) {
           setStatus("Low bandwidth mode enabled. Joining with audio-only.");
+          emitRealtimeTextAlert({
+            title: "Connection unstable",
+            message: "Network is weak. Joining with audio-only to keep the call stable.",
+            type: "warning"
+          });
         }
         await attachLocalStream({ video: allowVideo });
+        if (localStreamRef.current) {
+          localStreamRef.current.getAudioTracks().forEach((track) => {
+            track.enabled = true;
+          });
+        }
+        setMuted(false);
         await applyRemoteDescriptionAndDrain(pendingOffer.sdp);
         const pc = ensurePeer();
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
         socketRef.current?.emit("webrtc.answer", { sessionId, sdp: answer });
+        socketRef.current?.emit("call.accepted", {
+          sessionId,
+          hasVideo: allowVideo
+        });
         setCallState("connected");
         setCallLaunchStage("idle");
         setCallLaunchStartedAt(null);
@@ -1302,6 +1342,11 @@ export function useSessionRealtime(sessionId) {
       pendingVideoUpgradeRef.current = Boolean(incomingSnapshot.hasVideo) && !allowVideo;
       if (incomingSnapshot.hasVideo && !allowVideo) {
         setStatus("Weak network detected. Joining audio first, then upgrading to video.");
+        emitRealtimeTextAlert({
+          title: "Connection unstable",
+          message: "Network is weak. Joining with audio-only to keep the call stable.",
+          type: "warning"
+        });
       }
       const callSessionId = incomingSnapshot.callSessionId;
       if (!callSessionId) {
@@ -1325,6 +1370,10 @@ export function useSessionRealtime(sessionId) {
       setCallState("connected");
       setCallLaunchStage("idle");
       setCallLaunchStartedAt(null);
+      setMuted(false);
+      if (localAudioTrackRef.current) {
+        localAudioTrackRef.current.unmute?.();
+      }
       grantSessionCallAccess(sessionId, "connected");
       saveCallAcceptIntent({
         sessionId,
@@ -1771,6 +1820,13 @@ export function useSessionRealtime(sessionId) {
       setCallLaunchStartedAt(null);
       setStatus("Visitor joined the call.");
       markNetworkGood("Call connected.");
+      if (lastInviteHasVideoRef.current && payload?.hasVideo === false) {
+        emitRealtimeTextAlert({
+          title: "Connection unstable",
+          message: "Visitor joined with audio-only due to weak network.",
+          type: "warning"
+        });
+      }
     });
 
     socket.on("call.rejected", (payload) => {
@@ -2110,6 +2166,7 @@ export function useSessionRealtime(sessionId) {
     remoteAudioRef,
     localStreamRef,
     remoteMuted,
+    audioPlaybackBlocked,
     callDiagnostics,
     incomingCall,
     acceptedCallMode,
@@ -2130,6 +2187,7 @@ export function useSessionRealtime(sessionId) {
     startVideoCall,
     retryCallConnection,
     acceptIncomingCall,
-    rejectIncomingCall
+    rejectIncomingCall,
+    retryAudioPlayback
   };
 }
