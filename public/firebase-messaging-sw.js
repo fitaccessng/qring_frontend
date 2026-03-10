@@ -1,6 +1,6 @@
 /* global importScripts, firebase */
-importScripts("https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js");
-importScripts("https://www.gstatic.com/firebasejs/10.12.5/firebase-messaging-compat.js");
+importScripts("/firebase-app-compat.js");
+importScripts("/firebase-messaging-compat.js");
 
 (function setupFirebaseMessagingSW() {
   try {
