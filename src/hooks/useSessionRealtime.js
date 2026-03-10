@@ -205,6 +205,7 @@ export function useSessionRealtime(sessionId) {
   const [cameraFacing, setCameraFacing] = useState("user");
   const [speakerOn, setSpeakerOn] = useState(true);
   const [audioPlaybackBlocked, setAudioPlaybackBlocked] = useState(false);
+  const [localMicEnabled, setLocalMicEnabled] = useState(true);
   const [messages, setMessages] = useState([]);
   const [status, setStatus] = useState("");
   const [networkQuality, setNetworkQuality] = useState("reconnecting");
@@ -908,6 +909,7 @@ export function useSessionRealtime(sessionId) {
       } else {
         localAudioTrackRef.current.unmute?.();
       }
+      setLocalMicEnabled(!muted);
 
       if (video) {
         await publishLivekitLocalVideoTrack({
@@ -1054,6 +1056,7 @@ export function useSessionRealtime(sessionId) {
       throw error;
     }
     localStreamRef.current = stream;
+    setLocalMicEnabled(true);
     if (localVideoRef.current) {
       localVideoRef.current.srcObject = stream;
       localVideoRef.current.muted = true;
@@ -1523,6 +1526,7 @@ export function useSessionRealtime(sessionId) {
         localAudioTrackRef.current.unmute();
       }
       setMuted(nextMuted);
+      setLocalMicEnabled(!nextMuted);
       socketRef.current?.emit("session.control", {
         sessionId,
         action: nextMuted ? "mute" : "unmute"
@@ -1535,6 +1539,7 @@ export function useSessionRealtime(sessionId) {
       track.enabled = !nextMuted;
     });
     setMuted(nextMuted);
+    setLocalMicEnabled(!nextMuted);
     socketRef.current?.emit("session.control", {
       sessionId,
       action: nextMuted ? "mute" : "unmute"
@@ -1618,6 +1623,7 @@ export function useSessionRealtime(sessionId) {
         localStreamRef.current.getTracks().forEach((track) => track.stop());
         localStreamRef.current = null;
       }
+      setLocalMicEnabled(false);
       if (localVideoRef.current) localVideoRef.current.srcObject = null;
       setCallState("ended");
       setCallLaunchStage("idle");
@@ -1658,6 +1664,7 @@ export function useSessionRealtime(sessionId) {
       localStreamRef.current.getTracks().forEach((track) => track.stop());
       localStreamRef.current = null;
     }
+    setLocalMicEnabled(false);
     if (localVideoRef.current) localVideoRef.current.srcObject = null;
     if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
     if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
@@ -2184,6 +2191,7 @@ export function useSessionRealtime(sessionId) {
     localStreamRef,
     remoteMuted,
     audioPlaybackBlocked,
+    localMicEnabled,
     callDiagnostics,
     incomingCall,
     acceptedCallMode,

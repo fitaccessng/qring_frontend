@@ -28,6 +28,7 @@ export default function SessionVideoPage() {
     remoteVideoRef,
     remoteAudioRef,
     audioPlaybackBlocked,
+    localMicEnabled,
     incomingCall,
     canStartCall,
     remoteVideoActive,
@@ -99,6 +100,18 @@ export default function SessionVideoPage() {
               className="rounded-full bg-white/20 px-3 py-1 text-[11px] font-semibold text-white"
             >
               Enable audio
+            </button>
+          </div>
+        ) : null}
+        {callState === "connected" && !localMicEnabled ? (
+          <div className="relative z-20 mx-5 mt-3 flex items-center justify-between gap-3 rounded-xl bg-rose-500/20 px-3 py-2 text-[12px] text-rose-100 backdrop-blur">
+            <span>Mic is off. Tap to enable.</span>
+            <button
+              type="button"
+              onClick={toggleMute}
+              className="rounded-full bg-white/20 px-3 py-1 text-[11px] font-semibold text-white"
+            >
+              Enable mic
             </button>
           </div>
         ) : null}
