@@ -63,6 +63,7 @@ import PublicOnlyRoute from "./routes/PublicOnlyRoute";
 import { AuthProvider } from "./state/AuthContext";
 import { ThemeProvider } from "./state/ThemeContext";
 import FlashModal from "./components/FlashModal";
+import BlockingModal from "./components/BlockingModal";
 import AppPreloader from "./components/mobile/AppPreloader";
 
 export default function App() {
@@ -105,6 +106,7 @@ function AppRoutes() {
       ) : (
         <>
           <FlashModal />
+          <BlockingModal />
           <div className="animate-screen-enter">
             <Routes location={location}>
               <Route path="/" element={<LandingPage />} />

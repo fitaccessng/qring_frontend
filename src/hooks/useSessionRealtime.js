@@ -140,6 +140,20 @@ function emitRealtimeTextAlert({
   }
 }
 
+function emitBlockingModal({ title = "Notice", message }) {
+  if (typeof window === "undefined") return;
+  const body = String(message || "").trim();
+  if (!body) return;
+  window.dispatchEvent(
+    new CustomEvent("qring:blocking", {
+      detail: {
+        title,
+        message: body
+      }
+    })
+  );
+}
+
 function acquireSignalingSocket(sessionId) {
   const key = String(sessionId || "");
   let entry = signalingSocketPool.get(key);
@@ -230,6 +244,7 @@ export function useSessionRealtime(sessionId) {
   const socketRef = useRef(null);
   const peerRef = useRef(null);
   const localStreamRef = useRef(null);
+  const previewStreamRef = useRef(null);
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const remoteAudioRef = useRef(null);
@@ -247,8 +262,11 @@ export function useSessionRealtime(sessionId) {
   const diagnosticsTimerRef = useRef(null);
   const forceRelayRef = useRef(false);
   const pendingVideoUpgradeRef = useRef(false);
+  const pendingHomeownerVideoRef = useRef(false);
   const connectionRecoveryCountRef = useRef(0);
   const lastAlertAtRef = useRef(new Map());
+  const audioOnlyModalKeyRef = useRef("");
+  const audioOnlyModalShownRef = useRef(false);
   const lastInviteHasVideoRef = useRef(false);
   const inviteRetryTimerRef = useRef(null);
   const livekitRoomRef = useRef(null);
@@ -443,6 +461,17 @@ export function useSessionRealtime(sessionId) {
     }
   }
 
+  function showAudioOnlyModal(key) {
+    const modalKey = String(key || sessionId || "").trim();
+    if (audioOnlyModalShownRef.current && audioOnlyModalKeyRef.current === modalKey) return;
+    audioOnlyModalShownRef.current = true;
+    audioOnlyModalKeyRef.current = modalKey;
+    emitBlockingModal({
+      title: "Connection unstable",
+      message: "Bad network detected on visitor side. Joined audio-only to keep the call stable."
+    });
+  }
+
   async function applyAudioOutputPreference() {
     const audioEl = remoteAudioRef.current;
     if (!audioEl) return;
@@ -475,6 +504,30 @@ export function useSessionRealtime(sessionId) {
       setAudioPlaybackBlocked(true);
       return false;
     }
+  }
+
+  function stopLocalPreview() {
+    if (!previewStreamRef.current) return;
+    previewStreamRef.current.getTracks().forEach((track) => track.stop());
+    previewStreamRef.current = null;
+    if (localVideoRef.current) localVideoRef.current.srcObject = null;
+  }
+
+  async function startLocalPreview({ video }) {
+    if (!video) return;
+    if (featureError) return;
+    stopLocalPreview();
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: true
+    });
+    previewStreamRef.current = stream;
+    if (localVideoRef.current) {
+      localVideoRef.current.srcObject = stream;
+      localVideoRef.current.muted = true;
+      localVideoRef.current.play().catch(() => {});
+    }
+    setCameraOn(true);
   }
 
   function ensurePeer() {
@@ -806,6 +859,7 @@ export function useSessionRealtime(sessionId) {
       if (livekitRoomRef.current) {
         disconnectLivekitRoom();
       }
+      stopLocalPreview();
       try {
         await ensureCallMediaPermissions({ video: Boolean(video) });
       } catch {
@@ -1160,16 +1214,20 @@ export function useSessionRealtime(sessionId) {
         });
         const startedCall = startResponse?.data ?? startResponse;
         const callSessionId = startedCall?.callSessionId;
-        if (!callSessionId) {
-          throw new Error("Unable to initialize call session.");
-        }
-        callSessionRef.current = callSessionId;
-        startInviteRetryLoop(Boolean(requestVideo));
-        setStatus("Call request sent. Waiting for visitor to accept.");
-        setCallState("connecting");
-        await connectLivekitRoom({ video: Boolean(requestVideo) });
-        setCallLaunchStage("ringing");
-      } catch (error) {
+          if (!callSessionId) {
+            throw new Error("Unable to initialize call session.");
+          }
+          callSessionRef.current = callSessionId;
+          pendingHomeownerVideoRef.current = Boolean(requestVideo);
+          startInviteRetryLoop(Boolean(requestVideo));
+          setStatus("Call request sent. Waiting for visitor to accept.");
+          try {
+            await startLocalPreview({ video: Boolean(requestVideo) });
+          } catch {
+            setStatus("Unable to open camera preview. Waiting for visitor to accept.");
+          }
+          setCallLaunchStage("ringing");
+        } catch (error) {
         setStatus(error?.message || "Unable to start LiveKit call");
         setCallState("failed");
         setCallLaunchStage("idle");
@@ -1199,15 +1257,16 @@ export function useSessionRealtime(sessionId) {
     })();
   }
 
-  function startAudioCall() {
-    if (!isHomeowner) {
-      setStatus("Only homeowner can start calls. Wait for incoming call.");
-      return;
-    }
-    if (legacyWebrtcEnabled) {
-      startCall({ video: false });
-      return;
-    }
+    function startAudioCall() {
+      if (!isHomeowner) {
+        setStatus("Only homeowner can start calls. Wait for incoming call.");
+        return;
+      }
+      pendingHomeownerVideoRef.current = false;
+      if (legacyWebrtcEnabled) {
+        startCall({ video: false });
+        return;
+      }
     if (!livekitEnabled) {
       setStatus("Call service is unavailable. LiveKit URL is not configured.");
       return;
@@ -1216,31 +1275,29 @@ export function useSessionRealtime(sessionId) {
     startLivekitCall(false);
   }
 
-  function startVideoCall() {
-    if (!isHomeowner) {
-      setStatus("Only homeowner can start calls. Wait for incoming call.");
-      return;
+    function startVideoCall() {
+      if (!isHomeowner) {
+        setStatus("Only homeowner can start calls. Wait for incoming call.");
+        return;
+      }
+      if (legacyWebrtcEnabled) {
+        const requestVideo = !lowBandwidthMode;
+        pendingHomeownerVideoRef.current = requestVideo;
+        startCall({ video: requestVideo });
+        return;
+      }
+      if (!livekitEnabled) {
+        setStatus("Call service is unavailable. LiveKit URL is not configured.");
+        return;
+      }
+      const startWithVideo = !lowBandwidthMode;
+      pendingVideoUpgradeRef.current = !startWithVideo;
+      pendingHomeownerVideoRef.current = startWithVideo;
+      if (!startWithVideo) {
+        setStatus("Weak network detected. Starting audio first, video will connect after stabilization.");
+      }
+      startLivekitCall(startWithVideo);
     }
-    if (legacyWebrtcEnabled) {
-      startCall({ video: !lowBandwidthMode });
-      return;
-    }
-    if (!livekitEnabled) {
-      setStatus("Call service is unavailable. LiveKit URL is not configured.");
-      return;
-    }
-    const startWithVideo = !lowBandwidthMode;
-    pendingVideoUpgradeRef.current = !startWithVideo;
-    if (!startWithVideo) {
-      setStatus("Weak network detected. Starting audio first, video will connect after stabilization.");
-      emitRealtimeTextAlert({
-        title: "Connection unstable",
-        message: "Network is weak. Starting audio-only to keep the call stable.",
-        type: "warning"
-      });
-    }
-    startLivekitCall(startWithVideo);
-  }
 
   function retryCallConnection() {
     if (!isHomeowner) {
@@ -1287,11 +1344,8 @@ export function useSessionRealtime(sessionId) {
         const allowVideo = wantsVideo && !lowBandwidthMode;
         if (wantsVideo && !allowVideo) {
           setStatus("Low bandwidth mode enabled. Joining with audio-only.");
-          emitRealtimeTextAlert({
-            title: "Connection unstable",
-            message: "Network is weak. Joining with audio-only to keep the call stable.",
-            type: "warning"
-          });
+          const modalKey = `${sessionId}:${incomingSnapshot.callSessionId || "legacy"}`;
+          showAudioOnlyModal(modalKey);
         }
         setAcceptedCallMode(allowVideo ? "video" : "audio");
         const joinedAt = Date.now();
@@ -1349,11 +1403,8 @@ export function useSessionRealtime(sessionId) {
       pendingVideoUpgradeRef.current = Boolean(incomingSnapshot.hasVideo) && !allowVideo;
       if (incomingSnapshot.hasVideo && !allowVideo) {
         setStatus("Weak network detected. Joining audio first, then upgrading to video.");
-        emitRealtimeTextAlert({
-          title: "Connection unstable",
-          message: "Network is weak. Joining with audio-only to keep the call stable.",
-          type: "warning"
-        });
+        const modalKey = `${sessionId}:${incomingSnapshot.callSessionId || "legacy"}`;
+        showAudioOnlyModal(modalKey);
       }
       setAcceptedCallMode(allowVideo ? "video" : "audio");
       const callSessionId = incomingSnapshot.callSessionId;
@@ -1688,6 +1739,10 @@ export function useSessionRealtime(sessionId) {
     clearOfferRetryTimer();
     lastOfferRef.current = null;
     offerRetryCountRef.current = 0;
+    stopLocalPreview();
+    audioOnlyModalShownRef.current = false;
+    audioOnlyModalKeyRef.current = "";
+    pendingHomeownerVideoRef.current = false;
     clearSessionCallAccess(sessionId);
   }
 
@@ -1833,7 +1888,6 @@ export function useSessionRealtime(sessionId) {
       if (payload?.sessionId !== sessionId) return;
       if (!isHomeowner) return;
       clearInviteRetryTimer();
-      setCallState("connected");
       setCallLaunchStage("idle");
       setCallLaunchStartedAt(null);
       setStatus("Visitor joined the call.");
@@ -1843,13 +1897,22 @@ export function useSessionRealtime(sessionId) {
       } else {
         setCallConnectedAt(Date.now());
       }
-      if (lastInviteHasVideoRef.current && payload?.hasVideo === false) {
-        emitRealtimeTextAlert({
-          title: "Connection unstable",
-          message: "Visitor joined with audio-only due to weak network.",
-          type: "warning"
-        });
+      if (pendingHomeownerVideoRef.current && payload?.hasVideo === false) {
+        const modalKey = `${sessionId}:${callSessionRef.current || "legacy"}`;
+        showAudioOnlyModal(modalKey);
       }
+      if (livekitEnabled) {
+        const allowVideo = Boolean(pendingHomeownerVideoRef.current) && payload?.hasVideo !== false;
+        setCallState("connecting");
+        setStatus("Visitor joined. Connecting call...");
+        stopLocalPreview();
+        connectLivekitRoom({ video: allowVideo }).catch((error) => {
+          setStatus(error?.message || "Unable to connect call");
+          setCallState("failed");
+        });
+        return;
+      }
+      setCallState("connected");
     });
 
     socket.on("call.rejected", (payload) => {
