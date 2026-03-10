@@ -1,6 +1,6 @@
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../state/AuthContext";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getHomeownerContext } from "../services/homeownerService";
 import BrandMark from "../components/BrandMark";
 import {
@@ -169,6 +169,43 @@ export default function AppShell({ title, children, showTopBar = true }) {
     } catch {
       return false;
     }
+  }, []);
+  const stopRinging = useCallback(() => {
+    if (ringTimerRef.current) {
+      clearInterval(ringTimerRef.current);
+      ringTimerRef.current = null;
+    }
+  }, []);
+  const playRing = useCallback(() => {
+    if (typeof window === "undefined") return;
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+
+    if (!audioContextRef.current) {
+      audioContextRef.current = new AudioContextClass();
+    }
+    const ctx = audioContextRef.current;
+    if (ctx.state === "suspended") {
+      ctx.resume().catch(() => {});
+    }
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+    gain.connect(ctx.destination);
+
+    const tones = [880, 660];
+    tones.forEach((frequency, index) => {
+      const startAt = ctx.currentTime + index * 0.2;
+      const endAt = startAt + 0.16;
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(frequency, startAt);
+      osc.connect(gain);
+      gain.gain.exponentialRampToValueAtTime(0.07, startAt + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, endAt);
+      osc.start(startAt);
+      osc.stop(endAt);
+    });
   }, []);
 
   useEffect(() => {
@@ -368,7 +405,8 @@ export default function AppShell({ title, children, showTopBar = true }) {
               type: "info",
               title: "New Visitor Request",
               message: "A visitor is requesting access.",
-              duration: 3200
+              duration: 3200,
+              kind: "visitor.request"
             }
           })
         );
@@ -380,45 +418,6 @@ export default function AppShell({ title, children, showTopBar = true }) {
   }, [unreadVisitRequestIds]);
 
   useEffect(() => {
-    function stopRinging() {
-      if (ringTimerRef.current) {
-        clearInterval(ringTimerRef.current);
-        ringTimerRef.current = null;
-      }
-    }
-
-    function playRing() {
-      if (typeof window === "undefined") return;
-      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-      if (!AudioContextClass) return;
-
-      if (!audioContextRef.current) {
-        audioContextRef.current = new AudioContextClass();
-      }
-      const ctx = audioContextRef.current;
-      if (ctx.state === "suspended") {
-        ctx.resume().catch(() => {});
-      }
-
-      const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-      gain.connect(ctx.destination);
-
-      const tones = [880, 660];
-      tones.forEach((frequency, index) => {
-        const startAt = ctx.currentTime + index * 0.2;
-        const endAt = startAt + 0.16;
-        const osc = ctx.createOscillator();
-        osc.type = "sine";
-        osc.frequency.setValueAtTime(frequency, startAt);
-        osc.connect(gain);
-        gain.gain.exponentialRampToValueAtTime(0.07, startAt + 0.02);
-        gain.gain.exponentialRampToValueAtTime(0.0001, endAt);
-        osc.start(startAt);
-        osc.stop(endAt);
-      });
-    }
-
     if (soundAlertsEnabled && unreadVisitRequestIds.length > 0 && !muteVisitRing) {
       playRing();
       if (!ringTimerRef.current) {
@@ -429,7 +428,20 @@ export default function AppShell({ title, children, showTopBar = true }) {
 
     stopRinging();
     return stopRinging;
-  }, [soundAlertsEnabled, unreadVisitRequestIds, muteVisitRing]);
+  }, [soundAlertsEnabled, unreadVisitRequestIds, muteVisitRing, playRing, stopRinging]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleDismissed = (event) => {
+      const detail = event?.detail ?? {};
+      const kind = String(detail.kind || "").trim();
+      if (kind !== "visitor.request") return;
+      setMuteVisitRing(true);
+      stopRinging();
+    };
+    window.addEventListener("qring:flash_dismissed", handleDismissed);
+    return () => window.removeEventListener("qring:flash_dismissed", handleDismissed);
+  }, [stopRinging]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;

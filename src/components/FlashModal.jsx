@@ -29,7 +29,8 @@ export default function FlashModal() {
               : "Notice");
       const duration = Number.isFinite(Number(detail.duration)) ? Number(detail.duration) : 3600;
 
-      setFlash({ message, type, title });
+      const kind = String(detail.kind ?? "").trim();
+      setFlash({ message, type, title, kind });
       window.clearTimeout(timerRef.current);
       timerRef.current = window.setTimeout(() => setFlash(null), Math.max(1200, duration));
     };
@@ -62,6 +63,19 @@ export default function FlashModal() {
           <button
             type="button"
             onClick={() => {
+              try {
+                window.dispatchEvent(
+                  new CustomEvent("qring:flash_dismissed", {
+                    detail: {
+                      kind: flash.kind || "",
+                      title: flash.title,
+                      message: flash.message
+                    }
+                  })
+                );
+              } catch {
+                // Ignore event dispatch failures.
+              }
               window.clearTimeout(timerRef.current);
               setFlash(null);
             }}
