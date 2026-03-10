@@ -20,6 +20,7 @@ export default function SessionAudioPage() {
     status,
     networkQuality,
     featureError,
+    callConnectedAt,
     localStreamRef,
     remoteMuted,
     remoteAudioRef,
@@ -40,16 +41,15 @@ export default function SessionAudioPage() {
   const showReconnectBanner = networkQuality === "reconnecting" || networkQuality === "slow";
 
   useEffect(() => {
-    if (callState !== "connected") {
+    if (callState !== "connected" || !callConnectedAt) {
       setConnectedSeconds(0);
       return;
     }
-    const start = Date.now();
     const timer = setInterval(() => {
-      setConnectedSeconds(Math.max(0, Math.floor((Date.now() - start) / 1000)));
+      setConnectedSeconds(Math.max(0, Math.floor((Date.now() - callConnectedAt) / 1000)));
     }, 1000);
     return () => clearInterval(timer);
-  }, [callState]);
+  }, [callState, callConnectedAt]);
 
   return (
     <div className="min-h-screen bg-[#0b1118] text-white">

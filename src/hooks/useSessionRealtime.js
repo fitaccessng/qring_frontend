@@ -211,6 +211,7 @@ export function useSessionRealtime(sessionId) {
   const [networkDetail, setNetworkDetail] = useState("Connecting...");
   const [callLaunchStage, setCallLaunchStage] = useState("idle");
   const [callLaunchStartedAt, setCallLaunchStartedAt] = useState(null);
+  const [callConnectedAt, setCallConnectedAt] = useState(null);
   const [incomingCall, setIncomingCall] = useState({
     pending: false,
     hasVideo: false,
@@ -1225,16 +1226,16 @@ export function useSessionRealtime(sessionId) {
       setStatus("Call service is unavailable. LiveKit URL is not configured.");
       return;
     }
-    const startWithVideo = !autoLowBandwidthActive;
+    const startWithVideo = !lowBandwidthMode;
     pendingVideoUpgradeRef.current = !startWithVideo;
-  if (!startWithVideo) {
-    setStatus("Weak network detected. Starting audio first, video will connect after stabilization.");
-    emitRealtimeTextAlert({
-      title: "Connection unstable",
-      message: "Network is weak. Starting audio-only to keep the call stable.",
-      type: "warning"
-    });
-  }
+    if (!startWithVideo) {
+      setStatus("Weak network detected. Starting audio first, video will connect after stabilization.");
+      emitRealtimeTextAlert({
+        title: "Connection unstable",
+        message: "Network is weak. Starting audio-only to keep the call stable.",
+        type: "warning"
+      });
+    }
     startLivekitCall(startWithVideo);
   }
 
@@ -1289,6 +1290,8 @@ export function useSessionRealtime(sessionId) {
             type: "warning"
           });
         }
+        setAcceptedCallMode(allowVideo ? "video" : "audio");
+        const joinedAt = Date.now();
         await attachLocalStream({ video: allowVideo });
         if (localStreamRef.current) {
           localStreamRef.current.getAudioTracks().forEach((track) => {
@@ -1303,8 +1306,10 @@ export function useSessionRealtime(sessionId) {
         socketRef.current?.emit("webrtc.answer", { sessionId, sdp: answer });
         socketRef.current?.emit("call.accepted", {
           sessionId,
-          hasVideo: allowVideo
+          hasVideo: allowVideo,
+          joinedAt
         });
+        setCallConnectedAt(joinedAt);
         setCallState("connected");
         setCallLaunchStage("idle");
         setCallLaunchStartedAt(null);
@@ -1315,7 +1320,6 @@ export function useSessionRealtime(sessionId) {
           callSessionId: incomingSnapshot.callSessionId || "",
           visitorId: incomingSnapshot.visitorId || "",
         });
-        setAcceptedCallMode(allowVideo ? "video" : "audio");
         pendingOfferRef.current = null;
       } catch (error) {
         setStatus(error?.message ?? "Failed to accept incoming call");
@@ -1338,7 +1342,7 @@ export function useSessionRealtime(sessionId) {
     }
     try {
       setStatus("");
-      const allowVideo = incomingSnapshot.hasVideo && !autoLowBandwidthActive;
+      const allowVideo = incomingSnapshot.hasVideo && !lowBandwidthMode;
       pendingVideoUpgradeRef.current = Boolean(incomingSnapshot.hasVideo) && !allowVideo;
       if (incomingSnapshot.hasVideo && !allowVideo) {
         setStatus("Weak network detected. Joining audio first, then upgrading to video.");
@@ -1348,11 +1352,13 @@ export function useSessionRealtime(sessionId) {
           type: "warning"
         });
       }
+      setAcceptedCallMode(allowVideo ? "video" : "audio");
       const callSessionId = incomingSnapshot.callSessionId;
       if (!callSessionId) {
         throw new Error("Call session was not provided.");
       }
       callSessionRef.current = callSessionId;
+      const joinedAt = Date.now();
       const auth = await apiRequest("/calls/join", {
         method: "POST",
         body: JSON.stringify({
@@ -1363,8 +1369,10 @@ export function useSessionRealtime(sessionId) {
       });
       socketRef.current?.emit("call.accepted", {
         sessionId,
-        hasVideo: allowVideo
+        hasVideo: allowVideo,
+        joinedAt
       });
+      setCallConnectedAt(joinedAt);
       setCallState("connecting");
       await connectLivekitRoom({ video: allowVideo, auth: auth?.data ?? auth });
       setCallState("connected");
@@ -1381,7 +1389,6 @@ export function useSessionRealtime(sessionId) {
         callSessionId,
         visitorId: incomingSnapshot.visitorId || getVisitorIdentity(),
       });
-      setAcceptedCallMode(allowVideo ? "video" : "audio");
       pendingOfferRef.current = null;
       acceptingCallRef.current = false;
     } catch (error) {
@@ -1411,6 +1418,7 @@ export function useSessionRealtime(sessionId) {
       setCallState("idle");
       setCallLaunchStage("idle");
       setCallLaunchStartedAt(null);
+      setCallConnectedAt(null);
       setAcceptedCallMode("");
       clearCallAcceptIntent();
       clearIncomingCall();
@@ -1448,6 +1456,7 @@ export function useSessionRealtime(sessionId) {
     setCallState("idle");
     setCallLaunchStage("idle");
     setCallLaunchStartedAt(null);
+    setCallConnectedAt(null);
     setAcceptedCallMode("");
     clearCallAcceptIntent();
     clearIncomingCall();
@@ -1613,6 +1622,7 @@ export function useSessionRealtime(sessionId) {
       setCallState("ended");
       setCallLaunchStage("idle");
       setCallLaunchStartedAt(null);
+      setCallConnectedAt(null);
       setCameraOn(false);
       setMuted(false);
       setRemoteMuted(false);
@@ -1654,6 +1664,7 @@ export function useSessionRealtime(sessionId) {
     setCallState("ended");
     setCallLaunchStage("idle");
     setCallLaunchStartedAt(null);
+    setCallConnectedAt(null);
     setCameraOn(false);
     setMuted(false);
     setRemoteMuted(false);
@@ -1820,6 +1831,11 @@ export function useSessionRealtime(sessionId) {
       setCallLaunchStartedAt(null);
       setStatus("Visitor joined the call.");
       markNetworkGood("Call connected.");
+      if (payload?.joinedAt) {
+        setCallConnectedAt(payload.joinedAt);
+      } else {
+        setCallConnectedAt(Date.now());
+      }
       if (lastInviteHasVideoRef.current && payload?.hasVideo === false) {
         emitRealtimeTextAlert({
           title: "Connection unstable",
@@ -2160,6 +2176,7 @@ export function useSessionRealtime(sessionId) {
     networkDetail,
     callLaunchStage,
     callLaunchStartedAt,
+    callConnectedAt,
     featureError,
     localVideoRef,
     remoteVideoRef,

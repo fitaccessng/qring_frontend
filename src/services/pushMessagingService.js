@@ -17,6 +17,7 @@ function getMessagingServiceWorkerUrl() {
 
 async function ensureMessagingReady() {
   if (!isFirebaseConfigured || !app) return null;
+  if (!import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID) return null;
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) return null;
   if (!(await isSupported())) return null;
   const registration = await navigator.serviceWorker.register(getMessagingServiceWorkerUrl(), { scope: "/" });
