@@ -266,6 +266,7 @@ export default function AppShell({ title, children, showTopBar = true }) {
 
     async function loadNotifications() {
       if (unauthorized) return;
+      if (typeof navigator !== "undefined" && navigator.onLine === false) return;
       const token = localStorage.getItem("qring_access_token");
       if (!token) {
         notificationsCache = [];
@@ -298,11 +299,14 @@ export default function AppShell({ title, children, showTopBar = true }) {
     const interval = setInterval(loadNotifications, 20000);
     const handleNotificationsUpdated = () => loadNotifications();
     window.addEventListener("qring:notifications-updated", handleNotificationsUpdated);
+    const handleOnline = () => loadNotifications();
+    window.addEventListener("online", handleOnline);
 
     return () => {
       active = false;
       clearInterval(interval);
       window.removeEventListener("qring:notifications-updated", handleNotificationsUpdated);
+      window.removeEventListener("online", handleOnline);
     };
   }, []);
 

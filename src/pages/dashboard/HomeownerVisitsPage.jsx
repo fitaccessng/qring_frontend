@@ -27,6 +27,7 @@ export default function HomeownerVisitsPage() {
   const [activeTab, setActiveTab] = useState("all");
   const [selectedDate, setSelectedDate] = useState(() => toDateKey(new Date()));
   const inFlightRef = useRef(false);
+  const approvedSessionIdsRef = useRef(new Set());
 
   const loadVisits = useCallback(async ({ background = false, force = false } = {}) => {
     if (inFlightRef.current && !force) return;
@@ -40,7 +41,27 @@ export default function HomeownerVisitsPage() {
         getHomeownerVisits(),
         getHomeownerAppointments()
       ]);
-      setRows(visitData);
+      const approvedIds = approvedSessionIdsRef.current;
+      const normalized = (visitData || []).map((row) => {
+        const status = String(row?.status || "").toLowerCase();
+        const sessionStatus = String(row?.sessionStatus || "").toLowerCase();
+        const isApproved =
+          ["approved", "active", "accepted"].includes(sessionStatus) ||
+          ["approved", "active", "accepted"].includes(status);
+        const isClosed = ["closed", "completed"].includes(sessionStatus) || status === "completed";
+        if (isApproved) approvedIds.add(row.id);
+        if (isClosed) approvedIds.delete(row.id);
+        if (approvedIds.has(row.id)) {
+          return {
+            ...row,
+            status: row.status || "Approved",
+            sessionStatus: sessionStatus || "approved",
+            canDecide: false
+          };
+        }
+        return row;
+      });
+      setRows(normalized);
       setAppointments(appointmentData);
     } catch (requestError) {
       if (!background) {
@@ -119,6 +140,9 @@ export default function HomeownerVisitsPage() {
         window.dispatchEvent(new Event("qring:notifications-updated"));
       } catch {
         // Keep decision flow non-blocking.
+      }
+      if (action === "approve") {
+        approvedSessionIdsRef.current.add(sessionId);
       }
       setRows((prev) =>
         prev.map((row) =>
@@ -326,9 +350,18 @@ function MiniStat({ label, value }) {
 
 function ActionRow({ row, busyId, endingId, onApprove, onReject, onOpen, onEnd }) {
   const btn = "rounded-lg px-3 py-1.5 text-[11px] sm:text-xs";
+  const status = String(row?.status || "").toLowerCase();
+  const sessionStatus = String(row?.sessionStatus || "").toLowerCase();
+  const isApproved =
+    ["approved", "active", "accepted"].includes(sessionStatus) ||
+    ["approved", "active", "accepted"].includes(status);
+  const isClosed = ["closed", "completed"].includes(sessionStatus) || status === "completed";
+  const decisionAllowed = Boolean(row?.canDecide) && !isApproved && !isClosed;
+  const canOpenSession = isApproved && !isClosed;
+
   return (
     <div className="mt-3 flex flex-wrap gap-2">
-      {row.canDecide ? (
+      {decisionAllowed ? (
         <>
           <button type="button" disabled={busyId === row.id} onClick={onApprove} className={`${btn} bg-success font-semibold text-white disabled:opacity-50`}>
             Approve
@@ -337,7 +370,7 @@ function ActionRow({ row, busyId, endingId, onApprove, onReject, onOpen, onEnd }
             Reject
           </button>
         </>
-      ) : row.sessionStatus === "approved" || row.sessionStatus === "active" ? (
+      ) : canOpenSession ? (
         <>
           <button type="button" onClick={onOpen} className={`${btn} bg-brand-500 font-semibold text-white`}>
             Open Session

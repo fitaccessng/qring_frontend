@@ -1,6 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { io } from "socket.io-client";
 import { apiRequest } from "../../services/apiClient";
+import { env } from "../../config/env";
+import { realtimeTransportOptions } from "../../services/socketConfig";
 import { getVisitorSessionStatus } from "../../services/homeownerService";
 
 const RETRYABLE_STATUSES = new Set([0, 502, 503, 504]);
@@ -77,6 +80,7 @@ export default function ScanPage() {
   const [seconds, setSeconds] = useState(0);
   const [requestLatencyMs, setRequestLatencyMs] = useState(0);
   const visitorDeviceId = useMemo(() => getOrCreateVisitorDeviceId(), []);
+  const socketRef = useRef(null);
   const [visitorForm, setVisitorForm] = useState({
     name: "",
     purpose: ""
@@ -123,7 +127,7 @@ export default function ScanPage() {
   useEffect(() => {
     if (!requestState.sent || !requestState.sessionId) return;
     let active = true;
-    const id = setInterval(async () => {
+    const poll = async () => {
       try {
         const data = await getVisitorSessionStatus(requestState.sessionId);
         if (!active || !data?.status) return;
@@ -131,7 +135,9 @@ export default function ScanPage() {
       } catch {
         // silent poll failures
       }
-    }, 3000);
+    };
+    poll();
+    const id = setInterval(poll, 1000);
     return () => {
       active = false;
       clearInterval(id);
@@ -143,6 +149,37 @@ export default function ScanPage() {
     if (requestState.status !== "approved" && requestState.status !== "active") return;
     navigate(`/session/${requestState.sessionId}/message`, { replace: true });
   }, [navigate, requestState.sessionId, requestState.status]);
+
+  useEffect(() => {
+    if (!requestState.sent || !requestState.sessionId) return;
+    const socket = io(`${env.socketUrl}${env.signalingNamespace ?? "/realtime/signaling"}`, {
+      path: env.socketPath,
+      ...realtimeTransportOptions,
+      reconnection: true,
+      reconnectionAttempts: 6,
+      reconnectionDelay: 400,
+      reconnectionDelayMax: 2000,
+      timeout: 7000,
+      auth: (cb) => cb({})
+    });
+    socketRef.current = socket;
+
+    socket.on("connect", () => {
+      socket.emit("session.join", { sessionId: requestState.sessionId, displayName: "Visitor" });
+    });
+
+    socket.on("session.status", (payload) => {
+      if (payload?.sessionId !== requestState.sessionId) return;
+      const status = String(payload?.status || "");
+      if (!status) return;
+      setRequestState((prev) => ({ ...prev, status }));
+    });
+
+    return () => {
+      socketRef.current = null;
+      socket.disconnect();
+    };
+  }, [requestState.sent, requestState.sessionId]);
 
   const onSubmit = async (event) => {
     event.preventDefault();
