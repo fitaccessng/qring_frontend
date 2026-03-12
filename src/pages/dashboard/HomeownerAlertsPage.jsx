@@ -58,6 +58,10 @@ export default function HomeownerAlertsPage() {
       const payload = { paymentMethod: method };
       if (reference) payload.reference = reference;
       const data = await payEstateAlert(alertId, payload);
+      if (data?.stale) {
+        await load();
+        return;
+      }
       if (data?.authorizationUrl) {
         window.location.assign(data.authorizationUrl);
         return;
@@ -98,7 +102,11 @@ export default function HomeownerAlertsPage() {
     setRespondingAlertId(alertId);
     setError("");
     try {
-      await respondEstateMeeting(alertId, response);
+      const res = await respondEstateMeeting(alertId, response);
+      if (res?.stale) {
+        await load();
+        return;
+      }
       await load();
     } catch (requestError) {
       setError(requestError?.message ?? "Unable to submit response");
@@ -112,7 +120,11 @@ export default function HomeownerAlertsPage() {
     setVotingAlertId(alertId);
     setError("");
     try {
-      await voteEstatePoll(alertId, optionIndex);
+      const res = await voteEstatePoll(alertId, optionIndex);
+      if (res?.stale) {
+        await load();
+        return;
+      }
       await load();
     } catch (requestError) {
       setError(requestError?.message ?? "Unable to vote");

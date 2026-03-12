@@ -74,7 +74,6 @@ import FlashModal from "./components/FlashModal";
 import BlockingModal from "./components/BlockingModal";
 import AppPreloader from "./components/mobile/AppPreloader";
 import NotificationModal from "./components/NotificationModal";
-import ReconnectBanner from "./components/ReconnectBanner";
 import { env } from "./config/env";
 
 export default function App() {
@@ -127,7 +126,6 @@ function AppRoutes() {
         <AppPreloader />
       ) : (
         <>
-          <ReconnectBanner />
           <GlobalNotifications />
           <div className="animate-screen-enter">
             <Routes location={location}>

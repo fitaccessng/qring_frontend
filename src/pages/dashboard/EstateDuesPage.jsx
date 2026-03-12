@@ -254,6 +254,15 @@ export default function EstateDuesPage() {
     setError("");
     try {
       const res = await sendEstateAlertReminder(alertId);
+      if (res?.stale) {
+        const [rows, paymentRows] = await Promise.all([
+          listEstateAlerts(estateId, "payment_request"),
+          listEstateAlertPayments(estateId)
+        ]);
+        setAlerts(rows);
+        setPayments(paymentRows);
+        return;
+      }
       showSuccess(`Reminder sent to ${res?.reminded ?? 0} homeowners.`);
     } catch (err) {
       setError(err?.message || "Failed to send reminders");
@@ -268,12 +277,22 @@ export default function EstateDuesPage() {
     setVerifyingKey(key);
     setError("");
     try {
-      await verifyEstateAlertPayment(alertId, {
+      const res = await verifyEstateAlertPayment(alertId, {
         homeownerId: homeowner.homeownerId,
         paymentMethod: homeowner.paymentMethod,
         reference: homeowner.reference,
         receiptUrl: homeowner.receiptUrl
       });
+      if (res?.stale) {
+        const [rows, paymentRows] = await Promise.all([
+          listEstateAlerts(estateId, "payment_request"),
+          listEstateAlertPayments(estateId)
+        ]);
+        setAlerts(rows);
+        setPayments(paymentRows);
+        closeReview();
+        return;
+      }
       showSuccess(`Marked payment as paid for ${homeowner.homeownerName || "Homeowner"}.`);
       const [rows, paymentRows] = await Promise.all([
         listEstateAlerts(estateId, "payment_request"),

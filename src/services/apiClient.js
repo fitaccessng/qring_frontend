@@ -247,9 +247,6 @@ export async function apiRequest(path, options = {}, attempt = 0) {
       body: options.body
     });
   } catch (networkError) {
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("qring:reconnect", { detail: { status: "show" } }));
-    }
     if (isGet) {
       const cached = readGetCache(cacheKey);
       if (cached && cached.ageMs < GET_CACHE_STALE_TTL_MS) {
@@ -263,11 +260,6 @@ export async function apiRequest(path, options = {}, attempt = 0) {
     }
     const message =
       "We couldn't connect right now. Please check your internet and try again in a moment. If this is your first request, the server may still be waking up.";
-    const now = Date.now();
-    if (!silent && now - lastNetworkErrorAt > 15000) {
-      emitFlash(message, "error");
-      lastNetworkErrorAt = now;
-    }
     throw new ApiError(
       message,
       0,
@@ -312,10 +304,6 @@ export async function apiRequest(path, options = {}, attempt = 0) {
       response.status,
       payload
     );
-  }
-
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent("qring:reconnect", { detail: { status: "hide" } }));
   }
 
   if (isGet && !noCache) {

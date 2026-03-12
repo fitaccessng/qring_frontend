@@ -172,42 +172,67 @@ export async function listMyEstateAlerts() {
 }
 
 export async function respondEstateMeeting(alertId, response) {
-  const res = await apiRequest(`/estate/alerts/${encodeURIComponent(alertId)}/meeting-response`, {
-    method: "POST",
-    body: JSON.stringify({ response })
-  });
-  return res?.data ?? null;
+  try {
+    const res = await apiRequest(`/estate/alerts/${encodeURIComponent(alertId)}/meeting-response`, {
+      method: "POST",
+      body: JSON.stringify({ response })
+    });
+    return res?.data ?? null;
+  } catch (error) {
+    if (error?.status === 404) return { stale: true, alertId };
+    throw error;
+  }
 }
 
 export async function voteEstatePoll(alertId, optionIndex) {
-  const res = await apiRequest(`/estate/alerts/${encodeURIComponent(alertId)}/poll-vote`, {
-    method: "POST",
-    body: JSON.stringify({ optionIndex })
-  });
-  return res?.data ?? null;
+  try {
+    const res = await apiRequest(`/estate/alerts/${encodeURIComponent(alertId)}/poll-vote`, {
+      method: "POST",
+      body: JSON.stringify({ optionIndex })
+    });
+    return res?.data ?? null;
+  } catch (error) {
+    if (error?.status === 404) return { stale: true, alertId };
+    throw error;
+  }
 }
 
 export async function sendEstateAlertReminder(alertId) {
-  const res = await apiRequest(`/estate/alerts/${encodeURIComponent(alertId)}/remind`, {
-    method: "POST"
-  });
-  return res?.data ?? null;
+  try {
+    const res = await apiRequest(`/estate/alerts/${encodeURIComponent(alertId)}/remind`, {
+      method: "POST"
+    });
+    return res?.data ?? null;
+  } catch (error) {
+    if (error?.status === 404) return { stale: true, alertId };
+    throw error;
+  }
 }
 
 export async function verifyEstateAlertPayment(alertId, payload) {
-  const res = await apiRequest(`/estate/alerts/${encodeURIComponent(alertId)}/payments/verify`, {
-    method: "POST",
-    body: JSON.stringify(payload)
-  });
-  return res?.data ?? null;
+  try {
+    const res = await apiRequest(`/estate/alerts/${encodeURIComponent(alertId)}/payments/verify`, {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+    return res?.data ?? null;
+  } catch (error) {
+    if (error?.status === 404) return { stale: true, alertId };
+    throw error;
+  }
 }
 
 export async function payEstateAlert(alertId, payload = { paymentMethod: "paystack" }) {
-  const response = await apiRequest(`/alert/${encodeURIComponent(alertId)}/pay`, {
-    method: "POST",
-    body: JSON.stringify(payload)
-  });
-  return response?.data ?? null;
+  try {
+    const response = await apiRequest(`/alert/${encodeURIComponent(alertId)}/pay`, {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+    return response?.data ?? null;
+  } catch (error) {
+    if (error?.status === 404) return { stale: true, alertId };
+    throw error;
+  }
 }
 
 export async function listEstateAlertPayments(estateId) {
