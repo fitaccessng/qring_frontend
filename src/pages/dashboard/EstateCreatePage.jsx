@@ -2,13 +2,13 @@
 import AppShell from "../../layouts/AppShell";
 import { env } from "../../config/env";
 import { createEstate, createEstateSharedQr, getEstateOverview, listEstateSharedQrs } from "../../services/estateService";
+import { showError, showSuccess } from "../../utils/flash";
 
 export default function EstateCreatePage() {
   const [name, setName] = useState("");
   const [estates, setEstates] = useState([]);
   const [estateQrByEstateId, setEstateQrByEstateId] = useState({});
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [qrBusyEstateId, setQrBusyEstateId] = useState("");
 
@@ -20,6 +20,10 @@ export default function EstateCreatePage() {
   useEffect(() => {
     load().catch((requestError) => setError(requestError.message ?? "Failed to load estates"));
   }, []);
+  
+  useEffect(() => {
+    if (error) showError(error);
+  }, [error]);
 
   useEffect(() => {
     let active = true;
@@ -48,10 +52,9 @@ export default function EstateCreatePage() {
     event.preventDefault();
     setBusy(true);
     setError("");
-    setNotice("");
     try {
       const created = await createEstate({ name });
-      setNotice(`Estate created: ${created?.name ?? name}`);
+      showSuccess(`Estate created: ${created?.name ?? name}`);
       if (created?.id) {
         setEstates((prev) => {
           const nextRow = {
@@ -83,10 +86,9 @@ export default function EstateCreatePage() {
   async function handleGenerateSharedQr(estateId) {
     setQrBusyEstateId(estateId);
     setError("");
-    setNotice("");
     try {
       const created = await createEstateSharedQr(estateId);
-      setNotice(`Estate QR created: ${created?.qrId ?? "ready"}`);
+      showSuccess(`Estate QR created: ${created?.qrId ?? "ready"}`);
       const rows = await listEstateSharedQrs(estateId);
       setEstateQrByEstateId((prev) => ({ ...prev, [estateId]: rows }));
     } catch (requestError) {
@@ -99,8 +101,6 @@ export default function EstateCreatePage() {
   return (
     <AppShell title="Create Estate">
       <div className="mx-auto max-w-7xl space-y-6">
-        {error ? <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600 dark:border-red-900/20 dark:bg-red-900/10 dark:text-red-400">{error}</div> : null}
-        {notice ? <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-900/20 dark:bg-emerald-900/10 dark:text-emerald-400">{notice}</div> : null}
 
         <section className="relative overflow-hidden rounded-[2.5rem] bg-slate-900 p-8 text-white dark:bg-indigo-600">
           <div className="relative z-10">

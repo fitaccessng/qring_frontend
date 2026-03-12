@@ -19,9 +19,11 @@ const navByRole = {
     { to: "/dashboard/homeowner/appointments", label: "Appointments", icon: "appointments" },
     { to: "/dashboard/homeowner/visits", label: "Visits", icon: "visits" },
     { to: "/dashboard/homeowner/messages", label: "Messages", icon: "messages" },
+    { to: "/dashboard/homeowner/alerts", label: "Alerts", icon: "bell_ring" },
     { to: "/dashboard/homeowner/doors", label: "Doors", icon: "doors" },
     { to: "/dashboard/homeowner/live-queue", label: "Live Queue", icon: "queue" },
     { to: "/dashboard/homeowner/receipts", label: "Receipts", icon: "receipt" },
+    { to: "/dashboard/homeowner/maintenance", label: "Maintenance", icon: "maintenance" },
     { to: "/billing/paywall", label: "Billing", icon: "billing" },
     { to: "/dashboard/homeowner/settings", label: "Settings", icon: "settings" }
   ],
@@ -31,6 +33,12 @@ const navByRole = {
     { to: "/dashboard/estate/doors", label: "Add Doors", icon: "doors" },
     { to: "/dashboard/estate/assign", label: "Assign Doors", icon: "assign" },
     { to: "/dashboard/estate/invites", label: "Invite Owners", icon: "invite" },
+    { to: "/dashboard/estate/broadcasts", label: "Broadcasts", icon: "broadcast" },
+    { to: "/dashboard/estate/meetings", label: "Meetings", icon: "meeting" },
+    { to: "/dashboard/estate/polls", label: "Polls", icon: "polls" },
+    { to: "/dashboard/estate/dues", label: "Dues", icon: "dues" },
+    { to: "/dashboard/estate/maintenance", label: "Maintenance", icon: "maintenance" },
+    { to: "/dashboard/estate/stats", label: "Visitor Stats", icon: "stats" },
     { to: "/dashboard/estate/mappings", label: "Mappings", icon: "mappings" },
     { to: "/dashboard/estate/logs", label: "Access Logs", icon: "logs" },
     { to: "/dashboard/estate/plan", label: "Plan Rules", icon: "plans" },
@@ -68,13 +76,18 @@ function onboardingSeenForUser(user) {
   if (user?.id) {
     keys.push(`qring_dashboard_welcome_seen_${role}_id:${user.id}`);
     keys.push(`qring_dashboard_welcome_seen_${role}_${user.id}`);
+    keys.push(`qring_onboarding_seen_${role}_id:${user.id}`);
+    keys.push(`qring_onboarding_seen_${role}_${user.id}`);
   }
   if (user?.email) {
     const email = String(user.email).trim().toLowerCase();
     keys.push(`qring_dashboard_welcome_seen_${role}_email:${email}`);
     keys.push(`qring_dashboard_welcome_seen_${role}_${email}`);
+    keys.push(`qring_onboarding_seen_${role}_email:${email}`);
+    keys.push(`qring_onboarding_seen_${role}_${email}`);
   }
   keys.push(`qring_dashboard_welcome_seen_${role}_anonymous`);
+  keys.push(`qring_onboarding_seen_${role}_anonymous`);
   return keys.some((key) => localStorage.getItem(key) === "true");
 }
 
@@ -86,6 +99,11 @@ export default function AppShell({ title, children, showTopBar = true }) {
     const path = location?.pathname || "";
     return path === "/dashboard/homeowner/overview" || path === "/dashboard/estate";
   }, [location?.pathname]);
+  const showBackHeader = useMemo(() => {
+    if (!showTopBar) return false;
+    if (showProfileHeader) return false;
+    return user?.role === "estate" || user?.role === "homeowner";
+  }, [showTopBar, showProfileHeader, user?.role]);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [homeownerContext, setHomeownerContext] = useState(null);
@@ -627,6 +645,11 @@ export default function AppShell({ title, children, showTopBar = true }) {
               <NavLink
                 key={item.to}
                 to={item.to}
+                end={
+                  item.to === "/dashboard/estate" ||
+                  item.to === "/dashboard/homeowner/overview" ||
+                  item.to === "/dashboard/admin"
+                }
                 className={({ isActive }) =>
                   `group relative flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-semibold transition-all ${
                     isActive
@@ -654,14 +677,7 @@ export default function AppShell({ title, children, showTopBar = true }) {
               </button>
             ) : null}
           </nav>
-          <div className="mt-8 rounded-2xl bg-slate-100 p-4 dark:bg-slate-800">
-            <p className="text-xs uppercase tracking-wide text-slate-500">Live Status</p>
-            <p className="mt-2 text-sm font-semibold">Realtime services operational</p>
-            <div className="mt-3 inline-flex items-center gap-2 rounded-lg bg-success/15 px-2 py-1 text-xs font-semibold text-success">
-              <span className="h-2 w-2 rounded-full bg-success" />
-              Connected
-            </div>
-          </div>
+          
         </aside>
 
         <main className={`safe-content relative flex-1 overflow-y-auto px-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:px-5 lg:ml-72 lg:px-10 lg:pb-8 ${mobileContentBottomPaddingClass} ${showTopBar ? "pt-[calc(12.75rem+env(safe-area-inset-top))] sm:pt-[calc(7rem+env(safe-area-inset-top))] lg:pt-[7.35rem]" : "pt-[calc(1.1rem+env(safe-area-inset-top))] sm:pt-[calc(1.2rem+env(safe-area-inset-top))] lg:pt-6"}`}>
@@ -691,6 +707,23 @@ export default function AppShell({ title, children, showTopBar = true }) {
                     </div>
                     <div className="min-w-0">
                       <p className="truncate text-[11px] font-semibold text-slate-500">Hello!</p>
+                      <p className="truncate text-sm font-black text-slate-900 dark:text-white sm:text-base">{title || profileName}</p>
+                    </div>
+                  </div>
+                ) : null}
+                {showBackHeader ? (
+                  <div className="flex items-center gap-2.5">
+                    <button
+                      type="button"
+                      onClick={handleBack}
+                      className="grid h-9 w-9 place-items-center rounded-full bg-slate-100 text-slate-500 transition-all active:scale-95 dark:bg-slate-800 dark:text-slate-300"
+                      aria-label="Go back"
+                      title="Back"
+                    >
+                      <BackIcon />
+                    </button>
+                    <div className="min-w-0">
+                      <p className="truncate text-[11px] font-semibold text-slate-500">Back</p>
                       <p className="truncate text-sm font-black text-slate-900 dark:text-white sm:text-base">{title || profileName}</p>
                     </div>
                   </div>
@@ -780,7 +813,6 @@ export default function AppShell({ title, children, showTopBar = true }) {
           </header>
           ) : null}
           <div className={`dashboard-canvas ${showTopBar ? "pt-20 sm:pt-12 lg:pt-1" : "pt-0"}`}>
-            {user?.role === "estate" ? <EstateQuickNav currentPath={location.pathname} /> : null}
             {children}
             <div className={mobileBottomSpacerClass} aria-hidden="true" />
           </div>
@@ -922,6 +954,12 @@ function NavIcon({ name }) {
     queue: <path d="M4 7h14M4 12h10M4 17h8M18 7v10M15 14l3 3 3-3" />,
     receipt: <path d="M6 3h12v18l-2-1-2 1-2-1-2 1-2-1-2 1zM9 8h6M9 12h6M9 16h4" />,
     community: <path d="M4 5h16v10H8l-4 4zM9 9h6M9 12h4" />,
+    broadcast: <path d="M4 12h16M4 7h10M4 17h10M18 7v10" />,
+    meeting: <path d="M7 2v3M17 2v3M4 8h16M5 5h14a1 1 0 0 1 1 1v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a1 1 0 0 1 1-1zM8 12h8M8 15h5" />,
+    polls: <path d="M4 19h4V9H4zM10 19h4V5h-4zM16 19h4v-7h-4z" />,
+    dues: <path d="M3 7h18v10H3zM3 11h18M7 15h2" />,
+    maintenance: <path d="M12 2l2 2-2 2-2-2 2-2zm-6 8l2 2-2 2-2-2 2-2zm12 0l2 2-2 2-2-2 2-2zM5 19h14" />,
+    stats: <path d="M4 19h16M6 16V8M12 16V5M18 16v-6" />,
     bell_ring: <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5M9 17a3 3 0 0 0 6 0M18 3l2 2M6 3L4 5" />,
     user_admin: <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm10 0v-2m0 0V7m0 2h-2m2 0h2" />,
     sessions: <path d="M8 7h13M8 12h13M8 17h13M3 7h.01M3 12h.01M3 17h.01" />,

@@ -3,12 +3,12 @@ import { Link } from "react-router-dom";
 import AppShell from "../../layouts/AppShell";
 import { createEstateHomeowner, getEstateOverview, inviteHomeowner } from "../../services/estateService";
 import PageSkeleton from "../../components/PageSkeleton";
+import { showError, showSuccess } from "../../utils/flash";
 
 export default function EstateInvitesPage() {
   const [homeowners, setHomeowners] = useState([]);
   const [estates, setEstates] = useState([]);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const [busyUser, setBusyUser] = useState("");
   const [creating, setCreating] = useState(false);
   const [createForm, setCreateForm] = useState({
@@ -40,15 +40,22 @@ export default function EstateInvitesPage() {
       setLoading(false);
     });
   }, []);
+  
+  useEffect(() => {
+    if (error) showError(error);
+  }, [error]);
+
+  function showNotice(message) {
+    showSuccess(message);
+  }
 
   async function sendInvite(homeownerId) {
     setBusyUser(homeownerId);
     setError("");
-    setNotice("");
     try {
       const sent = await inviteHomeowner(homeownerId);
       const emailStatus = sent?.emailStatus ? ` Email: ${sent.emailStatus}.` : "";
-      setNotice(`Invite sent. Token: ${sent?.inviteToken ?? "-"}${emailStatus}`);
+      showNotice(`Invite sent. Token: ${sent?.inviteToken ?? "-"}${emailStatus}`);
     } catch (requestError) {
       setError(requestError.message ?? "Failed to send invite");
     } finally {
@@ -60,10 +67,9 @@ export default function EstateInvitesPage() {
     event.preventDefault();
     setCreating(true);
     setError("");
-    setNotice("");
     try {
       const created = await createEstateHomeowner(createForm);
-      setNotice(`Homeowner created: ${created?.fullName || createForm.fullName}. Send invite from the list below.`);
+      showNotice(`Homeowner created: ${created?.fullName || createForm.fullName}. Send invite from the list below.`);
       if (created?.id) {
         setHomeowners((prev) => {
           const nextRow = {
@@ -91,8 +97,6 @@ export default function EstateInvitesPage() {
   return (
     <AppShell title="Invite Homeowners">
       <div className="mx-auto max-w-7xl space-y-6">
-        {error ? <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600 dark:border-red-900/20 dark:bg-red-900/10 dark:text-red-400">{error}</div> : null}
-        {notice ? <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-900/20 dark:bg-emerald-900/10 dark:text-emerald-400">{notice}</div> : null}
 
         <section className="relative overflow-hidden rounded-[2.5rem] bg-slate-900 p-8 text-white dark:bg-indigo-600">
           <div className="relative z-10">

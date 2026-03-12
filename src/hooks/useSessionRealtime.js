@@ -2038,7 +2038,7 @@ export function useSessionRealtime(sessionId) {
           "incoming_message",
           {
             title: "New Message",
-            message: `${incoming.displayName}: ${incoming.text || "Sent a message"}`,
+            message: `${incoming.displayName}: ${previewMessageText(incoming.text) || "Sent a message"}`,
             type: "info",
             route: `/session/${sessionId}/message`
           },
@@ -2284,4 +2284,11 @@ export function useSessionRealtime(sessionId) {
     rejectIncomingCall,
     retryAudioPlayback
   };
+}
+
+function previewMessageText(text) {
+  if (typeof text !== "string") return "";
+  if (text.startsWith("voice_note_url:")) return "Voice note";
+  if (text.startsWith("voice_note:")) return "Voice note";
+  return text;
 }

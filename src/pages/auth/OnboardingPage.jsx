@@ -74,6 +74,8 @@ export default function OnboardingPage() {
       localStorage.setItem(`qring_dashboard_welcome_seen_${role}_${user.id}`, "true");
       localStorage.setItem(`qring_onboarding_seen_${role}_${user.id}`, "true");
     }
+    localStorage.setItem(`qring_dashboard_welcome_seen_${role}_anonymous`, "true");
+    localStorage.setItem(`qring_onboarding_seen_${role}_anonymous`, "true");
   }
 
   function completeOnboarding() {

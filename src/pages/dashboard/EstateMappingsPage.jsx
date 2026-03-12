@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import AppShell from "../../layouts/AppShell";
 import { getEstateMappings } from "../../services/estateService";
 import PageSkeleton from "../../components/PageSkeleton";
+import { showError } from "../../utils/flash";
 
 export default function EstateMappingsPage() {
   const [mappings, setMappings] = useState([]);
@@ -28,11 +29,14 @@ export default function EstateMappingsPage() {
       mounted = false;
     };
   }, []);
+  
+  useEffect(() => {
+    if (error) showError(error);
+  }, [error]);
 
   return (
     <AppShell title="Door Mappings">
       <div className="mx-auto max-w-7xl space-y-6">
-        {error ? <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600 dark:border-red-900/20 dark:bg-red-900/10 dark:text-red-400">{error}</div> : null}
 
         <section className="relative overflow-hidden rounded-[2.5rem] bg-slate-900 p-8 text-white dark:bg-indigo-600">
           <div className="relative z-10">
@@ -73,4 +77,3 @@ export default function EstateMappingsPage() {
     </AppShell>
   );
 }
-

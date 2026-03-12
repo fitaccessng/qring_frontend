@@ -6,6 +6,8 @@ import AppShell from "../../layouts/AppShell";
 import { env } from "../../config/env";
 import { realtimeTransportOptions } from "../../services/socketConfig";
 import { playMessageNotificationSound } from "../../utils/notificationSound";
+import VoiceNoteRecorder from "../../components/VoiceNoteRecorder";
+import { resolveVoiceNoteUrl, uploadHomeownerVoiceNote } from "../../services/voiceNoteService";
 import {
   deleteHomeownerSessionMessage,
   getHomeownerMessages,
@@ -54,7 +56,7 @@ export default function HomeownerMessagesPage() {
         thread.id === message.sessionId
           ? {
               ...thread,
-              last: message.text,
+              last: previewMessageText(message.text),
               time: message.at,
               unread:
                 selectedIdRef.current === message.sessionId || message.senderType === "homeowner"
@@ -74,8 +76,12 @@ export default function HomeownerMessagesPage() {
       try {
         const data = await getHomeownerMessages();
         if (!active) return;
-        setThreads(data);
-        const sortedThreads = sortThreadsForInbox(data);
+        const normalized = (data || []).map((thread) => ({
+          ...thread,
+          last: previewMessageText(thread?.last || "")
+        }));
+        setThreads(normalized);
+        const sortedThreads = sortThreadsForInbox(normalized);
         const isDesktop = typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches;
         const preferredExists = preferredSessionId && sortedThreads.some((item) => item.id === preferredSessionId);
         setSelectedId((prev) => {
@@ -119,7 +125,13 @@ export default function HomeownerMessagesPage() {
         setMessagesByThread((prev) => ({ ...prev, [selectedId]: rows }));
         const freshThreads = await getHomeownerMessages();
         if (!active) return;
-        setThreads(freshThreads.map((item) => (item.id === selectedId ? { ...item, unread: 0 } : item)));
+        setThreads(
+          freshThreads.map((item) => ({
+            ...item,
+            last: previewMessageText(item?.last || ""),
+            unread: item.id === selectedId ? 0 : item.unread
+          }))
+        );
       } catch (requestError) {
         if (!active) return;
         setError(requestError.message ?? "Failed to load conversation");
@@ -141,7 +153,11 @@ export default function HomeownerMessagesPage() {
         if (!active) return;
         setThreads((prev) => {
           const selected = selectedIdRef.current;
-          return latestThreads.map((item) => (item.id === selected ? { ...item, unread: 0 } : item));
+          return latestThreads.map((item) => ({
+            ...item,
+            last: previewMessageText(item?.last || ""),
+            unread: item.id === selected ? 0 : item.unread
+          }));
         });
       } catch {
         // Keep realtime UX resilient to intermittent network errors.
@@ -170,7 +186,13 @@ export default function HomeownerMessagesPage() {
         ]);
         if (!active) return;
         setMessagesByThread((prev) => ({ ...prev, [selectedId]: rows }));
-        setThreads(latestThreads.map((item) => (item.id === selectedId ? { ...item, unread: 0 } : item)));
+        setThreads(
+          latestThreads.map((item) => ({
+            ...item,
+            last: previewMessageText(item?.last || ""),
+            unread: item.id === selectedId ? 0 : item.unread
+          }))
+        );
       } catch {
         // Keep live view resilient when network/sockets are unstable.
       }
@@ -326,6 +348,40 @@ export default function HomeownerMessagesPage() {
     }
   }
 
+  async function handleSendVoiceNote(file) {
+    if (!selectedId || !file) return false;
+    setSending(true);
+    setError("");
+    try {
+      const upload = await uploadHomeownerVoiceNote(selectedId, file);
+      const url = resolveVoiceNoteUrl(upload?.url);
+      if (!url) return false;
+      const text = `voice_note_url:${url}`;
+      const saved = await sendHomeownerSessionMessage(selectedId, text);
+      const outbound = {
+        id: saved?.id ?? `local-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        sessionId: selectedId,
+        text,
+        senderType: "homeowner",
+        displayName: saved?.displayName || "Homeowner",
+        at: saved?.at || new Date().toISOString()
+      };
+      setMessagesByThread((prev) => {
+        const current = prev[selectedId] ?? [];
+        if (current.some((item) => isLikelyDuplicateMessage(item, outbound))) return prev;
+        return { ...prev, [selectedId]: [...current, outbound] };
+      });
+      upsertThreadPreview(outbound);
+      socketRef.current?.emit("chat.message", outbound);
+      return true;
+    } catch (requestError) {
+      setError(requestError.message ?? "Failed to send voice note");
+      return false;
+    } finally {
+      setSending(false);
+    }
+  }
+
   async function handleDeleteMessage(messageId) {
     if (!selectedId || !messageId || deletingMessageId) return;
     setError("");
@@ -338,7 +394,7 @@ export default function HomeownerMessagesPage() {
         prev.map((thread) => {
           if (thread.id !== selectedId) return thread;
           const latest = nextMessages[nextMessages.length - 1];
-          return { ...thread, last: latest?.text ?? "", time: latest?.at ?? thread.time };
+          return { ...thread, last: previewMessageText(latest?.text ?? ""), time: latest?.at ?? thread.time };
         })
       );
     } catch (requestError) {
@@ -495,7 +551,7 @@ export default function HomeownerMessagesPage() {
                             : "bg-white text-slate-800 dark:bg-slate-800 dark:text-slate-100"
                         }`}
                       >
-                        <p>{message.text}</p>
+                        {renderMessageBody(message.text)}
                         <div className={`mt-1 flex items-center gap-2 text-[11px] ${mine ? "text-slate-300 dark:text-slate-500" : "text-slate-400"}`}>
                           <span>{formatClockTime(message.at)}</span>
                           {mine ? (
@@ -522,6 +578,10 @@ export default function HomeownerMessagesPage() {
                     onChange={(event) => setDraft(event.target.value)}
                     placeholder="Type your message..."
                     className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-900"
+                  />
+                  <VoiceNoteRecorder
+                    onSend={(dataUrl) => handleSendVoiceNote(dataUrl)}
+                    disabled={!selectedId || sending}
                   />
                   <button
                     type="submit"
@@ -567,4 +627,26 @@ function sortThreadsForInbox(rows) {
     const bTime = new Date(b?.time || 0).getTime();
     return bTime - aTime;
   });
+}
+
+function renderMessageBody(text) {
+  if (typeof text !== "string") return <p>{String(text || "")}</p>;
+  if (text.startsWith("voice_note_url:")) {
+    const src = text.replace("voice_note_url:", "");
+    return <audio controls className="mt-2 w-full" src={src} />;
+  }
+  if (text.startsWith("voice_note:")) {
+    const src = text.replace("voice_note:", "");
+    return (
+      <audio controls className="mt-2 w-full" src={src} />
+    );
+  }
+  return <p>{text}</p>;
+}
+
+function previewMessageText(text) {
+  if (typeof text !== "string") return "";
+  if (text.startsWith("voice_note_url:")) return "Voice note";
+  if (text.startsWith("voice_note:")) return "Voice note";
+  return text;
 }

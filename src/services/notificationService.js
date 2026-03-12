@@ -1,7 +1,7 @@
 import { apiRequest } from "./apiClient";
 
 export async function getNotifications() {
-  const response = await apiRequest("/notifications/");
+  const response = await apiRequest("/notifications/", { silent: true });
   return Array.isArray(response?.data) ? response.data : [];
 }
 

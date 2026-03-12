@@ -28,6 +28,7 @@ import { changePassword } from "../../services/authService";
 import { getReferralSummary } from "../../services/paymentService";
 import { useAuth } from "../../state/AuthContext";
 import { useTheme } from "../../state/ThemeContext";
+import { showError, showSuccess } from "../../utils/flash";
 
 const SETTINGS_CACHE_TTL_MS = 60 * 1000;
 const REFERRAL_CACHE_TTL_MS = 60 * 1000;
@@ -82,7 +83,6 @@ export default function HomeownerSettingsPage() {
   const [editProfileOpen, setEditProfileOpen] = useState(false);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const [confirmLeaveOpen, setConfirmLeaveOpen] = useState(false);
-  const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -149,11 +149,14 @@ export default function HomeownerSettingsPage() {
       active = false;
     };
   }, []);
+  
+  useEffect(() => {
+    if (error) showError(error);
+  }, [error]);
 
   async function savePreferences() {
     setSaving(true);
     setError("");
-    setNotice("");
     try {
       const updated = await updateHomeownerSettings(settings);
       setSettings({
@@ -163,7 +166,7 @@ export default function HomeownerSettingsPage() {
       });
       localStorage.setItem("qring_sound_alerts", String(Boolean(updated?.soundAlerts)));
       window.dispatchEvent(new Event("qring:sound-alerts-updated"));
-      setNotice("Preferences saved.");
+      showSuccess("Preferences saved.");
     } catch (requestError) {
       setError(requestError?.message || "Failed to save preferences.");
     } finally {
@@ -177,7 +180,7 @@ export default function HomeownerSettingsPage() {
     try {
       await navigator.clipboard.writeText(code);
       setCopied(true);
-      setNotice("Referral code copied.");
+      showSuccess("Referral code copied.");
       setTimeout(() => setCopied(false), 1800);
     } catch {
       setError("Unable to copy referral code.");
@@ -197,7 +200,7 @@ export default function HomeownerSettingsPage() {
       bio: profile.bio
     };
     localStorage.setItem("qring_user", JSON.stringify(nextUser));
-    setNotice("Profile details updated on this device.");
+    showSuccess("Profile details updated on this device.");
     setEditProfileOpen(false);
   }
 
@@ -205,7 +208,6 @@ export default function HomeownerSettingsPage() {
     event.preventDefault();
     setChangingPassword(true);
     setError("");
-    setNotice("");
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
       setError("New password and confirm password do not match.");
       setChangingPassword(false);
@@ -217,7 +219,7 @@ export default function HomeownerSettingsPage() {
         newPassword: passwordForm.newPassword
       });
       setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
-      setNotice("Password changed successfully.");
+      showSuccess("Password changed successfully.");
       return true;
     } catch (requestError) {
       setError(requestError?.message || "Failed to change password");
@@ -254,17 +256,6 @@ export default function HomeownerSettingsPage() {
   return (
     <AppShell >
       <div className="mx-auto w-full max-w-md px-1 pb-16 md:max-w-3xl lg:max-w-5xl">
-        {error || notice ? (
-          <div
-            className={`mb-4 rounded-2xl border px-4 py-3 text-sm font-semibold ${
-              error
-                ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/30 dark:bg-rose-900/20 dark:text-rose-400"
-                : "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/30 dark:bg-emerald-900/20 dark:text-emerald-400"
-            }`}
-          >
-            {error || notice}
-          </div>
-        ) : null}
 
         {managedByEstate ? (
           <div className="mb-4 rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-xs font-semibold text-indigo-700 dark:border-indigo-900/30 dark:bg-indigo-900/20 dark:text-indigo-300">

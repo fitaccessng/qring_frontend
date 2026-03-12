@@ -10,6 +10,7 @@ import {
   requestSubscription
 } from "../../services/paymentService";
 import { getHomeownerContext } from "../../services/homeownerService";
+import { showError, showSuccess } from "../../utils/flash";
 
 const PLAN_FEATURES = {
   estate_starter: [
@@ -79,7 +80,6 @@ export default function HomeownerPaywallPage() {
   const [submitting, setSubmitting] = useState("");
   const [billingCycle, setBillingCycle] = useState("monthly");
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const [checkoutUrl, setCheckoutUrl] = useState("");
   const [confirmCheckoutOpen, setConfirmCheckoutOpen] = useState(false);
   const navigate = useNavigate();
@@ -114,6 +114,10 @@ export default function HomeownerPaywallPage() {
       active = false;
     };
   }, [navigate, user?.role]);
+  
+  useEffect(() => {
+    if (error) showError(error);
+  }, [error]);
 
   const activePlanName = useMemo(() => {
     if (!subscription?.plan) return "Free";
@@ -135,7 +139,6 @@ export default function HomeownerPaywallPage() {
   async function handleSelectPlan(plan) {
     setSubmitting(plan.id);
     setError("");
-    setNotice("");
 
     try {
       if (!plan.selfServe) {
@@ -152,7 +155,7 @@ export default function HomeownerPaywallPage() {
             maxQrCodes: plan.maxQrCodes
           }
         }));
-        setNotice(
+        showSuccess(
           `Free plan activated. You can manage up to ${plan.maxDoors} door${plan.maxDoors === 1 ? "" : "s"} and ${plan.maxQrCodes} QR code${plan.maxQrCodes === 1 ? "" : "s"}.`
         );
       } else {
@@ -184,16 +187,6 @@ export default function HomeownerPaywallPage() {
 
   return (
     <AppShell >
-      {error ? (
-        <div className="mb-4 rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
-          {error}
-        </div>
-      ) : null}
-      {notice ? (
-        <div className="mb-4 rounded-xl border border-success/30 bg-success/10 px-4 py-3 text-sm text-success">
-          {notice}
-        </div>
-      ) : null}
 
       <section className="rounded-3xl border border-slate-200 bg-white/95 p-4 sm:p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/90">
         <div className="flex flex-wrap items-center justify-between gap-3">

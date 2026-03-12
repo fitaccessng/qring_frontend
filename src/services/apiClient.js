@@ -205,6 +205,8 @@ function redirectToLogin() {
 }
 
 export async function apiRequest(path, options = {}, attempt = 0) {
+  const silent = Boolean(options?.silent);
+  const noCache = Boolean(options?.noCache);
   const token = localStorage.getItem("qring_access_token");
   if (requiresAuthenticatedUser(path) && !token) {
     clearAuthStorage();
@@ -215,7 +217,11 @@ export async function apiRequest(path, options = {}, attempt = 0) {
   const isGet = method === "GET" && !options.body;
   const cacheKey = isGet ? buildCacheKey(path, token) : "";
 
-  if (isGet) {
+  if (!isGet) {
+    getResponseCache.clear();
+  }
+
+  if (isGet && !noCache) {
     const cached = readGetCache(cacheKey);
     if (cached && cached.ageMs < GET_CACHE_TTL_MS) {
       return cached.row.payload;
@@ -240,6 +246,9 @@ export async function apiRequest(path, options = {}, attempt = 0) {
       body: options.body
     });
   } catch (networkError) {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("qring:reconnect", { detail: { status: "show" } }));
+    }
     if (isGet) {
       const cached = readGetCache(cacheKey);
       if (cached && cached.ageMs < GET_CACHE_STALE_TTL_MS) {
@@ -247,9 +256,13 @@ export async function apiRequest(path, options = {}, attempt = 0) {
         return cached.row.payload;
       }
     }
+    if (isGet && attempt < 1) {
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+      return apiRequest(path, options, attempt + 1);
+    }
     const message =
       "We couldn't connect right now. Please check your internet and try again in a moment. If this is your first request, the server may still be waking up.";
-    emitFlash(message, "error");
+    if (!silent) emitFlash(message, "error");
     throw new ApiError(
       message,
       0,
@@ -266,7 +279,7 @@ export async function apiRequest(path, options = {}, attempt = 0) {
 
   if (response.ok && !payload) {
     const message = `API returned an empty/non-JSON success response. Check VITE_API_BASE_URL (${env.apiBaseUrl}) and backend routing.`;
-    emitFlash(message, "error");
+    if (!silent) emitFlash(message, "error");
     throw new ApiError(
       message,
       response.status,
@@ -288,7 +301,7 @@ export async function apiRequest(path, options = {}, attempt = 0) {
     const message = shouldHandleSessionTimeout
       ? "Session timeout. Please login again."
       : payload?.message ?? payload?.detail ?? `Request failed (${response.status})`;
-    emitFlash(message, "error");
+    if (!silent) emitFlash(message, "error");
     throw new ApiError(
       message,
       response.status,
@@ -296,9 +309,65 @@ export async function apiRequest(path, options = {}, attempt = 0) {
     );
   }
 
-  if (isGet) {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("qring:reconnect", { detail: { status: "hide" } }));
+  }
+
+  if (isGet && !noCache) {
     getResponseCache.set(cacheKey, { payload, at: Date.now() });
   }
 
+  return payload;
+}
+
+export async function apiUpload(path, formData) {
+  const token = localStorage.getItem("qring_access_token");
+  if (requiresAuthenticatedUser(path) && !token) {
+    clearAuthStorage();
+    redirectToLogin();
+    throw new ApiError("Session timeout. Please login again.", 401, { path });
+  }
+
+  const headers = {
+    "X-DB-Access-Mode": "write",
+  };
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  let response;
+  try {
+    response = await performHttpRequest(`${env.apiBaseUrl}${path}`, {
+      method: "POST",
+      headers,
+      body: formData
+    });
+  } catch (networkError) {
+    const message =
+      "We couldn't connect right now. Please check your internet and try again in a moment. If this is your first request, the server may still be waking up.";
+    emitFlash(message, "error");
+    throw new ApiError(
+      message,
+      0,
+      {
+        reason: networkError?.message ?? "fetch failed",
+        apiBaseUrl: env.apiBaseUrl,
+        path
+      }
+    );
+  }
+
+  const raw = response.raw;
+  const payload = response.payload;
+  if (response.ok && !payload) {
+    const message = "API returned an empty/non-JSON success response for upload.";
+    emitFlash(message, "error");
+    throw new ApiError(message, response.status, { raw });
+  }
+  if (!response.ok) {
+    const message = payload?.message ?? payload?.detail ?? `Upload failed (${response.status})`;
+    emitFlash(message, "error");
+    throw new ApiError(message, response.status, payload);
+  }
   return payload;
 }

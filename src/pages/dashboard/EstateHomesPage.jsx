@@ -3,12 +3,12 @@ import { Link } from "react-router-dom";
 import AppShell from "../../layouts/AppShell";
 import { addEstateHome, getEstateOverview } from "../../services/estateService";
 import PageSkeleton from "../../components/PageSkeleton";
+import { showError, showSuccess } from "../../utils/flash";
 
 export default function EstateHomesPage() {
   const [overview, setOverview] = useState(null);
   const [form, setForm] = useState({ estateId: "", name: "", homeownerId: "" });
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -34,15 +34,18 @@ export default function EstateHomesPage() {
       setLoading(false);
     });
   }, []);
+  
+  useEffect(() => {
+    if (error) showError(error);
+  }, [error]);
 
   async function onSubmit(event) {
     event.preventDefault();
     setBusy(true);
     setError("");
-    setNotice("");
     try {
       const created = await addEstateHome(form);
-      setNotice("Home added successfully.");
+      showSuccess("Home added successfully.");
       if (created?.id) {
         setOverview((prev) => {
           if (!prev) return prev;
@@ -72,8 +75,6 @@ export default function EstateHomesPage() {
   return (
     <AppShell title="Multi-Home Support">
       <div className="mx-auto max-w-7xl space-y-6">
-        {error ? <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600 dark:border-red-900/20 dark:bg-red-900/10 dark:text-red-400">{error}</div> : null}
-        {notice ? <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-900/20 dark:bg-emerald-900/10 dark:text-emerald-400">{notice}</div> : null}
 
         <section className="relative overflow-hidden rounded-[2.5rem] bg-slate-900 p-8 text-white dark:bg-indigo-600">
           <div className="relative z-10">

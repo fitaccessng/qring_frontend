@@ -1,4 +1,4 @@
-import { apiRequest } from "./apiClient";
+import { apiRequest, apiUpload } from "./apiClient";
 
 export async function getHomeownerVisits() {
   const response = await apiRequest("/homeowner/visits");
@@ -96,6 +96,21 @@ export async function createHomeownerDoor(payload) {
     method: "POST",
     body: JSON.stringify(payload)
   });
+  return response?.data ?? null;
+}
+
+export async function createMaintenanceRequest(payload) {
+  const response = await apiRequest("/homeowner/maintenance-requests", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+  return response?.data ?? null;
+}
+
+export async function uploadPaymentProof(alertId, file) {
+  const formData = new FormData();
+  formData.append("media", file);
+  const response = await apiUpload(`/homeowner/alerts/${encodeURIComponent(alertId)}/payment-proof`, formData);
   return response?.data ?? null;
 }
 

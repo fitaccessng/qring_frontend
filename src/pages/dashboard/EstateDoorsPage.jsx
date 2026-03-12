@@ -8,6 +8,7 @@ import {
   getEstateOverview,
   updateEstateDoorAdminProfile
 } from "../../services/estateService";
+import { showError, showSuccess } from "../../utils/flash";
 
 function qrImageUrl(value, size = 140) {
   return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(value)}`;
@@ -16,7 +17,6 @@ function qrImageUrl(value, size = 140) {
 export default function EstateDoorsPage() {
   const [overview, setOverview] = useState(null);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [createdQr, setCreatedQr] = useState(null);
   const [sharedQr, setSharedQr] = useState(null);
@@ -45,6 +45,10 @@ export default function EstateDoorsPage() {
   useEffect(() => {
     load().catch((requestError) => setError(requestError.message ?? "Failed to load door data"));
   }, []);
+
+  useEffect(() => {
+    if (error) showError(error);
+  }, [error]);
 
   const homesByEstate = useMemo(
     () => (overview?.homes ?? []).filter((home) => !form.estateId || home.estateId === form.estateId),
@@ -81,7 +85,6 @@ export default function EstateDoorsPage() {
     event.preventDefault();
     setBusy(true);
     setError("");
-    setNotice("");
     setCreatedQr(null);
     try {
       const selectedHomeowner = homeownerOptions.find((row) => row.homeownerId === form.homeownerId);
@@ -125,7 +128,7 @@ export default function EstateDoorsPage() {
           };
         });
       }
-      setNotice("Door created successfully.");
+      showSuccess("Door created successfully.");
       setForm((prev) => ({
         ...prev,
         name: ""
@@ -141,14 +144,13 @@ export default function EstateDoorsPage() {
   async function generateSharedQr() {
     if (!form.estateId) return;
     setError("");
-    setNotice("");
     try {
       const data = await createEstateSharedQr(form.estateId);
       setSharedQr({
         ...data,
         fullScanUrl: toPublicUrl(data.scanUrl)
       });
-      setNotice("Estate shared QR generated. Visitors can pick a door after scanning.");
+      showSuccess("Estate shared QR generated. Visitors can pick a door after scanning.");
       await load();
     } catch (requestError) {
       setError(requestError.message ?? "Failed to generate estate shared QR");
@@ -160,7 +162,6 @@ export default function EstateDoorsPage() {
     if (!editingDoorId) return;
     setEditingBusy(true);
     setError("");
-    setNotice("");
     try {
       const payload = {
         doorName: adminForm.doorName || undefined,
@@ -169,7 +170,7 @@ export default function EstateDoorsPage() {
         newPassword: adminForm.newPassword || undefined
       };
       await updateEstateDoorAdminProfile(editingDoorId, payload);
-      setNotice("Door admin profile updated successfully.");
+      showSuccess("Door admin profile updated successfully.");
       setEditingDoorId("");
       setAdminForm({ doorName: "", homeownerName: "", homeownerEmail: "", newPassword: "" });
       await load();
@@ -228,7 +229,7 @@ export default function EstateDoorsPage() {
     const payload = `Homeowner: ${door.homeownerName || "N/A"}\nEmail: ${door.homeownerEmail || "N/A"}\nLogin: ${loginLink}`;
     try {
       await navigator.clipboard.writeText(payload);
-      setNotice(`Login details copied for ${door.name}.`);
+      showSuccess(`Login details copied for ${door.name}.`);
       setError("");
     } catch {
       setError("Unable to copy login details. Please copy manually.");
@@ -291,8 +292,6 @@ export default function EstateDoorsPage() {
   return (
     <AppShell title="Estate Doors">
       <div className="mx-auto max-w-7xl space-y-6">
-        {error ? <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600 dark:border-red-900/20 dark:bg-red-900/10 dark:text-red-400">{error}</div> : null}
-        {notice ? <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-900/20 dark:bg-emerald-900/10 dark:text-emerald-400">{notice}</div> : null}
 
         <section className="relative overflow-hidden rounded-[2.5rem] bg-slate-900 p-8 text-white dark:bg-indigo-600">
           <div className="relative z-10">

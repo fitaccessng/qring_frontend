@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Bell,
   ChevronRight,
+  Clock,
   Globe,
   HelpCircle,
   Lock,
@@ -21,9 +22,10 @@ import {
 import AppShell from "../../layouts/AppShell";
 import { env } from "../../config/env";
 import { changePassword } from "../../services/authService";
-import { getEstateOverview } from "../../services/estateService";
+import { getEstateOverview, getEstateSettings, updateEstateSettings } from "../../services/estateService";
 import { useAuth } from "../../state/AuthContext";
 import { useTheme } from "../../state/ThemeContext";
+import { showError, showSuccess } from "../../utils/flash";
 
 const ESTATE_OVERVIEW_CACHE_TTL_MS = 60 * 1000;
 let estateOverviewCache = null;
@@ -52,6 +54,11 @@ export default function EstateSettingsPage() {
     bio: storedUser?.bio || "Estate administrator on Qring"
   });
   const [overview, setOverview] = useState(null);
+  const [selectedEstateId, setSelectedEstateId] = useState("");
+  const [reminderFrequencyDays, setReminderFrequencyDays] = useState(1);
+  const [reminderMode, setReminderMode] = useState("daily");
+  const [settingsLoading, setSettingsLoading] = useState(false);
+  const [savingSettings, setSavingSettings] = useState(false);
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: "",
     newPassword: "",
@@ -62,7 +69,6 @@ export default function EstateSettingsPage() {
   const [editProfileOpen, setEditProfileOpen] = useState(false);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const [confirmLeaveOpen, setConfirmLeaveOpen] = useState(false);
-  const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -94,6 +100,41 @@ export default function EstateSettingsPage() {
       active = false;
     };
   }, []);
+  
+  useEffect(() => {
+    if (error) showError(error);
+  }, [error]);
+
+  useEffect(() => {
+    const firstId = overview?.estates?.[0]?.id || "";
+    if (firstId && !selectedEstateId) {
+      setSelectedEstateId(firstId);
+    }
+  }, [overview, selectedEstateId]);
+
+  useEffect(() => {
+    if (!selectedEstateId) return;
+    let active = true;
+    async function loadSettings() {
+      setSettingsLoading(true);
+      try {
+        const data = await getEstateSettings(selectedEstateId);
+        if (!active) return;
+        const days = Number(data?.reminderFrequencyDays ?? 1);
+        const safeDays = Number.isFinite(days) && days > 0 ? days : 1;
+        setReminderFrequencyDays(safeDays);
+        setReminderMode(safeDays === 1 ? "daily" : safeDays === 7 ? "weekly" : "custom");
+      } catch (requestError) {
+        if (active) setError(requestError?.message || "Failed to load reminder settings.");
+      } finally {
+        if (active) setSettingsLoading(false);
+      }
+    }
+    loadSettings();
+    return () => {
+      active = false;
+    };
+  }, [selectedEstateId]);
 
   const statItems = useMemo(
     () => [
@@ -101,6 +142,11 @@ export default function EstateSettingsPage() {
       { label: "Homes", value: String(overview?.homes?.length ?? 0), icon: <Users className="h-4 w-4" /> },
       { label: "Doors", value: String(overview?.doors?.length ?? 0), icon: <DoorOpen className="h-4 w-4" /> }
     ],
+    [overview]
+  );
+
+  const estateOptions = useMemo(
+    () => (overview?.estates ?? []).map((row) => ({ value: row.id, label: row.name })),
     [overview]
   );
 
@@ -116,7 +162,7 @@ export default function EstateSettingsPage() {
       bio: profile.bio
     };
     localStorage.setItem("qring_user", JSON.stringify(nextUser));
-    setNotice("Profile details updated on this device.");
+    showSuccess("Profile details updated on this device.");
     setEditProfileOpen(false);
   }
 
@@ -124,7 +170,6 @@ export default function EstateSettingsPage() {
     event.preventDefault();
     setChangingPassword(true);
     setError("");
-    setNotice("");
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
       setError("New password and confirm password do not match.");
       setChangingPassword(false);
@@ -136,7 +181,7 @@ export default function EstateSettingsPage() {
         newPassword: passwordForm.newPassword
       });
       setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
-      setNotice("Password changed successfully.");
+      showSuccess("Password changed successfully.");
       return true;
     } catch (requestError) {
       setError(requestError?.message || "Failed to change password");
@@ -161,20 +206,39 @@ export default function EstateSettingsPage() {
     }
   }
 
+  async function saveReminderSettings(event) {
+    event.preventDefault();
+    setError("");
+    if (!selectedEstateId) {
+      setError("Select an estate to update reminder settings.");
+      return;
+    }
+    setSavingSettings(true);
+    const derivedDays =
+      reminderMode === "daily" ? 1 : reminderMode === "weekly" ? 7 : Number(reminderFrequencyDays || 0);
+    if (!Number.isFinite(derivedDays) || derivedDays < 1) {
+      setSavingSettings(false);
+      setError("Custom reminder frequency must be at least 1 day.");
+      return;
+    }
+    try {
+      const data = await updateEstateSettings(selectedEstateId, {
+        reminderFrequencyDays: derivedDays
+      });
+      const nextDays = Number(data?.reminderFrequencyDays ?? derivedDays);
+      setReminderFrequencyDays(nextDays);
+      setReminderMode(nextDays === 1 ? "daily" : nextDays === 7 ? "weekly" : "custom");
+      showSuccess("Payment reminder frequency updated.");
+    } catch (requestError) {
+      setError(requestError?.message || "Failed to update reminder settings.");
+    } finally {
+      setSavingSettings(false);
+    }
+  }
+
   return (
     <AppShell title="My Profile">
       <div className="mx-auto w-full max-w-7xl space-y-6 px-1 pb-16">
-        {error || notice ? (
-          <div
-            className={`mb-4 rounded-2xl border px-4 py-3 text-sm font-semibold ${
-              error
-                ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/30 dark:bg-rose-900/20 dark:text-rose-400"
-                : "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/30 dark:bg-emerald-900/20 dark:text-emerald-400"
-            }`}
-          >
-            {error || notice}
-          </div>
-        ) : null}
 
         <section className="overflow-hidden rounded-[2.5rem] border border-slate-200/70 bg-white/95 p-5 shadow-[0_8px_30px_rgb(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-900/90 lg:p-8">
           {loading ? (
@@ -234,6 +298,77 @@ export default function EstateSettingsPage() {
               </div>
             </>
           )}
+        </section>
+
+        <section className="rounded-[2.5rem] border border-slate-200/70 bg-white/95 p-5 shadow-[0_8px_30px_rgb(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-900/90 lg:p-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-extrabold">Payment Reminders</h3>
+              <p className="text-xs text-slate-500">Control how often unpaid homeowners receive reminders.</p>
+            </div>
+            <Clock className="h-5 w-5 text-indigo-500" />
+          </div>
+          <form onSubmit={saveReminderSettings} className="mt-4 grid gap-3">
+            <label className="block">
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Estate</span>
+              <select
+                value={selectedEstateId}
+                onChange={(event) => setSelectedEstateId(event.target.value)}
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
+              >
+                {estateOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-300">
+              <p className="font-semibold">Reminder frequency</p>
+              <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                {[
+                  { key: "daily", label: "Daily" },
+                  { key: "weekly", label: "Weekly" },
+                  { key: "custom", label: "Custom" }
+                ].map((item) => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => setReminderMode(item.key)}
+                    className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${
+                      reminderMode === item.key
+                        ? "border-indigo-500 bg-indigo-600 text-white"
+                        : "border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-200"
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+              {reminderMode === "custom" ? (
+                <div className="mt-3">
+                  <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Days between reminders</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={365}
+                    value={reminderFrequencyDays}
+                    onChange={(event) => setReminderFrequencyDays(Number(event.target.value || 0))}
+                    className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900/60"
+                  />
+                </div>
+              ) : null}
+            </div>
+
+            <button
+              type="submit"
+              disabled={savingSettings || settingsLoading || !selectedEstateId}
+              className="rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition-all active:scale-95 disabled:opacity-50 dark:bg-white dark:text-slate-900"
+            >
+              {savingSettings ? "Saving..." : settingsLoading ? "Loading..." : "Save Reminder Settings"}
+            </button>
+          </form>
         </section>
       </div>
 

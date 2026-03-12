@@ -4,6 +4,7 @@ import { env } from "../../config/env";
 import { createHomeownerDoor, generateDoorQr, getHomeownerContext, getHomeownerDoors } from "../../services/homeownerService";
 import QrPrintDesigner from "../../components/qr/QrPrintDesigner";
 import { useAuth } from "../../state/AuthContext";
+import { showError, showSuccess } from "../../utils/flash";
 
 export default function HomeownerDoorsPage() {
   const { user } = useAuth();
@@ -12,7 +13,6 @@ export default function HomeownerDoorsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busyDoorId, setBusyDoorId] = useState("");
-  const [notice, setNotice] = useState("");
   const [selectedDoorId, setSelectedDoorId] = useState("");
   const [newDoorName, setNewDoorName] = useState("");
   const [creatingDoor, setCreatingDoor] = useState(false);
@@ -63,6 +63,10 @@ export default function HomeownerDoorsPage() {
   useEffect(() => {
     loadDoors();
   }, []);
+  
+  useEffect(() => {
+    if (error) showError(error);
+  }, [error]);
 
   useEffect(() => {
     let active = true;
@@ -107,7 +111,6 @@ export default function HomeownerDoorsPage() {
     }
     setCreatingDoor(true);
     setError("");
-    setNotice("");
 
     try {
       const created = await createHomeownerDoor({
@@ -141,12 +144,12 @@ export default function HomeownerDoorsPage() {
         const fullUrl = toScanUrl(created.qr.qr_id);
         try {
           await navigator.clipboard.writeText(fullUrl);
-          setNotice(`Door created and QR copied: ${fullUrl}`);
+          showSuccess(`Door created and QR copied: ${fullUrl}`);
         } catch {
-          setNotice(`Door created with QR: ${fullUrl}`);
+          showSuccess(`Door created with QR: ${fullUrl}`);
         }
       } else {
-        setNotice("Door created successfully.");
+        showSuccess("Door created successfully.");
       }
     } catch (requestError) {
       setError(requestError.message ?? "Failed to create door");
@@ -158,7 +161,6 @@ export default function HomeownerDoorsPage() {
   async function handleGenerateQr(doorId) {
     setBusyDoorId(doorId);
     setError("");
-    setNotice("");
 
     try {
       const created = await generateDoorQr(doorId, { mode: "direct", plan: "single" });
@@ -185,9 +187,9 @@ export default function HomeownerDoorsPage() {
         const fullUrl = toScanUrl(newQr);
         try {
           await navigator.clipboard.writeText(fullUrl);
-          setNotice(`QR created and copied: ${fullUrl}`);
+          showSuccess(`QR created and copied: ${fullUrl}`);
         } catch {
-          setNotice(`QR created: ${fullUrl}`);
+          showSuccess(`QR created: ${fullUrl}`);
         }
       }
     } catch (requestError) {
@@ -222,16 +224,6 @@ export default function HomeownerDoorsPage() {
           </div>
         </section>
 
-        {error ? (
-          <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/30 dark:bg-rose-900/20 dark:text-rose-400">
-            {error}
-          </div>
-        ) : null}
-        {notice ? (
-          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-900/30 dark:bg-emerald-900/20 dark:text-emerald-400">
-            {notice}
-          </div>
-        ) : null}
         {managedByEstate ? (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-900/30 dark:bg-amber-900/20 dark:text-amber-400">
             Door and QR creation are managed by your estate{estateName ? ` (${estateName})` : ""}.

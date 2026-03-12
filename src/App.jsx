@@ -31,6 +31,8 @@ import HomeownerPaywallPage from "./pages/dashboard/HomeownerPaywallPage";
 import HomeownerLiveQueuePage from "./pages/dashboard/HomeownerLiveQueuePage";
 import HomeownerReceiptsPage from "./pages/dashboard/HomeownerReceiptsPage";
 import BillingCallbackPage from "./pages/dashboard/BillingCallbackPage";
+import HomeownerAlertsPage from "./pages/dashboard/HomeownerAlertsPage";
+import HomeownerMaintenancePage from "./pages/dashboard/HomeownerMaintenancePage";
 import EstateDashboardPage from "./pages/dashboard/EstateDashboardPage";
 import EstateCreatePage from "./pages/dashboard/EstateCreatePage";
 import EstateDoorsPage from "./pages/dashboard/EstateDoorsPage";
@@ -42,6 +44,12 @@ import EstatePlanPage from "./pages/dashboard/EstatePlanPage";
 import EstateHomesPage from "./pages/dashboard/EstateHomesPage";
 import EstateSettingsPage from "./pages/dashboard/EstateSettingsPage";
 import EstateCommunityBoardPage from "./pages/dashboard/EstateCommunityBoardPage";
+import EstateBroadcastsPage from "./pages/dashboard/EstateBroadcastsPage";
+import EstateMeetingsPage from "./pages/dashboard/EstateMeetingsPage";
+import EstatePollsPage from "./pages/dashboard/EstatePollsPage";
+import EstateDuesPage from "./pages/dashboard/EstateDuesPage";
+import EstateMaintenancePage from "./pages/dashboard/EstateMaintenancePage";
+import EstateStatsPage from "./pages/dashboard/EstateStatsPage";
 import AdminDashboardPage from "./pages/dashboard/AdminDashboardPage";
 import AdminPaymentsPage from "./pages/dashboard/AdminPaymentsPage";
 import AdminUsersPage from "./pages/dashboard/AdminUsersPage";
@@ -60,11 +68,14 @@ import ProtectedRoute from "./routes/ProtectedRoute";
 import RoleRoute from "./routes/RoleRoute";
 import VisitorCallRoute from "./routes/VisitorCallRoute";
 import PublicOnlyRoute from "./routes/PublicOnlyRoute";
-import { AuthProvider } from "./state/AuthContext";
+import { AuthProvider, useAuth } from "./state/AuthContext";
 import { ThemeProvider } from "./state/ThemeContext";
 import FlashModal from "./components/FlashModal";
 import BlockingModal from "./components/BlockingModal";
 import AppPreloader from "./components/mobile/AppPreloader";
+import NotificationModal from "./components/NotificationModal";
+import ReconnectBanner from "./components/ReconnectBanner";
+import { env } from "./config/env";
 
 export default function App() {
   return (
@@ -86,6 +97,17 @@ function AppRoutes() {
   });
 
   useEffect(() => {
+    if (typeof window === "undefined") return () => {};
+    const ping = () => {
+      if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+      fetch(`${env.apiBaseUrl}/health`, { method: "GET", cache: "no-store" }).catch(() => {});
+    };
+    ping();
+    const interval = window.setInterval(ping, 4 * 60 * 1000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
     if (!showPreloader) return () => {};
     const timer = window.setTimeout(() => {
       setShowPreloader(false);
@@ -105,8 +127,8 @@ function AppRoutes() {
         <AppPreloader />
       ) : (
         <>
-          <FlashModal />
-          <BlockingModal />
+          <ReconnectBanner />
+          <GlobalNotifications />
           <div className="animate-screen-enter">
             <Routes location={location}>
               <Route path="/" element={<LandingPage />} />
@@ -169,6 +191,8 @@ function AppRoutes() {
                   <Route path="/dashboard/homeowner/doors" element={<HomeownerDoorsPage />} />
                   <Route path="/dashboard/homeowner/live-queue" element={<HomeownerLiveQueuePage />} />
                   <Route path="/dashboard/homeowner/receipts" element={<HomeownerReceiptsPage />} />
+                  <Route path="/dashboard/homeowner/alerts" element={<HomeownerAlertsPage />} />
+                  <Route path="/dashboard/homeowner/maintenance" element={<HomeownerMaintenancePage />} />
                   <Route path="/dashboard/homeowner/settings" element={<HomeownerSettingsPage />} />
                 </Route>
                 <Route element={<RoleRoute allowedRoles={["estate"]} />}>
@@ -183,6 +207,12 @@ function AppRoutes() {
                   <Route path="/dashboard/estate/homes" element={<EstateHomesPage />} />
                   <Route path="/dashboard/estate/community" element={<EstateCommunityBoardPage />} />
                   <Route path="/dashboard/estate/settings" element={<EstateSettingsPage />} />
+                  <Route path="/dashboard/estate/broadcasts" element={<EstateBroadcastsPage />} />
+                  <Route path="/dashboard/estate/meetings" element={<EstateMeetingsPage />} />
+                  <Route path="/dashboard/estate/polls" element={<EstatePollsPage />} />
+                  <Route path="/dashboard/estate/dues" element={<EstateDuesPage />} />
+                  <Route path="/dashboard/estate/maintenance" element={<EstateMaintenancePage />} />
+                  <Route path="/dashboard/estate/stats" element={<EstateStatsPage />} />
                 </Route>
                 <Route element={<RoleRoute allowedRoles={["admin"]} />}>
                   <Route path="/dashboard/admin" element={<AdminDashboardPage />} />
@@ -201,6 +231,18 @@ function AppRoutes() {
           </div>
         </>
       )}
+    </>
+  );
+}
+
+function GlobalNotifications() {
+  const { user } = useAuth();
+  const role = String(user?.role || "").toLowerCase();
+  const useModal = role === "homeowner" || role === "estate";
+  return (
+    <>
+      {useModal ? <NotificationModal /> : <FlashModal />}
+      <BlockingModal />
     </>
   );
 }

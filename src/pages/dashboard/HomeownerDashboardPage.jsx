@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Activity, ChevronRight, Clock3, DoorOpen, Info, LogOut, MessageSquare, Phone, UserCircle2 } from "lucide-react";
+import { Activity, ChevronRight, Clock3, DoorOpen, Info, MessageSquare, Phone } from "lucide-react";
 import AppShell from "../../layouts/AppShell";
 import { useDashboardData } from "../../hooks/useDashboardData";
 import { getHomeownerContext } from "../../services/homeownerService";
 import { useAuth } from "../../state/AuthContext";
+import { useSocketEvents } from "../../hooks/useSocketEvents";
 
 export default function HomeownerDashboardPage() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [managedByEstate, setManagedByEstate] = useState(false);
   const {
     metrics,
@@ -20,7 +21,8 @@ export default function HomeownerDashboardPage() {
     connected,
     incomingCall,
     clearIncomingCall,
-    realtimeEnabled
+    realtimeEnabled,
+    refresh
   } =
     useDashboardData();
   const homeownerName = user?.fullName?.trim() || "Homeowner";
@@ -72,6 +74,18 @@ export default function HomeownerDashboardPage() {
       active = false;
     };
   }, []);
+
+  useSocketEvents(
+    useMemo(
+      () => ({
+        ALERT_CREATED: () => refresh(),
+        ALERT_UPDATED: () => refresh(),
+        ALERT_DELETED: () => refresh(),
+        PAYMENT_STATUS_UPDATED: () => refresh()
+      }),
+      [refresh]
+    )
+  );
 
   const taskGroups = [
     {
@@ -142,34 +156,13 @@ export default function HomeownerDashboardPage() {
     <AppShell title="Homeowner Overview" showTopBar={false}>
       <div className="mx-auto w-full max-w-4xl space-y-8 px-2 py-3 sm:px-3 sm:py-4">
         <section className="rounded-[1.6rem] border border-slate-200/70 bg-white/95 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/90 sm:p-5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="grid h-11 w-11 place-items-center rounded-full bg-sky-100 text-sm font-bold text-sky-700 dark:bg-sky-900/30 dark:text-sky-300">
-                {initials}
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-slate-500">Hello!</p>
-                <p className="text-xl font-black text-slate-900 dark:text-white">{homeownerName}</p>
-              </div>
+          <div className="flex items-center gap-3">
+            <div className="grid h-11 w-11 place-items-center rounded-full bg-sky-100 text-sm font-bold text-sky-700 dark:bg-sky-900/30 dark:text-sky-300">
+              {initials}
             </div>
-            <div className="flex items-center gap-2">
-              <Link
-                to="/dashboard/homeowner/settings"
-                className="grid h-9 w-9 place-items-center rounded-full bg-slate-100 text-slate-500 transition-all active:scale-95 dark:bg-slate-800 dark:text-slate-300"
-                aria-label="Profile"
-                title="Profile"
-              >
-                <UserCircle2 size={16} />
-              </Link>
-              <button
-                type="button"
-                onClick={logout}
-                className="grid h-9 w-9 place-items-center rounded-full bg-rose-100 text-rose-600 transition-all active:scale-95 dark:bg-rose-900/30 dark:text-rose-300"
-                aria-label="Logout"
-                title="Logout"
-              >
-                <LogOut size={15} />
-              </button>
+            <div>
+              <p className="text-xs font-semibold text-slate-500">Hello!</p>
+              <p className="text-xl font-black text-slate-900 dark:text-white">{homeownerName}</p>
             </div>
           </div>
         </section>

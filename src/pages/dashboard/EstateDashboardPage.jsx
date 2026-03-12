@@ -1,17 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Building2, ChevronRight, DoorClosed, Home, LogOut, Plus, UserCircle2, Users } from "lucide-react";
+import { BarChart3, BellRing, Building2, ClipboardList, DoorClosed, Home, Megaphone, Plus, Users, Vote } from "lucide-react";
 import AppShell from "../../layouts/AppShell";
-import { getEstateOverview } from "../../services/estateService";
+import { getEstateOverview, listEstateAlerts } from "../../services/estateService";
+import { showError } from "../../utils/flash";
 import { useAuth } from "../../state/AuthContext";
-
-const modules = [
-  { title: "Access Logs", to: "/dashboard/estate/logs", subtitle: "Review recent estate activity" },
-  { title: "Assign Doors", to: "/dashboard/estate/assign", subtitle: "Link entries to owners" },
-  { title: "Create / Invite Homeowners", to: "/dashboard/estate/invites", subtitle: "Create homeowner accounts and send access links" },
-  { title: "Mappings", to: "/dashboard/estate/mappings", subtitle: "Review home-to-door map" },
-  { title: "Plan Rules", to: "/dashboard/estate/plan", subtitle: "Monitor usage limits" }
-];
+import { useSocketEvents } from "../../hooks/useSocketEvents";
+import { getDashboardSocket } from "../../services/socketClient";
 
 const guidedSetup = [
   {
@@ -41,10 +36,12 @@ const guidedSetup = [
 ];
 
 export default function EstateDashboardPage() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [overview, setOverview] = useState(null);
+  const [meetingSnapshot, setMeetingSnapshot] = useState(null);
   const [error, setError] = useState("");
   const managerName = user?.fullName?.trim() || "Estate Manager";
+  const estateName = overview?.estates?.[0]?.name || "Estate";
   const initials = managerName.slice(0, 1).toUpperCase();
 
   useEffect(() => {
@@ -62,6 +59,56 @@ export default function EstateDashboardPage() {
       mounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (error) showError(error);
+  }, [error]);
+
+  useEffect(() => {
+    let mounted = true;
+    async function loadMeetings() {
+      const estateId = overview?.estates?.[0]?.id;
+      if (!estateId) return;
+      try {
+        const rows = await listEstateAlerts(estateId, "meeting");
+        if (!mounted) return;
+        setMeetingSnapshot(rows?.[0] ?? null);
+      } catch {
+        if (mounted) setMeetingSnapshot(null);
+      }
+    }
+    loadMeetings();
+    return () => {
+      mounted = false;
+    };
+  }, [overview?.estates]);
+
+  useEffect(() => {
+    const estateId = overview?.estates?.[0]?.id;
+    if (!estateId) return;
+    const socket = getDashboardSocket();
+    socket.emit("dashboard.subscribe", { room: `estate:${estateId}:alerts` });
+  }, [overview?.estates]);
+
+  useSocketEvents(
+    useMemo(
+      () => ({
+        ALERT_CREATED: () => {
+          getEstateOverview().then(setOverview).catch(() => {});
+        },
+        ALERT_UPDATED: () => {
+          getEstateOverview().then(setOverview).catch(() => {});
+        },
+        ALERT_DELETED: () => {
+          getEstateOverview().then(setOverview).catch(() => {});
+        },
+        PAYMENT_STATUS_UPDATED: () => {
+          getEstateOverview().then(setOverview).catch(() => {});
+        }
+      }),
+      []
+    )
+  );
 
   const counts = useMemo(
     () => ({
@@ -95,7 +142,7 @@ export default function EstateDashboardPage() {
     },
     {
       title: "Resident Onboarding",
-      subtitle: `${counts.residents} owners active`,
+      subtitle: `${counts.residents} owners onboarded`,
       bar: counts.homes > 0 ? Math.min(100, Math.round((counts.residents / counts.homes) * 100)) : 0,
       tone: "bg-orange-400"
     }
@@ -105,34 +152,13 @@ export default function EstateDashboardPage() {
     <AppShell title="Estate Hub" showTopBar={false}>
       <div className="mx-auto w-full max-w-4xl space-y-8 px-2 py-3 sm:px-3 sm:py-4">
         <section className="rounded-[1.6rem] border border-slate-200/70 bg-white/95 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/90 sm:p-5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="grid h-11 w-11 place-items-center rounded-full bg-indigo-100 text-sm font-bold text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">
-                {initials}
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-slate-500 dark:text-slate-300">Hello!</p>
-                <p className="text-xl font-black text-slate-900 dark:text-white">{managerName}</p>
-              </div>
+          <div className="flex items-center gap-3">
+            <div className="grid h-11 w-11 place-items-center rounded-full bg-indigo-100 text-sm font-bold text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">
+              {initials}
             </div>
-            <div className="flex items-center gap-2">
-              <Link
-                to="/dashboard/estate/settings"
-                className="grid h-9 w-9 place-items-center rounded-full bg-slate-100 text-slate-500 transition-all active:scale-95 dark:bg-slate-800 dark:text-slate-300"
-                aria-label="Profile"
-                title="Profile"
-              >
-                <UserCircle2 size={16} />
-              </Link>
-              <button
-                type="button"
-                onClick={logout}
-                className="grid h-9 w-9 place-items-center rounded-full bg-rose-100 text-rose-600 transition-all active:scale-95 dark:bg-rose-900/30 dark:text-rose-300"
-                aria-label="Logout"
-                title="Logout"
-              >
-                <LogOut size={15} />
-              </button>
+            <div>
+              <p className="text-xs font-semibold text-slate-500 dark:text-slate-300">Hello!</p>
+              <p className="text-xl font-black text-slate-900 dark:text-white">{managerName}</p>
             </div>
           </div>
         </section>
@@ -141,7 +167,7 @@ export default function EstateDashboardPage() {
           <article className="rounded-[1.4rem] bg-gradient-to-br from-violet-600 to-indigo-700 p-5 text-white shadow-lg shadow-violet-500/20 sm:p-6">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-sm text-violet-100">Estate operations overview</p>
+                <p className="text-xl text-violet-100">{estateName} Overview</p>
                 <p className="mt-1 text-xs font-semibold uppercase tracking-wider text-violet-200">Access control status</p>
               </div>
               <ProgressRing value={setupPercent} />
@@ -164,13 +190,6 @@ export default function EstateDashboardPage() {
             </div>
           </article>
         </section>
-
-        {error ? (
-          <div className="flex items-center gap-3 rounded-2xl border border-red-100 bg-red-50 p-4 text-sm text-red-600 dark:border-red-900/20 dark:bg-red-900/10 dark:text-red-400">
-            <span className="h-2 w-2 rounded-full bg-red-500" />
-            {error}
-          </div>
-        ) : null}
 
         <section className="space-y-4">
           <h3 className="text-2xl font-black text-slate-900 dark:text-white">In Progress</h3>
@@ -203,6 +222,29 @@ export default function EstateDashboardPage() {
             ))}
           </div>
         </section>
+
+        {meetingSnapshot ? (
+          <section className="rounded-[2rem] border border-slate-200/70 bg-white/95 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/90 sm:p-6">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Latest meeting</p>
+                <p className="text-lg font-bold text-slate-900 dark:text-white">{meetingSnapshot.title}</p>
+                <p className="text-xs text-slate-500">{meetingSnapshot.dueDate ? new Date(meetingSnapshot.dueDate).toLocaleString() : "Schedule TBD"}</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
+                <span className="rounded-full bg-emerald-100 px-2 py-1 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200">
+                  Attending {meetingSnapshot.meetingResponses?.attending ?? 0}
+                </span>
+                <span className="rounded-full bg-rose-100 px-2 py-1 text-rose-700 dark:bg-rose-900/40 dark:text-rose-200">
+                  Not attending {meetingSnapshot.meetingResponses?.not_attending ?? 0}
+                </span>
+                <span className="rounded-full bg-amber-100 px-2 py-1 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200">
+                  Maybe {meetingSnapshot.meetingResponses?.maybe ?? 0}
+                </span>
+              </div>
+            </div>
+          </section>
+        ) : null}
 
         <section className="space-y-4">
           <h3 className="text-2xl font-black text-slate-900 dark:text-white">Assets Overview</h3>
@@ -238,29 +280,7 @@ export default function EstateDashboardPage() {
           </div>
         </section>
 
-        <section className="space-y-3 pb-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xl font-black text-slate-900 dark:text-white">Quick Actions</h3>
-            <Link to="/dashboard/estate/logs" className="text-sm font-semibold text-indigo-600 dark:text-indigo-400">
-              View logs
-            </Link>
-          </div>
-          <div className="space-y-2 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900/80 sm:p-5">
-            {modules.map((module) => (
-              <Link
-                key={module.title}
-                to={module.to}
-                className="flex items-center justify-between rounded-xl px-2 py-2 transition-all hover:bg-slate-50 active:scale-[0.99] dark:hover:bg-slate-800/60"
-              >
-                <div>
-                  <p className="text-sm font-bold text-slate-900 dark:text-white">{module.title}</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-300">{module.subtitle}</p>
-                </div>
-                <ChevronRight size={16} className="text-slate-400" />
-              </Link>
-            ))}
-          </div>
-        </section>
+        <QuickActionGrid />
       </div>
     </AppShell>
   );
@@ -301,5 +321,85 @@ function ProgressRing({ value }) {
     >
       <span className="grid h-11 w-11 place-items-center rounded-full bg-indigo-700/90">{value}%</span>
     </div>
+  );
+}
+
+function QuickActionGrid() {
+  const [showMore, setShowMore] = useState(false);
+  const primaryActions = [
+    { label: "Broadcast", to: "/dashboard/estate/broadcasts", icon: <Megaphone size={18} /> },
+    { label: "Meetings", to: "/dashboard/estate/meetings", icon: <BellRing size={18} /> },
+    { label: "Polls", to: "/dashboard/estate/polls", icon: <Vote size={18} /> },
+    { label: "Dues", to: "/dashboard/estate/dues", icon: <ClipboardList size={18} /> },
+    { label: "Maintenance", to: "/dashboard/estate/maintenance", icon: <DoorClosed size={18} /> },
+    { label: "Visitor Stats", to: "/dashboard/estate/stats", icon: <BarChart3 size={18} /> }
+  ];
+  const moreActions = [
+    { label: "Access Logs", to: "/dashboard/estate/logs" },
+    { label: "Assign Doors", to: "/dashboard/estate/assign" },
+    { label: "Invite Homeowners", to: "/dashboard/estate/invites" },
+    { label: "Mappings", to: "/dashboard/estate/mappings" },
+    { label: "Plan Rules", to: "/dashboard/estate/plan" },
+    { label: "Community", to: "/dashboard/estate/community" },
+    { label: "Settings", to: "/dashboard/estate/settings" }
+  ];
+
+  return (
+    <section className="space-y-3 pb-3">
+      <div className="flex items-center justify-between">
+        <h3 className="text-xl font-black text-slate-900 dark:text-white">Quick Actions</h3>
+        <button
+          type="button"
+          onClick={() => setShowMore(true)}
+          className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200"
+        >
+          More
+        </button>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {primaryActions.map((action) => (
+          <Link
+            key={action.label}
+            to={action.to}
+            className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-sm font-semibold text-slate-900 transition hover:border-indigo-200 hover:shadow-sm active:scale-[0.99] dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100"
+          >
+            <span className="grid h-10 w-10 place-items-center rounded-xl bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">
+              {action.icon}
+            </span>
+            <span>{action.label}</span>
+          </Link>
+        ))}
+      </div>
+
+      {showMore ? (
+        <div className="fixed inset-0 z-[55] flex items-end justify-center bg-slate-950/50 px-4 pb-6 pt-10 backdrop-blur-sm">
+          <div className="h-[50vh] w-full max-w-md overflow-hidden rounded-[2rem] bg-white p-5 shadow-2xl dark:bg-slate-900">
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-sm font-bold text-slate-900 dark:text-white">More Actions</p>
+              <button
+                type="button"
+                onClick={() => setShowMore(false)}
+                className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+              >
+                Close
+              </button>
+            </div>
+            <div className="grid gap-2 overflow-y-auto pr-1">
+              {moreActions.map((action) => (
+                <Link
+                  key={action.label}
+                  to={action.to}
+                  onClick={() => setShowMore(false)}
+                  className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-800 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800/60"
+                >
+                  <span>{action.label}</span>
+                  <span className="text-xs text-slate-400">Open</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </section>
   );
 }

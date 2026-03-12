@@ -3,7 +3,9 @@ import { Navigate, useNavigate, useParams } from "react-router-dom";
 import SessionNetworkBadge from "../../components/SessionNetworkBadge";
 import SessionModeNav from "../../components/SessionModeNav";
 import VisitorIncomingCallModal from "../../components/VisitorIncomingCallModal";
+import VoiceNoteRecorder from "../../components/VoiceNoteRecorder";
 import { useSessionRealtime } from "../../hooks/useSessionRealtime";
+import { resolveVoiceNoteUrl, uploadVisitorVoiceNote } from "../../services/voiceNoteService";
 
 export default function SessionMessagePage() {
   const { sessionId } = useParams();
@@ -85,7 +87,19 @@ export default function SessionMessagePage() {
           ? "Server call session state: ended. Ask homeowner to start a new call."
           : serverCallState === "failed"
             ? "Server call session state: failed. Check network/permissions and retry."
-          : "Server call session state: pending. Audio and video unlock once homeowner starts a call.";
+      : "Server call session state: pending. Audio and video unlock once homeowner starts a call.";
+
+  async function handleVoiceNoteSend(file) {
+    if (!sessionId || !file) return false;
+    try {
+      const data = await uploadVisitorVoiceNote(sessionId, file);
+      const url = resolveVoiceNoteUrl(data?.url);
+      if (!url) return false;
+      return Boolean(sendMessage(`voice_note_url:${url}`));
+    } catch {
+      return false;
+    }
+  }
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_#f8fafc_0,_#eef2ff_42%,_#e0f2fe_78%,_#dbeafe_100%)] p-4 text-slate-900">
@@ -126,7 +140,7 @@ export default function SessionMessagePage() {
                       }`}
                     >
                       <p className={`text-[11px] font-semibold ${message.mine ? "text-slate-200" : "text-slate-500"}`}>{message.displayName}</p>
-                      <p>{message.text}</p>
+                      {renderMessageBody(message.text)}
                       {message.mine && message.failed ? (
                         <div className="mt-1 flex items-center justify-between gap-2 text-[10px]">
                           <span className="rounded bg-amber-200/90 px-2 py-0.5 font-semibold text-amber-900">
@@ -154,6 +168,10 @@ export default function SessionMessagePage() {
                     onChange={(event) => setText(event.target.value)}
                     className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm"
                     placeholder="Type your message..."
+                  />
+                  <VoiceNoteRecorder
+                    onSend={handleVoiceNoteSend}
+                    disabled={!joined}
                   />
                   <button
                     type="submit"
@@ -184,4 +202,19 @@ function getStoredUserRole() {
   } catch {
     return "";
   }
+}
+
+function renderMessageBody(text) {
+  if (typeof text !== "string") return <p>{String(text || "")}</p>;
+  if (text.startsWith("voice_note_url:")) {
+    const src = text.replace("voice_note_url:", "");
+    return <audio controls className="mt-2 w-full" src={src} />;
+  }
+  if (text.startsWith("voice_note:")) {
+    const src = text.replace("voice_note:", "");
+    return (
+      <audio controls className="mt-2 w-full" src={src} />
+    );
+  }
+  return <p>{text}</p>;
 }
