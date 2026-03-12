@@ -11,6 +11,7 @@ export class ApiError extends Error {
 
 let refreshPromise = null;
 let capacitorRuntime = null;
+let lastNetworkErrorAt = 0;
 const GET_CACHE_TTL_MS = 20 * 1000;
 const GET_CACHE_STALE_TTL_MS = 2 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 30000;
@@ -256,13 +257,17 @@ export async function apiRequest(path, options = {}, attempt = 0) {
         return cached.row.payload;
       }
     }
-    if (isGet && attempt < 1) {
+    if (attempt < 1) {
       await new Promise((resolve) => setTimeout(resolve, 1200));
       return apiRequest(path, options, attempt + 1);
     }
     const message =
       "We couldn't connect right now. Please check your internet and try again in a moment. If this is your first request, the server may still be waking up.";
-    if (!silent) emitFlash(message, "error");
+    const now = Date.now();
+    if (!silent && now - lastNetworkErrorAt > 15000) {
+      emitFlash(message, "error");
+      lastNetworkErrorAt = now;
+    }
     throw new ApiError(
       message,
       0,
