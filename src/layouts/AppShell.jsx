@@ -723,7 +723,6 @@ export default function AppShell({ title, children, showTopBar = true }) {
                       <BackIcon />
                     </button>
                     <div className="min-w-0">
-                      <p className="truncate text-[11px] font-semibold text-slate-500">Back</p>
                       <p className="truncate text-sm font-black text-slate-900 dark:text-white sm:text-base">{title || profileName}</p>
                     </div>
                   </div>
@@ -747,6 +746,17 @@ export default function AppShell({ title, children, showTopBar = true }) {
                       </span>
                     ) : null}
                   </button>
+                  {showProfileHeader && user?.role === "estate" ? (
+                    <button
+                      type="button"
+                      onClick={logout}
+                      className="grid h-9 w-9 place-items-center rounded-full bg-rose-100 text-rose-600 transition-all active:scale-95 dark:bg-rose-900/30 dark:text-rose-300"
+                      aria-label="Logout"
+                      title="Logout"
+                    >
+                      <LogoutIcon />
+                    </button>
+                  ) : null}
                   {notificationsOpen ? (
                     <div
                       ref={notificationsPanelRef}
