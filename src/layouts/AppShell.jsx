@@ -766,7 +766,7 @@ export default function AppShell({ title, children, showTopBar = true }) {
                       type="button"
                       onClick={handleLogout}
                       disabled={logoutBusy}
-                      className="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 transition-all hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-70 dark:border-rose-900/40 dark:bg-rose-900/30 dark:text-rose-200"
+                      className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200 dark:hover:bg-slate-800"
                       aria-label="Logout"
                       title="Logout"
                     >
