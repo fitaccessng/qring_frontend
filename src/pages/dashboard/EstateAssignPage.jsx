@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import AppShell from "../../layouts/AppShell";
 import { assignDoorToHomeowner, getEstateOverview } from "../../services/estateService";
 import { showError, showSuccess } from "../../utils/flash";
+import CardSurface from "../../components/CardSurface";
 
 export default function EstateAssignPage() {
   const [overview, setOverview] = useState(null);
@@ -71,7 +72,7 @@ export default function EstateAssignPage() {
           </section>
         ) : null}
 
-        <section className="rounded-[2rem] border border-slate-200/70 bg-white/95 p-5 shadow-[0_8px_30px_rgb(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-900/90 sm:p-6">
+        <CardSurface accent="from-indigo-100/80 via-white/10 to-transparent" glow="bg-indigo-300/50" className="sm:p-6">
           <form onSubmit={onSubmit} className="grid gap-3 md:grid-cols-2">
             <Select
               label="Door"
@@ -96,27 +97,33 @@ export default function EstateAssignPage() {
               {busy ? "Assigning..." : "Assign Door"}
             </button>
           </form>
-        </section>
+        </CardSurface>
 
-        <section className="rounded-[2rem] border border-slate-200/70 bg-white/95 p-5 shadow-[0_8px_30px_rgb(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-900/90 sm:p-6">
+        <CardSurface accent="from-slate-100/80 via-white/10 to-transparent" glow="bg-slate-300/50" className="sm:p-6">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <h3 className="text-base font-bold text-slate-900 dark:text-white">Door Assignments</h3>
             <span className="text-xs text-slate-500">{overview?.doors?.length ?? 0} total</span>
           </div>
           <div className="mt-4 grid gap-2 sm:grid-cols-2">
             {(overview?.doors ?? []).map((door) => (
-              <div key={door.id} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
+              <CardSurface
+                as="div"
+                key={door.id}
+                className="rounded-[1.4rem] border-slate-200/80 bg-white/80 px-4 py-3 text-sm text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200"
+                accent="from-slate-100/80 via-white/10 to-transparent"
+                glow="bg-slate-300/30"
+              >
                 <p className="font-semibold">{door.name}</p>
                 <p className="text-xs text-slate-500">
                   {door.homeName || "Home"} · {door.homeownerName || "Unassigned"}
                 </p>
-              </div>
+              </CardSurface>
             ))}
             {(overview?.doors ?? []).length === 0 ? (
               <p className="text-sm text-slate-500">No doors assigned yet.</p>
             ) : null}
           </div>
-        </section>
+        </CardSurface>
       </div>
     </AppShell>
   );
@@ -142,3 +149,4 @@ function Select({ label, value, onChange, options }) {
     </label>
   );
 }
+

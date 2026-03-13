@@ -30,8 +30,9 @@ export default function ReconnectBanner() {
     <div className="pointer-events-none fixed inset-x-0 top-0 z-[70] flex justify-center px-3 pt-[calc(0.55rem+env(safe-area-inset-top))] sm:px-4 sm:pt-4">
       <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-900 shadow-md">
         <span className="h-2 w-2 animate-pulse rounded-full bg-amber-500" />
-        Reconnecting… the server may still be waking up.
+        Reconnecting... Please check your connection.
       </div>
     </div>
   );
 }
+

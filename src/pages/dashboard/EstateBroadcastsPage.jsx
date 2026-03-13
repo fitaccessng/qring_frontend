@@ -4,6 +4,7 @@ import { createEstateAlert, deleteEstateAlert, getEstateOverview, listEstateAler
 import { showError, showSuccess } from "../../utils/flash";
 import { useSocketEvents } from "../../hooks/useSocketEvents";
 import { getDashboardSocket } from "../../services/socketClient";
+import CardSurface from "../../components/CardSurface";
 
 export default function EstateBroadcastsPage() {
   const [overview, setOverview] = useState(null);
@@ -242,7 +243,7 @@ export default function EstateBroadcastsPage() {
     <AppShell title="Broadcast Messaging">
       <div className="mx-auto w-full max-w-4xl space-y-5">
 
-        <section className="rounded-[2rem] border border-slate-200 bg-white/90 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
+        <CardSurface accent="from-amber-100/80 via-white/10 to-transparent" glow="bg-amber-300/50">
           <h2 className="text-lg font-bold text-slate-900 dark:text-white">Send a broadcast</h2>
           <p className="mt-1 text-xs text-slate-500">Message all homeowners in the estate.</p>
           <form onSubmit={handleSubmit} className="mt-4 grid gap-3">
@@ -341,15 +342,21 @@ export default function EstateBroadcastsPage() {
               {busy ? "Sending..." : "Send Broadcast"}
             </button>
           </form>
-        </section>
+        </CardSurface>
 
-        <section className="rounded-[2rem] border border-slate-200 bg-white/90 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
+        <CardSurface accent="from-slate-100/80 via-white/10 to-transparent" glow="bg-slate-300/50">
           <h3 className="text-base font-bold text-slate-900 dark:text-white">Recent broadcasts</h3>
           {loading ? <p className="mt-3 text-sm text-slate-500">Loading...</p> : null}
           {!loading && alerts.length === 0 ? <p className="mt-3 text-sm text-slate-500">No broadcasts yet.</p> : null}
           <div className="mt-3 space-y-3">
             {alerts.map((item) => (
-              <article key={item.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/60">
+              <CardSurface
+                as="article"
+                key={item.id}
+                className="rounded-[1.6rem] border-slate-200/80 bg-white/80 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/70"
+                accent="from-amber-100/80 via-white/10 to-transparent"
+                glow="bg-amber-300/40"
+              >
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
                     <h4 className="truncate text-sm font-bold">{item.title}</h4>
@@ -394,10 +401,10 @@ export default function EstateBroadcastsPage() {
                 ) : (
                   <p className="mt-2 text-[11px] text-slate-500">Sent to all homeowners</p>
                 )}
-              </article>
+              </CardSurface>
             ))}
           </div>
-        </section>
+        </CardSurface>
       </div>
 
       {editingId ? (

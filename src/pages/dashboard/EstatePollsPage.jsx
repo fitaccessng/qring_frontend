@@ -4,6 +4,7 @@ import { createEstateAlert, deleteEstateAlert, getEstateOverview, listEstateAler
 import { showError, showSuccess } from "../../utils/flash";
 import { useSocketEvents } from "../../hooks/useSocketEvents";
 import { getDashboardSocket } from "../../services/socketClient";
+import CardSurface from "../../components/CardSurface";
 
 export default function EstatePollsPage() {
   const [overview, setOverview] = useState(null);
@@ -216,7 +217,7 @@ export default function EstatePollsPage() {
     <AppShell title="Estate Polls">
       <div className="mx-auto w-full max-w-4xl space-y-5">
 
-        <section className="rounded-[2rem] border border-slate-200 bg-white/90 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
+        <CardSurface accent="from-rose-100/80 via-white/10 to-transparent" glow="bg-rose-300/50">
           <h2 className="text-lg font-bold text-slate-900 dark:text-white">Create a poll</h2>
           <form onSubmit={handleSubmit} className="mt-4 grid gap-3">
             <label className="block">
@@ -280,15 +281,21 @@ export default function EstatePollsPage() {
               {busy ? "Publishing..." : "Publish Poll"}
             </button>
           </form>
-        </section>
+        </CardSurface>
 
-        <section className="rounded-[2rem] border border-slate-200 bg-white/90 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
+        <CardSurface accent="from-slate-100/80 via-white/10 to-transparent" glow="bg-slate-300/50">
           <h3 className="text-base font-bold text-slate-900 dark:text-white">Poll results</h3>
           {loading ? <p className="mt-3 text-sm text-slate-500">Loading...</p> : null}
           {!loading && polls.length === 0 ? <p className="mt-3 text-sm text-slate-500">No polls yet.</p> : null}
           <div className="mt-3 space-y-4">
             {polls.map((poll) => (
-              <article key={poll.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/60">
+              <CardSurface
+                as="article"
+                key={poll.id}
+                className="rounded-[1.6rem] border-slate-200/80 bg-white/80 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/70"
+                accent="from-rose-100/80 via-white/10 to-transparent"
+                glow="bg-rose-300/40"
+              >
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
                     <h4 className="truncate text-sm font-bold">{poll.title}</h4>
@@ -326,10 +333,10 @@ export default function EstatePollsPage() {
                     </div>
                   ))}
                 </div>
-              </article>
+              </CardSurface>
             ))}
           </div>
-        </section>
+        </CardSurface>
       </div>
 
       {editingId ? (

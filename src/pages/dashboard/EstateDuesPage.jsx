@@ -13,6 +13,7 @@ import {
 import { showError, showSuccess } from "../../utils/flash";
 import { useSocketEvents } from "../../hooks/useSocketEvents";
 import { getDashboardSocket } from "../../services/socketClient";
+import CardSurface from "../../components/CardSurface";
 
 export default function EstateDuesPage() {
   const [overview, setOverview] = useState(null);
@@ -337,7 +338,7 @@ export default function EstateDuesPage() {
     <AppShell title="Estate Dues & Payments">
       <div className="mx-auto w-full max-w-4xl space-y-5">
 
-        <section className="rounded-[2rem] border border-slate-200 bg-white/90 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
+        <CardSurface accent="from-emerald-100/80 via-white/10 to-transparent" glow="bg-emerald-300/50">
           <h2 className="text-lg font-bold text-slate-900 dark:text-white">Create payment request</h2>
           <p className="mt-1 text-xs text-slate-500">Homeowners can pay via Paystack, bank transfer reference, or wallet balance.</p>
           <form onSubmit={handleSubmit} className="mt-4 grid gap-3">
@@ -405,9 +406,9 @@ export default function EstateDuesPage() {
               {busy ? "Creating..." : "Create Payment Request"}
             </button>
           </form>
-        </section>
+        </CardSurface>
 
-        <section className="rounded-[2rem] border border-slate-200 bg-white/90 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
+        <CardSurface accent="from-amber-100/80 via-white/10 to-transparent" glow="bg-amber-300/50">
           <h3 className="text-base font-bold text-slate-900 dark:text-white">Payment status</h3>
           {loading ? <p className="mt-3 text-sm text-slate-500">Loading...</p> : null}
           {!loading && alerts.length === 0 ? <p className="mt-3 text-sm text-slate-500">No payment requests yet.</p> : null}
@@ -415,7 +416,13 @@ export default function EstateDuesPage() {
             {alerts.map((alert) => {
               const summary = paymentMap.get(alert.id);
               return (
-                <article key={alert.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/60">
+                <CardSurface
+                  as="article"
+                  key={alert.id}
+                  className="rounded-[1.6rem] border-slate-200/80 bg-white/80 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/70"
+                  accent="from-slate-100/80 via-white/10 to-transparent"
+                  glow="bg-slate-300/40"
+                >
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div className="min-w-0">
                       <h4 className="truncate text-sm font-bold">{alert.title}</h4>
@@ -501,11 +508,11 @@ export default function EstateDuesPage() {
                       {remindingId === alert.id ? "Sending..." : "Send reminder"}
                     </button>
                   </div>
-                </article>
+                </CardSurface>
               );
             })}
           </div>
-        </section>
+        </CardSurface>
       </div>
       {reviewTarget ? (
         <div className="fixed inset-0 z-[70] flex items-end justify-center bg-slate-950/50 px-4 pb-6 pt-10 backdrop-blur-sm">

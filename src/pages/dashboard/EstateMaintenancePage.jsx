@@ -4,6 +4,7 @@ import { getEstateOverview, listEstateAlerts, listMaintenanceAudits, updateEstat
 import { showError, showSuccess } from "../../utils/flash";
 import { useSocketEvents } from "../../hooks/useSocketEvents";
 import { getDashboardSocket } from "../../services/socketClient";
+import CardSurface from "../../components/CardSurface";
 
 export default function EstateMaintenancePage() {
   const [overview, setOverview] = useState(null);
@@ -181,7 +182,7 @@ export default function EstateMaintenancePage() {
   return (
     <AppShell title="Maintenance Requests">
       <div className="mx-auto w-full max-w-4xl space-y-5">
-        <section className="rounded-[2rem] border border-slate-200 bg-white/90 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
+        <CardSurface accent="from-cyan-100/80 via-white/10 to-transparent" glow="bg-cyan-300/50">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-lg font-bold text-slate-900 dark:text-white">Maintenance inbox</h2>
@@ -240,16 +241,22 @@ export default function EstateMaintenancePage() {
               </select>
             </div>
           ) : null}
-        </section>
+        </CardSurface>
 
-        <section className="rounded-[2rem] border border-slate-200 bg-white/90 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
+        <CardSurface accent="from-slate-100/80 via-white/10 to-transparent" glow="bg-slate-300/50">
           {loading ? <p className="text-sm text-slate-500">Loading...</p> : null}
           {activeTab === "requests" ? (
             <>
               {!loading && requests.length === 0 ? <p className="text-sm text-slate-500">No maintenance requests yet.</p> : null}
               <div className="space-y-3">
                 {requests.map((item) => (
-                  <article key={item.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/60">
+                  <CardSurface
+                    as="article"
+                    key={item.id}
+                    className="rounded-[1.6rem] border-slate-200/80 bg-white/80 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/70"
+                    accent="from-amber-100/80 via-white/10 to-transparent"
+                    glow="bg-amber-300/40"
+                  >
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
                     <h4 className="truncate text-sm font-bold">{item.title}</h4>
@@ -288,7 +295,7 @@ export default function EstateMaintenancePage() {
                         {updatingId === item.id ? "Updating..." : "Mark Solved"}
                       </button>
                     </div>
-                  </article>
+                  </CardSurface>
                 ))}
               </div>
             </>
@@ -299,7 +306,13 @@ export default function EstateMaintenancePage() {
                 {filteredAudits.map((row) => {
                   const request = requestById.get(row.alertId);
                   return (
-                    <div key={row.id} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
+                    <CardSurface
+                      as="div"
+                      key={row.id}
+                      className="rounded-[1.2rem] border-slate-200/80 bg-white/80 px-3 py-2 text-xs text-slate-600 shadow-sm dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300"
+                      accent="from-slate-100/80 via-white/10 to-transparent"
+                      glow="bg-slate-300/30"
+                    >
                       <div className="flex items-center justify-between gap-2">
                         <div>
                           <p className="font-semibold text-slate-900 dark:text-white">
@@ -316,13 +329,13 @@ export default function EstateMaintenancePage() {
                       <p className="mt-1 text-[11px] text-slate-400">
                         {row.changedByName} {row.changedByEmail ? `(${row.changedByEmail})` : ""}
                       </p>
-                    </div>
+                    </CardSurface>
                   );
                 })}
               </div>
             </>
           )}
-        </section>
+        </CardSurface>
       </div>
     </AppShell>
   );

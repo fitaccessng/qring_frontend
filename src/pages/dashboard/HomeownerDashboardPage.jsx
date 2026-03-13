@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Activity, ChevronRight, Clock3, DoorOpen, Info, MessageSquare, Phone } from "lucide-react";
+import { Activity, Clock3, DoorOpen, FileText, Info, MessageSquare, Phone, Settings2 } from "lucide-react";
 import AppShell from "../../layouts/AppShell";
 import { useDashboardData } from "../../hooks/useDashboardData";
 import { getHomeownerContext } from "../../services/homeownerService";
@@ -124,29 +124,49 @@ export default function HomeownerDashboardPage() {
       percent: totalSignals > 0 ? Math.round(((Number(metrics.callsToday) || 0) / totalSignals) * 100) : 0
     }
   ];
-  const quickActions = useMemo(() => {
+  const actionCards = useMemo(() => {
     const base = [
       {
-        title: "Live Queue",
-        subtitle: "Monitor live visitor queue",
-        to: "/dashboard/homeowner/live-queue"
+        label: "Live Queue",
+        to: "/dashboard/homeowner/live-queue",
+        icon: <Activity size={18} />,
+        eyebrow: "Real-time",
+        description: "Track visitor arrivals and approvals as they happen.",
+        badge: "Live",
+        accent: "from-emerald-100/80 via-white/10 to-transparent",
+        glow: "bg-emerald-300/50"
       },
       {
-        title: "Receipts",
-        subtitle: "View your payment history",
-        to: "/dashboard/homeowner/receipts"
+        label: "Receipts",
+        to: "/dashboard/homeowner/receipts",
+        icon: <FileText size={18} />,
+        eyebrow: "Payments",
+        description: "Keep your payment history and receipts organized.",
+        badge: "Records",
+        accent: "from-amber-100/80 via-white/10 to-transparent",
+        glow: "bg-amber-300/50"
       },
       {
-        title: "Settings",
-        subtitle: "Profile, alerts, and preferences",
-        to: "/dashboard/homeowner/settings"
+        label: "Settings",
+        to: "/dashboard/homeowner/settings",
+        icon: <Settings2 size={18} />,
+        eyebrow: "Profile",
+        description: "Update profile details, alerts, and preferences.",
+        badge: "Manage",
+        accent: "from-slate-100/80 via-white/10 to-transparent",
+        glow: "bg-slate-300/50"
       }
     ];
     if (!managedByEstate) {
       base.splice(2, 0, {
-        title: "Billing",
-        subtitle: "Manage subscription and plan",
-        to: "/billing/paywall"
+        label: "Billing",
+        to: "/billing/paywall",
+        icon: <MessageSquare size={18} />,
+        eyebrow: "Subscription",
+        description: "Manage your plan and payment methods.",
+        badge: "Plan",
+        accent: "from-violet-100/80 via-white/10 to-transparent",
+        glow: "bg-violet-300/50"
       });
     }
     return base;
@@ -280,21 +300,11 @@ export default function HomeownerDashboardPage() {
         <section className="space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-xl font-black text-slate-900 dark:text-white">Quick Actions</h3>
-            <span className="text-xs font-semibold text-slate-500">More tools</span>
+            <span className="text-xs font-semibold text-slate-500">Homeowner tools</span>
           </div>
-          <div className="space-y-2 rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900/80 sm:p-4">
-            {quickActions.map((action) => (
-              <Link
-                key={action.title}
-                to={action.to}
-                className="flex items-center justify-between rounded-xl px-2 py-2 transition-all hover:bg-slate-50 active:scale-[0.99] dark:hover:bg-slate-800/60"
-              >
-                <div>
-                  <p className="text-sm font-bold text-slate-900 dark:text-white">{action.title}</p>
-                  <p className="text-xs text-slate-500">{action.subtitle}</p>
-                </div>
-                <ChevronRight size={16} className="text-slate-400" />
-              </Link>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {actionCards.map((action) => (
+              <ActionCard key={action.label} {...action} />
             ))}
           </div>
         </section>
@@ -382,5 +392,43 @@ function PercentPill({ value }) {
     >
       <span className="grid h-8 w-8 place-items-center rounded-full bg-white dark:bg-slate-900">{value}%</span>
     </span>
+  );
+}
+
+function ActionCard({ label, to, icon, eyebrow, description, badge, accent, glow }) {
+  return (
+    <Link
+      to={to}
+      className="group relative overflow-hidden rounded-[1.6rem] border border-slate-200/80 bg-white p-5 text-sm text-slate-900 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md active:translate-y-0 active:shadow-sm dark:border-slate-700 dark:bg-slate-900/90 dark:text-slate-100"
+    >
+      <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${accent} opacity-70`} />
+      <div className={`pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full ${glow} blur-2xl opacity-70`} />
+      <div className="relative flex items-center justify-between">
+        <span className="rounded-full border border-slate-200/70 bg-white/80 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300">
+          {eyebrow}
+        </span>
+        <span className="rounded-full bg-slate-900 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-white dark:bg-white dark:text-slate-900">
+          {badge}
+        </span>
+      </div>
+      <div className="relative mt-4 flex items-center gap-3">
+        <span className="grid h-11 w-11 place-items-center rounded-2xl bg-white/90 text-slate-900 shadow-sm ring-1 ring-slate-200/80 transition group-hover:-rotate-3 dark:bg-slate-950 dark:text-slate-100 dark:ring-slate-700">
+          {icon}
+        </span>
+        <div>
+          <p className="text-lg font-black">{label}</p>
+          <p className="text-xs text-slate-500 dark:text-slate-300">{description}</p>
+        </div>
+      </div>
+      <div className="relative mt-4 flex items-center justify-between text-xs font-semibold text-slate-600 dark:text-slate-300">
+        <span className="inline-flex items-center gap-2">
+          Open dashboard
+          <span className="text-sm transition group-hover:translate-x-1">-&gt;</span>
+        </span>
+        <span className="rounded-full border border-slate-200/70 bg-white/70 px-2 py-1 text-[10px] uppercase tracking-wider text-slate-500 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-400">
+          Manage
+        </span>
+      </div>
+    </Link>
   );
 }

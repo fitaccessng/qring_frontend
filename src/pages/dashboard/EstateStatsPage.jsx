@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "../../layouts/AppShell";
 import { getEstateAccessLogs, getEstateOverview } from "../../services/estateService";
+import CardSurface from "../../components/CardSurface";
 
 export default function EstateStatsPage() {
   const [overview, setOverview] = useState(null);
@@ -60,13 +61,19 @@ export default function EstateStatsPage() {
           <StatCard label="Residents" value={stats.residents} />
         </section>
 
-        <section className="rounded-[2rem] border border-slate-200 bg-white/90 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
+        <CardSurface accent="from-slate-100/80 via-white/10 to-transparent" glow="bg-slate-300/50">
           <h3 className="text-base font-bold text-slate-900 dark:text-white">Recent visitor activity</h3>
           {loading ? <p className="mt-3 text-sm text-slate-500">Loading...</p> : null}
           {!loading && logs.length === 0 ? <p className="mt-3 text-sm text-slate-500">No visits logged yet.</p> : null}
           <div className="mt-3 space-y-2">
             {logs.slice(0, 12).map((row) => (
-              <div key={row.id} className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
+              <CardSurface
+                as="div"
+                key={row.id}
+                className="rounded-[1.2rem] border-slate-200/80 bg-white/80 px-3 py-2 text-xs text-slate-600 shadow-sm dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300"
+                accent="from-slate-100/80 via-white/10 to-transparent"
+                glow="bg-slate-300/30"
+              >
                 <div>
                   <p className="font-semibold text-slate-800 dark:text-slate-100">{row.visitor || "Visitor"}</p>
                   <p className="text-[11px] text-slate-500">{row.homeName} · {row.doorName}</p>
@@ -75,20 +82,34 @@ export default function EstateStatsPage() {
                   <p className="text-[11px] uppercase tracking-wide">{row.status}</p>
                   <p className="text-[10px] text-slate-400">{row.startedAt ? new Date(row.startedAt).toLocaleString() : ""}</p>
                 </div>
-              </div>
+              </CardSurface>
             ))}
           </div>
-        </section>
+        </CardSurface>
       </div>
     </AppShell>
   );
 }
 
 function StatCard({ label, value }) {
+  const themes = {
+    "Total visits": { accent: "from-cyan-100/80 via-white/10 to-transparent", glow: "bg-cyan-300/40" },
+    Approved: { accent: "from-emerald-100/80 via-white/10 to-transparent", glow: "bg-emerald-300/40" },
+    Rejected: { accent: "from-rose-100/80 via-white/10 to-transparent", glow: "bg-rose-300/40" },
+    Homes: { accent: "from-amber-100/80 via-white/10 to-transparent", glow: "bg-amber-300/40" },
+    Doors: { accent: "from-violet-100/80 via-white/10 to-transparent", glow: "bg-violet-300/40" },
+    Residents: { accent: "from-indigo-100/80 via-white/10 to-transparent", glow: "bg-indigo-300/40" }
+  };
+  const theme = themes[label] || { accent: "from-slate-100/80 via-white/10 to-transparent", glow: "bg-slate-300/30" };
   return (
-    <div className="rounded-[1.6rem] border border-slate-200 bg-white/95 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/90">
+    <CardSurface
+      as="div"
+      className="rounded-[1.6rem] border-slate-200/80 bg-white/90 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/85"
+      accent={theme.accent}
+      glow={theme.glow}
+    >
       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
       <p className="mt-2 text-2xl font-black text-slate-900 dark:text-white">{value}</p>
-    </div>
+    </CardSurface>
   );
 }

@@ -259,7 +259,7 @@ export async function apiRequest(path, options = {}, attempt = 0) {
       return apiRequest(path, options, attempt + 1);
     }
     const message =
-      "We couldn't connect right now. Please check your internet and try again in a moment. If this is your first request, the server may still be waking up.";
+      "We couldn't connect right now. Please check your internet and try again in a moment.";
     throw new ApiError(
       message,
       0,
@@ -337,7 +337,7 @@ export async function apiUpload(path, formData) {
     });
   } catch (networkError) {
     const message =
-      "We couldn't connect right now. Please check your internet and try again in a moment. If this is your first request, the server may still be waking up.";
+      "We couldn't connect right now. Please check your internet and try again in a moment.";
     emitFlash(message, "error");
     throw new ApiError(
       message,
