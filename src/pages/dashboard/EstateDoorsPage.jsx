@@ -465,7 +465,7 @@ export default function EstateDoorsPage() {
 
       {editingDoorId ? (
         <section className="rounded-[2rem] border border-slate-200/70 bg-white/95 p-5 shadow-[0_8px_30px_rgb(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-900/90 sm:p-6">
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <h3 className="font-heading text-lg font-bold">Door Admin Profile</h3>
             <button
               type="button"

@@ -301,7 +301,7 @@ export default function EstateSettingsPage() {
         </section>
 
         <section className="rounded-[2.5rem] border border-slate-200/70 bg-white/95 p-5 shadow-[0_8px_30px_rgb(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-900/90 lg:p-8">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h3 className="text-lg font-extrabold">Payment Reminders</h3>
               <p className="text-xs text-slate-500">Control how often unpaid homeowners receive reminders.</p>
@@ -493,7 +493,7 @@ function ActionModal({ open, title, onClose, children }) {
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/50 p-4 backdrop-blur-sm">
       <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h3 className="text-lg font-extrabold">{title}</h3>
           <button type="button" onClick={onClose} className="rounded-full bg-slate-100 p-2 text-slate-500 dark:bg-slate-800">
             <X className="h-4 w-4" />

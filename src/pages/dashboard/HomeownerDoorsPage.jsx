@@ -345,7 +345,7 @@ export default function HomeownerDoorsPage() {
 
         {activeDoor ? (
           <section ref={detailsSectionRef} className="rounded-[2rem] border border-slate-200 bg-white/95 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/90 sm:p-5">
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <h2 className="text-lg font-bold sm:text-xl">Door Details & QR Print</h2>
               <button
                 type="button"

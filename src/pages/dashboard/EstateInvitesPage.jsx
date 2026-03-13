@@ -182,7 +182,7 @@ export default function EstateInvitesPage() {
         </section>
 
         <section>
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <h3 className="text-base font-bold text-slate-900 dark:text-white">Homeowners</h3>
             <span className="text-xs text-slate-500">{homeowners.length} total</span>
           </div>

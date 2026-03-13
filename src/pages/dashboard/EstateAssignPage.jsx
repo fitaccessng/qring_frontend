@@ -99,7 +99,7 @@ export default function EstateAssignPage() {
         </section>
 
         <section className="rounded-[2rem] border border-slate-200/70 bg-white/95 p-5 shadow-[0_8px_30px_rgb(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-900/90 sm:p-6">
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <h3 className="text-base font-bold text-slate-900 dark:text-white">Door Assignments</h3>
             <span className="text-xs text-slate-500">{overview?.doors?.length ?? 0} total</span>
           </div>

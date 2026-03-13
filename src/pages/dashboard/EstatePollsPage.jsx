@@ -289,10 +289,14 @@ export default function EstatePollsPage() {
           <div className="mt-3 space-y-4">
             {polls.map((poll) => (
               <article key={poll.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/60">
-                <div className="flex items-center justify-between gap-2">
-                  <h4 className="text-sm font-bold">{poll.title}</h4>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] text-slate-500">{poll.createdAt ? new Date(poll.createdAt).toLocaleString() : ""}</span>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <h4 className="truncate text-sm font-bold">{poll.title}</h4>
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      {poll.createdAt ? new Date(poll.createdAt).toLocaleString() : ""}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
                       onClick={() => startEdit(poll)}

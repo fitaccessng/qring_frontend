@@ -182,7 +182,7 @@ export default function EstateMaintenancePage() {
     <AppShell title="Maintenance Requests">
       <div className="mx-auto w-full max-w-4xl space-y-5">
         <section className="rounded-[2rem] border border-slate-200 bg-white/90 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-lg font-bold text-slate-900 dark:text-white">Maintenance inbox</h2>
               <p className="mt-1 text-xs text-slate-500">Requests submitted by homeowners.</p>
@@ -250,21 +250,25 @@ export default function EstateMaintenancePage() {
               <div className="space-y-3">
                 {requests.map((item) => (
                   <article key={item.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/60">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-sm font-bold">{item.title}</h4>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[11px] text-slate-500">{item.createdAt ? new Date(item.createdAt).toLocaleString() : ""}</span>
-                        <span
-                          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                            item.maintenanceStatus === "solved"
-                              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200"
-                              : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200"
-                          }`}
-                        >
-                          {item.maintenanceStatus === "solved" ? "Solved" : "Pending"}
-                        </span>
-                      </div>
-                    </div>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <h4 className="truncate text-sm font-bold">{item.title}</h4>
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      {item.createdAt ? new Date(item.createdAt).toLocaleString() : ""}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                        item.maintenanceStatus === "solved"
+                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200"
+                          : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200"
+                      }`}
+                    >
+                      {item.maintenanceStatus === "solved" ? "Solved" : "Pending"}
+                    </span>
+                  </div>
+                </div>
                     {item.description ? <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{item.description}</p> : null}
                     <div className="mt-3 flex gap-2">
                       <button

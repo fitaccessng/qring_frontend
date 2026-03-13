@@ -416,7 +416,7 @@ export default function HomeownerMessagesPage() {
         <article
           className={`${selectedId ? "hidden lg:flex" : "flex"} min-h-[74vh] flex-col overflow-hidden rounded-[2rem] border border-slate-200 bg-slate-50/80 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60`}
         >
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="text-2xl font-extrabold">Messages</h2>
             <button
               type="button"
@@ -439,7 +439,7 @@ export default function HomeownerMessagesPage() {
             />
           </div>
 
-          <div className="mb-2 flex items-center justify-between px-1">
+          <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between px-1">
             <p className="text-sm font-bold">{filterLabel} ({filteredThreads.length})</p>
             <button
               type="button"
