@@ -115,6 +115,7 @@ export default function AppShell({ title, children, showTopBar = true }) {
     () => localStorage.getItem("qring_sound_alerts") !== "false"
   );
   const [muteVisitRing, setMuteVisitRing] = useState(true);
+  const [logoutBusy, setLogoutBusy] = useState(false);
   const notificationsPanelRef = useRef(null);
   const notificationsButtonRef = useRef(null);
   const audioContextRef = useRef(null);
@@ -129,6 +130,7 @@ export default function AppShell({ title, children, showTopBar = true }) {
         (typeof user?.email === "string" && user.email.toLowerCase().endsWith("@estate.useqring.online"))),
     [user?.role, user?.email, homeownerContext]
   );
+  const isEstateUser = user?.role === "estate";
 
   const navItems = useMemo(() => {
     const base = navByRole[user?.role] ?? [];
@@ -622,6 +624,19 @@ export default function AppShell({ title, children, showTopBar = true }) {
     navigate(fallback);
   }
 
+  async function handleLogout() {
+    if (logoutBusy) return;
+    setLogoutBusy(true);
+    try {
+      await logout();
+    } catch {
+      // Continue with redirect even if logout request fails.
+    } finally {
+      setLogoutBusy(false);
+      navigate("/login");
+    }
+  }
+
   return (
     <div className="min-h-[100dvh] overflow-hidden bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_top_right,_rgba(36,86,245,0.16),_transparent_40%),radial-gradient(circle_at_bottom_left,_rgba(20,184,166,0.12),_transparent_35%)]" />
@@ -746,15 +761,17 @@ export default function AppShell({ title, children, showTopBar = true }) {
                       </span>
                     ) : null}
                   </button>
-                  {showProfileHeader && user?.role === "estate" ? (
+                  {isEstateUser ? (
                     <button
                       type="button"
-                      onClick={logout}
-                      className="grid h-9 w-9 place-items-center rounded-full bg-rose-100 text-rose-600 transition-all active:scale-95 dark:bg-rose-900/30 dark:text-rose-300"
+                      onClick={handleLogout}
+                      disabled={logoutBusy}
+                      className="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 transition-all hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-70 dark:border-rose-900/40 dark:bg-rose-900/30 dark:text-rose-200"
                       aria-label="Logout"
                       title="Logout"
                     >
                       <LogoutIcon />
+                      {logoutBusy ? "Logging out..." : "Logout"}
                     </button>
                   ) : null}
                   {notificationsOpen ? (

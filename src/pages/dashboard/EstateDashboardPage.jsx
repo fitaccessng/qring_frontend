@@ -249,6 +249,8 @@ export default function EstateDashboardPage() {
           </div>
         </section>
 
+        <QuickActionGrid />
+
         {meetingSnapshot ? (
           <section className="rounded-[2rem] border border-slate-200/70 bg-white/95 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/90 sm:p-6">
             <div className="flex items-center justify-between gap-3">
@@ -305,8 +307,6 @@ export default function EstateDashboardPage() {
             />
           </div>
         </section>
-
-        <QuickActionGrid />
       </div>
     </AppShell>
   );
@@ -374,6 +374,16 @@ function QuickActionGrid() {
       glow: "bg-violet-300/50"
     },
     {
+      label: "Polls",
+      to: "/dashboard/estate/polls",
+      icon: <Vote size={18} />,
+      eyebrow: "Decisions",
+      description: "Run estate votes and get clean participation stats.",
+      badge: "Live",
+      accent: "from-rose-100/80 via-white/10 to-transparent",
+      glow: "bg-rose-300/50"
+    },
+    {
       label: "Dues",
       to: "/dashboard/estate/dues",
       icon: <ClipboardList size={18} />,
@@ -394,16 +404,6 @@ function QuickActionGrid() {
       glow: "bg-cyan-300/50"
     },
     {
-      label: "Polls",
-      to: "/dashboard/estate/polls",
-      icon: <Vote size={18} />,
-      eyebrow: "Decisions",
-      description: "Run estate votes and get clean participation stats.",
-      badge: "Live",
-      accent: "from-rose-100/80 via-white/10 to-transparent",
-      glow: "bg-rose-300/50"
-    },
-    {
       label: "Visitor Stats",
       to: "/dashboard/estate/stats",
       icon: <BarChart3 size={18} />,
@@ -412,20 +412,11 @@ function QuickActionGrid() {
       badge: "Trends",
       accent: "from-slate-100/80 via-white/10 to-transparent",
       glow: "bg-slate-300/50"
-    },
-    {
-      label: "Assign Doors",
-      to: "/dashboard/estate/assign",
-      icon: <Users size={18} />,
-      eyebrow: "Access",
-      description: "Map doors to residents and tighten access control.",
-      badge: "Setup",
-      accent: "from-indigo-100/80 via-white/10 to-transparent",
-      glow: "bg-indigo-300/50"
     }
   ];
   const moreActions = [
     { label: "Access Logs", to: "/dashboard/estate/logs" },
+    { label: "Assign Doors", to: "/dashboard/estate/assign" },
     { label: "Invite Homeowners", to: "/dashboard/estate/invites" },
     { label: "Mappings", to: "/dashboard/estate/mappings" },
     { label: "Plan Rules", to: "/dashboard/estate/plan" },
