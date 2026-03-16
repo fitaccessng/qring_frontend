@@ -211,7 +211,7 @@ export default function HomeownerDoorsPage() {
       : null;
 
   return (
-    <AppShell>
+    <AppShell title="Doors">
       <div className="mx-auto max-w-6xl space-y-4 pb-14">
         <section className="rounded-[2rem] border border-slate-200 bg-white/95 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/90 sm:p-6 lg:p-8">
           <h2 className="text-2xl font-extrabold sm:text-3xl">Doors & QR</h2>
