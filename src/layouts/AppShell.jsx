@@ -12,6 +12,7 @@ import {
 } from "../services/notificationService";
 import { registerFcmPushSubscription, setupForegroundMessageListener } from "../services/pushMessagingService";
 import { resolveNotificationRoute } from "../utils/notificationRouting";
+import { notify } from "../utils/notifier";
 
 const navByRole = {
   homeowner: [
@@ -488,24 +489,24 @@ export default function AppShell({ title, children, showTopBar = true }) {
       if (browserAlertedIdsRef.current.has(item.id)) return;
       browserAlertedIdsRef.current.add(item.id);
       const body = item.payload?.message ?? "You have a new alert";
-      if (canNotify) {
-        const notification = new window.Notification("Qring Alert", { body });
-        notification.onclick = () => {
-          window.focus();
-          openNotification(item);
-        };
-        return;
-      }
-      window.dispatchEvent(
-        new CustomEvent("qring:flash", {
-          detail: {
-            type: "info",
-            title: "Qring Alert",
-            message: body,
-            duration: 3600
-          }
-        })
-      );
+      const route = resolveNotificationRoute({
+        role: user?.role,
+        kind: item?.kind,
+        payload: item?.payload
+      });
+
+      notify({
+        type: "info",
+        title: "Qring Alert",
+        message: body,
+        duration: 3600,
+        kind: item?.kind || "",
+        route,
+        actionLabel: route ? "Open" : "",
+        dedupeKey: `alert|${item.id}`,
+        systemWhenHidden: true,
+        onSystemClick: canNotify ? () => openNotification(item) : undefined
+      });
     });
   }, [parsedNotifications]);
 
@@ -514,20 +515,14 @@ export default function AppShell({ title, children, showTopBar = true }) {
     setupForegroundMessageListener((payload) => {
       const title = payload?.notification?.title || payload?.data?.title || "Qring Alert";
       const message = payload?.notification?.body || payload?.data?.body || "You have a new notification.";
-      try {
-        window.dispatchEvent(
-          new CustomEvent("qring:flash", {
-            detail: {
-              type: "info",
-              title,
-              message,
-              duration: 3600
-            }
-          })
-        );
-      } catch {
-        // Keep foreground push non-blocking.
-      }
+      notify({
+        type: "info",
+        title,
+        message,
+        duration: 3600,
+        systemWhenHidden: true,
+        dedupeKey: `push|${title}|${message}`
+      });
     }).then((dispose) => {
       unsub = typeof dispose === "function" ? dispose : () => {};
     });
@@ -862,7 +857,7 @@ export default function AppShell({ title, children, showTopBar = true }) {
       ) : null}
       {mobileNavItems.length > 0 ? (
         <nav className="fixed inset-x-0 bottom-3 z-[9999] px-3 pb-[max(0.2rem,env(safe-area-inset-bottom))] lg:hidden">
-          <div className="relative mx-auto max-w-md rounded-[1.35rem] border border-slate-200/60 bg-[#ebe8f8]/95 px-3 py-2 shadow-[0_12px_32px_rgba(76,29,149,0.16)] backdrop-blur-md dark:border-slate-700 dark:bg-slate-900/90">
+          <div className="relative mx-auto max-w-md rounded-[1.35rem] border border-slate-200/70 bg-white/90 px-3 py-2 shadow-[0_12px_32px_rgba(15,23,42,0.10)] backdrop-blur-md dark:border-slate-700/70 dark:bg-slate-900/85">
             <div className={`flex items-stretch gap-1 ${isEstateMobileNav ? "h-14 sm:h-14" : "h-12 sm:h-12"}`}>
             {mobileNavItems.map((item) => (
               <NavLink
@@ -870,27 +865,23 @@ export default function AppShell({ title, children, showTopBar = true }) {
                 to={item.to}
                 end
                 className={({ isActive }) =>
-                  `flex min-w-0 flex-1 items-center justify-center rounded-xl px-1 py-1 text-[10px] font-semibold transition-all duration-200 active:scale-95 sm:text-[11px] ${
-                    isActive ? "text-white" : "text-violet-700 dark:text-slate-300"
+                  `flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 py-1.5 text-[10px] font-semibold transition-all duration-200 active:scale-95 sm:text-[11px] ${
+                    isActive ? "text-slate-900 dark:text-white" : "text-slate-600 dark:text-slate-300"
                   }`
                 }
               >
                 {({ isActive }) => (
-                  <div className="group relative flex items-center justify-center">
+                  <div className="relative flex flex-col items-center justify-center gap-1">
                     <span
-                      className={`grid place-items-center rounded-full transition-all duration-200 ${
+                      className={`grid place-items-center transition-all duration-200 ${
                         isActive
-                          ? "h-10 w-10 bg-violet-600 text-white shadow-[0_10px_24px_rgba(124,58,237,0.45)]"
-                          : "h-8 w-8 text-violet-700 opacity-90 dark:text-slate-300"
+                          ? "h-10 w-10 rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-700 text-white shadow-[0_10px_24px_rgba(79,70,229,0.35)] ring-1 ring-white/20"
+                          : "h-10 w-10 rounded-2xl bg-white/70 text-slate-700 shadow-sm ring-1 ring-slate-200/70 dark:bg-slate-800/60 dark:text-slate-100 dark:ring-slate-700/70"
                       }`}
                     >
                       <NavIcon name={item.icon} />
                     </span>
-                    <span
-                      className={`pointer-events-none absolute -top-7 whitespace-nowrap rounded-full bg-violet-600 px-2 py-0.5 text-[10px] font-semibold text-white transition-all ${
-                        isActive ? "opacity-100" : "opacity-0"
-                      } group-hover:opacity-100`}
-                    >
+                    <span className={`leading-none ${isActive ? "text-violet-700 dark:text-violet-200" : ""}`}>
                       {item.label}
                     </span>
                   </div>

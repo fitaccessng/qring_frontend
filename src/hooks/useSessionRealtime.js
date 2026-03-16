@@ -12,6 +12,7 @@ import {
   playIncomingCallNotificationSound,
   playMessageNotificationSound
 } from "../utils/notificationSound";
+import { notify } from "../utils/notifier";
 
 const rtcConfig = {
   iceServers: env.webRtcIceServers,
@@ -115,29 +116,15 @@ function emitRealtimeTextAlert({
   if (typeof window === "undefined") return;
   const body = String(message || "").trim();
   if (!body) return;
-  window.dispatchEvent(
-    new CustomEvent("qring:flash", {
-      detail: {
-        title,
-        message: body,
-        type,
-        duration,
-        route
-      }
-    })
-  );
-  if (
-    typeof document !== "undefined" &&
-    document.visibilityState === "hidden" &&
-    typeof window.Notification !== "undefined" &&
-    window.Notification.permission === "granted"
-  ) {
-    try {
-      new window.Notification(title, { body });
-    } catch {
-      // Keep alerts non-blocking.
-    }
-  }
+  notify({
+    title,
+    message: body,
+    type,
+    duration,
+    route,
+    systemWhenHidden: true,
+    dedupeKey: `realtime|${type}|${title}|${body}|${route}`
+  });
 }
 
 function emitBlockingModal({ title = "Notice", message }) {

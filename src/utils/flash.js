@@ -1,11 +1,15 @@
 export function showFlash(message, options = {}) {
   if (typeof window === "undefined") return;
   const detail = {
+    id: options.id || "",
+    dedupeKey: options.dedupeKey || "",
     type: options.type || "success",
     title: options.title || (options.type === "error" ? "Something went wrong" : "Success"),
     message,
     duration: options.duration ?? 3600,
-    kind: options.kind || ""
+    kind: options.kind || "",
+    route: options.route || "",
+    actionLabel: options.actionLabel || ""
   };
   window.dispatchEvent(new CustomEvent("qring:flash", { detail }));
 }

@@ -3,6 +3,7 @@ import QRCode from "qrcode";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import BrandMark from "../../components/BrandMark";
+import { notify } from "../../utils/notifier";
 
 const fadeInUp = {
   initial: { opacity: 0, y: 26 },
@@ -928,12 +929,16 @@ async function requestNotificationPermission() {
 
 function maybeNotifyHomeowner(visit) {
   try {
-    if (!("Notification" in window)) return;
-    if (Notification.permission !== "granted") return;
     const title = "Someone is at the door";
     const body = `${visit?.name || "Visitor"} • ${visit?.doorName || "Door"}`;
-    // eslint-disable-next-line no-new
-    new Notification(title, { body });
+    notify({
+      title,
+      message: body,
+      type: "info",
+      duration: 3600,
+      systemWhenHidden: true,
+      dedupeKey: `landing_visit|${visit?.id || ""}|${visit?.name || ""}|${visit?.doorName || ""}`
+    });
   } catch {
     // ignore
   }

@@ -70,12 +70,11 @@ import RoleRoute from "./routes/RoleRoute";
 import VisitorCallRoute from "./routes/VisitorCallRoute";
 import PublicOnlyRoute from "./routes/PublicOnlyRoute";
 import EstateManagedHomeownerRoute from "./routes/EstateManagedHomeownerRoute";
-import { AuthProvider, useAuth } from "./state/AuthContext";
+import { AuthProvider } from "./state/AuthContext";
 import { ThemeProvider } from "./state/ThemeContext";
-import FlashModal from "./components/FlashModal";
 import BlockingModal from "./components/BlockingModal";
 import AppPreloader from "./components/mobile/AppPreloader";
-import NotificationModal from "./components/NotificationModal";
+import ToastCenter from "./components/ToastCenter";
 import { env } from "./config/env";
 
 export default function App() {
@@ -239,12 +238,9 @@ function AppRoutes() {
 }
 
 function GlobalNotifications() {
-  const { user } = useAuth();
-  const role = String(user?.role || "").toLowerCase();
-  const useModal = role === "homeowner" || role === "estate";
   return (
     <>
-      {useModal ? <NotificationModal /> : <FlashModal />}
+      <ToastCenter />
       <BlockingModal />
     </>
   );
