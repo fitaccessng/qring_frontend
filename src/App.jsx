@@ -68,6 +68,7 @@ import LoaderPage from "./pages/common/LoaderPage";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import RoleRoute from "./routes/RoleRoute";
 import VisitorCallRoute from "./routes/VisitorCallRoute";
+import VisitorSessionGateRoute from "./routes/VisitorSessionGateRoute";
 import PublicOnlyRoute from "./routes/PublicOnlyRoute";
 import EstateManagedHomeownerRoute from "./routes/EstateManagedHomeownerRoute";
 import { AuthProvider } from "./state/AuthContext";
@@ -158,21 +159,32 @@ function AppRoutes() {
               <Route path="/scan/:qrId" element={<ScanPage />} />
               <Route path="/appointment/:shareToken" element={<AppointmentPage />} />
               <Route path="/session/:sessionId" element={<Navigate to="message" replace />} />
-              <Route path="/session/:sessionId/message" element={<SessionMessagePage />} />
+              <Route
+                path="/session/:sessionId/message"
+                element={
+                  <VisitorSessionGateRoute>
+                    <SessionMessagePage />
+                  </VisitorSessionGateRoute>
+                }
+              />
               <Route
                 path="/session/:sessionId/audio"
                 element={
-                  <VisitorCallRoute>
-                    <SessionAudioPage />
-                  </VisitorCallRoute>
+                  <VisitorSessionGateRoute>
+                    <VisitorCallRoute>
+                      <SessionAudioPage />
+                    </VisitorCallRoute>
+                  </VisitorSessionGateRoute>
                 }
               />
               <Route
                 path="/session/:sessionId/video"
                 element={
-                  <VisitorCallRoute>
-                    <SessionVideoPage />
-                  </VisitorCallRoute>
+                  <VisitorSessionGateRoute>
+                    <VisitorCallRoute>
+                      <SessionVideoPage />
+                    </VisitorCallRoute>
+                  </VisitorSessionGateRoute>
                 }
               />
 

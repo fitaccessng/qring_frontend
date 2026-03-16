@@ -36,7 +36,7 @@ function normalizeToast(detail) {
   const id = String(detail?.id ?? "").trim();
 
   const dedupeKeyRaw = String(detail?.dedupeKey ?? "").trim();
-  const dedupeKey = dedupeKeyRaw || `${kind}|${type}|${title}|${message}|${route}`;
+  const dedupeKey = dedupeKeyRaw || `${kind}|${type}|${message}|${route}`;
 
   return {
     id: id || `toast_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
@@ -197,4 +197,3 @@ export default function ToastCenter() {
     </div>
   );
 }
-
