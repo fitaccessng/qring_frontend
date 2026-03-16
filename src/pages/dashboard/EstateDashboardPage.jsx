@@ -475,39 +475,19 @@ function QuickActionGrid() {
   );
 }
 
-function ActionCard({ label, to, icon, eyebrow, description, badge, accent, glow }) {
+function ActionCard({ label, to, icon, accent, glow }) {
   return (
     <Link
       to={to}
-      className="group relative overflow-hidden rounded-[1.6rem] border border-slate-200/80 bg-white p-5 text-sm text-slate-900 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md active:translate-y-0 active:shadow-sm dark:border-slate-700 dark:bg-slate-900/90 dark:text-slate-100"
+      className="group relative overflow-hidden rounded-[1.6rem] border border-slate-200/80 bg-white p-4 text-sm text-slate-900 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md active:translate-y-0 active:shadow-sm dark:border-slate-700 dark:bg-slate-900/90 dark:text-slate-100"
     >
       <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${accent} opacity-70`} />
       <div className={`pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full ${glow} blur-2xl opacity-70`} />
-      <div className="relative flex items-center justify-between">
-        <span className="rounded-full border border-slate-200/70 bg-white/80 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300">
-          {eyebrow}
-        </span>
-        <span className="rounded-full bg-slate-900 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-white dark:bg-white dark:text-slate-900">
-          {badge}
-        </span>
-      </div>
-      <div className="relative mt-4 flex items-center gap-3">
-        <span className="grid h-11 w-11 place-items-center rounded-2xl bg-white/90 text-slate-900 shadow-sm ring-1 ring-slate-200/80 transition group-hover:-rotate-3 dark:bg-slate-950 dark:text-slate-100 dark:ring-slate-700">
+      <div className="relative flex items-center gap-3">
+        <span className="grid h-11 w-11 place-items-center rounded-2xl bg-white/92 text-slate-900 shadow-sm ring-1 ring-slate-200/80 transition group-hover:-rotate-3 dark:bg-slate-950 dark:text-slate-100 dark:ring-slate-700">
           {icon}
         </span>
-        <div>
-          <p className="text-lg font-black">{label}</p>
-          <p className="text-xs text-slate-500 dark:text-slate-300">{description}</p>
-        </div>
-      </div>
-      <div className="relative mt-4 flex items-center justify-between text-xs font-semibold text-slate-600 dark:text-slate-300">
-        <span className="inline-flex items-center gap-2">
-          Open dashboard
-          <span className="text-sm transition group-hover:translate-x-1">-&gt;</span>
-        </span>
-        <span className="rounded-full border border-slate-200/70 bg-white/70 px-2 py-1 text-[10px] uppercase tracking-wider text-slate-500 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-400">
-          Manage
-        </span>
+        <p className="text-base font-black tracking-tight">{label}</p>
       </div>
     </Link>
   );

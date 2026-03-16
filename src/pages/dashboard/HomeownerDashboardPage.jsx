@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Activity, Clock3, DoorOpen, FileText, Info, MessageSquare, Phone, Settings2 } from "lucide-react";
 import AppShell from "../../layouts/AppShell";
 import { useDashboardData } from "../../hooks/useDashboardData";
@@ -8,8 +8,10 @@ import { useAuth } from "../../state/AuthContext";
 import { useSocketEvents } from "../../hooks/useSocketEvents";
 
 export default function HomeownerDashboardPage() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [managedByEstate, setManagedByEstate] = useState(false);
+  const [logoutBusy, setLogoutBusy] = useState(false);
   const {
     metrics,
     activity,
@@ -86,6 +88,19 @@ export default function HomeownerDashboardPage() {
       [refresh]
     )
   );
+
+  async function handleLogout() {
+    if (logoutBusy) return;
+    setLogoutBusy(true);
+    try {
+      await logout();
+    } catch {
+      // Continue with redirect even if logout request fails.
+    } finally {
+      setLogoutBusy(false);
+      navigate("/login");
+    }
+  }
 
   const taskGroups = [
     {
@@ -181,14 +196,24 @@ export default function HomeownerDashboardPage() {
     <AppShell title="Homeowner Overview" showTopBar={false}>
       <div className="mx-auto w-full max-w-4xl space-y-8 px-2 py-3 sm:px-3 sm:py-4">
         <section className="rounded-[1.6rem] border border-slate-200/70 bg-white/95 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/90 sm:p-5">
-          <div className="flex items-center gap-3">
-            <div className="grid h-11 w-11 place-items-center rounded-full bg-sky-100 text-sm font-bold text-sky-700 dark:bg-sky-900/30 dark:text-sky-300">
-              {initials}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="grid h-11 w-11 place-items-center rounded-full bg-sky-100 text-sm font-bold text-sky-700 dark:bg-sky-900/30 dark:text-sky-300">
+                {initials}
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-slate-500">Hello!</p>
+                <p className="text-xl font-black text-slate-900 dark:text-white">{homeownerName}</p>
+              </div>
             </div>
-            <div>
-              <p className="text-xs font-semibold text-slate-500">Hello!</p>
-              <p className="text-xl font-black text-slate-900 dark:text-white">{homeownerName}</p>
-            </div>
+            <button
+              type="button"
+              onClick={handleLogout}
+              disabled={logoutBusy}
+              className="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
+              Sign out
+            </button>
           </div>
         </section>
 
@@ -400,39 +425,19 @@ function PercentPill({ value }) {
   );
 }
 
-function ActionCard({ label, to, icon, eyebrow, description, badge, accent, glow }) {
+function ActionCard({ label, to, icon, accent, glow }) {
   return (
     <Link
       to={to}
-      className="group relative overflow-hidden rounded-[1.6rem] border border-slate-200/80 bg-white p-5 text-sm text-slate-900 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md active:translate-y-0 active:shadow-sm dark:border-slate-700 dark:bg-slate-900/90 dark:text-slate-100"
+      className="group relative overflow-hidden rounded-[1.6rem] border border-slate-200/80 bg-white p-4 text-sm text-slate-900 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md active:translate-y-0 active:shadow-sm dark:border-slate-700 dark:bg-slate-900/90 dark:text-slate-100"
     >
       <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${accent} opacity-70`} />
       <div className={`pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full ${glow} blur-2xl opacity-70`} />
-      <div className="relative flex items-center justify-between">
-        <span className="rounded-full border border-slate-200/70 bg-white/80 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300">
-          {eyebrow}
-        </span>
-        <span className="rounded-full bg-slate-900 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-white dark:bg-white dark:text-slate-900">
-          {badge}
-        </span>
-      </div>
-      <div className="relative mt-4 flex items-center gap-3">
-        <span className="grid h-11 w-11 place-items-center rounded-2xl bg-white/90 text-slate-900 shadow-sm ring-1 ring-slate-200/80 transition group-hover:-rotate-3 dark:bg-slate-950 dark:text-slate-100 dark:ring-slate-700">
+      <div className="relative flex items-center gap-3">
+        <span className="grid h-11 w-11 place-items-center rounded-2xl bg-white/92 text-slate-900 shadow-sm ring-1 ring-slate-200/80 transition group-hover:-rotate-3 dark:bg-slate-950 dark:text-slate-100 dark:ring-slate-700">
           {icon}
         </span>
-        <div>
-          <p className="text-lg font-black">{label}</p>
-          <p className="text-xs text-slate-500 dark:text-slate-300">{description}</p>
-        </div>
-      </div>
-      <div className="relative mt-4 flex items-center justify-between text-xs font-semibold text-slate-600 dark:text-slate-300">
-        <span className="inline-flex items-center gap-2">
-          Open dashboard
-          <span className="text-sm transition group-hover:translate-x-1">-&gt;</span>
-        </span>
-        <span className="rounded-full border border-slate-200/70 bg-white/70 px-2 py-1 text-[10px] uppercase tracking-wider text-slate-500 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-400">
-          Manage
-        </span>
+        <p className="text-base font-black tracking-tight">{label}</p>
       </div>
     </Link>
   );

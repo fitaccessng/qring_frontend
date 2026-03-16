@@ -14,9 +14,18 @@ export async function registerPushSubscription(payload) {
 }
 
 export async function markNotificationRead(notificationId) {
-  const response = await apiRequest(`/notifications/${notificationId}/read`, {
-    method: "POST"
-  });
+  let response = null;
+  try {
+    response = await apiRequest(`/notifications/${notificationId}/read`, {
+      method: "POST",
+      silent: true
+    });
+  } catch (error) {
+    if (Number(error?.status) === 404) {
+      return null;
+    }
+    throw error;
+  }
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event("qring:notifications-updated"));
   }
