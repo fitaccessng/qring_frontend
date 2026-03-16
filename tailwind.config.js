@@ -17,7 +17,8 @@ export default {
       },
       fontFamily: {
         heading: ["Sora", "Manrope", "Segoe UI", "Roboto", "Noto Sans", "ui-sans-serif", "sans-serif"],
-        body: ["Manrope", "Segoe UI", "Roboto", "Noto Sans", "ui-sans-serif", "sans-serif"]
+        body: ["Manrope", "Segoe UI", "Roboto", "Noto Sans", "ui-sans-serif", "sans-serif"],
+        saas: ["Inter", "Manrope", "Segoe UI", "Roboto", "Noto Sans", "ui-sans-serif", "sans-serif"]
       },
       boxShadow: {
         soft: "0 10px 30px -15px rgba(12, 23, 62, 0.25)"

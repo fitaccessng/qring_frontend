@@ -134,10 +134,19 @@ export default function AppShell({ title, children, showTopBar = true }) {
 
   const navItems = useMemo(() => {
     const base = navByRole[user?.role] ?? [];
-    if (user?.role === "homeowner" && (homeownerContextLoading || isEstateManagedHomeowner)) {
+    if (user?.role !== "homeowner") return base;
+
+    if (homeownerContextLoading || isEstateManagedHomeowner) {
       return base.filter((item) => item.to !== "/billing/paywall");
     }
-    return base;
+
+    const estateOnly = new Set([
+      "/dashboard/homeowner/live-queue",
+      "/dashboard/homeowner/alerts",
+      "/dashboard/homeowner/receipts",
+      "/dashboard/homeowner/maintenance"
+    ]);
+    return base.filter((item) => !estateOnly.has(item.to));
   }, [user?.role, isEstateManagedHomeowner, homeownerContextLoading]);
   const settingsNavItem = useMemo(
     () => navItems.find((item) => item.to.endsWith("/settings")) ?? null,

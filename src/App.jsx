@@ -14,6 +14,7 @@ import LegalPage from "./pages/landing/LegalPage";
 import PrivacyPage from "./pages/landing/PrivacyPage";
 import TermsPage from "./pages/landing/TermsPage";
 import CompliancePage from "./pages/landing/CompliancePage";
+import RequestDemoPage from "./pages/landing/RequestDemoPage";
 import LoginPage from "./pages/auth/LoginPage";
 import AdminLoginPage from "./pages/auth/AdminLoginPage";
 import AdminSignupPage from "./pages/auth/AdminSignupPage";
@@ -68,6 +69,7 @@ import ProtectedRoute from "./routes/ProtectedRoute";
 import RoleRoute from "./routes/RoleRoute";
 import VisitorCallRoute from "./routes/VisitorCallRoute";
 import PublicOnlyRoute from "./routes/PublicOnlyRoute";
+import EstateManagedHomeownerRoute from "./routes/EstateManagedHomeownerRoute";
 import { AuthProvider, useAuth } from "./state/AuthContext";
 import { ThemeProvider } from "./state/ThemeContext";
 import FlashModal from "./components/FlashModal";
@@ -143,6 +145,7 @@ function AppRoutes() {
               <Route path="/privacy" element={<PrivacyPage />} />
               <Route path="/terms" element={<TermsPage />} />
               <Route path="/compliance" element={<CompliancePage />} />
+              <Route path="/request-demo" element={<RequestDemoPage />} />
               <Route element={<PublicOnlyRoute />}>
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/admin/login" element={<AdminLoginPage />} />
@@ -187,10 +190,12 @@ function AppRoutes() {
                   <Route path="/dashboard/homeowner/visits" element={<HomeownerVisitsPage />} />
                   <Route path="/dashboard/homeowner/messages" element={<HomeownerMessagesPage />} />
                   <Route path="/dashboard/homeowner/doors" element={<HomeownerDoorsPage />} />
-                  <Route path="/dashboard/homeowner/live-queue" element={<HomeownerLiveQueuePage />} />
-                  <Route path="/dashboard/homeowner/receipts" element={<HomeownerReceiptsPage />} />
-                  <Route path="/dashboard/homeowner/alerts" element={<HomeownerAlertsPage />} />
-                  <Route path="/dashboard/homeowner/maintenance" element={<HomeownerMaintenancePage />} />
+                  <Route element={<EstateManagedHomeownerRoute />}>
+                    <Route path="/dashboard/homeowner/live-queue" element={<HomeownerLiveQueuePage />} />
+                    <Route path="/dashboard/homeowner/receipts" element={<HomeownerReceiptsPage />} />
+                    <Route path="/dashboard/homeowner/alerts" element={<HomeownerAlertsPage />} />
+                    <Route path="/dashboard/homeowner/maintenance" element={<HomeownerMaintenancePage />} />
+                  </Route>
                   <Route path="/dashboard/homeowner/settings" element={<HomeownerSettingsPage />} />
                 </Route>
                 <Route element={<RoleRoute allowedRoles={["estate"]} />}>

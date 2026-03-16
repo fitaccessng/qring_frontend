@@ -2,12 +2,18 @@
 import AppShell from "../../layouts/AppShell";
 import { getAdminOverview } from "../../services/adminService";
 import { ApiError } from "../../services/apiClient";
+import {
+  clearDemoRequests,
+  getDemoRequests,
+  removeDemoRequest
+} from "../../services/demoRequestService";
 
 export default function AdminDashboardPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
+  const [demoRequests, setDemoRequests] = useState(() => getDemoRequests());
 
   useEffect(() => {
     let active = true;
@@ -37,6 +43,8 @@ export default function AdminDashboardPage() {
     };
   }, []);
 
+  const refreshDemoRequests = () => setDemoRequests(getDemoRequests());
+
   const filteredVisits = useMemo(() => {
     const rows = data?.visits?.rows ?? [];
     const term = query.trim().toLowerCase();
@@ -65,6 +73,88 @@ export default function AdminDashboardPage() {
           {error}
         </div>
       ) : null}
+
+      <section className="mb-4 rounded-3xl border border-slate-200 bg-white/95 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/90 sm:p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="font-heading text-lg font-bold sm:text-xl">Demo Requests</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Captured from the public request demo form (stored in this browser).
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={refreshDemoRequests}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
+              Refresh
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                clearDemoRequests();
+                refreshDemoRequests();
+              }}
+              className="rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-sm font-semibold text-danger transition hover:bg-danger/15"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+
+        {demoRequests.length === 0 ? (
+          <p className="mt-4 text-sm text-slate-500">No demo requests captured yet.</p>
+        ) : (
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full min-w-[980px] text-left text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 text-slate-500 dark:border-slate-700">
+                  <th className="py-2 font-semibold">Name</th>
+                  <th className="py-2 font-semibold">Email</th>
+                  <th className="py-2 font-semibold">Phone</th>
+                  <th className="py-2 font-semibold">Organization</th>
+                  <th className="py-2 font-semibold">Role</th>
+                  <th className="py-2 font-semibold">Doors</th>
+                  <th className="py-2 font-semibold">Created</th>
+                  <th className="py-2 font-semibold">Notes</th>
+                  <th className="py-2 font-semibold">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {demoRequests.slice(0, 100).map((row) => (
+                  <tr key={row.id} className="border-b border-slate-100 align-top dark:border-slate-800">
+                    <td className="py-2 font-medium text-slate-800 dark:text-slate-100">{row.fullName || "-"}</td>
+                    <td className="py-2">{row.email || "-"}</td>
+                    <td className="py-2">{row.phone || "-"}</td>
+                    <td className="py-2">{row.organization || "-"}</td>
+                    <td className="py-2">{row.role || "-"}</td>
+                    <td className="py-2">{row.doors || "-"}</td>
+                    <td className="py-2">{formatTime(row.createdAt)}</td>
+                    <td className="py-2">
+                      <span className="block max-h-16 max-w-[22rem] overflow-hidden whitespace-pre-wrap break-words text-slate-600 dark:text-slate-300">
+                        {row.notes || "-"}
+                      </span>
+                    </td>
+                    <td className="py-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          removeDemoRequest(row.id);
+                          refreshDemoRequests();
+                        }}
+                        className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="Total Homeowners" value={metrics.totalHomeowners} loading={loading} />

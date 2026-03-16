@@ -125,40 +125,33 @@ export default function HomeownerDashboardPage() {
     }
   ];
   const actionCards = useMemo(() => {
-    const base = [
-      {
-        label: "Live Queue",
-        to: "/dashboard/homeowner/live-queue",
-        icon: <Activity size={18} />,
-        eyebrow: "Real-time",
-        description: "Track visitor arrivals and approvals as they happen.",
-        badge: "Live",
-        accent: "from-emerald-100/80 via-white/10 to-transparent",
-        glow: "bg-emerald-300/50"
-      },
-      {
-        label: "Receipts",
-        to: "/dashboard/homeowner/receipts",
-        icon: <FileText size={18} />,
-        eyebrow: "Payments",
-        description: "Keep your payment history and receipts organized.",
-        badge: "Records",
-        accent: "from-amber-100/80 via-white/10 to-transparent",
-        glow: "bg-amber-300/50"
-      },
-      {
-        label: "Settings",
-        to: "/dashboard/homeowner/settings",
-        icon: <Settings2 size={18} />,
-        eyebrow: "Profile",
-        description: "Update profile details, alerts, and preferences.",
-        badge: "Manage",
-        accent: "from-slate-100/80 via-white/10 to-transparent",
-        glow: "bg-slate-300/50"
-      }
-    ];
-    if (!managedByEstate) {
-      base.splice(2, 0, {
+    const base = [];
+
+    if (managedByEstate) {
+      base.push(
+        {
+          label: "Live Queue",
+          to: "/dashboard/homeowner/live-queue",
+          icon: <Activity size={18} />,
+          eyebrow: "Real-time",
+          description: "Track visitor arrivals and approvals as they happen.",
+          badge: "Live",
+          accent: "from-emerald-100/80 via-white/10 to-transparent",
+          glow: "bg-emerald-300/50"
+        },
+        {
+          label: "Receipts",
+          to: "/dashboard/homeowner/receipts",
+          icon: <FileText size={18} />,
+          eyebrow: "Payments",
+          description: "Keep your payment history and receipts organized.",
+          badge: "Records",
+          accent: "from-amber-100/80 via-white/10 to-transparent",
+          glow: "bg-amber-300/50"
+        }
+      );
+    } else {
+      base.push({
         label: "Billing",
         to: "/billing/paywall",
         icon: <MessageSquare size={18} />,
@@ -169,6 +162,18 @@ export default function HomeownerDashboardPage() {
         glow: "bg-violet-300/50"
       });
     }
+
+    base.push({
+      label: "Settings",
+      to: "/dashboard/homeowner/settings",
+      icon: <Settings2 size={18} />,
+      eyebrow: "Profile",
+      description: "Update profile details, alerts, and preferences.",
+      badge: "Manage",
+      accent: "from-slate-100/80 via-white/10 to-transparent",
+      glow: "bg-slate-300/50"
+    });
+
     return base;
   }, [managedByEstate]);
 

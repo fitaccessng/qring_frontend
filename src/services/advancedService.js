@@ -6,6 +6,23 @@ export async function getLiveVisitorQueue(limit = 50) {
   return Array.isArray(response?.data) ? response.data : [];
 }
 
+export async function fetchVisitorSnapshotFileUrl(snapshotId) {
+  if (!snapshotId) return "";
+  const token = localStorage.getItem("qring_access_token");
+  const response = await fetch(
+    `${env.apiBaseUrl}/advanced/visitor/snapshots/${encodeURIComponent(snapshotId)}/file`,
+    {
+      method: "GET",
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    }
+  );
+  if (!response.ok) {
+    throw new Error(`Unable to load snapshot (${response.status})`);
+  }
+  const blob = await response.blob();
+  return URL.createObjectURL(blob);
+}
+
 export async function listDigitalReceipts(limit = 50) {
   const response = await apiRequest(`/advanced/receipts?limit=${encodeURIComponent(limit)}`);
   return Array.isArray(response?.data) ? response.data : [];

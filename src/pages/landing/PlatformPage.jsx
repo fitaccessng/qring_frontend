@@ -97,7 +97,7 @@ export default function PlatformPage() {
         <div className="rounded-[2.5rem] bg-slate-900 p-8 text-white shadow-xl dark:bg-white dark:text-slate-900 sm:p-10">
           <h2 className="text-2xl font-black">See Qring in action</h2>
           <p className="mt-2 text-sm text-white/70 dark:text-slate-600">Book a walkthrough tailored to your estate configuration.</p>
-          <Link to="/contact" className="mt-6 inline-flex rounded-full bg-white px-6 py-3 text-sm font-semibold text-slate-900 dark:bg-slate-900 dark:text-white">
+          <Link to="/request-demo" className="mt-6 inline-flex rounded-full bg-white px-6 py-3 text-sm font-semibold text-slate-900 dark:bg-slate-900 dark:text-white">
             Request Demo
           </Link>
         </div>

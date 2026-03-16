@@ -2,14 +2,26 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
 const ThemeContext = createContext(null);
 const THEME_STORAGE_KEY = "qring_theme";
+const THEME_EXPLICIT_KEY = "qring_theme_explicit";
 
 function getInitialThemeMode() {
-  if (typeof window === "undefined") return "system";
+  if (typeof window === "undefined") return "light";
   const stored = localStorage.getItem(THEME_STORAGE_KEY);
-  if (stored === "light" || stored === "dark" || stored === "system") {
-    return stored;
+
+  if (stored === "light" || stored === "dark") return stored;
+
+  if (stored === "system") {
+    const explicit = localStorage.getItem(THEME_EXPLICIT_KEY) === "true";
+    if (explicit) return "system";
+    try {
+      localStorage.removeItem(THEME_STORAGE_KEY);
+    } catch {
+      // ignore
+    }
+    return "light";
   }
-  return "system";
+
+  return "light";
 }
 
 function getSystemTheme() {
@@ -20,9 +32,18 @@ function getSystemTheme() {
 }
 
 export function ThemeProvider({ children }) {
-  const [themeMode, setThemeMode] = useState(getInitialThemeMode);
+  const [themeMode, setThemeModeState] = useState(getInitialThemeMode);
   const [systemTheme, setSystemTheme] = useState(getSystemTheme);
   const resolvedTheme = themeMode === "system" ? systemTheme : themeMode;
+
+  function setThemeMode(next) {
+    try {
+      localStorage.setItem(THEME_EXPLICIT_KEY, "true");
+    } catch {
+      // ignore
+    }
+    setThemeModeState(next);
+  }
 
   useEffect(() => {
     if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
