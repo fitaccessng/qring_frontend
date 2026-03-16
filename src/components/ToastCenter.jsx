@@ -33,13 +33,11 @@ function normalizeToast(detail) {
   const kind = String(detail?.kind ?? "").trim();
   const route = typeof detail?.route === "string" ? detail.route : "";
   const actionLabel = typeof detail?.actionLabel === "string" ? detail.actionLabel : "";
-  const id = String(detail?.id ?? "").trim();
-
   const dedupeKeyRaw = String(detail?.dedupeKey ?? "").trim();
   const dedupeKey = dedupeKeyRaw || `${kind}|${type}|${message}|${route}`;
 
   return {
-    id: id || `toast_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    id: dedupeKey || `toast_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     type,
     title: String(title || "").trim() || "Notice",
     message,
@@ -57,6 +55,7 @@ export default function ToastCenter() {
   const [toasts, setToasts] = useState([]);
   const timerByIdRef = useRef(new Map());
   const lastByDedupeKeyRef = useRef(new Map());
+  const lastAnyToastAtRef = useRef(0);
 
   const removeToast = useCallback((toastId, toast) => {
     const timer = timerByIdRef.current.get(toastId);
@@ -85,13 +84,24 @@ export default function ToastCenter() {
       if (!toast) return;
 
       const now = Date.now();
+      const lastAnyAt = lastAnyToastAtRef.current || 0;
+      if (now - lastAnyAt < 250) return;
+      lastAnyToastAtRef.current = now;
+
       const lastAt = lastByDedupeKeyRef.current.get(toast.dedupeKey) || 0;
-      if (now - lastAt < 900) return;
+      if (now - lastAt < 4500) return;
       lastByDedupeKeyRef.current.set(toast.dedupeKey, now);
 
       setToasts((prev) => {
-        const next = [toast, ...prev].slice(0, 4);
-        return next;
+        const existingIndex = prev.findIndex((item) => item.dedupeKey === toast.dedupeKey);
+        if (existingIndex >= 0) {
+          const existing = prev[existingIndex];
+          const merged = { ...existing, ...toast, id: existing.id };
+          const next = [...prev];
+          next[existingIndex] = merged;
+          return next;
+        }
+        return [toast, ...prev].slice(0, 3);
       });
 
       const existingTimer = timerByIdRef.current.get(toast.id);

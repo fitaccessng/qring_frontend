@@ -124,6 +124,8 @@ export default function AppShell({ title, children, showTopBar = true }) {
   const prevVisitUnreadIdsRef = useRef([]);
   const visitUnreadInitializedRef = useRef(false);
   const browserAlertedIdsRef = useRef(new Set());
+  const prevUnreadNotificationIdsRef = useRef([]);
+  const unreadNotificationsInitializedRef = useRef(false);
   const isEstateManagedHomeowner = useMemo(
     () =>
       user?.role === "homeowner" &&
@@ -432,21 +434,6 @@ export default function AppShell({ title, children, showTopBar = true }) {
       } catch {
         // No-op on unsupported platforms.
       }
-      try {
-        window.dispatchEvent(
-          new CustomEvent("qring:flash", {
-            detail: {
-              type: "info",
-              title: "New Visitor Request",
-              message: "A visitor is requesting access.",
-              duration: 3200,
-              kind: "visitor.request"
-            }
-          })
-        );
-      } catch {
-        // Keep notifications non-blocking.
-      }
     }
     prevVisitUnreadIdsRef.current = unreadVisitRequestIds;
   }, [unreadVisitRequestIds]);
@@ -483,9 +470,26 @@ export default function AppShell({ title, children, showTopBar = true }) {
     const notificationSupported = typeof window.Notification !== "undefined";
     const canNotify = notificationSupported && window.Notification.permission === "granted";
 
-    parsedNotifications.forEach((item) => {
+    const unread = parsedNotifications.filter((item) => !item.readAt && item.kind !== "system");
+    const unreadIds = unread.map((item) => item.id);
+
+    if (!unreadNotificationsInitializedRef.current) {
+      unreadIds.forEach((id) => browserAlertedIdsRef.current.add(id));
+      prevUnreadNotificationIdsRef.current = unreadIds;
+      unreadNotificationsInitializedRef.current = true;
+      return;
+    }
+
+    const previous = prevUnreadNotificationIdsRef.current || [];
+    const newUnreadIds = unreadIds.filter((id) => !previous.includes(id));
+    prevUnreadNotificationIdsRef.current = unreadIds;
+
+    if (newUnreadIds.length === 0) return;
+
+    unread.forEach((item) => {
       if (item.readAt) return;
       if (item.kind === "system") return;
+      if (!newUnreadIds.includes(item.id)) return;
       if (browserAlertedIdsRef.current.has(item.id)) return;
       browserAlertedIdsRef.current.add(item.id);
       const body = item.payload?.message ?? "You have a new alert";
@@ -508,21 +512,19 @@ export default function AppShell({ title, children, showTopBar = true }) {
         onSystemClick: canNotify ? () => openNotification(item) : undefined
       });
     });
-  }, [parsedNotifications]);
+  }, [parsedNotifications, user?.role]);
 
   useEffect(() => {
     let unsub = () => {};
     setupForegroundMessageListener((payload) => {
-      const title = payload?.notification?.title || payload?.data?.title || "Qring Alert";
-      const message = payload?.notification?.body || payload?.data?.body || "You have a new notification.";
-      notify({
-        type: "info",
-        title,
-        message,
-        duration: 3600,
-        systemWhenHidden: true,
-        dedupeKey: `push|${title}|${message}`
-      });
+      // Foreground push can duplicate UI toasts (the app also polls /notifications).
+      // Use push only as a signal to refresh notifications.
+      try {
+        const kind = String(payload?.data?.kind || "").trim();
+        window.dispatchEvent(new CustomEvent("qring:notifications-updated", { detail: { source: "push", kind } }));
+      } catch {
+        // Ignore dispatch failures.
+      }
     }).then((dispose) => {
       unsub = typeof dispose === "function" ? dispose : () => {};
     });
@@ -591,6 +593,7 @@ export default function AppShell({ title, children, showTopBar = true }) {
         return next;
       });
       browserAlertedIdsRef.current.clear();
+      prevUnreadNotificationIdsRef.current = [];
     } catch {
       // No-op, keep existing list.
     }

@@ -30,6 +30,17 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function createVisitorRequestId() {
+  try {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+      return `vrq_${crypto.randomUUID()}`;
+    }
+  } catch {
+    // Fall back to pseudo-random ID.
+  }
+  return `vrq_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`;
+}
+
 function isRetryableSubmitError(error) {
   const status = Number(error?.status ?? -1);
   return RETRYABLE_STATUSES.has(status);
@@ -285,6 +296,7 @@ export default function ScanPage() {
       return;
     }
     const startedAt = Date.now();
+    const requestId = createVisitorRequestId();
     setRequestLatencyMs(0);
     setRequestState((prev) => ({
       ...prev,
@@ -297,6 +309,7 @@ export default function ScanPage() {
     try {
       const response = await submitVisitorRequestWithRetry(
         {
+          requestId,
           qrId,
           doorId: doorId || undefined,
           name: visitorForm.name.trim(),
