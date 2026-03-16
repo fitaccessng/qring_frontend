@@ -88,35 +88,6 @@ export default function HomeownerVisitsPage() {
   }, [snapshotUrls]);
 
   useEffect(() => {
-    let active = true;
-    const needed = (filteredRows || [])
-      .map((row) => row?.snapshotAuditId)
-      .filter(Boolean)
-      .slice(0, 18);
-    needed.forEach(async (snapshotId) => {
-      if (!active) return;
-      if (snapshotUrlsRef.current[snapshotId]) return;
-      if (snapshotInFlightRef.current.has(snapshotId)) return;
-      snapshotInFlightRef.current.add(snapshotId);
-      try {
-        const url = await fetchVisitorSnapshotFileUrl(snapshotId);
-        if (!active) {
-          if (url) URL.revokeObjectURL(url);
-          return;
-        }
-        setSnapshotUrls((prev) => ({ ...prev, [snapshotId]: url }));
-      } catch {
-        // Best-effort snapshot loading.
-      } finally {
-        snapshotInFlightRef.current.delete(snapshotId);
-      }
-    });
-    return () => {
-      active = false;
-    };
-  }, [filteredRows]);
-
-  useEffect(() => {
     return () => {
       Object.values(snapshotUrlsRef.current || {}).forEach((url) => {
         try {
@@ -170,6 +141,35 @@ export default function HomeownerVisitsPage() {
     if (activeTab === "all") return dateScopedRows;
     return dateScopedRows.filter((row) => normalizeVisitState(row) === activeTab);
   }, [dateScopedRows, activeTab]);
+
+  useEffect(() => {
+    let active = true;
+    const needed = (filteredRows || [])
+      .map((row) => row?.snapshotAuditId)
+      .filter(Boolean)
+      .slice(0, 18);
+    needed.forEach(async (snapshotId) => {
+      if (!active) return;
+      if (snapshotUrlsRef.current[snapshotId]) return;
+      if (snapshotInFlightRef.current.has(snapshotId)) return;
+      snapshotInFlightRef.current.add(snapshotId);
+      try {
+        const url = await fetchVisitorSnapshotFileUrl(snapshotId);
+        if (!active) {
+          if (url) URL.revokeObjectURL(url);
+          return;
+        }
+        setSnapshotUrls((prev) => ({ ...prev, [snapshotId]: url }));
+      } catch {
+        // Best-effort snapshot loading.
+      } finally {
+        snapshotInFlightRef.current.delete(snapshotId);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [filteredRows]);
 
   const dateTiles = useMemo(() => buildMonthDateTiles(rows, appointments), [rows, appointments]);
   const selectedDateLabel = useMemo(() => formatDateHeader(selectedDate), [selectedDate]);
