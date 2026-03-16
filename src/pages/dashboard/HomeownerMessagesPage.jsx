@@ -349,13 +349,13 @@ export default function HomeownerMessagesPage() {
   }
 
   async function handleSendVoiceNote(file) {
-    if (!selectedId || !file) return false;
+    if (!selectedId || !file) return "Select a session first.";
     setSending(true);
     setError("");
     try {
       const upload = await uploadHomeownerVoiceNote(selectedId, file);
       const url = resolveVoiceNoteUrl(upload?.url);
-      if (!url) return false;
+      if (!url) return "Voice note uploaded but no URL was returned.";
       const text = `voice_note_url:${url}`;
       const saved = await sendHomeownerSessionMessage(selectedId, text);
       const outbound = {
@@ -375,8 +375,9 @@ export default function HomeownerMessagesPage() {
       socketRef.current?.emit("chat.message", outbound);
       return true;
     } catch (requestError) {
-      setError(requestError.message ?? "Failed to send voice note");
-      return false;
+      const message = requestError.message ?? "Failed to send voice note";
+      setError(message);
+      return message;
     } finally {
       setSending(false);
     }

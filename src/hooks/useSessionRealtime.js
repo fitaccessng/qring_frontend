@@ -280,6 +280,7 @@ export function useSessionRealtime(sessionId) {
   const remoteLivekitTracksRef = useRef(new Set());
   const callSessionRef = useRef("");
   const callVisitorIdRef = useRef("");
+  const incomingRingTimerRef = useRef(null);
 
   const supportsWebRTC =
     typeof window !== "undefined" && typeof window.RTCPeerConnection !== "undefined";
@@ -330,6 +331,42 @@ export function useSessionRealtime(sessionId) {
       visitorId: ""
     });
   }
+
+  useEffect(() => {
+    if (isHomeowner) return;
+    if (!incomingCall.pending) {
+      if (incomingRingTimerRef.current) {
+        clearInterval(incomingRingTimerRef.current);
+        incomingRingTimerRef.current = null;
+      }
+      return;
+    }
+
+    const shouldRing = () => {
+      try {
+        return typeof document === "undefined" ? true : !document.hidden;
+      } catch {
+        return true;
+      }
+    };
+
+    if (shouldRing()) {
+      playIncomingCallNotificationSound();
+    }
+    if (!incomingRingTimerRef.current) {
+      incomingRingTimerRef.current = setInterval(() => {
+        if (!shouldRing()) return;
+        playIncomingCallNotificationSound();
+      }, CALL_INVITE_RETRY_MS);
+    }
+
+    return () => {
+      if (incomingRingTimerRef.current) {
+        clearInterval(incomingRingTimerRef.current);
+        incomingRingTimerRef.current = null;
+      }
+    };
+  }, [incomingCall.pending, isHomeowner]);
 
   function getVisitorIdentity() {
     try {

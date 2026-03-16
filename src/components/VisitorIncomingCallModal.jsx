@@ -1,7 +1,32 @@
 import { Phone, PhoneOff, Video } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { getNotificationAudioContextState, unlockNotificationAudio } from "../utils/notificationSound";
 
 export default function VisitorIncomingCallModal({ open, hasVideo, onAccept, onReject }) {
   if (!open) return null;
+
+  const [audioState, setAudioState] = useState(() => getNotificationAudioContextState());
+  const showSoundUnlock = audioState !== "running";
+
+  useEffect(() => {
+    if (!open) return;
+    setAudioState(getNotificationAudioContextState());
+  }, [open]);
+
+  const handleUnlockSound = useCallback(async () => {
+    await unlockNotificationAudio();
+    setAudioState(getNotificationAudioContextState());
+  }, []);
+
+  const handleAccept = useCallback(async () => {
+    await unlockNotificationAudio();
+    onAccept?.();
+  }, [onAccept]);
+
+  const handleReject = useCallback(async () => {
+    await unlockNotificationAudio();
+    onReject?.();
+  }, [onReject]);
 
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/82 px-5 py-6 backdrop-blur-md">
@@ -12,6 +37,19 @@ export default function VisitorIncomingCallModal({ open, hasVideo, onAccept, onR
         </h2>
         <p className="mt-1.5 text-[13px] text-white/70">Tap to answer quickly or decline to stay in chat.</p>
 
+        {showSoundUnlock ? (
+          <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-[12px] text-white/80">
+            <span>Ringtone may be muted until a tap enables sound.</span>
+            <button
+              type="button"
+              onClick={handleUnlockSound}
+              className="shrink-0 rounded-full bg-white/15 px-3 py-1 text-[11px] font-semibold text-white transition hover:bg-white/20"
+            >
+              Enable sound
+            </button>
+          </div>
+        ) : null}
+
         <div className="mt-5 grid place-items-center">
           <div className="grid h-24 w-24 place-items-center rounded-full bg-white/12">
             {hasVideo ? <Video size={34} className="text-emerald-300" /> : <Phone size={34} className="text-emerald-300" />}
@@ -21,7 +59,7 @@ export default function VisitorIncomingCallModal({ open, hasVideo, onAccept, onR
         <div className="mt-7 space-y-3.5">
           <button
             type="button"
-            onClick={onAccept}
+            onClick={handleAccept}
             className="flex h-14 w-full items-center justify-between rounded-2xl bg-emerald-500 px-4 text-left text-white transition-all hover:bg-emerald-400 active:scale-[0.99]"
           >
             <span>
@@ -32,7 +70,7 @@ export default function VisitorIncomingCallModal({ open, hasVideo, onAccept, onR
           </button>
           <button
             type="button"
-            onClick={onReject}
+            onClick={handleReject}
             className="flex h-14 w-full items-center justify-between rounded-2xl bg-rose-500 px-4 text-left text-white transition-all hover:bg-rose-400 active:scale-[0.99]"
           >
             <span>

@@ -90,14 +90,16 @@ export default function SessionMessagePage() {
       : "Server call session state: pending. Audio and video unlock once homeowner starts a call.";
 
   async function handleVoiceNoteSend(file) {
-    if (!sessionId || !file) return false;
+    if (!sessionId || !file) return "Missing session. Refresh and try again.";
     try {
       const data = await uploadVisitorVoiceNote(sessionId, file);
       const url = resolveVoiceNoteUrl(data?.url);
-      if (!url) return false;
-      return Boolean(sendMessage(`voice_note_url:${url}`));
-    } catch {
-      return false;
+      if (!url) return "Voice note uploaded but no URL was returned.";
+      const ok = Boolean(sendMessage(`voice_note_url:${url}`));
+      if (!ok) return "Unable to send message right now. Check connection and try again.";
+      return true;
+    } catch (error) {
+      return error?.message || "Unable to upload voice note";
     }
   }
 

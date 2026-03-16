@@ -150,6 +150,7 @@ export default function ScanPage() {
     ctx.drawImage(video, 0, 0, targetW, targetH);
     const dataUrl = canvas.toDataURL("image/jpeg", 0.72);
     setVisitorForm((prev) => ({ ...prev, snapshotDataUrl: dataUrl }));
+    stopCamera();
   }
 
   useEffect(() => {
@@ -182,6 +183,16 @@ export default function ScanPage() {
       mounted = false;
     };
   }, [qrId]);
+
+  useEffect(() => {
+    if (loading) return;
+    if (requestState.sent) return;
+    if (!qr) return;
+    if (visitorForm.snapshotDataUrl) return;
+    if (cameraState.ready || cameraState.starting) return;
+    startCamera();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, qr, requestState.sent, visitorForm.snapshotDataUrl]);
 
   useEffect(() => {
     if (!requestState.sent) return;
@@ -265,6 +276,14 @@ export default function ScanPage() {
       setError("Please capture a live snapshot before submitting.");
       return;
     }
+    if (!visitorForm.name.trim()) {
+      setError("Please enter your name before submitting.");
+      return;
+    }
+    if (!visitorForm.purpose.trim()) {
+      setError("Please enter a purpose before submitting.");
+      return;
+    }
     const startedAt = Date.now();
     setRequestLatencyMs(0);
     setRequestState((prev) => ({
@@ -309,6 +328,9 @@ export default function ScanPage() {
         status: data?.status ?? "pending"
       });
       setRequestLatencyMs(latencyMs);
+      if (data?.sessionId) {
+        navigate(`/session/${data.sessionId}/message`, { replace: true });
+      }
     } catch (submitError) {
       const latencyMs = Date.now() - startedAt;
       setRequestState((prev) => ({
@@ -366,65 +388,8 @@ export default function ScanPage() {
         {!loading && qr && !requestState.sent ? (
           <form onSubmit={onSubmit} className="mt-6 space-y-4">
             <p className="text-sm text-slate-600 dark:text-slate-300">
-              Fill your details, capture a live snapshot, then submit your access request.
+              First take a selfie. Then fill your details and submit.
             </p>
-
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-800/50">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Visitor Info</p>
-              <div className="mt-3 grid gap-3">
-                <label className="block text-sm">
-                  <span className="mb-1 block font-medium">Name</span>
-                  <input
-                    type="text"
-                    value={visitorForm.name}
-                    onChange={(event) => setVisitorForm((prev) => ({ ...prev, name: event.target.value }))}
-                    className="w-full rounded-xl border border-slate-300 px-3 py-3 dark:border-slate-700 dark:bg-slate-900"
-                    placeholder="e.g. John Doe"
-                    required
-                  />
-                </label>
-                <label className="block text-sm">
-                  <span className="mb-1 block font-medium">Phone number (optional)</span>
-                  <input
-                    type="tel"
-                    value={visitorForm.phone}
-                    onChange={(event) => setVisitorForm((prev) => ({ ...prev, phone: event.target.value }))}
-                    className="w-full rounded-xl border border-slate-300 px-3 py-3 dark:border-slate-700 dark:bg-slate-900"
-                    placeholder="+234..."
-                  />
-                </label>
-                <label className="block text-sm">
-                  <span className="mb-1 block font-medium">Purpose of visit</span>
-                  <textarea
-                    value={visitorForm.purpose}
-                    onChange={(event) => setVisitorForm((prev) => ({ ...prev, purpose: event.target.value }))}
-                    className="w-full rounded-xl border border-slate-300 px-3 py-3 dark:border-slate-700 dark:bg-slate-900"
-                    placeholder="e.g. Package delivery"
-                    rows={3}
-                    required
-                  />
-                </label>
-                <label className="block text-sm">
-                  <span className="mb-1 block font-medium">Door</span>
-                  <select
-                    value={doorId}
-                    onChange={(event) => setDoorId(event.target.value)}
-                    className="w-full rounded-xl border border-slate-300 px-3 py-3 dark:border-slate-700 dark:bg-slate-900"
-                  >
-                    {(doorOptions.length ? doorOptions : (qr.doors ?? []).map((id) => ({ id, name: id }))).map((door) => (
-                      <option key={door.id} value={door.id}>
-                        {door.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-              {selectedDoor ? (
-                <p className="mt-3 text-xs text-slate-500">
-                  Home: {selectedDoor.homeName || "N/A"} | Homeowner: {selectedDoor.homeownerName || "N/A"}
-                </p>
-              ) : null}
-            </div>
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-800/50">
               <div className="flex items-center justify-between gap-3">
@@ -432,7 +397,11 @@ export default function ScanPage() {
                 {visitorForm.snapshotDataUrl ? (
                   <button
                     type="button"
-                    onClick={() => setVisitorForm((prev) => ({ ...prev, snapshotDataUrl: "" }))}
+                    onClick={() => {
+                      setVisitorForm((prev) => ({ ...prev, snapshotDataUrl: "" }));
+                      setCameraState({ starting: false, ready: false, error: "" });
+                      startCamera();
+                    }}
                     className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
                   >
                     Retake
@@ -486,11 +455,69 @@ export default function ScanPage() {
                 </div>
               )}
             </div>
-            {selectedDoor ? (
-              <p className="text-xs text-slate-500">
-                Home: {selectedDoor.homeName || "N/A"} | Homeowner: {selectedDoor.homeownerName || "N/A"}
-              </p>
-            ) : null}
+
+            {visitorForm.snapshotDataUrl ? (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-800/50">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Visitor Info</p>
+                <div className="mt-3 grid gap-3">
+                  <label className="block text-sm">
+                    <span className="mb-1 block font-medium">Name</span>
+                    <input
+                      type="text"
+                      value={visitorForm.name}
+                      onChange={(event) => setVisitorForm((prev) => ({ ...prev, name: event.target.value }))}
+                      className="w-full rounded-xl border border-slate-300 px-3 py-3 dark:border-slate-700 dark:bg-slate-900"
+                      placeholder="e.g. John Doe"
+                      required
+                    />
+                  </label>
+                  <label className="block text-sm">
+                    <span className="mb-1 block font-medium">Phone number (optional)</span>
+                    <input
+                      type="tel"
+                      value={visitorForm.phone}
+                      onChange={(event) => setVisitorForm((prev) => ({ ...prev, phone: event.target.value }))}
+                      className="w-full rounded-xl border border-slate-300 px-3 py-3 dark:border-slate-700 dark:bg-slate-900"
+                      placeholder="+234..."
+                    />
+                  </label>
+                  <label className="block text-sm">
+                    <span className="mb-1 block font-medium">Purpose of visit</span>
+                    <textarea
+                      value={visitorForm.purpose}
+                      onChange={(event) => setVisitorForm((prev) => ({ ...prev, purpose: event.target.value }))}
+                      className="w-full rounded-xl border border-slate-300 px-3 py-3 dark:border-slate-700 dark:bg-slate-900"
+                      placeholder="e.g. Package delivery"
+                      rows={3}
+                      required
+                    />
+                  </label>
+                  <label className="block text-sm">
+                    <span className="mb-1 block font-medium">Door</span>
+                    <select
+                      value={doorId}
+                      onChange={(event) => setDoorId(event.target.value)}
+                      className="w-full rounded-xl border border-slate-300 px-3 py-3 dark:border-slate-700 dark:bg-slate-900"
+                    >
+                      {(doorOptions.length ? doorOptions : (qr.doors ?? []).map((id) => ({ id, name: id }))).map((door) => (
+                        <option key={door.id} value={door.id}>
+                          {door.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                {selectedDoor ? (
+                  <p className="mt-3 text-xs text-slate-500">
+                    Home: {selectedDoor.homeName || "N/A"} | Homeowner: {selectedDoor.homeownerName || "N/A"}
+                  </p>
+                ) : null}
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-slate-200 bg-white/70 px-4 py-3 text-xs font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300">
+                Take a selfie to unlock the form fields.
+              </div>
+            )}
             <button
               type="submit"
               disabled={requestState.sending}

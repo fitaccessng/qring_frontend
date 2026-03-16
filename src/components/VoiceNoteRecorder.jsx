@@ -39,22 +39,25 @@ export default function VoiceNoteRecorder({ onSend, disabled = false }) {
 
       recorder.onstop = async () => {
         stream.getTracks().forEach((track) => track.stop());
-      const mime = recorder.mimeType || "audio/webm";
-      const blob = new Blob(chunksRef.current, { type: mime });
-      if (!blob.size) {
-        setStatus("No audio captured.");
-        return;
-      }
-      if (blob.size > MAX_BYTES) {
-        setStatus("Voice note too large. Keep it under 20 seconds.");
-        return;
-      }
-      const file = new File([blob], `voice-note${extensionForMime(mime)}`, { type: mime });
-      const ok = await onSend?.(file);
-      if (!ok) {
+        const mime = recorder.mimeType || "audio/webm";
+        const blob = new Blob(chunksRef.current, { type: mime });
+        if (!blob.size) {
+          setStatus("No audio captured.");
+          return;
+        }
+        if (blob.size > MAX_BYTES) {
+          setStatus("Voice note too large. Keep it under 20 seconds.");
+          return;
+        }
+        const file = new File([blob], `voice-note${extensionForMime(mime)}`, { type: mime });
+        const result = await onSend?.(file);
+        if (result === true) return;
+        if (typeof result === "string" && result.trim()) {
+          setStatus(result.trim());
+          return;
+        }
         setStatus("Unable to send voice note. Try again.");
-      }
-    };
+      };
 
       recorder.start();
       setRecording(true);

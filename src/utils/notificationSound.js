@@ -13,6 +13,35 @@ function getAudioContext() {
   return audioContext;
 }
 
+export function getNotificationAudioContextState() {
+  if (typeof window === "undefined") return "unavailable";
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return "unavailable";
+  if (!audioContext) return "not_created";
+  return audioContext.state || "unknown";
+}
+
+export async function unlockNotificationAudio() {
+  const ctx = getAudioContext();
+  if (!ctx) return false;
+  try {
+    await ctx.resume();
+  } catch {
+    // Some browsers require a user gesture; keep this non-blocking.
+  }
+
+  if (ctx.state !== "running") return false;
+
+  // A tiny near-silent tone helps "unlock" WebAudio on mobile after a gesture.
+  playToneSequence([440], 0.02, 0, 0.0005);
+  try {
+    localStorage.setItem("qring_audio_unlocked", "true");
+  } catch {
+    // Ignore storage failures (private mode / quota).
+  }
+  return true;
+}
+
 function playToneSequence(frequencies, durationSeconds = 0.12, gapSeconds = 0.06, gainValue = 0.06) {
   const ctx = getAudioContext();
   if (!ctx) return;
@@ -41,4 +70,3 @@ export function playMessageNotificationSound() {
 export function playIncomingCallNotificationSound() {
   playToneSequence([660, 880, 660], 0.14, 0.05, 0.06);
 }
-
