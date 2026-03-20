@@ -1,10 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { BarChart3, BellRing, Building2, ClipboardList, DoorClosed, Home, LogOut, Megaphone, Plus, Users, Vote } from "lucide-react";
+import NotificationBell from "../../components/notifications/NotificationBell";
+import NotificationPanel from "../../components/notifications/NotificationPanel";
 import AppShell from "../../layouts/AppShell";
 import { getEstateOverview, listEstateAlerts } from "../../services/estateService";
 import { showError } from "../../utils/flash";
 import { useAuth } from "../../state/AuthContext";
+import { useNotifications } from "../../state/NotificationsContext";
 import { useSocketEvents } from "../../hooks/useSocketEvents";
 import { getDashboardSocket } from "../../services/socketClient";
 import useSubscription from "../../hooks/useSubscription";
@@ -39,6 +42,7 @@ const guidedSetup = [
 export default function EstateDashboardPage() {
   const { subscription } = useSubscription();
   const { user, logout } = useAuth();
+  const { unreadCount } = useNotifications();
   const navigate = useNavigate();
   const [overview, setOverview] = useState(null);
   const [meetingSnapshot, setMeetingSnapshot] = useState(null);
@@ -47,6 +51,9 @@ export default function EstateDashboardPage() {
   const estateName = overview?.estates?.[0]?.name || "Estate";
   const initials = managerName.slice(0, 1).toUpperCase();
   const [logoutBusy, setLogoutBusy] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const notificationsPanelRef = useRef(null);
+  const notificationsButtonRef = useRef(null);
 
   useEffect(() => {
     let mounted = true;
@@ -86,6 +93,33 @@ export default function EstateDashboardPage() {
       mounted = false;
     };
   }, [overview?.estates]);
+
+  useEffect(() => {
+    if (!notificationsOpen) return undefined;
+
+    function handleOutside(event) {
+      const target = event.target;
+      if (notificationsPanelRef.current?.contains(target)) return;
+      if (notificationsButtonRef.current?.contains(target)) return;
+      setNotificationsOpen(false);
+    }
+
+    function handleEscape(event) {
+      if (event.key === "Escape") setNotificationsOpen(false);
+    }
+
+    document.addEventListener("mousedown", handleOutside, true);
+    document.addEventListener("click", handleOutside, true);
+    document.addEventListener("touchstart", handleOutside, { passive: true });
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handleOutside, true);
+      document.removeEventListener("click", handleOutside, true);
+      document.removeEventListener("touchstart", handleOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [notificationsOpen]);
 
   useEffect(() => {
     const estateId = overview?.estates?.[0]?.id;
@@ -179,15 +213,29 @@ export default function EstateDashboardPage() {
                 <p className="text-xl font-black text-slate-900 dark:text-white">{managerName}</p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={handleLogout}
-              disabled={logoutBusy}
-              className="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200 dark:hover:bg-slate-800"
-            >
-              <LogOut size={14} />
-              {logoutBusy ? "Signing out..." : "Logout"}
-            </button>
+            <div className="relative flex items-center gap-2">
+              <div ref={notificationsButtonRef}>
+                <NotificationBell
+                  unreadCount={unreadCount}
+                  isOpen={notificationsOpen}
+                  onClick={() => setNotificationsOpen((prev) => !prev)}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleLogout}
+                disabled={logoutBusy}
+                className="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                <LogOut size={14} />
+                {logoutBusy ? "Signing out..." : "Logout"}
+              </button>
+              {notificationsOpen ? (
+                <div ref={notificationsPanelRef}>
+                  <NotificationPanel onClose={() => setNotificationsOpen(false)} />
+                </div>
+              ) : null}
+            </div>
           </div>
         </section>
 

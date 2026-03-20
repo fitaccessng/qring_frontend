@@ -1,19 +1,26 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Activity, Clock3, DoorOpen, FileText, Info, MessageSquare, Phone, Settings2 } from "lucide-react";
+import NotificationBell from "../../components/notifications/NotificationBell";
+import NotificationPanel from "../../components/notifications/NotificationPanel";
 import AppShell from "../../layouts/AppShell";
 import { useDashboardData } from "../../hooks/useDashboardData";
 import useSubscription from "../../hooks/useSubscription";
 import { getHomeownerContext } from "../../services/homeownerService";
 import { useAuth } from "../../state/AuthContext";
+import { useNotifications } from "../../state/NotificationsContext";
 import { useSocketEvents } from "../../hooks/useSocketEvents";
 
 export default function HomeownerDashboardPage() {
   const { subscription } = useSubscription();
   const { user, logout } = useAuth();
+  const { unreadCount } = useNotifications();
   const navigate = useNavigate();
   const [managedByEstate, setManagedByEstate] = useState(false);
   const [logoutBusy, setLogoutBusy] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const notificationsPanelRef = useRef(null);
+  const notificationsButtonRef = useRef(null);
   const {
     metrics,
     activity,
@@ -78,6 +85,33 @@ export default function HomeownerDashboardPage() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!notificationsOpen) return undefined;
+
+    function handleOutside(event) {
+      const target = event.target;
+      if (notificationsPanelRef.current?.contains(target)) return;
+      if (notificationsButtonRef.current?.contains(target)) return;
+      setNotificationsOpen(false);
+    }
+
+    function handleEscape(event) {
+      if (event.key === "Escape") setNotificationsOpen(false);
+    }
+
+    document.addEventListener("mousedown", handleOutside, true);
+    document.addEventListener("click", handleOutside, true);
+    document.addEventListener("touchstart", handleOutside, { passive: true });
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handleOutside, true);
+      document.removeEventListener("click", handleOutside, true);
+      document.removeEventListener("touchstart", handleOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [notificationsOpen]);
 
   useSocketEvents(
     useMemo(
@@ -208,14 +242,28 @@ export default function HomeownerDashboardPage() {
                 <p className="text-xl font-black text-slate-900 dark:text-white">{homeownerName}</p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={handleLogout}
-              disabled={logoutBusy}
-              className="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200 dark:hover:bg-slate-800"
-            >
-              Sign out
-            </button>
+            <div className="relative flex items-center gap-2">
+              <div ref={notificationsButtonRef}>
+                <NotificationBell
+                  unreadCount={unreadCount}
+                  isOpen={notificationsOpen}
+                  onClick={() => setNotificationsOpen((prev) => !prev)}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleLogout}
+                disabled={logoutBusy}
+                className="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                Sign out
+              </button>
+              {notificationsOpen ? (
+                <div ref={notificationsPanelRef}>
+                  <NotificationPanel onClose={() => setNotificationsOpen(false)} />
+                </div>
+              ) : null}
+            </div>
           </div>
         </section>
 
