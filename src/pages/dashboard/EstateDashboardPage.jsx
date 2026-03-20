@@ -225,10 +225,11 @@ export default function EstateDashboardPage() {
                 type="button"
                 onClick={handleLogout}
                 disabled={logoutBusy}
-                className="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200 dark:hover:bg-slate-800"
+                aria-label={logoutBusy ? "Signing out" : "Sign out"}
+                title={logoutBusy ? "Signing out" : "Sign out"}
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200/80 bg-white text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200 dark:hover:bg-slate-800"
               >
-                <LogOut size={14} />
-                {logoutBusy ? "Signing out..." : "Logout"}
+                <LogOut size={16} className={logoutBusy ? "animate-pulse" : ""} />
               </button>
               {notificationsOpen ? (
                 <div ref={notificationsPanelRef}>
