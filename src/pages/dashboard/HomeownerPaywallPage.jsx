@@ -15,7 +15,7 @@ import { showError, showSuccess } from "../../utils/flash";
 const PLAN_FEATURES = {
   estate_starter: [
     "Up to 3 doors",
-    "Trial only - 60 days"
+    "Trial only - 30 days"
   ],
   estate_basic: [
     "Realtime alerts",
@@ -146,15 +146,9 @@ export default function HomeownerPaywallPage() {
         return;
       }
       if (plan.amount === 0) {
-        const result = await requestSubscription(plan.id);
-        setSubscription((prev) => ({
-          ...(prev ?? {}),
-          ...result,
-          limits: {
-            maxDoors: plan.maxDoors,
-            maxQrCodes: plan.maxQrCodes
-          }
-        }));
+        await requestSubscription(plan.id);
+        const refreshed = await getMySubscription();
+        setSubscription(refreshed);
         showSuccess(
           `Free plan activated. You can manage up to ${plan.maxDoors} door${plan.maxDoors === 1 ? "" : "s"} and ${plan.maxQrCodes} QR code${plan.maxQrCodes === 1 ? "" : "s"}.`
         );
@@ -192,11 +186,17 @@ export default function HomeownerPaywallPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="font-heading text-xl font-bold">Current Plan</h2>
-            <p className="mt-1 text-sm text-slate-500">{activePlanName}</p>
+            <p className="mt-1 text-sm text-slate-500">{subscription?.planName || activePlanName}</p>
             {subscription?.limits ? (
             <p className="mt-1 text-xs text-slate-500">
-              Limit: {subscription.limits.maxDoors} door(s), {subscription.limits.maxQrCodes} QR code(s)
+              Limit: {subscription.limits.maxDoors} door(s), {subscription.limits.maxQrCodes} QR code(s), {subscription.limits.maxAdmins ?? 1} admin(s)
             </p>
+            ) : null}
+            {subscription?.expiresAt ? <p className="mt-1 text-xs text-slate-500">Expires: {new Date(subscription.expiresAt).toLocaleString()}</p> : null}
+            {subscription?.trialDaysRemaining > 0 ? (
+              <p className="mt-1 text-xs font-medium text-amber-600 dark:text-amber-300">
+                Trial ends in {subscription.trialDaysRemaining} day{subscription.trialDaysRemaining === 1 ? "" : "s"}.
+              </p>
             ) : null}
           </div>
           <button
@@ -258,6 +258,11 @@ export default function HomeownerPaywallPage() {
                 ))}
               </ul>
             ) : null}
+            {Array.isArray(plan?.restrictions) && plan.restrictions.length > 0 ? (
+              <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-900/30 dark:bg-rose-900/20 dark:text-rose-300">
+                Restricted: {plan.restrictions.map(formatFeatureLabel).join(", ")}
+              </div>
+            ) : null}
 
             <button
               type="button"
@@ -311,6 +316,14 @@ export default function HomeownerPaywallPage() {
       />
     </AppShell>
   );
+}
+
+function formatFeatureLabel(value) {
+  return String(value || "")
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 function formatMoney(amount, currency = "NGN") {

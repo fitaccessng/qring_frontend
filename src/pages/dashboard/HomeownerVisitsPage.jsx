@@ -4,8 +4,8 @@ import { CalendarDays, Clock3 } from "lucide-react";
 import AppShell from "../../layouts/AppShell";
 import SessionModePickerModal from "../../components/SessionModePickerModal";
 import { decideVisit, endHomeownerSession, getHomeownerAppointments, getHomeownerVisits } from "../../services/homeownerService";
-import { markVisitRequestNotificationsRead } from "../../services/notificationService";
 import { fetchVisitorSnapshotFileUrl } from "../../services/advancedService";
+import { useNotifications } from "../../state/NotificationsContext";
 
 const tabs = [
   { key: "all", label: "All" },
@@ -17,6 +17,7 @@ const tabs = [
 
 export default function HomeownerVisitsPage() {
   const navigate = useNavigate();
+  const { refresh, syncVisitRequestNotifications } = useNotifications();
   const [rows, setRows] = useState([]);
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -184,12 +185,8 @@ export default function HomeownerVisitsPage() {
     }
     try {
       const updated = await decideVisit(sessionId, action);
-      await markVisitRequestNotificationsRead(sessionId);
-      try {
-        window.dispatchEvent(new Event("qring:notifications-updated"));
-      } catch {
-        // Keep decision flow non-blocking.
-      }
+      await syncVisitRequestNotifications(sessionId);
+      await refresh();
       if (action === "approve") {
         approvedSessionIdsRef.current.add(sessionId);
       }

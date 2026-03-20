@@ -642,10 +642,10 @@ Reception teams can manage visitor check-ins, monitor building access, and keep 
               const estatePlans = [
                 {
                   name: 'Starter Estate',
-                  tagline: 'Up to 3 doors (trial only, 60 days)',
+                  tagline: 'Up to 3 doors (trial only, 30 days)',
                   price: '₦0',
                   period: '/month',
-                  features: ['Up to 3 doors', 'Trial only - 60 days'],
+                  features: ['Up to 3 doors', 'Trial only - 30 days'],
                   cta: 'Start Free Trial',
                 },
                 {

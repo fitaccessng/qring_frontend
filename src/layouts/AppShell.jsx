@@ -1,18 +1,11 @@
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../state/AuthContext";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getHomeownerContext } from "../services/homeownerService";
 import BrandMark from "../components/BrandMark";
-import {
-  clearNotifications,
-  getNotifications,
-  markNotificationRead,
-  registerPushSubscription,
-  requestBrowserNotificationPermission
-} from "../services/notificationService";
-import { registerFcmPushSubscription, setupForegroundMessageListener } from "../services/pushMessagingService";
-import { resolveNotificationRoute } from "../utils/notificationRouting";
-import { notify } from "../utils/notifier";
+import NotificationBell from "../components/notifications/NotificationBell";
+import NotificationPanel from "../components/notifications/NotificationPanel";
+import { useNotifications } from "../state/NotificationsContext";
 
 const navByRole = {
   homeowner: [
@@ -59,12 +52,9 @@ const navByRole = {
 };
 
 const HOMEOWNER_CONTEXT_CACHE_TTL_MS = 2 * 60 * 1000;
-const NOTIFICATIONS_CACHE_TTL_MS = 20 * 1000;
 
 let homeownerContextCache = null;
 let homeownerContextCacheAt = 0;
-let notificationsCache = null;
-let notificationsCacheAt = 0;
 
 function isCacheFresh(cachedAt, ttlMs) {
   return Number(cachedAt) > 0 && Date.now() - cachedAt < ttlMs;
@@ -94,8 +84,16 @@ function onboardingSeenForUser(user) {
 
 export default function AppShell({ title, children, showTopBar = true }) {
   const { user, logout } = useAuth();
+  const { unreadCount } = useNotifications();
   const navigate = useNavigate();
   const location = useLocation();
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [homeownerContext, setHomeownerContext] = useState(null);
+  const [homeownerContextLoading, setHomeownerContextLoading] = useState(false);
+  const [logoutBusy, setLogoutBusy] = useState(false);
+  const notificationsPanelRef = useRef(null);
+  const notificationsButtonRef = useRef(null);
+
   const showProfileHeader = useMemo(() => {
     const path = location?.pathname || "";
     return path === "/dashboard/homeowner/overview" || path === "/dashboard/estate";
@@ -105,27 +103,6 @@ export default function AppShell({ title, children, showTopBar = true }) {
     if (showProfileHeader) return false;
     return user?.role === "estate" || user?.role === "homeowner";
   }, [showTopBar, showProfileHeader, user?.role]);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [notifications, setNotifications] = useState([]);
-  const [homeownerContext, setHomeownerContext] = useState(null);
-  const [homeownerContextLoading, setHomeownerContextLoading] = useState(false);
-  const [webAlertsPermission, setWebAlertsPermission] = useState(
-    () => (typeof window !== "undefined" && window.Notification ? window.Notification.permission : "unsupported")
-  );
-  const [soundAlertsEnabled, setSoundAlertsEnabled] = useState(
-    () => localStorage.getItem("qring_sound_alerts") !== "false"
-  );
-  const [muteVisitRing, setMuteVisitRing] = useState(true);
-  const [logoutBusy, setLogoutBusy] = useState(false);
-  const notificationsPanelRef = useRef(null);
-  const notificationsButtonRef = useRef(null);
-  const audioContextRef = useRef(null);
-  const ringTimerRef = useRef(null);
-  const prevVisitUnreadIdsRef = useRef([]);
-  const visitUnreadInitializedRef = useRef(false);
-  const browserAlertedIdsRef = useRef(new Set());
-  const prevUnreadNotificationIdsRef = useRef([]);
-  const unreadNotificationsInitializedRef = useRef(false);
   const isEstateManagedHomeowner = useMemo(
     () =>
       user?.role === "homeowner" &&
@@ -151,43 +128,29 @@ export default function AppShell({ title, children, showTopBar = true }) {
     ]);
     return base.filter((item) => !estateOnly.has(item.to));
   }, [user?.role, isEstateManagedHomeowner, homeownerContextLoading]);
-  const settingsNavItem = useMemo(
-    () => navItems.find((item) => item.to.endsWith("/settings")) ?? null,
-    [navItems]
-  );
-  const profileRoute = useMemo(() => {
-    if (settingsNavItem?.to) return settingsNavItem.to;
-    if (user?.role === "estate") return "/dashboard/estate/settings";
-    if (user?.role === "homeowner") return "/dashboard/homeowner/settings";
-    if (user?.role === "admin") return "/dashboard/admin/config";
-    return null;
-  }, [settingsNavItem, user?.role]);
   const profileName = useMemo(() => user?.fullName?.trim() || user?.email || "User", [user?.fullName, user?.email]);
   const initials = useMemo(() => String(profileName).slice(0, 1).toUpperCase(), [profileName]);
-  const mobileNavItems = useMemo(
-    () => {
-      if (user?.role === "homeowner") {
-        return [
-          { to: "/dashboard/homeowner/overview", label: "Home", icon: "overview" },
-          { to: "/dashboard/homeowner/visits", label: "Visits", icon: "visits" },
-          { to: "/dashboard/homeowner/appointments", label: "Appointments", icon: "appointments" },
-          { to: "/dashboard/homeowner/messages", label: "Messages", icon: "messages" },
-          { to: "/dashboard/homeowner/doors", label: "Doors", icon: "doors" }
-        ];
-      }
-      if (user?.role === "estate") {
-        return [
-          { to: "/dashboard/estate", label: "Overview", icon: "estate" },
-          { to: "/dashboard/estate/invites", label: "Owners", icon: "invite" },
-          { to: "/dashboard/estate/homes", label: "Homes", icon: "homes" },
-          { to: "/dashboard/estate/doors", label: "Doors", icon: "doors" },
-          { to: "/dashboard/estate/assign", label: "Assign", icon: "assign" }
-        ];
-      }
-      return navItems.filter((item) => !item.to.endsWith("/settings")).slice(0, 4);
-    },
-    [navItems, user?.role]
-  );
+  const mobileNavItems = useMemo(() => {
+    if (user?.role === "homeowner") {
+      return [
+        { to: "/dashboard/homeowner/overview", label: "Home", icon: "overview" },
+        { to: "/dashboard/homeowner/visits", label: "Visits", icon: "visits" },
+        { to: "/dashboard/homeowner/appointments", label: "Appointments", icon: "appointments" },
+        { to: "/dashboard/homeowner/messages", label: "Messages", icon: "messages" },
+        { to: "/dashboard/homeowner/doors", label: "Doors", icon: "doors" }
+      ];
+    }
+    if (user?.role === "estate") {
+      return [
+        { to: "/dashboard/estate", label: "Overview", icon: "estate" },
+        { to: "/dashboard/estate/invites", label: "Owners", icon: "invite" },
+        { to: "/dashboard/estate/homes", label: "Homes", icon: "homes" },
+        { to: "/dashboard/estate/doors", label: "Doors", icon: "doors" },
+        { to: "/dashboard/estate/assign", label: "Assign", icon: "assign" }
+      ];
+    }
+    return navItems.filter((item) => !item.to.endsWith("/settings")).slice(0, 4);
+  }, [navItems, user?.role]);
   const isEstateMobileNav = user?.role === "estate";
   const showHelpButton = user?.role === "estate";
   const mobileContentBottomPaddingClass = isEstateMobileNav
@@ -202,49 +165,10 @@ export default function AppShell({ title, children, showTopBar = true }) {
       return false;
     }
   }, []);
-  const stopRinging = useCallback(() => {
-    if (ringTimerRef.current) {
-      clearInterval(ringTimerRef.current);
-      ringTimerRef.current = null;
-    }
-  }, []);
-  const playRing = useCallback(() => {
-    if (typeof window === "undefined") return;
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContextClass) return;
-
-    if (!audioContextRef.current) {
-      audioContextRef.current = new AudioContextClass();
-    }
-    const ctx = audioContextRef.current;
-    if (ctx.state === "suspended") {
-      ctx.resume().catch(() => {});
-    }
-
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-    gain.connect(ctx.destination);
-
-    const tones = [880, 660];
-    tones.forEach((frequency, index) => {
-      const startAt = ctx.currentTime + index * 0.2;
-      const endAt = startAt + 0.16;
-      const osc = ctx.createOscillator();
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(frequency, startAt);
-      osc.connect(gain);
-      gain.gain.exponentialRampToValueAtTime(0.07, startAt + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, endAt);
-      osc.start(startAt);
-      osc.stop(endAt);
-    });
-  }, []);
 
   useEffect(() => {
     homeownerContextCache = null;
     homeownerContextCacheAt = 0;
-    notificationsCache = null;
-    notificationsCacheAt = 0;
   }, [user?.id, user?.role]);
 
   useEffect(() => {
@@ -293,56 +217,6 @@ export default function AppShell({ title, children, showTopBar = true }) {
   }, [isNativeApp, user?.role, user?.email, user?.id, location.pathname, navigate]);
 
   useEffect(() => {
-    let active = true;
-    let unauthorized = false;
-
-    async function loadNotifications() {
-      if (unauthorized) return;
-      if (typeof navigator !== "undefined" && navigator.onLine === false) return;
-      const token = localStorage.getItem("qring_access_token");
-      if (!token) {
-        notificationsCache = [];
-        notificationsCacheAt = Date.now();
-        setNotifications([]);
-        return;
-      }
-      if (notificationsCache && isCacheFresh(notificationsCacheAt, NOTIFICATIONS_CACHE_TTL_MS)) {
-        setNotifications(notificationsCache);
-        return;
-      }
-      try {
-        const items = await getNotifications();
-        if (!active) return;
-        notificationsCache = items;
-        notificationsCacheAt = Date.now();
-        setNotifications(items);
-      } catch (requestError) {
-        if (!active) return;
-        if (requestError?.status === 401) {
-          unauthorized = true;
-        }
-        notificationsCache = [];
-        notificationsCacheAt = Date.now();
-        setNotifications([]);
-      }
-    }
-
-    loadNotifications();
-    const interval = setInterval(loadNotifications, 20000);
-    const handleNotificationsUpdated = () => loadNotifications();
-    window.addEventListener("qring:notifications-updated", handleNotificationsUpdated);
-    const handleOnline = () => loadNotifications();
-    window.addEventListener("online", handleOnline);
-
-    return () => {
-      active = false;
-      clearInterval(interval);
-      window.removeEventListener("qring:notifications-updated", handleNotificationsUpdated);
-      window.removeEventListener("online", handleOnline);
-    };
-  }, []);
-
-  useEffect(() => {
     if (!notificationsOpen) return;
     const handleOutside = (event) => {
       const target = event.target;
@@ -364,258 +238,6 @@ export default function AppShell({ title, children, showTopBar = true }) {
       document.removeEventListener("keydown", handleEscape);
     };
   }, [notificationsOpen]);
-
-  useEffect(() => {
-    const handleStorage = (event) => {
-      if (event.key === "qring_sound_alerts") {
-        setSoundAlertsEnabled(event.newValue !== "false");
-      }
-    };
-    const handleSoundUpdated = () => {
-      setSoundAlertsEnabled(localStorage.getItem("qring_sound_alerts") !== "false");
-    };
-    window.addEventListener("storage", handleStorage);
-    window.addEventListener("qring:sound-alerts-updated", handleSoundUpdated);
-    const handleMuteVisitRing = () => setMuteVisitRing(true);
-    window.addEventListener("qring:mute-visit-ring", handleMuteVisitRing);
-    return () => {
-      window.removeEventListener("storage", handleStorage);
-      window.removeEventListener("qring:sound-alerts-updated", handleSoundUpdated);
-      window.removeEventListener("qring:mute-visit-ring", handleMuteVisitRing);
-    };
-  }, []);
-
-  const parsedNotifications = useMemo(
-    () =>
-      notifications.map((item) => {
-        let payload = item.payload;
-        if (typeof payload === "string") {
-          try {
-            payload = JSON.parse(payload);
-          } catch {
-            payload = { message: item.payload };
-          }
-        }
-        return {
-          ...item,
-          payload: payload && typeof payload === "object" ? payload : {}
-        };
-      }),
-    [notifications]
-  );
-
-  const unreadCount = useMemo(
-    () => parsedNotifications.filter((item) => !item.readAt).length,
-    [parsedNotifications]
-  );
-
-  const unreadVisitRequestIds = useMemo(
-    () =>
-      parsedNotifications
-        .filter((item) => !item.readAt && item.kind === "visitor.request")
-        .map((item) => item.id),
-    [parsedNotifications]
-  );
-
-  useEffect(() => {
-    if (!visitUnreadInitializedRef.current) {
-      prevVisitUnreadIdsRef.current = unreadVisitRequestIds;
-      visitUnreadInitializedRef.current = true;
-      return;
-    }
-    const previous = prevVisitUnreadIdsRef.current;
-    const hasNewVisitRequest = unreadVisitRequestIds.some((id) => !previous.includes(id));
-    if (hasNewVisitRequest) {
-      setMuteVisitRing(false);
-      try {
-        if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
-          navigator.vibrate([120, 80, 120]);
-        }
-      } catch {
-        // No-op on unsupported platforms.
-      }
-    }
-    prevVisitUnreadIdsRef.current = unreadVisitRequestIds;
-  }, [unreadVisitRequestIds]);
-
-  useEffect(() => {
-    if (soundAlertsEnabled && unreadVisitRequestIds.length > 0 && !muteVisitRing) {
-      playRing();
-      if (!ringTimerRef.current) {
-        ringTimerRef.current = setInterval(playRing, 1800);
-      }
-      return;
-    }
-
-    stopRinging();
-    return stopRinging;
-  }, [soundAlertsEnabled, unreadVisitRequestIds, muteVisitRing, playRing, stopRinging]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const handleDismissed = (event) => {
-      const detail = event?.detail ?? {};
-      const kind = String(detail.kind || "").trim();
-      if (kind !== "visitor.request") return;
-      setMuteVisitRing(true);
-      stopRinging();
-    };
-    window.addEventListener("qring:flash_dismissed", handleDismissed);
-    return () => window.removeEventListener("qring:flash_dismissed", handleDismissed);
-  }, [stopRinging]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const notificationSupported = typeof window.Notification !== "undefined";
-    const canNotify = notificationSupported && window.Notification.permission === "granted";
-
-    const unread = parsedNotifications.filter((item) => !item.readAt && item.kind !== "system");
-    const unreadIds = unread.map((item) => item.id);
-
-    if (!unreadNotificationsInitializedRef.current) {
-      unreadIds.forEach((id) => browserAlertedIdsRef.current.add(id));
-      prevUnreadNotificationIdsRef.current = unreadIds;
-      unreadNotificationsInitializedRef.current = true;
-      return;
-    }
-
-    const previous = prevUnreadNotificationIdsRef.current || [];
-    const newUnreadIds = unreadIds.filter((id) => !previous.includes(id));
-    prevUnreadNotificationIdsRef.current = unreadIds;
-
-    if (newUnreadIds.length === 0) return;
-
-    unread.forEach((item) => {
-      if (item.readAt) return;
-      if (item.kind === "system") return;
-      if (!newUnreadIds.includes(item.id)) return;
-      if (browserAlertedIdsRef.current.has(item.id)) return;
-      browserAlertedIdsRef.current.add(item.id);
-      const body = item.payload?.message ?? "You have a new alert";
-      const route = resolveNotificationRoute({
-        role: user?.role,
-        kind: item?.kind,
-        payload: item?.payload
-      });
-
-      notify({
-        type: "info",
-        title: "Qring Alert",
-        message: body,
-        duration: 3600,
-        kind: item?.kind || "",
-        route,
-        actionLabel: route ? "Open" : "",
-        dedupeKey: `alert|${item.id}`,
-        systemWhenHidden: true,
-        onSystemClick: canNotify ? () => openNotification(item) : undefined
-      });
-    });
-  }, [parsedNotifications, user?.role]);
-
-  useEffect(() => {
-    let unsub = () => {};
-    setupForegroundMessageListener((payload) => {
-      // Foreground push can duplicate UI toasts (the app also polls /notifications).
-      // Use push only as a signal to refresh notifications.
-      try {
-        const kind = String(payload?.data?.kind || "").trim();
-        window.dispatchEvent(new CustomEvent("qring:notifications-updated", { detail: { source: "push", kind } }));
-      } catch {
-        // Ignore dispatch failures.
-      }
-    }).then((dispose) => {
-      unsub = typeof dispose === "function" ? dispose : () => {};
-    });
-    return () => {
-      try {
-        unsub();
-      } catch {
-        // Ignore cleanup errors.
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (webAlertsPermission !== "granted") return;
-    registerFcmPushSubscription().catch(() => {});
-  }, [webAlertsPermission]);
-
-  useEffect(() => {
-    return () => {
-      if (ringTimerRef.current) {
-        clearInterval(ringTimerRef.current);
-      }
-      audioContextRef.current?.close?.().catch(() => {});
-      audioContextRef.current = null;
-    };
-  }, []);
-
-  async function openNotification(item) {
-    setMuteVisitRing(true);
-    if (item?.id && !item?.readAt) {
-      try {
-        await markNotificationRead(item.id);
-        setNotifications((prev) => {
-          const next = prev.map((row) =>
-            row.id === item.id
-              ? { ...row, readAt: row.readAt || new Date().toISOString() }
-              : row
-          );
-          notificationsCache = next;
-          notificationsCacheAt = Date.now();
-          return next;
-        });
-      } catch {
-        // Keep UX responsive even if read API fails.
-      }
-    }
-
-    navigate(
-      resolveNotificationRoute({
-        role: user?.role,
-        kind: item?.kind,
-        payload: item?.payload
-      })
-    );
-    setNotificationsOpen(false);
-  }
-
-  async function handleClearNotifications() {
-    setMuteVisitRing(true);
-    try {
-      await clearNotifications();
-      setNotifications(() => {
-        const next = [];
-        notificationsCache = next;
-        notificationsCacheAt = Date.now();
-        return next;
-      });
-      browserAlertedIdsRef.current.clear();
-      prevUnreadNotificationIdsRef.current = [];
-    } catch {
-      // No-op, keep existing list.
-    }
-  }
-
-  async function handleEnableWebAlerts() {
-    const permission = await requestBrowserNotificationPermission();
-    setWebAlertsPermission(permission);
-    if (permission === "granted") {
-      try {
-        const registration = await registerFcmPushSubscription();
-        if (registration?.status !== "registered") {
-          await registerPushSubscription({
-            endpoint: "browser-notification",
-            keys: { ua: navigator.userAgent }
-          });
-        }
-      } catch {
-        // Keep running even if registration fails.
-      }
-    }
-  }
 
   function handleBack() {
     if (canGoBack) {
@@ -648,11 +270,9 @@ export default function AppShell({ title, children, showTopBar = true }) {
     <div className="min-h-[100dvh] overflow-hidden bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_top_right,_rgba(36,86,245,0.16),_transparent_40%),radial-gradient(circle_at_bottom_left,_rgba(20,184,166,0.12),_transparent_35%)]" />
       <div className="flex h-[100dvh]">
-        <aside
-          className="fixed inset-y-0 left-0 hidden w-72 overflow-y-auto border-r border-slate-200/70 bg-white/90 p-6 backdrop-blur [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden dark:border-slate-800 dark:bg-slate-900/95 lg:block"
-        >
+        <aside className="fixed inset-y-0 left-0 hidden w-72 overflow-y-auto border-r border-slate-200/70 bg-white/90 p-6 backdrop-blur [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden dark:border-slate-800 dark:bg-slate-900/95 lg:block">
           <div className="mb-8 flex items-center gap-3">
-            <div className="grid h-10 w-16 place-items-center rounded-xl  text-xs font-bold text-white shadow-soft">
+            <div className="grid h-10 w-16 place-items-center rounded-xl text-xs font-bold text-white shadow-soft">
               <BrandMark tone="dark" className="h-18 w-46" />
             </div>
             <div>
@@ -699,7 +319,6 @@ export default function AppShell({ title, children, showTopBar = true }) {
               </button>
             ) : null}
           </nav>
-          
         </aside>
 
         <main className={`safe-content relative flex-1 overflow-y-auto px-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:px-5 lg:ml-72 lg:px-10 lg:pb-8 ${mobileContentBottomPaddingClass} ${showTopBar ? "pt-[calc(12.75rem+env(safe-area-inset-top))] sm:pt-[calc(7rem+env(safe-area-inset-top))] lg:pt-[7.35rem]" : "pt-[calc(1.1rem+env(safe-area-inset-top))] sm:pt-[calc(1.2rem+env(safe-area-inset-top))] lg:pt-6"}`}>
@@ -710,141 +329,75 @@ export default function AppShell({ title, children, showTopBar = true }) {
             />
           ) : null}
           {showTopBar ? (
-          <header className="fixed inset-x-0 top-0 z-30 px-3 pt-[calc(0.95rem+env(safe-area-inset-top))] sm:px-4 lg:left-72 lg:px-8">
-            <div className="rounded-[1.4rem] border border-slate-200/70 bg-white/95 p-3 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/90 sm:p-4">
-              <div className="flex items-center gap-3">
-                {showProfileHeader ? (
-                  <div className="flex items-center gap-2.5">
-                    <button
-                      type="button"
-                      onClick={handleBack}
-                      className="grid h-9 w-9 place-items-center rounded-full bg-slate-100 text-slate-500 transition-all active:scale-95 dark:bg-slate-800 dark:text-slate-300"
-                      aria-label="Go back"
-                      title="Back"
-                    >
-                      <BackIcon />
-                    </button>
-                    <div className="grid h-10 w-10 place-items-center rounded-full bg-violet-100 text-sm font-bold text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
-                      {initials}
+            <header className="fixed inset-x-0 top-0 z-30 px-3 pt-[calc(0.95rem+env(safe-area-inset-top))] sm:px-4 lg:left-72 lg:px-8">
+              <div className="rounded-[1.4rem] border border-slate-200/70 bg-white/95 p-3 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/90 sm:p-4">
+                <div className="flex items-center gap-3">
+                  {showProfileHeader ? (
+                    <div className="flex items-center gap-2.5">
+                      <button
+                        type="button"
+                        onClick={handleBack}
+                        className="grid h-9 w-9 place-items-center rounded-full bg-slate-100 text-slate-500 transition-all active:scale-95 dark:bg-slate-800 dark:text-slate-300"
+                        aria-label="Go back"
+                        title="Back"
+                      >
+                        <BackIcon />
+                      </button>
+                      <div className="grid h-10 w-10 place-items-center rounded-full bg-violet-100 text-sm font-bold text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
+                        {initials}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-[11px] font-semibold text-slate-500">Hello!</p>
+                        <p className="truncate text-sm font-black text-slate-900 dark:text-white sm:text-base">{title || profileName}</p>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-[11px] font-semibold text-slate-500">Hello!</p>
-                      <p className="truncate text-sm font-black text-slate-900 dark:text-white sm:text-base">{title || profileName}</p>
+                  ) : null}
+                  {showBackHeader ? (
+                    <div className="flex items-center gap-2.5">
+                      <button
+                        type="button"
+                        onClick={handleBack}
+                        className="grid h-9 w-9 place-items-center rounded-full bg-slate-100 text-slate-500 transition-all active:scale-95 dark:bg-slate-800 dark:text-slate-300"
+                        aria-label="Go back"
+                        title="Back"
+                      >
+                        <BackIcon />
+                      </button>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-black text-slate-900 dark:text-white sm:text-base">{title || profileName}</p>
+                      </div>
                     </div>
-                  </div>
-                ) : null}
-                {showBackHeader ? (
-                  <div className="flex items-center gap-2.5">
-                    <button
-                      type="button"
-                      onClick={handleBack}
-                      className="grid h-9 w-9 place-items-center rounded-full bg-slate-100 text-slate-500 transition-all active:scale-95 dark:bg-slate-800 dark:text-slate-300"
-                      aria-label="Go back"
-                      title="Back"
-                    >
-                      <BackIcon />
-                    </button>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-black text-slate-900 dark:text-white sm:text-base">{title || profileName}</p>
+                  ) : null}
+                  <div className="relative ml-auto flex items-center gap-2">
+                    <div ref={notificationsButtonRef}>
+                      <NotificationBell
+                        unreadCount={unreadCount}
+                        isOpen={notificationsOpen}
+                        onClick={() => setNotificationsOpen((prev) => !prev)}
+                      />
                     </div>
-                  </div>
-                ) : null}
-                <div className="relative ml-auto flex items-center gap-2">
-                  <button
-                    ref={notificationsButtonRef}
-                    type="button"
-                    onClick={() => {
-                      setMuteVisitRing(true);
-                      setNotificationsOpen((prev) => !prev);
-                    }}
-                    className="relative grid h-9 w-9 place-items-center rounded-full bg-slate-100 text-slate-500 transition-all active:scale-95 dark:bg-slate-800 dark:text-slate-300"
-                    aria-label="Notifications"
-                    title="Notifications"
-                  >
-                    <BellIcon />
-                    {unreadCount > 0 ? (
-                      <span className="absolute -right-0.5 -top-0.5 min-w-[1rem] rounded-full bg-rose-600 px-1 text-[10px] font-bold text-white">
-                        {unreadCount > 9 ? "9+" : unreadCount}
-                      </span>
+                    {isEstateUser ? (
+                      <button
+                        type="button"
+                        onClick={handleLogout}
+                        disabled={logoutBusy}
+                        className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200 dark:hover:bg-slate-800"
+                        aria-label="Logout"
+                        title="Logout"
+                      >
+                        <LogoutIcon />
+                        {logoutBusy ? "Logging out..." : "Logout"}
+                      </button>
                     ) : null}
-                  </button>
-                  {isEstateUser ? (
-                    <button
-                      type="button"
-                      onClick={handleLogout}
-                      disabled={logoutBusy}
-                      className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200 dark:hover:bg-slate-800"
-                      aria-label="Logout"
-                      title="Logout"
-                    >
-                      <LogoutIcon />
-                      {logoutBusy ? "Logging out..." : "Logout"}
-                    </button>
-                  ) : null}
-                  {notificationsOpen ? (
-                    <div
-                      ref={notificationsPanelRef}
-                      className="absolute right-0 top-11 z-40 w-[min(22rem,90vw)] rounded-2xl border border-slate-200 bg-white p-3 shadow-xl dark:border-slate-700 dark:bg-slate-900"
-                    >
-                      <div className="mb-2 flex items-center justify-between">
-                        <p className="text-sm font-bold text-slate-900 dark:text-slate-100">Notifications</p>
-                        <button
-                          type="button"
-                          onClick={handleClearNotifications}
-                          className="text-xs font-semibold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
-                        >
-                          Clear all
-                        </button>
+                    {notificationsOpen ? (
+                      <div ref={notificationsPanelRef}>
+                        <NotificationPanel onClose={() => setNotificationsOpen(false)} />
                       </div>
-                      <div className="max-h-72 space-y-2 overflow-y-auto">
-                        {parsedNotifications.length === 0 ? (
-                          <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                            No notifications yet.
-                          </p>
-                        ) : (
-                          parsedNotifications.map((item) => (
-                            <button
-                              key={item.id}
-                              type="button"
-                              onClick={() => openNotification(item)}
-                              className={`w-full rounded-xl border px-3 py-2 text-left text-xs transition ${
-                                item.readAt
-                                  ? "border-slate-200 bg-slate-50 text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400"
-                                  : "border-indigo-200 bg-indigo-50 text-indigo-900 dark:border-indigo-800/50 dark:bg-indigo-900/30 dark:text-indigo-100"
-                              }`}
-                            >
-                              <p className="font-semibold">{item.kind?.replace(".", " ") || "Alert"}</p>
-                              <p className="mt-1">{item.payload?.message || "You have a new alert."}</p>
-                              <p className="mt-1 text-[10px] opacity-70">{formatTime(item.createdAt)}</p>
-                            </button>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  ) : null}
-                  {/* {profileRoute ? (
-                    <Link
-                      to={profileRoute}
-                      className="grid h-9 w-9 place-items-center rounded-full bg-slate-100 text-slate-500 transition-all active:scale-95 dark:bg-slate-800 dark:text-slate-300"
-                      aria-label="Profile"
-                      title="Profile"
-                    >
-                      <ProfileIcon />
-                    </Link>
-                  ) : null}
-                  <button
-                    type="button"
-                    onClick={logout}
-                    className="grid h-9 w-9 place-items-center rounded-full bg-rose-100 text-rose-600 transition-all active:scale-95 dark:bg-rose-900/30 dark:text-rose-300"
-                    aria-label="Logout"
-                    title="Logout"
-                  >
-                    <LogoutIcon />
-                  </button> */}
+                    ) : null}
+                  </div>
                 </div>
               </div>
-            </div>
-          </header>
+            </header>
           ) : null}
           <div className={`dashboard-canvas ${showTopBar ? "pt-20 sm:pt-12 lg:pt-1" : "pt-0"}`}>
             {children}
@@ -862,40 +415,40 @@ export default function AppShell({ title, children, showTopBar = true }) {
         <nav className="fixed inset-x-0 bottom-3 z-[9999] px-3 pb-[max(0.2rem,env(safe-area-inset-bottom))] lg:hidden">
           <div className="relative mx-auto max-w-md rounded-[1.35rem] border border-slate-200/60 bg-[#ebe8f8]/95 px-3 py-2 shadow-[0_12px_32px_rgba(76,29,149,0.16)] backdrop-blur-md dark:border-slate-700 dark:bg-slate-900/90">
             <div className={`flex items-stretch gap-1 ${isEstateMobileNav ? "h-14 sm:h-14" : "h-12 sm:h-12"}`}>
-            {mobileNavItems.map((item) => (
-              <NavLink
-                key={`mobile-${item.to}`}
-                to={item.to}
-                end
-                className={({ isActive }) =>
-                  `flex min-w-0 flex-1 items-center justify-center rounded-xl px-1 py-1 text-[10px] font-semibold transition-all duration-200 active:scale-95 sm:text-[11px] ${
-                    isActive ? "text-white" : "text-violet-700 dark:text-slate-300"
-                  }`
-                }
-              >
-                {({ isActive }) => (
-                  <div className="group relative flex items-center justify-center">
-                    <span
-                      className={`grid place-items-center rounded-full transition-all duration-200 ${
-                        isActive
-                          ? "h-10 w-10 bg-violet-600 text-white shadow-[0_10px_24px_rgba(124,58,237,0.45)]"
-                          : "h-8 w-8 text-violet-700 opacity-90 dark:text-slate-300"
-                      }`}
-                    >
-                      <NavIcon name={item.icon} />
-                    </span>
-                    <span
-                      className={`pointer-events-none absolute -top-7 whitespace-nowrap rounded-full bg-violet-600 px-2 py-0.5 text-[10px] font-semibold text-white transition-all ${
-                        isActive ? "opacity-100" : "opacity-0"
-                      } group-hover:opacity-100`}
-                    >
-                      {item.label}
-                    </span>
-                  </div>
-                )}
-              </NavLink>
-            ))}
-            {showHelpButton && !isEstateMobileNav ? (
+              {mobileNavItems.map((item) => (
+                <NavLink
+                  key={`mobile-${item.to}`}
+                  to={item.to}
+                  end
+                  className={({ isActive }) =>
+                    `flex min-w-0 flex-1 items-center justify-center rounded-xl px-1 py-1 text-[10px] font-semibold transition-all duration-200 active:scale-95 sm:text-[11px] ${
+                      isActive ? "text-white" : "text-violet-700 dark:text-slate-300"
+                    }`
+                  }
+                >
+                  {({ isActive }) => (
+                    <div className="group relative flex items-center justify-center">
+                      <span
+                        className={`grid place-items-center rounded-full transition-all duration-200 ${
+                          isActive
+                            ? "h-10 w-10 bg-violet-600 text-white shadow-[0_10px_24px_rgba(124,58,237,0.45)]"
+                            : "h-8 w-8 text-violet-700 opacity-90 dark:text-slate-300"
+                        }`}
+                      >
+                        <NavIcon name={item.icon} />
+                      </span>
+                      <span
+                        className={`pointer-events-none absolute -top-7 whitespace-nowrap rounded-full bg-violet-600 px-2 py-0.5 text-[10px] font-semibold text-white transition-all ${
+                          isActive ? "opacity-100" : "opacity-0"
+                        } group-hover:opacity-100`}
+                      >
+                        {item.label}
+                      </span>
+                    </div>
+                  )}
+                </NavLink>
+              ))}
+              {showHelpButton && !isEstateMobileNav ? (
                 <button
                   type="button"
                   onClick={() => navigate("/onboarding")}
@@ -903,10 +456,10 @@ export default function AppShell({ title, children, showTopBar = true }) {
                 >
                   <span className="mb-1">
                     <NavIcon name="help" />
-                </span>
-                <span className="leading-none">Help</span>
-              </button>
-            ) : null}
+                  </span>
+                  <span className="leading-none">Help</span>
+                </button>
+              ) : null}
             </div>
           </div>
         </nav>
@@ -915,44 +468,10 @@ export default function AppShell({ title, children, showTopBar = true }) {
   );
 }
 
-function formatTime(value) {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString();
-}
-
-function BellIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5" />
-      <path d="M9 17a3 3 0 0 0 6 0" />
-    </svg>
-  );
-}
-
 function BackIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M15 18l-6-6 6-6" />
-    </svg>
-  );
-}
-
-function SettingsIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="3" />
-      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0A1.65 1.65 0 0 0 9.93 3.1V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-    </svg>
-  );
-}
-
-function ProfileIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20 21a8 8 0 1 0-16 0" />
-      <circle cx="12" cy="7" r="4" />
     </svg>
   );
 }
@@ -983,8 +502,7 @@ function NavIcon({ name }) {
     mappings: <path d="M3 5h6v6H3zM15 5h6v6h-6zM9 8h6M3 17h6v6H3zM15 17h6v6h-6zM9 20h6" />,
     logs: <path d="M5 3h14v18H5zM8 8h8M8 12h8M8 16h5" />,
     system: <path d="M12 1v4M12 19v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M1 12h4M19 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8" />,
-    plans: <path d="M4 20V8l8-4 8 4v12M4 12h16" />
-    ,
+    plans: <path d="M4 20V8l8-4 8 4v12M4 12h16" />,
     queue: <path d="M4 7h14M4 12h10M4 17h8M18 7v10M15 14l3 3 3-3" />,
     receipt: <path d="M6 3h12v18l-2-1-2 1-2-1-2 1-2-1-2 1zM9 8h6M9 12h6M9 16h4" />,
     community: <path d="M4 5h16v10H8l-4 4zM9 9h6M9 12h4" />,
@@ -997,7 +515,6 @@ function NavIcon({ name }) {
     bell_ring: <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5M9 17a3 3 0 0 0 6 0M18 3l2 2M6 3L4 5" />,
     user_admin: <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm10 0v-2m0 0V7m0 2h-2m2 0h2" />,
     sessions: <path d="M8 7h13M8 12h13M8 17h13M3 7h.01M3 12h.01M3 17h.01" />,
-    plus: <path d="M12 5v14M5 12h14" />,
     help: <path d="M12 17h.01M9.1 9a3 3 0 1 1 4.9 2.3c-.8.7-2 1.5-2 2.7v.5M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z" />,
     settings: <path d="M12 8.5A3.5 3.5 0 1 1 8.5 12 3.5 3.5 0 0 1 12 8.5zm0-6 1.2 2.4 2.7.4.4 2.7L18.8 9l-1.5 2.3 1.5 2.3-2.5 1.2-.4 2.7-2.7.4L12 21.5l-1.2-2.4-2.7-.4-.4-2.7L5.2 13.6 6.7 11.3 5.2 9l2.5-1.2.4-2.7 2.7-.4z" />
   };
@@ -1006,40 +523,5 @@ function NavIcon({ name }) {
     <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       {paths[name] ?? <circle cx="12" cy="12" r="9" />}
     </svg>
-  );
-}
-
-function EstateQuickNav({ currentPath }) {
-  const items = [
-    { to: "/dashboard/estate", label: "Overview" },
-    { to: "/dashboard/estate/invites", label: "Homeowners" },
-    { to: "/dashboard/estate/homes", label: "Homes" },
-    { to: "/dashboard/estate/doors", label: "Doors" },
-    { to: "/dashboard/estate/assign", label: "Assign" },
-    { to: "/dashboard/estate/logs", label: "Logs" },
-    { to: "/dashboard/estate/settings", label: "Settings" }
-  ];
-
-  const isActive = (path) => {
-    if (path === "/dashboard/estate") return currentPath === path;
-    return currentPath === path || currentPath.startsWith(`${path}/`);
-  };
-
-  return (
-    <div className="mb-4 -mx-1 flex gap-2 overflow-x-auto px-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:mb-5 lg:mb-6">
-      {items.map((item) => (
-        <Link
-          key={`estate-quick-nav-${item.to}`}
-          to={item.to}
-          className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all ${
-            isActive(item.to)
-              ? "border-indigo-500 bg-indigo-600 text-white shadow-sm"
-              : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-300"
-          }`}
-        >
-          {item.label}
-        </Link>
-      ))}
-    </div>
   );
 }

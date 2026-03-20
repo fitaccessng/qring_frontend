@@ -41,11 +41,24 @@ export function resolveNotificationRoute({ role, kind, payload }) {
     if (safeRole === "homeowner") {
       if (safeKind.includes("maintenance")) return "/dashboard/homeowner/maintenance";
       if (safeKind.includes("door")) return "/dashboard/homeowner/doors";
-      return "/dashboard/homeowner/alerts";
+      return "/dashboard/notifications";
     }
   }
 
+  if (safeKind.startsWith("system.") || safeKind.startsWith("security.") || safeKind.startsWith("payment.")) {
+    return "/dashboard/notifications";
+  }
+
+  if (safeKind.startsWith("access.")) {
+    return safeRole === "estate" ? "/dashboard/estate/logs" : "/dashboard/homeowner/visits";
+  }
+
+  if (safeKind.startsWith("visitor.")) {
+    return safeRole === "estate" ? "/dashboard/estate/logs" : "/dashboard/homeowner/visits";
+  }
+
+  if (safeRole === "homeowner") return "/dashboard/notifications";
   if (safeRole === "estate") return "/dashboard/estate";
   if (safeRole === "admin") return "/dashboard/admin";
-  return "/dashboard/homeowner/overview";
+  return "/dashboard/notifications";
 }

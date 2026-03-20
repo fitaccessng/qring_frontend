@@ -7,6 +7,7 @@ import { showError } from "../../utils/flash";
 import { useAuth } from "../../state/AuthContext";
 import { useSocketEvents } from "../../hooks/useSocketEvents";
 import { getDashboardSocket } from "../../services/socketClient";
+import useSubscription from "../../hooks/useSubscription";
 
 const guidedSetup = [
   {
@@ -36,6 +37,7 @@ const guidedSetup = [
 ];
 
 export default function EstateDashboardPage() {
+  const { subscription } = useSubscription();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [overview, setOverview] = useState(null);
@@ -213,7 +215,21 @@ export default function EstateDashboardPage() {
                 <Users size={14} />
                 Create Homeowner
               </Link>
+              <Link to="/billing/paywall" className="inline-flex items-center gap-2 rounded-xl bg-white/20 px-4 py-2 text-sm font-bold text-white transition-all hover:bg-white/30 active:scale-95">
+                {subscription?.planName || "Upgrade"}
+              </Link>
             </div>
+            {subscription ? (
+              <div className="mt-4 rounded-xl bg-white/10 px-4 py-3 text-xs text-white/90">
+                <p className="font-semibold">{subscription.planName}</p>
+                <p>
+                  Doors: {overview?.planRestrictions?.usedDoors ?? 0}/{overview?.planRestrictions?.maxDoors ?? subscription?.limits?.maxDoors ?? 0}
+                  {" · "}
+                  Status: {subscription.status}
+                  {subscription.expiresAt ? ` · Expires ${new Date(subscription.expiresAt).toLocaleDateString()}` : ""}
+                </p>
+              </div>
+            ) : null}
           </article>
         </section>
 

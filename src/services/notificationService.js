@@ -14,40 +14,33 @@ export async function registerPushSubscription(payload) {
 }
 
 export async function markNotificationRead(notificationId) {
-  let response = null;
   try {
-    response = await apiRequest(`/notifications/${notificationId}/read`, {
+    const response = await apiRequest(`/notifications/${notificationId}/read`, {
       method: "POST",
       silent: true
     });
+    return response?.data ?? null;
   } catch (error) {
     if (Number(error?.status) === 404) {
       return null;
     }
     throw error;
   }
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new Event("qring:notifications-updated"));
-  }
+}
+
+export async function markAllNotificationsRead() {
+  const response = await apiRequest("/notifications/read-all", {
+    method: "POST",
+    silent: true
+  });
   return response?.data ?? null;
 }
 
 export async function clearNotifications() {
-  let response;
-  try {
-    response = await apiRequest("/notifications/clear-all", {
-      method: "DELETE"
-    });
-  } catch (error) {
-    // Backward compatibility for older backend nodes that don't have clear-all yet.
-    if (error?.status !== 404) throw error;
-    response = await apiRequest("/notifications/read-all", {
-      method: "POST"
-    });
-  }
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new Event("qring:notifications-updated"));
-  }
+  const response = await apiRequest("/notifications/clear-all", {
+    method: "DELETE",
+    silent: true
+  });
   return response?.data ?? null;
 }
 
@@ -81,7 +74,4 @@ export async function markVisitRequestNotificationsRead(sessionId) {
     .filter(Boolean);
 
   await Promise.all(targetIds.map((id) => markNotificationRead(id)));
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new Event("qring:notifications-updated"));
-  }
 }

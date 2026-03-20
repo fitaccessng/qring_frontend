@@ -8,9 +8,9 @@ const estatePlans = [
     id: "estate_starter",
     name: "Starter Estate",
     monthly: 0,
-    bestFor: "Up to 3 doors (trial only, 60 days)",
+    bestFor: "Up to 3 doors (trial only, 30 days)",
     cta: "Start Free Trial",
-    features: ["Up to 3 doors", "Trial only - 60 days"]
+    features: ["Up to 3 doors", "Trial only - 30 days"]
   },
   {
     id: "estate_basic",

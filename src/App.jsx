@@ -77,14 +77,18 @@ import BlockingModal from "./components/BlockingModal";
 import AppPreloader from "./components/mobile/AppPreloader";
 import ToastCenter from "./components/ToastCenter";
 import { env } from "./config/env";
+import NotificationsPage from "./pages/dashboard/NotificationsPage";
+import { NotificationsProvider } from "./state/NotificationsContext";
 
 export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
+        <NotificationsProvider>
+          <BrowserRouter>
+            <AppRoutes />
+          </BrowserRouter>
+        </NotificationsProvider>
       </AuthProvider>
     </ThemeProvider>
   );
@@ -193,6 +197,9 @@ function AppRoutes() {
                   <Route path="/billing/paywall" element={<HomeownerPaywallPage />} />
                   <Route path="/billing/callback" element={<BillingCallbackPage />} />
                   <Route path="/onboarding" element={<OnboardingPage />} />
+                </Route>
+                <Route element={<RoleRoute allowedRoles={["homeowner", "estate", "admin"]} />}>
+                  <Route path="/dashboard/notifications" element={<NotificationsPage />} />
                 </Route>
                 <Route element={<RoleRoute allowedRoles={["homeowner"]} />}>
                   <Route path="/dashboard/homeowner" element={<Navigate to="/dashboard/homeowner/overview" replace />} />

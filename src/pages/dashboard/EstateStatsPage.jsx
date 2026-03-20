@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import AppShell from "../../layouts/AppShell";
-import { getEstateAccessLogs, getEstateOverview } from "../../services/estateService";
+import { getEstateStatsSummary } from "../../services/estateService";
 import CardSurface from "../../components/CardSurface";
 
 export default function EstateStatsPage() {
-  const [overview, setOverview] = useState(null);
-  const [logs, setLogs] = useState([]);
+  const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -14,13 +14,9 @@ export default function EstateStatsPage() {
     async function load() {
       setLoading(true);
       try {
-        const [overviewData, logRows] = await Promise.all([
-          getEstateOverview(),
-          getEstateAccessLogs()
-        ]);
+        const data = await getEstateStatsSummary();
         if (!active) return;
-        setOverview(overviewData);
-        setLogs(logRows);
+        setSummary(data);
       } catch (err) {
         if (active) setError(err?.message || "Failed to load stats");
       } finally {
@@ -34,39 +30,52 @@ export default function EstateStatsPage() {
   }, []);
 
   const stats = useMemo(() => {
-    const totalVisits = logs.length;
-    const approved = logs.filter((row) => String(row.status || "").toLowerCase().includes("approved")).length;
-    const rejected = logs.filter((row) => String(row.status || "").toLowerCase().includes("rejected")).length;
-    const activeHomes = overview?.homes?.length ?? 0;
-    const activeDoors = overview?.doors?.length ?? 0;
-    const residents = overview?.homeowners?.length ?? 0;
+    const totalVisits = summary?.summary?.totalVisits ?? 0;
+    const approved = summary?.summary?.approved ?? 0;
+    const rejected = summary?.summary?.rejected ?? 0;
+    const activeHomes = summary?.summary?.activeHomes ?? 0;
+    const activeDoors = summary?.summary?.activeDoors ?? 0;
+    const residents = summary?.summary?.residents ?? 0;
     return { totalVisits, approved, rejected, activeHomes, activeDoors, residents };
-  }, [logs, overview]);
+  }, [summary]);
+  const restricted = !loading && !summary && Boolean(error);
 
   return (
     <AppShell title="Visitor Statistics">
       <div className="mx-auto w-full max-w-5xl space-y-5">
-        {error ? (
+        {error && !restricted ? (
           <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/30 dark:bg-rose-900/20 dark:text-rose-400">
             {error}
           </div>
         ) : null}
+        {restricted ? (
+          <section className="rounded-[2rem] border border-amber-200 bg-amber-50 p-6 dark:border-amber-900/30 dark:bg-amber-900/20">
+            <p className="text-xs font-bold uppercase tracking-wide text-amber-700 dark:text-amber-300">Upgrade Required</p>
+            <h2 className="mt-2 text-2xl font-black text-slate-900 dark:text-white">Analytics are not available on your current plan.</h2>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+              Upgrade to Estate Growth or above to unlock visitor analytics, trend reporting, and performance insights.
+            </p>
+            <Link to="/billing/paywall" className="mt-4 inline-flex rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white dark:bg-white dark:text-slate-900">
+              Upgrade Plan
+            </Link>
+          </section>
+        ) : null}
 
-        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {!restricted ? <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <StatCard label="Total visits" value={stats.totalVisits} />
           <StatCard label="Approved" value={stats.approved} />
           <StatCard label="Rejected" value={stats.rejected} />
           <StatCard label="Homes" value={stats.activeHomes} />
           <StatCard label="Doors" value={stats.activeDoors} />
           <StatCard label="Residents" value={stats.residents} />
-        </section>
+        </section> : null}
 
-        <CardSurface accent="from-slate-100/80 via-white/10 to-transparent" glow="bg-slate-300/50">
+        {!restricted ? <CardSurface accent="from-slate-100/80 via-white/10 to-transparent" glow="bg-slate-300/50">
           <h3 className="text-base font-bold text-slate-900 dark:text-white">Recent visitor activity</h3>
           {loading ? <p className="mt-3 text-sm text-slate-500">Loading...</p> : null}
-          {!loading && logs.length === 0 ? <p className="mt-3 text-sm text-slate-500">No visits logged yet.</p> : null}
+          {!loading && (summary?.recentActivity?.length ?? 0) === 0 ? <p className="mt-3 text-sm text-slate-500">No visits logged yet.</p> : null}
           <div className="mt-3 space-y-2">
-            {logs.slice(0, 12).map((row) => (
+            {(summary?.recentActivity || []).map((row) => (
               <CardSurface
                 as="div"
                 key={row.id}
@@ -85,7 +94,7 @@ export default function EstateStatsPage() {
               </CardSurface>
             ))}
           </div>
-        </CardSurface>
+        </CardSurface> : null}
       </div>
     </AppShell>
   );

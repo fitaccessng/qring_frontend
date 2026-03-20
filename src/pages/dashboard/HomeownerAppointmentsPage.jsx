@@ -7,9 +7,11 @@ import {
   getHomeownerDoors,
   shareHomeownerAppointment
 } from "../../services/homeownerService";
+import useSubscription from "../../hooks/useSubscription";
 import { getCurrentDeviceLocation, openLocationSettings } from "../../utils/locationService";
 
 export default function HomeownerAppointmentsPage() {
+  const { subscription, hasFeature } = useSubscription();
   const [appointments, setAppointments] = useState([]);
   const [doorOptions, setDoorOptions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -80,12 +82,16 @@ export default function HomeownerAppointmentsPage() {
         .slice(0, 8),
     [appointments]
   );
+  const schedulingLocked = Boolean(subscription && !hasFeature("visitor_scheduling"));
 
   async function handleCreate(event) {
     event.preventDefault();
     setCreating(true);
     setError("");
     try {
+      if (schedulingLocked) {
+        throw new Error("Visitor scheduling is not available on your current plan. Upgrade to continue.");
+      }
       const created = await createHomeownerAppointment({
         doorId: form.doorId,
         visitorName: form.visitorName,
@@ -170,6 +176,9 @@ export default function HomeownerAppointmentsPage() {
     setSharingId(appointmentId);
     setError("");
     try {
+      if (schedulingLocked) {
+        throw new Error("Appointment sharing requires a plan with visitor scheduling.");
+      }
       const data = await shareHomeownerAppointment(appointmentId);
       const shareUrl = String(data?.shareUrl || "").trim();
       if (!shareUrl) throw new Error("Share link unavailable.");
@@ -199,6 +208,11 @@ export default function HomeownerAppointmentsPage() {
         {error ? (
           <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/30 dark:bg-rose-900/20 dark:text-rose-400">
             {error}
+          </div>
+        ) : null}
+        {schedulingLocked ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-900/30 dark:bg-amber-900/20 dark:text-amber-300">
+            Visitor scheduling is locked on your {subscription?.planName || "current"} plan. Upgrade from Billing to create and share appointments.
           </div>
         ) : null}
 
@@ -241,7 +255,7 @@ export default function HomeownerAppointmentsPage() {
                 <button
                   type="button"
                   onClick={() => handleShare(appt.id)}
-                  disabled={sharingId === appt.id}
+                  disabled={sharingId === appt.id || schedulingLocked}
                   className="inline-flex items-center gap-1 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
                 >
                   <Share2 className="h-3.5 w-3.5" />
@@ -360,7 +374,7 @@ export default function HomeownerAppointmentsPage() {
             </label>
             <button
               type="submit"
-              disabled={creating}
+              disabled={creating || schedulingLocked}
               className="sm:col-span-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
             >
               {creating ? "Creating..." : "Create Appointment"}

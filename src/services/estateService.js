@@ -75,6 +75,11 @@ export async function getEstatePlanRestrictions() {
   return response?.data ?? null;
 }
 
+export async function getEstateStatsSummary() {
+  const response = await apiRequest("/estate/stats-summary");
+  return response?.data ?? null;
+}
+
 export async function updateEstateDoorAdminProfile(doorId, payload) {
   const response = await apiRequest(`/estate/doors/${doorId}/admin-profile`, {
     method: "PUT",
