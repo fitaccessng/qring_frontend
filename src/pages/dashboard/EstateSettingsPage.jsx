@@ -16,13 +16,17 @@ import {
   User,
   Users,
   Building2,
-  DoorOpen,
-  X
+  DoorOpen
 } from "lucide-react";
 import AppShell from "../../layouts/AppShell";
+import MobileBottomSheet from "../../components/mobile/MobileBottomSheet";
 import { env } from "../../config/env";
 import { changePassword } from "../../services/authService";
-import { getEstateOverview, getEstateSettings, updateEstateSettings } from "../../services/estateService";
+import {
+  getEstateOverview,
+  getEstateSettings,
+  updateEstateSettings
+} from "../../services/estateService";
 import { useAuth } from "../../state/AuthContext";
 import { useTheme } from "../../state/ThemeContext";
 import { showError, showSuccess } from "../../utils/flash";
@@ -57,6 +61,12 @@ export default function EstateSettingsPage() {
   const [selectedEstateId, setSelectedEstateId] = useState("");
   const [reminderFrequencyDays, setReminderFrequencyDays] = useState(1);
   const [reminderMode, setReminderMode] = useState("daily");
+  const [securityRules, setSecurityRules] = useState({
+    canApproveWithoutHomeowner: false,
+    mustNotifyHomeowner: true,
+    requirePhotoVerification: false,
+    requireCallBeforeApproval: false
+  });
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
   const [passwordForm, setPasswordForm] = useState({
@@ -124,6 +134,12 @@ export default function EstateSettingsPage() {
         const safeDays = Number.isFinite(days) && days > 0 ? days : 1;
         setReminderFrequencyDays(safeDays);
         setReminderMode(safeDays === 1 ? "daily" : safeDays === 7 ? "weekly" : "custom");
+        setSecurityRules({
+          canApproveWithoutHomeowner: Boolean(data?.canApproveWithoutHomeowner),
+          mustNotifyHomeowner: Boolean(data?.mustNotifyHomeowner ?? true),
+          requirePhotoVerification: Boolean(data?.requirePhotoVerification),
+          requireCallBeforeApproval: Boolean(data?.requireCallBeforeApproval)
+        });
       } catch (requestError) {
         if (active) setError(requestError?.message || "Failed to load reminder settings.");
       } finally {
@@ -223,11 +239,18 @@ export default function EstateSettingsPage() {
     }
     try {
       const data = await updateEstateSettings(selectedEstateId, {
-        reminderFrequencyDays: derivedDays
+        reminderFrequencyDays: derivedDays,
+        ...securityRules
       });
       const nextDays = Number(data?.reminderFrequencyDays ?? derivedDays);
       setReminderFrequencyDays(nextDays);
       setReminderMode(nextDays === 1 ? "daily" : nextDays === 7 ? "weekly" : "custom");
+      setSecurityRules({
+        canApproveWithoutHomeowner: Boolean(data?.canApproveWithoutHomeowner),
+        mustNotifyHomeowner: Boolean(data?.mustNotifyHomeowner ?? true),
+        requirePhotoVerification: Boolean(data?.requirePhotoVerification),
+        requireCallBeforeApproval: Boolean(data?.requireCallBeforeApproval)
+      });
       showSuccess("Payment reminder frequency updated.");
     } catch (requestError) {
       setError(requestError?.message || "Failed to update reminder settings.");
@@ -370,6 +393,7 @@ export default function EstateSettingsPage() {
             </button>
           </form>
         </section>
+
       </div>
 
       <ActionModal open={editProfileOpen} title="Edit Profile" onClose={() => setEditProfileOpen(false)}>
@@ -491,16 +515,8 @@ function ProfileField({ label, icon, value, onChange, readOnly = false, type = "
 function ActionModal({ open, title, onClose, children }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
-        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <h3 className="text-lg font-extrabold">{title}</h3>
-          <button type="button" onClick={onClose} className="rounded-full bg-slate-100 p-2 text-slate-500 dark:bg-slate-800">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+    <MobileBottomSheet open={open} title={title} onClose={onClose} width="640px" height="88dvh">
         {children}
-      </div>
-    </div>
+    </MobileBottomSheet>
   );
 }

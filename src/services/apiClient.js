@@ -21,7 +21,9 @@ const protectedPathPrefixes = [
   "/homeowner",
   "/estate",
   "/admin",
-  "/notifications"
+  "/notifications",
+  "/security",
+  "/calls"
 ];
 
 function requiresAuthenticatedUser(path) {

@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
+import { BellRing } from "lucide-react";
 import AppShell from "../../layouts/AppShell";
 import { createEstateAlert, deleteEstateAlert, getEstateOverview, listEstateAlerts, updateEstateAlert } from "../../services/estateService";
 import { showError, showSuccess } from "../../utils/flash";
 import { useSocketEvents } from "../../hooks/useSocketEvents";
 import { getDashboardSocket } from "../../services/socketClient";
+import MobileBottomSheet from "../../components/mobile/MobileBottomSheet";
+import EstateManagerPageShell, { EstateManagerSection, estateFieldClassName, estateTextareaClassName } from "../../components/mobile/EstateManagerPageShell";
 
 export default function EstateMeetingsPage() {
   const [overview, setOverview] = useState(null);
@@ -20,6 +23,7 @@ export default function EstateMeetingsPage() {
   const [editingAgenda, setEditingAgenda] = useState("");
   const [editingDateTime, setEditingDateTime] = useState("");
   const [pendingDelete, setPendingDelete] = useState(null);
+  const [composeOpen, setComposeOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -92,7 +96,7 @@ export default function EstateMeetingsPage() {
 
   async function handleSubmit(event) {
     event.preventDefault();
-    if (!estateId || !title.trim()) return;
+    if (!estateId || !title.trim()) return false;
     setBusy(true);
     setError("");
     try {
@@ -109,8 +113,10 @@ export default function EstateMeetingsPage() {
       setDateTime("");
       const rows = await listEstateAlerts(estateId, "meeting");
       setAlerts(rows);
+      return true;
     } catch (err) {
       setError(err?.message || "Failed to schedule meeting");
+      return false;
     } finally {
       setBusy(false);
     }
@@ -185,67 +191,29 @@ export default function EstateMeetingsPage() {
 
   return (
     <AppShell title="Estate Meetings">
-      <div className="mx-auto w-full max-w-4xl space-y-5">
+      <EstateManagerPageShell
+        eyebrow="Estate Meetings"
+        title="Meetings"
+        description="Schedule meetings, announce the agenda, and track attendance in a layout that stays comfortable on mobile."
+        icon={<BellRing size={22} />}
+        accent="from-violet-500 to-indigo-500"
+        stats={[
+          { label: "Meetings", value: alerts.length, helper: "Scheduled so far" },
+          { label: "Next Up", value: alerts[0]?.dueDate ? new Date(alerts[0].dueDate).toLocaleDateString() : "TBD", helper: "Latest scheduled date" }
+        ]}
+      >
 
-        <section className="rounded-[2rem] border border-slate-200 bg-white/90 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white">Schedule a meeting</h2>
-          <p className="mt-1 text-xs text-slate-500">Homeowners can respond: Attending, Not attending, Maybe.</p>
-          <form onSubmit={handleSubmit} className="mt-4 grid gap-3">
-            <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Estate</span>
-              <select
-                value={estateId}
-                onChange={(event) => setEstateId(event.target.value)}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
-              >
-                {estateOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Meeting title</span>
-              <input
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
-                placeholder="Monthly estate meeting"
-                required
-              />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Agenda</span>
-              <textarea
-                value={agenda}
-                onChange={(event) => setAgenda(event.target.value)}
-                rows={4}
-                className="w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
-                placeholder="Security updates, maintenance, dues."
-              />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Date & time</span>
-              <input
-                value={dateTime}
-                onChange={(event) => setDateTime(event.target.value)}
-                type="datetime-local"
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
-              />
-            </label>
-            <button
-              type="submit"
-              disabled={busy || !estateId}
-              className="rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition-all active:scale-95 disabled:opacity-50 dark:bg-white dark:text-slate-900"
-            >
-              {busy ? "Scheduling..." : "Schedule Meeting"}
-            </button>
-          </form>
-        </section>
+        <EstateManagerSection title="Plan a meeting" subtitle="Open a focused sheet when you are ready to schedule the next estate meeting.">
+          <button
+            type="button"
+            onClick={() => setComposeOpen(true)}
+            className="w-full rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition-all active:scale-95 dark:bg-white dark:text-slate-900"
+          >
+            New Meeting
+          </button>
+        </EstateManagerSection>
 
-        <section className="rounded-[2rem] border border-slate-200 bg-white/90 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
-          <h3 className="text-base font-bold text-slate-900 dark:text-white">Upcoming & past meetings</h3>
+        <EstateManagerSection title="Upcoming and past meetings" subtitle="Review schedules, attendance sentiment, and meeting history.">
           {loading ? <p className="mt-3 text-sm text-slate-500">Loading...</p> : null}
           {!loading && alerts.length === 0 ? <p className="mt-3 text-sm text-slate-500">No meetings yet.</p> : null}
           <div className="mt-3 space-y-3">
@@ -293,12 +261,40 @@ export default function EstateMeetingsPage() {
               );
             })}
           </div>
-        </section>
-      </div>
+        </EstateManagerSection>
+      </EstateManagerPageShell>
+
+      <MobileBottomSheet open={composeOpen} title="Schedule Meeting" onClose={() => setComposeOpen(false)} width="720px" height="88dvh">
+        <form onSubmit={async (event) => { const ok = await handleSubmit(event); if (ok) setComposeOpen(false); }} className="grid gap-3">
+          <label className="block">
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Estate</span>
+            <select value={estateId} onChange={(event) => setEstateId(event.target.value)} className={estateFieldClassName}>
+              {estateOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Meeting title</span>
+            <input value={title} onChange={(event) => setTitle(event.target.value)} className={estateFieldClassName} placeholder="Monthly estate meeting" required />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Agenda</span>
+            <textarea value={agenda} onChange={(event) => setAgenda(event.target.value)} rows={4} className={estateTextareaClassName} placeholder="Security updates, maintenance, dues." />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Date & time</span>
+            <input value={dateTime} onChange={(event) => setDateTime(event.target.value)} type="datetime-local" className={estateFieldClassName} />
+          </label>
+          <button type="submit" disabled={busy || !estateId} className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition-all active:scale-95 disabled:opacity-50 dark:bg-white dark:text-slate-900">
+            {busy ? "Scheduling..." : "Schedule Meeting"}
+          </button>
+        </form>
+      </MobileBottomSheet>
 
       {editingId ? (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/50 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+        <MobileBottomSheet open={!!editingId} title="Edit Meeting" onClose={closeEdit} width="720px" height="88dvh">
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Edit Meeting</p>
@@ -349,12 +345,12 @@ export default function EstateMeetingsPage() {
               </button>
             </form>
           </div>
-        </div>
+        </MobileBottomSheet>
       ) : null}
 
       {pendingDelete ? (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/50 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+        <MobileBottomSheet open={!!pendingDelete} title="Delete Meeting" onClose={() => setPendingDelete(null)} width="560px" height="46dvh">
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Confirm Delete</p>
@@ -389,7 +385,7 @@ export default function EstateMeetingsPage() {
               </button>
             </div>
           </div>
-        </div>
+        </MobileBottomSheet>
       ) : null}
     </AppShell>
   );

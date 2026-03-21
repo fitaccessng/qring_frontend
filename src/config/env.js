@@ -1,6 +1,7 @@
 const trimTrailingSlash = (value) => value?.replace(/\/+$/, "") ?? "";
 const hasHttpProtocol = (value) => /^https?:\/\//i.test(value ?? "");
 const looksLikeDomain = (value) => /^[a-z0-9.-]+\.[a-z]{2,}(\/.*)?$/i.test(value ?? "");
+const normalizeLocalBackendHost = (value) => (value ?? "").replace(/:\/\/0\.0\.0\.0(?=[:/]|$)/i, "://localhost");
 
 const productionBackendOrigin = "https://qring-backend-1.onrender.com";
 const isDev = Boolean(import.meta.env.DEV);
@@ -20,7 +21,7 @@ const defaultPublicAppUrl =
     : "https://www.useqring.online";
 
 function resolveApiBaseUrl(rawValue) {
-  const value = (rawValue ?? "").trim();
+  const value = normalizeLocalBackendHost((rawValue ?? "").trim());
   if (!value) return defaultApiBase;
   if (hasHttpProtocol(value)) return trimTrailingSlash(value);
   if (looksLikeDomain(value)) return trimTrailingSlash(`https://${value}`);
@@ -31,7 +32,7 @@ function resolveApiBaseUrl(rawValue) {
 }
 
 function resolveSocketUrl(rawValue) {
-  const value = (rawValue ?? "").trim();
+  const value = normalizeLocalBackendHost((rawValue ?? "").trim());
   if (!value) return defaultSocketUrl;
   if (hasHttpProtocol(value)) return trimTrailingSlash(value);
   if (looksLikeDomain(value)) return trimTrailingSlash(`https://${value}`);
@@ -51,7 +52,7 @@ function originFromUrl(value) {
 }
 
 function resolvePublicAppUrl(rawValue) {
-  const value = (rawValue ?? "").trim();
+  const value = normalizeLocalBackendHost((rawValue ?? "").trim());
   if (!value) return trimTrailingSlash(defaultPublicAppUrl);
   if (hasHttpProtocol(value)) return trimTrailingSlash(value);
   if (looksLikeDomain(value)) return trimTrailingSlash(`https://${value}`);
@@ -62,9 +63,18 @@ function resolvePublicAppUrl(rawValue) {
 }
 
 function resolveLivekitUrl(rawValue) {
-  const value = (rawValue ?? "").trim();
+  const value = normalizeLocalBackendHost((rawValue ?? "").trim());
   if (!value) return defaultLivekitUrl;
-  if (/^wss?:\/\//i.test(value) || /^https?:\/\//i.test(value)) return trimTrailingSlash(value);
+  if (/^wss?:\/\//i.test(value)) return trimTrailingSlash(value);
+  if (/^https?:\/\//i.test(value)) {
+    try {
+      const parsed = new URL(value);
+      parsed.protocol = parsed.protocol === "http:" ? "ws:" : "wss:";
+      return trimTrailingSlash(parsed.toString());
+    } catch {
+      return defaultLivekitUrl;
+    }
+  }
   if (looksLikeDomain(value)) return trimTrailingSlash(`wss://${value}`);
   return defaultLivekitUrl;
 }

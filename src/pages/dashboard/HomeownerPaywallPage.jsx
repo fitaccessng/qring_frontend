@@ -1,6 +1,7 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AppShell from "../../layouts/AppShell";
+import MobileBottomSheet from "../../components/mobile/MobileBottomSheet";
 import { useAuth } from "../../state/AuthContext";
 import {
   getBillingPlans,
@@ -348,10 +349,9 @@ function resolvePlanAmount(plan, cycle) {
 function ConfirmLeaveModal({ open, title, message, onClose, onConfirm }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
-        <h3 className="text-lg font-extrabold">{title}</h3>
-        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{message}</p>
+    <MobileBottomSheet open={open} title={title} onClose={onClose} width="560px" height="46dvh">
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
+        <p className="text-sm text-slate-600 dark:text-slate-300">{message}</p>
         <div className="mt-4 grid grid-cols-2 gap-2">
           <button
             type="button"
@@ -369,6 +369,6 @@ function ConfirmLeaveModal({ open, title, message, onClose, onConfirm }) {
           </button>
         </div>
       </div>
-    </div>
+    </MobileBottomSheet>
   );
 }

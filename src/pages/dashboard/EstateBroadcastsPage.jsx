@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
+import { Megaphone } from "lucide-react";
 import AppShell from "../../layouts/AppShell";
 import { createEstateAlert, deleteEstateAlert, getEstateOverview, listEstateAlerts, updateEstateAlert } from "../../services/estateService";
 import { showError, showSuccess } from "../../utils/flash";
 import { useSocketEvents } from "../../hooks/useSocketEvents";
 import { getDashboardSocket } from "../../services/socketClient";
 import CardSurface from "../../components/CardSurface";
+import MobileBottomSheet from "../../components/mobile/MobileBottomSheet";
+import EstateManagerPageShell, { EstateManagerSection, estateFieldClassName, estateTextareaClassName } from "../../components/mobile/EstateManagerPageShell";
 
 export default function EstateBroadcastsPage() {
   const [overview, setOverview] = useState(null);
@@ -23,6 +26,7 @@ export default function EstateBroadcastsPage() {
   const [editingSendToAll, setEditingSendToAll] = useState(true);
   const [editingTargets, setEditingTargets] = useState([]);
   const [pendingDelete, setPendingDelete] = useState(null);
+  const [composeOpen, setComposeOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -124,7 +128,7 @@ export default function EstateBroadcastsPage() {
 
   async function handleSubmit(event) {
     event.preventDefault();
-    if (!estateId || !title.trim()) return;
+    if (!estateId || !title.trim()) return false;
     setBusy(true);
     setError("");
     try {
@@ -149,8 +153,10 @@ export default function EstateBroadcastsPage() {
           // Ignore refresh failure since broadcast already sent.
         }
       }
+      return true;
     } catch (err) {
       setError(err?.message || "Failed to send broadcast");
+      return false;
     } finally {
       setBusy(false);
     }
@@ -241,111 +247,28 @@ export default function EstateBroadcastsPage() {
 
   return (
     <AppShell title="Broadcast Messaging">
-      <div className="mx-auto w-full max-w-4xl space-y-5">
+      <EstateManagerPageShell
+        eyebrow="Estate Broadcasts"
+        title="Broadcasts"
+        description="Send estate-wide updates with a clean mobile workflow for quick alerts and targeted notices."
+        icon={<Megaphone size={22} />}
+        accent="from-amber-500 to-orange-500"
+        stats={[
+          { label: "Messages", value: alerts.length, helper: "Recent broadcasts" },
+          { label: "Audience", value: sendToAll ? "All" : selectedHomeowners.length, helper: sendToAll ? "All homeowners" : "Selected homes" }
+        ]}
+      >
+        <EstateManagerSection title="Compose" subtitle="Keep the page focused, then open the broadcast form only when you are ready.">
+          <button
+            type="button"
+            onClick={() => setComposeOpen(true)}
+            className="w-full rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition-all active:scale-95 dark:bg-white dark:text-slate-900"
+          >
+            New Broadcast
+          </button>
+        </EstateManagerSection>
 
-        <CardSurface accent="from-amber-100/80 via-white/10 to-transparent" glow="bg-amber-300/50">
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white">Send a broadcast</h2>
-          <p className="mt-1 text-xs text-slate-500">Message all homeowners in the estate.</p>
-          <form onSubmit={handleSubmit} className="mt-4 grid gap-3">
-            <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Estate</span>
-              <select
-                value={estateId}
-                onChange={(event) => setEstateId(event.target.value)}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
-              >
-                {estateOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Title</span>
-              <input
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
-                placeholder="Water maintenance tomorrow 10am-1pm."
-                required
-              />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Message</span>
-              <textarea
-                value={message}
-                onChange={(event) => setMessage(event.target.value)}
-                rows={4}
-                className="w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
-                placeholder="Please store water."
-              />
-            </label>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-300">
-              <p className="font-semibold">Audience</p>
-              <div className="mt-2 flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setSendToAll(true)}
-                  className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${
-                    sendToAll
-                      ? "border-indigo-500 bg-indigo-600 text-white"
-                      : "border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-200"
-                  }`}
-                >
-                  All homeowners
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSendToAll(false)}
-                  className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${
-                    !sendToAll
-                      ? "border-indigo-500 bg-indigo-600 text-white"
-                      : "border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-200"
-                  }`}
-                >
-                  Specific homeowners
-                </button>
-              </div>
-              {!sendToAll ? (
-                <div className="mt-3 grid gap-2">
-                  {homeownerOptions.length === 0 ? (
-                    <p className="text-[11px] text-slate-500">No homeowners available.</p>
-                  ) : (
-                    homeownerOptions.map((owner) => (
-                      <label key={owner.id} className="flex items-center gap-2 text-[11px]">
-                        <input
-                          type="checkbox"
-                          checked={selectedHomeowners.includes(owner.id)}
-                          onChange={(event) => {
-                            const next = new Set(selectedHomeowners);
-                            if (event.target.checked) {
-                              next.add(owner.id);
-                            } else {
-                              next.delete(owner.id);
-                            }
-                            setSelectedHomeowners(Array.from(next));
-                          }}
-                        />
-                        <span>{owner.label}</span>
-                      </label>
-                    ))
-                  )}
-                </div>
-              ) : null}
-            </div>
-            <button
-              type="submit"
-              disabled={busy || !estateId || (!sendToAll && selectedHomeowners.length === 0)}
-              className="rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition-all active:scale-95 disabled:opacity-50 dark:bg-white dark:text-slate-900"
-            >
-              {busy ? "Sending..." : "Send Broadcast"}
-            </button>
-          </form>
-        </CardSurface>
-
-        <CardSurface accent="from-slate-100/80 via-white/10 to-transparent" glow="bg-slate-300/50">
-          <h3 className="text-base font-bold text-slate-900 dark:text-white">Recent broadcasts</h3>
+        <EstateManagerSection title="Recent broadcasts" subtitle="Review what has gone out and fine-tune follow-up messages.">
           {loading ? <p className="mt-3 text-sm text-slate-500">Loading...</p> : null}
           {!loading && alerts.length === 0 ? <p className="mt-3 text-sm text-slate-500">No broadcasts yet.</p> : null}
           <div className="mt-3 space-y-3">
@@ -404,12 +327,62 @@ export default function EstateBroadcastsPage() {
               </CardSurface>
             ))}
           </div>
-        </CardSurface>
-      </div>
+        </EstateManagerSection>
+      </EstateManagerPageShell>
+
+      <MobileBottomSheet open={composeOpen} title="Send Broadcast" onClose={() => setComposeOpen(false)} width="720px" height="90dvh">
+        <form onSubmit={async (event) => { const ok = await handleSubmit(event); if (ok) setComposeOpen(false); }} className="grid gap-3">
+          <label className="block">
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Estate</span>
+            <select value={estateId} onChange={(event) => setEstateId(event.target.value)} className={estateFieldClassName}>
+              {estateOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Title</span>
+            <input value={title} onChange={(event) => setTitle(event.target.value)} className={estateFieldClassName} placeholder="Water maintenance tomorrow 10am-1pm." required />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Message</span>
+            <textarea value={message} onChange={(event) => setMessage(event.target.value)} rows={4} className={estateTextareaClassName} placeholder="Please store water." />
+          </label>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-300">
+            <p className="font-semibold">Audience</p>
+            <div className="mt-2 flex items-center gap-2">
+              <button type="button" onClick={() => setSendToAll(true)} className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${sendToAll ? "border-indigo-500 bg-indigo-600 text-white" : "border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-200"}`}>All homeowners</button>
+              <button type="button" onClick={() => setSendToAll(false)} className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${!sendToAll ? "border-indigo-500 bg-indigo-600 text-white" : "border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-200"}`}>Specific homeowners</button>
+            </div>
+            {!sendToAll ? (
+              <div className="mt-3 grid gap-2">
+                {homeownerOptions.length === 0 ? <p className="text-[11px] text-slate-500">No homeowners available.</p> : homeownerOptions.map((owner) => (
+                  <label key={owner.id} className="flex items-center gap-2 text-[11px]">
+                    <input
+                      type="checkbox"
+                      checked={selectedHomeowners.includes(owner.id)}
+                      onChange={(event) => {
+                        const next = new Set(selectedHomeowners);
+                        if (event.target.checked) next.add(owner.id);
+                        else next.delete(owner.id);
+                        setSelectedHomeowners(Array.from(next));
+                      }}
+                    />
+                    <span>{owner.label}</span>
+                  </label>
+                ))}
+              </div>
+            ) : null}
+          </div>
+          <button type="submit" disabled={busy || !estateId || (!sendToAll && selectedHomeowners.length === 0)} className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition-all active:scale-95 disabled:opacity-50 dark:bg-white dark:text-slate-900">
+            {busy ? "Sending..." : "Send Broadcast"}
+          </button>
+        </form>
+      </MobileBottomSheet>
 
       {editingId ? (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/50 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+        <MobileBottomSheet open={!!editingId} title="Edit Broadcast" onClose={closeEdit} width="720px" height="90dvh">
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Edit Broadcast</p>
@@ -504,12 +477,12 @@ export default function EstateBroadcastsPage() {
               </button>
             </form>
           </div>
-        </div>
+        </MobileBottomSheet>
       ) : null}
 
       {pendingDelete ? (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/50 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+        <MobileBottomSheet open={!!pendingDelete} title="Delete Broadcast" onClose={() => setPendingDelete(null)} width="560px" height="46dvh">
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Confirm Delete</p>
@@ -544,7 +517,7 @@ export default function EstateBroadcastsPage() {
               </button>
             </div>
           </div>
-        </div>
+        </MobileBottomSheet>
       ) : null}
     </AppShell>
   );

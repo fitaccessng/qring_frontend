@@ -171,6 +171,60 @@ export async function updateEstateSettings(estateId, payload) {
   return response?.data ?? null;
 }
 
+export async function listEstateSecurityUsers(estateId) {
+  const response = await apiRequest(`/estate/${encodeURIComponent(estateId)}/security-users`, { noCache: true });
+  return Array.isArray(response?.data) ? response.data : [];
+}
+
+export async function createEstateSecurityUser(payload) {
+  const response = await apiRequest("/estate/security-users", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+  return response?.data ?? null;
+}
+
+export async function updateEstateSecurityUser(estateId, securityUserId, payload) {
+  const response = await apiRequest(
+    `/estate/${encodeURIComponent(estateId)}/security-users/${encodeURIComponent(securityUserId)}`,
+    {
+      method: "PUT",
+      body: JSON.stringify(payload)
+    }
+  );
+  return response?.data ?? null;
+}
+
+export async function suspendEstateSecurityUser(estateId, securityUserId) {
+  const response = await apiRequest(
+    `/estate/${encodeURIComponent(estateId)}/security-users/${encodeURIComponent(securityUserId)}/suspend`,
+    {
+      method: "POST"
+    }
+  );
+  return response?.data ?? null;
+}
+
+export async function unsuspendEstateSecurityUser(estateId, securityUserId) {
+  const response = await apiRequest(
+    `/estate/${encodeURIComponent(estateId)}/security-users/${encodeURIComponent(securityUserId)}/unsuspend`,
+    {
+      method: "POST"
+    }
+  );
+  return response?.data ?? null;
+}
+
+export async function deleteEstateSecurityUser(estateId, securityUserId) {
+  const response = await apiRequest(
+    `/estate/${encodeURIComponent(estateId)}/security-users/${encodeURIComponent(securityUserId)}`,
+    {
+      method: "DELETE"
+    }
+  );
+  return response?.data ?? null;
+}
+
 export async function listMyEstateAlerts() {
   const response = await apiRequest("/estate/alerts/me", { noCache: true });
   return Array.isArray(response?.data) ? response.data : [];

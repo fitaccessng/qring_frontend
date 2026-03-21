@@ -17,11 +17,11 @@ import {
   Shield,
   Smartphone,
   User,
-  Volume2,
-  X
+  Volume2
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import AppShell from "../../layouts/AppShell";
+import MobileBottomSheet from "../../components/mobile/MobileBottomSheet";
 import { env } from "../../config/env";
 import { getHomeownerSettings, updateHomeownerSettings } from "../../services/homeownerSettingsService";
 import { changePassword } from "../../services/authService";
@@ -323,6 +323,12 @@ export default function HomeownerSettingsPage() {
                   onChange={() => toggleTheme()}
                 />
                 <MenuRow icon={<Shield className="h-4 w-4" />} label="Privacy & Security" onClick={() => setChangePasswordOpen(true)} />
+                {managedByEstate ? (
+                  <>
+                    <MenuRow icon={<Shield className="h-4 w-4" />} label="Automation Rules" onClick={() => navigate("/dashboard/homeowner/automation")} />
+                    <MenuRow icon={<Smartphone className="h-4 w-4" />} label="Digital Access" onClick={() => navigate("/dashboard/homeowner/access-passes")} />
+                  </>
+                ) : null}
                 <MenuRow
                   icon={<CreditCard className="h-4 w-4" />}
                   label="Billing & Subscription"
@@ -476,16 +482,8 @@ function ProfileField({ label, icon, value, onChange, readOnly = false, type = "
 function ActionModal({ open, title, onClose, children }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
-        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <h3 className="text-lg font-extrabold">{title}</h3>
-          <button type="button" onClick={onClose} className="rounded-full bg-slate-100 p-2 text-slate-500 dark:bg-slate-800">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+    <MobileBottomSheet open={open} title={title} onClose={onClose} width="640px" height="88dvh">
         {children}
-      </div>
-    </div>
+    </MobileBottomSheet>
   );
 }

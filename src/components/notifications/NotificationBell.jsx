@@ -5,7 +5,7 @@ export default function NotificationBell({ unreadCount, onClick, isOpen = false 
     <button
       type="button"
       onClick={onClick}
-      className={`group relative grid h-11 w-11 place-items-center overflow-hidden rounded-full border backdrop-blur-sm transition-all duration-200 ${
+      className={`group relative grid h-12 w-12 place-items-center rounded-full border backdrop-blur-sm transition-all duration-200 ${
         isOpen
           ? "border-sky-700/80 bg-slate-900 text-white shadow-[0_16px_36px_rgba(15,23,42,0.24)] dark:border-sky-400/70 dark:bg-sky-300 dark:text-slate-950"
           : "border-slate-200/80 bg-white/90 text-slate-600 shadow-[0_10px_24px_rgba(15,23,42,0.06)] hover:-translate-y-0.5 hover:border-sky-300/70 hover:text-sky-800 hover:shadow-[0_16px_34px_rgba(15,23,42,0.12)] dark:border-slate-700/80 dark:bg-slate-900/90 dark:text-slate-200 dark:hover:border-sky-500/70 dark:hover:text-white"
@@ -34,7 +34,7 @@ export default function NotificationBell({ unreadCount, onClick, isOpen = false 
         } ${isOpen ? "scale-105" : "group-hover:scale-105"}`}
       />
       {unreadCount > 0 ? (
-        <span className="absolute -right-1 -top-1 inline-flex min-w-[1.2rem] items-center justify-center rounded-full border border-white/80 bg-gradient-to-br from-rose-500 to-rose-600 px-1 py-0.5 text-[10px] font-black leading-none text-white shadow-[0_10px_18px_rgba(225,29,72,0.32)] ring-2 ring-white/90 dark:border-slate-950 dark:from-rose-400 dark:to-rose-500 dark:ring-slate-950">
+        <span className="absolute -right-1.5 -top-1.5 z-10 inline-flex min-w-[1.35rem] items-center justify-center rounded-full border border-white/90 bg-gradient-to-br from-rose-500 to-rose-600 px-1 py-0.5 text-[10px] font-black leading-none text-white shadow-[0_10px_18px_rgba(225,29,72,0.32)] ring-2 ring-white/90 dark:border-slate-950 dark:from-rose-400 dark:to-rose-500 dark:ring-slate-950">
           {unreadCount > 99 ? "99+" : unreadCount}
         </span>
       ) : null}

@@ -18,7 +18,7 @@ export default function VisitorSessionGateRoute({ children }) {
   const { sessionId } = useParams();
   const user = useMemo(() => getStoredUser(), []);
   const role = String(user?.role || "").toLowerCase();
-  const isStaff = role === "homeowner" || role === "estate" || role === "admin";
+  const isStaff = role === "homeowner" || role === "estate" || role === "admin" || role === "security";
 
   const [loading, setLoading] = useState(!isStaff);
   const [error, setError] = useState("");
@@ -88,4 +88,3 @@ export default function VisitorSessionGateRoute({ children }) {
     </div>
   );
 }
-

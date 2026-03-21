@@ -225,6 +225,31 @@ export default function HomeownerDashboardPage() {
       glow: "bg-slate-300/50"
     });
 
+    if (managedByEstate) {
+      base.push(
+        {
+          label: "Automation",
+          to: "/dashboard/homeowner/automation",
+          icon: <Settings2 size={18} />,
+          eyebrow: "Rules",
+          description: "Tune trusted visitor approval, delivery options, and fallback alerts.",
+          badge: "Smart",
+          accent: "from-emerald-100/80 via-white/10 to-transparent",
+          glow: "bg-emerald-300/50"
+        },
+        {
+          label: "Digital Access",
+          to: "/dashboard/homeowner/access-passes",
+          icon: <DoorOpen size={18} />,
+          eyebrow: "QR / PIN",
+          description: "Issue temporary QR and PIN passes for visitors and deliveries.",
+          badge: "Fast",
+          accent: "from-sky-100/80 via-white/10 to-transparent",
+          glow: "bg-sky-300/50"
+        }
+      );
+    }
+
     return base;
   }, [managedByEstate]);
 

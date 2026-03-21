@@ -80,6 +80,15 @@ export default function EstateDoorsPage() {
   }, [form.homeownerId, homeownerOptions]);
 
   const doors = useMemo(() => overview?.doors ?? [], [overview]);
+  const selectedEstate = useMemo(
+    () => (overview?.estates ?? []).find((item) => item.id === form.estateId) ?? null,
+    [overview, form.estateId]
+  );
+  const selectedEstateHomeIds = useMemo(() => new Set(homesByEstate.map((home) => home.id)), [homesByEstate]);
+  const selectedEstateDoors = useMemo(
+    () => doors.filter((door) => !form.estateId || selectedEstateHomeIds.has(door.homeId)),
+    [doors, form.estateId, selectedEstateHomeIds]
+  );
 
   async function onSubmit(event) {
     event.preventDefault();
@@ -374,16 +383,22 @@ export default function EstateDoorsPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="font-heading text-base font-bold">Estate Shared Entry QR</h3>
-            <p className="text-xs text-slate-500">One QR for the estate. Visitors scan, pick door, then request access.</p>
+            <p className="text-xs text-slate-500">One QR for the estate. Visitors scan, pick a configured door, then request access.</p>
           </div>
           <button
             type="button"
             onClick={generateSharedQr}
+            disabled={!selectedEstateDoors.length}
             className="rounded-2xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition-all active:scale-95 dark:bg-white dark:text-slate-900"
           >
             Generate Shared QR
           </button>
         </div>
+        {!selectedEstateDoors.length ? (
+          <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/30 dark:bg-amber-900/20 dark:text-amber-200">
+            {selectedEstate?.name || "This estate"} does not have any doors yet. Estate QR works after you create at least one homeowner-linked home and one door.
+          </div>
+        ) : null}
         {sharedQr ? (
           <div className="mt-3 inline-flex flex-col items-center rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800">
             <img src={qrImageUrl(sharedQr.fullScanUrl, 180)} alt={sharedQr.qrId} className="h-44 w-44 rounded bg-white p-2" />
@@ -560,8 +575,6 @@ function Select({ label, value, onChange, options }) {
     </label>
   );
 }
-
-
 
 
 

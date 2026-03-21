@@ -14,7 +14,7 @@ export default function EstateInvitesPage() {
   const [createForm, setCreateForm] = useState({
     estateId: "",
     fullName: "",
-    username: "",
+    email: "",
     password: ""
   });
   const [loading, setLoading] = useState(true);
@@ -69,13 +69,15 @@ export default function EstateInvitesPage() {
     setError("");
     try {
       const created = await createEstateHomeowner(createForm);
-      showNotice(`Homeowner created: ${created?.fullName || createForm.fullName}. Send invite from the list below.`);
+      showNotice(
+        `Homeowner created: ${created?.fullName || createForm.fullName}. Login email: ${created?.email || "generated automatically"}.`
+      );
       if (created?.id) {
         setHomeowners((prev) => {
           const nextRow = {
             id: created.id,
             fullName: created.fullName || createForm.fullName,
-            email: created.email || (createForm.username.includes("@") ? createForm.username : `${createForm.username}@estate.useqring.online`),
+            email: created.email || "Generated automatically",
             active: true
           };
           return [nextRow, ...prev.filter((row) => row.id !== created.id)];
@@ -84,7 +86,7 @@ export default function EstateInvitesPage() {
       setCreateForm((prev) => ({
         ...prev,
         fullName: "",
-        username: "",
+        email: "",
         password: ""
       }));
     } catch (requestError) {
@@ -152,10 +154,11 @@ export default function EstateInvitesPage() {
                 />
               </label>
               <label className="block">
-                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Username</span>
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Email</span>
                 <input
-                  value={createForm.username}
-                  onChange={(event) => setCreateForm((prev) => ({ ...prev, username: event.target.value }))}
+                  type="email"
+                  value={createForm.email}
+                  onChange={(event) => setCreateForm((prev) => ({ ...prev, email: event.target.value }))}
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
                   required
                 />

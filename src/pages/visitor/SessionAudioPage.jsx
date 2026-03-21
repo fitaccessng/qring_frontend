@@ -28,6 +28,7 @@ export default function SessionAudioPage() {
     localMicEnabled,
     incomingCall,
     canStartCall,
+    callLogs,
     startAudioCall,
     toggleMute,
     toggleSpeaker,
@@ -154,11 +155,23 @@ export default function SessionAudioPage() {
       </section>
 
       <VisitorIncomingCallModal
-        open={incomingCall.pending && !canStartCall}
+        open={incomingCall.pending}
         hasVideo={incomingCall.hasVideo}
         onAccept={acceptIncomingCall}
         onReject={rejectIncomingCall}
       />
+      {callLogs.length ? (
+        <div className="fixed inset-x-3 bottom-3 z-40 mx-auto max-w-md rounded-2xl border border-white/10 bg-black/70 p-3 text-[11px] text-white/75 backdrop-blur">
+          <p className="font-semibold text-white">Call Debug</p>
+          <div className="mt-2 max-h-28 space-y-1 overflow-y-auto">
+            {callLogs.slice(-4).map((entry) => (
+              <p key={entry.id}>
+                {entry.level.toUpperCase()} | {entry.message}
+              </p>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -185,6 +198,7 @@ function getExitRoute(sessionId) {
     if (!user?.role || user.role === "visitor") return `/session/${sessionId}/message`;
     if (user.role === "admin") return "/dashboard/admin";
     if (user.role === "estate") return "/dashboard/estate";
+    if (user.role === "security") return `/dashboard/security/messages?sessionId=${encodeURIComponent(sessionId)}`;
     return "/dashboard/homeowner/visits";
   } catch {
     return `/session/${sessionId}/message`;

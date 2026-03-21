@@ -14,8 +14,16 @@ export default function EstateAssignPage() {
   async function load() {
     const data = await getEstateOverview();
     setOverview(data);
-    if (!form.doorId && data?.doors?.length) setForm((prev) => ({ ...prev, doorId: data.doors[0].id }));
-    if (!form.homeownerId && data?.homeowners?.length) setForm((prev) => ({ ...prev, homeownerId: data.homeowners[0].id }));
+    setForm((prev) => ({
+      doorId:
+        (data?.doors ?? []).some((door) => String(door.id) === String(prev.doorId))
+          ? prev.doorId
+          : data?.doors?.[0]?.id || "",
+      homeownerId:
+        (data?.homeowners ?? []).some((homeowner) => String(homeowner.id) === String(prev.homeownerId))
+          ? prev.homeownerId
+          : data?.homeowners?.[0]?.id || ""
+    }));
   }
 
   useEffect(() => {
@@ -32,6 +40,23 @@ export default function EstateAssignPage() {
     setError("");
     try {
       await assignDoorToHomeowner(form.doorId, form.homeownerId);
+      const selectedHomeowner = (overview?.homeowners ?? []).find((row) => String(row.id) === String(form.homeownerId));
+      setOverview((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          doors: (prev.doors ?? []).map((door) =>
+            String(door.id) === String(form.doorId)
+              ? {
+                  ...door,
+                  homeownerId: selectedHomeowner?.id || door.homeownerId,
+                  homeownerName: selectedHomeowner?.fullName || door.homeownerName,
+                  homeownerEmail: selectedHomeowner?.email || door.homeownerEmail
+                }
+              : door
+          )
+        };
+      });
       showSuccess("Door assigned to homeowner.");
       await load();
     } catch (requestError) {
@@ -43,6 +68,8 @@ export default function EstateAssignPage() {
 
   const hasHomeowners = (overview?.homeowners?.length ?? 0) > 0;
   const hasDoors = (overview?.doors?.length ?? 0) > 0;
+  const selectedDoor = (overview?.doors ?? []).find((door) => String(door.id) === String(form.doorId));
+  const selectedHomeowner = (overview?.homeowners ?? []).find((homeowner) => String(homeowner.id) === String(form.homeownerId));
 
   return (
     <AppShell title="Assign Doors">
@@ -97,6 +124,14 @@ export default function EstateAssignPage() {
               {busy ? "Assigning..." : "Assign Door"}
             </button>
           </form>
+          {selectedDoor || selectedHomeowner ? (
+            <div className="mt-4 rounded-[1.4rem] border border-indigo-100 bg-indigo-50/80 px-4 py-3 text-sm text-indigo-900 dark:border-indigo-900/40 dark:bg-indigo-950/30 dark:text-indigo-100">
+              <p className="font-semibold">Assignment preview</p>
+              <p className="mt-1 text-xs text-indigo-700 dark:text-indigo-200">
+                {selectedDoor?.name || "Door"} will be linked to {selectedHomeowner?.fullName || "selected homeowner"}.
+              </p>
+            </div>
+          ) : null}
         </CardSurface>
 
         <CardSurface accent="from-slate-100/80 via-white/10 to-transparent" glow="bg-slate-300/50" className="sm:p-6">
@@ -149,4 +184,3 @@ function Select({ label, value, onChange, options }) {
     </label>
   );
 }
-

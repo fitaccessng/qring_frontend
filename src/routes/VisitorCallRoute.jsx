@@ -13,7 +13,7 @@ export default function VisitorCallRoute({ children }) {
   const { sessionId } = useParams();
   const user = getStoredUser();
 
-  if (user?.role === "homeowner") {
+  if (["homeowner", "security", "estate", "admin"].includes(String(user?.role || "").toLowerCase())) {
     return children;
   }
 

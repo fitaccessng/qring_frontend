@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
+import { Vote } from "lucide-react";
 import AppShell from "../../layouts/AppShell";
 import { createEstateAlert, deleteEstateAlert, getEstateOverview, listEstateAlerts, updateEstateAlert } from "../../services/estateService";
 import { showError, showSuccess } from "../../utils/flash";
 import { useSocketEvents } from "../../hooks/useSocketEvents";
 import { getDashboardSocket } from "../../services/socketClient";
 import CardSurface from "../../components/CardSurface";
+import MobileBottomSheet from "../../components/mobile/MobileBottomSheet";
+import EstateManagerPageShell, { EstateManagerSection, estateFieldClassName } from "../../components/mobile/EstateManagerPageShell";
 
 export default function EstatePollsPage() {
   const [overview, setOverview] = useState(null);
@@ -19,6 +22,7 @@ export default function EstatePollsPage() {
   const [editingQuestion, setEditingQuestion] = useState("");
   const [editingOptions, setEditingOptions] = useState(["", ""]);
   const [pendingDelete, setPendingDelete] = useState(null);
+  const [composeOpen, setComposeOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -103,11 +107,11 @@ export default function EstatePollsPage() {
 
   async function handleSubmit(event) {
     event.preventDefault();
-    if (!estateId || !question.trim()) return;
+    if (!estateId || !question.trim()) return false;
     const cleanOptions = options.map((opt) => opt.trim()).filter(Boolean);
     if (cleanOptions.length < 2) {
       setError("Provide at least two options.");
-      return;
+      return false;
     }
     setBusy(true);
     setError("");
@@ -124,8 +128,10 @@ export default function EstatePollsPage() {
       setOptions(["", ""]);
       const rows = await listEstateAlerts(estateId, "poll");
       setPolls(rows);
+      return true;
     } catch (err) {
       setError(err?.message || "Failed to create poll");
+      return false;
     } finally {
       setBusy(false);
     }
@@ -215,76 +221,33 @@ export default function EstatePollsPage() {
 
   return (
     <AppShell title="Estate Polls">
-      <div className="mx-auto w-full max-w-4xl space-y-5">
+      <EstateManagerPageShell
+        eyebrow="Estate Polls"
+        title="Polls"
+        description="Launch votes that are easy to create, edit, and track from a phone-first estate manager flow."
+        icon={<Vote size={22} />}
+        accent="from-rose-500 to-pink-500"
+        stats={[
+          { label: "Polls", value: polls.length, helper: "Published votes" },
+          {
+            label: "Options",
+            value: Math.max(...[2, ...polls.map((poll) => (poll.pollOptions || []).length)]),
+            helper: "Largest poll size"
+          }
+        ]}
+      >
 
-        <CardSurface accent="from-rose-100/80 via-white/10 to-transparent" glow="bg-rose-300/50">
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white">Create a poll</h2>
-          <form onSubmit={handleSubmit} className="mt-4 grid gap-3">
-            <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Estate</span>
-              <select
-                value={estateId}
-                onChange={(event) => setEstateId(event.target.value)}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
-              >
-                {estateOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Question</span>
-              <input
-                value={question}
-                onChange={(event) => setQuestion(event.target.value)}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
-                placeholder="Should we repaint the gate?"
-                required
-              />
-            </label>
-            <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Options</p>
-              {options.map((opt, idx) => (
-                <div key={`poll-option-${idx}`} className="flex items-center gap-2">
-                  <input
-                    value={opt}
-                    onChange={(event) => updateOption(idx, event.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
-                    placeholder={`Option ${idx + 1}`}
-                  />
-                  {options.length > 2 ? (
-                    <button
-                      type="button"
-                      onClick={() => removeOption(idx)}
-                      className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-50 dark:border-slate-700"
-                    >
-                      Remove
-                    </button>
-                  ) : null}
-                </div>
-              ))}
-              <button
-                type="button"
-                onClick={addOption}
-                className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300"
-              >
-                Add option
-              </button>
-            </div>
-            <button
-              type="submit"
-              disabled={busy || !estateId}
-              className="rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition-all active:scale-95 disabled:opacity-50 dark:bg-white dark:text-slate-900"
-            >
-              {busy ? "Publishing..." : "Publish Poll"}
-            </button>
-          </form>
-        </CardSurface>
+        <EstateManagerSection title="Create a poll" subtitle="Keep results visible on the page, then open the poll composer only when needed.">
+          <button
+            type="button"
+            onClick={() => setComposeOpen(true)}
+            className="w-full rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition-all active:scale-95 dark:bg-white dark:text-slate-900"
+          >
+            New Poll
+          </button>
+        </EstateManagerSection>
 
-        <CardSurface accent="from-slate-100/80 via-white/10 to-transparent" glow="bg-slate-300/50">
-          <h3 className="text-base font-bold text-slate-900 dark:text-white">Poll results</h3>
+        <EstateManagerSection title="Poll results" subtitle="Monitor how each vote is landing without losing mobile readability.">
           {loading ? <p className="mt-3 text-sm text-slate-500">Loading...</p> : null}
           {!loading && polls.length === 0 ? <p className="mt-3 text-sm text-slate-500">No polls yet.</p> : null}
           <div className="mt-3 space-y-4">
@@ -336,12 +299,44 @@ export default function EstatePollsPage() {
               </CardSurface>
             ))}
           </div>
-        </CardSurface>
-      </div>
+        </EstateManagerSection>
+      </EstateManagerPageShell>
+
+      <MobileBottomSheet open={composeOpen} title="Create Poll" onClose={() => setComposeOpen(false)} width="720px" height="90dvh">
+        <form onSubmit={async (event) => { const ok = await handleSubmit(event); if (ok) setComposeOpen(false); }} className="grid gap-3">
+          <label className="block">
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Estate</span>
+            <select value={estateId} onChange={(event) => setEstateId(event.target.value)} className={estateFieldClassName}>
+              {estateOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Question</span>
+            <input value={question} onChange={(event) => setQuestion(event.target.value)} className={estateFieldClassName} placeholder="Should we repaint the gate?" required />
+          </label>
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Options</p>
+            {options.map((opt, idx) => (
+              <div key={`poll-option-${idx}`} className="flex items-center gap-2">
+                <input value={opt} onChange={(event) => updateOption(idx, event.target.value)} className={estateFieldClassName} placeholder={`Option ${idx + 1}`} />
+                {options.length > 2 ? <button type="button" onClick={() => removeOption(idx)} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-50 dark:border-slate-700">Remove</button> : null}
+              </div>
+            ))}
+            <button type="button" onClick={addOption} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300">
+              Add option
+            </button>
+          </div>
+          <button type="submit" disabled={busy || !estateId} className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition-all active:scale-95 disabled:opacity-50 dark:bg-white dark:text-slate-900">
+            {busy ? "Publishing..." : "Publish Poll"}
+          </button>
+        </form>
+      </MobileBottomSheet>
 
       {editingId ? (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/50 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+        <MobileBottomSheet open={!!editingId} title="Edit Poll" onClose={closeEdit} width="720px" height="90dvh">
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Edit Poll</p>
@@ -403,12 +398,12 @@ export default function EstatePollsPage() {
               </button>
             </form>
           </div>
-        </div>
+        </MobileBottomSheet>
       ) : null}
 
       {pendingDelete ? (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/50 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+        <MobileBottomSheet open={!!pendingDelete} title="Delete Poll" onClose={() => setPendingDelete(null)} width="560px" height="46dvh">
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Confirm Delete</p>
@@ -443,7 +438,7 @@ export default function EstatePollsPage() {
               </button>
             </div>
           </div>
-        </div>
+        </MobileBottomSheet>
       ) : null}
     </AppShell>
   );

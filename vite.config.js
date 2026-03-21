@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
-  const proxyTarget = env.VITE_DEV_PROXY_TARGET || "https://qring-backend-1.onrender.com";
+  const proxyTarget = (env.VITE_DEV_PROXY_TARGET || "http://localhost:8000").replace("0.0.0.0", "localhost");
 
   return {
     plugins: [react()],

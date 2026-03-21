@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { ClipboardList } from "lucide-react";
 import AppShell from "../../layouts/AppShell";
 import {
   createEstateAlert,
@@ -14,6 +15,8 @@ import { showError, showSuccess } from "../../utils/flash";
 import { useSocketEvents } from "../../hooks/useSocketEvents";
 import { getDashboardSocket } from "../../services/socketClient";
 import CardSurface from "../../components/CardSurface";
+import MobileBottomSheet from "../../components/mobile/MobileBottomSheet";
+import EstateManagerPageShell, { EstateManagerSection, estateFieldClassName, estateTextareaClassName } from "../../components/mobile/EstateManagerPageShell";
 
 export default function EstateDuesPage() {
   const [overview, setOverview] = useState(null);
@@ -39,6 +42,7 @@ export default function EstateDuesPage() {
   const [editingAmountDue, setEditingAmountDue] = useState("");
   const [editingDueDate, setEditingDueDate] = useState("");
   const [pendingDelete, setPendingDelete] = useState(null);
+  const [composeOpen, setComposeOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -140,11 +144,11 @@ export default function EstateDuesPage() {
 
   async function handleSubmit(event) {
     event.preventDefault();
-    if (!estateId || !title.trim()) return;
+    if (!estateId || !title.trim()) return false;
     const value = Number(amountDue);
     if (!value || value <= 0) {
       setError("Amount is required.");
-      return;
+      return false;
     }
     setBusy(true);
     setError("");
@@ -168,8 +172,10 @@ export default function EstateDuesPage() {
       ]);
       setAlerts(rows);
       setPayments(paymentRows);
+      return true;
     } catch (err) {
       setError(err?.message || "Failed to create dues request");
+      return false;
     } finally {
       setBusy(false);
     }
@@ -336,80 +342,29 @@ export default function EstateDuesPage() {
 
   return (
     <AppShell title="Estate Dues & Payments">
-      <div className="mx-auto w-full max-w-4xl space-y-5">
+      <EstateManagerPageShell
+        eyebrow="Estate Collections"
+        title="Dues"
+        description="Create levies, review payment proofs, and keep collection work manageable on mobile."
+        icon={<ClipboardList size={22} />}
+        accent="from-emerald-500 to-teal-500"
+        stats={[
+          { label: "Requests", value: alerts.length, helper: "Active payment requests" },
+          { label: "Reviews", value: payments.length, helper: "Payment summaries loaded" }
+        ]}
+      >
 
-        <CardSurface accent="from-emerald-100/80 via-white/10 to-transparent" glow="bg-emerald-300/50">
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white">Create payment request</h2>
-          <p className="mt-1 text-xs text-slate-500">Homeowners can pay via Paystack, bank transfer reference, or wallet balance.</p>
-          <form onSubmit={handleSubmit} className="mt-4 grid gap-3">
-            <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Estate</span>
-              <select
-                value={estateId}
-                onChange={(event) => setEstateId(event.target.value)}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
-              >
-                {estateOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Title</span>
-              <input
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
-                placeholder="January security levy"
-                required
-              />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Amount (NGN)</span>
-              <input
-                value={amountDue}
-                onChange={(event) => setAmountDue(event.target.value)}
-                type="number"
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
-                placeholder="5000"
-                min="0"
-                step="0.01"
-                required
-              />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Due date</span>
-              <input
-                value={dueDate}
-                onChange={(event) => setDueDate(event.target.value)}
-                type="date"
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
-              />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Description</span>
-              <textarea
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
-                rows={3}
-                className="w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
-                placeholder="Payment covers security, waste, and generator upkeep."
-              />
-            </label>
-            <button
-              type="submit"
-              disabled={busy || !estateId}
-              className="rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition-all active:scale-95 disabled:opacity-50 dark:bg-white dark:text-slate-900"
-            >
-              {busy ? "Creating..." : "Create Payment Request"}
-            </button>
-          </form>
-        </CardSurface>
+        <EstateManagerSection title="Create payment request" subtitle="Use a dedicated button to open the dues form and keep collections easier to scan on mobile.">
+          <button
+            type="button"
+            onClick={() => setComposeOpen(true)}
+            className="w-full rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition-all active:scale-95 dark:bg-white dark:text-slate-900"
+          >
+            New Payment Request
+          </button>
+        </EstateManagerSection>
 
-        <CardSurface accent="from-amber-100/80 via-white/10 to-transparent" glow="bg-amber-300/50">
-          <h3 className="text-base font-bold text-slate-900 dark:text-white">Payment status</h3>
+        <EstateManagerSection title="Payment status" subtitle="Track homeowner payment state, proofs, and review actions in one stream.">
           {loading ? <p className="mt-3 text-sm text-slate-500">Loading...</p> : null}
           {!loading && alerts.length === 0 ? <p className="mt-3 text-sm text-slate-500">No payment requests yet.</p> : null}
           <div className="mt-3 space-y-4">
@@ -512,11 +467,42 @@ export default function EstateDuesPage() {
               );
             })}
           </div>
-        </CardSurface>
-      </div>
+        </EstateManagerSection>
+      </EstateManagerPageShell>
+      <MobileBottomSheet open={composeOpen} title="Create Payment Request" onClose={() => setComposeOpen(false)} width="720px" height="90dvh" zIndex={70}>
+        <form onSubmit={async (event) => { const ok = await handleSubmit(event); if (ok) setComposeOpen(false); }} className="grid gap-3">
+          <label className="block">
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Estate</span>
+            <select value={estateId} onChange={(event) => setEstateId(event.target.value)} className={estateFieldClassName}>
+              {estateOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Title</span>
+            <input value={title} onChange={(event) => setTitle(event.target.value)} className={estateFieldClassName} placeholder="January security levy" required />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Amount (NGN)</span>
+            <input value={amountDue} onChange={(event) => setAmountDue(event.target.value)} type="number" className={estateFieldClassName} placeholder="5000" min="0" step="0.01" required />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Due date</span>
+            <input value={dueDate} onChange={(event) => setDueDate(event.target.value)} type="date" className={estateFieldClassName} />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Description</span>
+            <textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} className={estateTextareaClassName} placeholder="Payment covers security, waste, and generator upkeep." />
+          </label>
+          <button type="submit" disabled={busy || !estateId} className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition-all active:scale-95 disabled:opacity-50 dark:bg-white dark:text-slate-900">
+            {busy ? "Creating..." : "Create Payment Request"}
+          </button>
+        </form>
+      </MobileBottomSheet>
       {reviewTarget ? (
-        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-slate-950/50 px-4 pb-6 pt-10 backdrop-blur-sm">
-          <div className="w-full max-w-md overflow-hidden rounded-[2rem] bg-white p-5 shadow-2xl dark:bg-slate-900">
+        <MobileBottomSheet open={!!reviewTarget} title="Manual Review" onClose={closeReview} width="640px" height="88dvh" zIndex={70}>
+          <div className="rounded-[2rem] bg-white p-1 dark:bg-slate-900/60">
             <div className="mb-3 flex items-center justify-between">
               <p className="text-sm font-bold text-slate-900 dark:text-white">Manual Review</p>
               <button
@@ -609,12 +595,12 @@ export default function EstateDuesPage() {
               </button>
             </div>
           </div>
-        </div>
+        </MobileBottomSheet>
       ) : null}
 
       {editingId ? (
-        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-slate-950/50 px-4 pb-6 pt-10 backdrop-blur-sm">
-          <div className="w-full max-w-md overflow-hidden rounded-[2rem] bg-white p-5 shadow-2xl dark:bg-slate-900">
+        <MobileBottomSheet open={!!editingId} title="Edit Payment Request" onClose={closeEdit} width="640px" height="82dvh" zIndex={70}>
+          <div className="rounded-[2rem] bg-white p-1 dark:bg-slate-900/60">
             <div className="mb-3 flex items-center justify-between">
               <p className="text-sm font-bold text-slate-900 dark:text-white">Edit Payment Request</p>
               <button
@@ -674,12 +660,12 @@ export default function EstateDuesPage() {
               </button>
             </form>
           </div>
-        </div>
+        </MobileBottomSheet>
       ) : null}
 
       {pendingDelete ? (
-        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-slate-950/50 px-4 pb-6 pt-10 backdrop-blur-sm">
-          <div className="w-full max-w-md overflow-hidden rounded-[2rem] bg-white p-5 shadow-2xl dark:bg-slate-900">
+        <MobileBottomSheet open={!!pendingDelete} title="Delete Payment Request" onClose={() => setPendingDelete(null)} width="560px" height="46dvh" zIndex={70}>
+          <div className="rounded-[2rem] bg-white p-1 dark:bg-slate-900/60">
             <div className="mb-3 flex items-center justify-between">
               <p className="text-sm font-bold text-slate-900 dark:text-white">Delete Payment Request</p>
               <button
@@ -711,7 +697,7 @@ export default function EstateDuesPage() {
               </button>
             </div>
           </div>
-        </div>
+        </MobileBottomSheet>
       ) : null}
     </AppShell>
   );

@@ -54,7 +54,7 @@ export default function NotificationsPage() {
                   <BellRing className="h-3.5 w-3.5" />
                   Notification Center
                 </div>
-                <h2 className="mt-4 text-2xl font-black sm:text-3xl">Stay on top of every gate event</h2>
+                <h2 style={{color:"white"}} className="mt-4 text-2xl text-white-200 sm:text-3xl">Stay on top of every gate event</h2>
                 <p className="mt-2 text-sm text-slate-200">
                   {connected ? "Realtime sync is live." : "Automatic fallback refresh is active."} You currently have {unreadCount} unread notifications.
                 </p>

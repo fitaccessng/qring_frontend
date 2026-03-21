@@ -103,7 +103,8 @@ export default function ScanPage() {
   const [visitorForm, setVisitorForm] = useState({
     name: "",
     phone: "",
-    purpose: "",
+    purpose: "visitor",
+    deliveryOption: "allow_entry",
     snapshotDataUrl: "",
   });
 
@@ -287,14 +288,12 @@ export default function ScanPage() {
       setError("Please capture a live snapshot before submitting.");
       return;
     }
-    if (!visitorForm.name.trim()) {
-      setError("Please enter your name before submitting.");
-      return;
-    }
     if (!visitorForm.purpose.trim()) {
-      setError("Please enter a purpose before submitting.");
+      setError("Please choose a visit purpose before submitting.");
       return;
     }
+    const normalizedPurpose = visitorForm.purpose.trim().toLowerCase();
+    const visitorType = normalizedPurpose === "delivery" ? "delivery" : "guest";
     const startedAt = Date.now();
     const requestId = createVisitorRequestId();
     setRequestLatencyMs(0);
@@ -312,9 +311,11 @@ export default function ScanPage() {
           requestId,
           qrId,
           doorId: doorId || undefined,
-          name: visitorForm.name.trim(),
+          name: visitorForm.name.trim() || undefined,
           phoneNumber: visitorForm.phone.trim() || undefined,
-          purpose: visitorForm.purpose.trim(),
+          purpose: normalizedPurpose,
+          visitorType,
+          deliveryOption: visitorType === "delivery" ? visitorForm.deliveryOption : undefined,
           snapshotBase64: visitorForm.snapshotDataUrl.split(",")[1] || "",
           snapshotMime: "image/jpeg",
           deviceId: visitorDeviceId
@@ -400,9 +401,9 @@ export default function ScanPage() {
 
         {!loading && qr && !requestState.sent ? (
           <form onSubmit={onSubmit} className="mt-6 space-y-4">
-            <p className="text-sm text-slate-600 dark:text-slate-300">
-              First take a selfie. Then fill your details and submit.
-            </p>
+            <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-100">
+              Visitor initiates, homeowner verifies, gateman executes. Capture your live photo, pick a purpose, and the resident will choose how to respond.
+            </div>
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-800/50">
               <div className="flex items-center justify-between gap-3">
@@ -474,14 +475,13 @@ export default function ScanPage() {
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Visitor Info</p>
                 <div className="mt-3 grid gap-3">
                   <label className="block text-sm">
-                    <span className="mb-1 block font-medium">Name</span>
+                    <span className="mb-1 block font-medium">Name (optional)</span>
                     <input
                       type="text"
                       value={visitorForm.name}
                       onChange={(event) => setVisitorForm((prev) => ({ ...prev, name: event.target.value }))}
                       className="w-full rounded-xl border border-slate-300 px-3 py-3 dark:border-slate-700 dark:bg-slate-900"
-                      placeholder="e.g. John Doe"
-                      required
+                      placeholder="Leave blank if you prefer"
                     />
                   </label>
                   <label className="block text-sm">
@@ -495,22 +495,41 @@ export default function ScanPage() {
                     />
                   </label>
                   <label className="block text-sm">
-                    <span className="mb-1 block font-medium">Purpose of visit</span>
-                    <textarea
+                    <span className="mb-1 block font-medium">Purpose</span>
+                    <select
                       value={visitorForm.purpose}
                       onChange={(event) => setVisitorForm((prev) => ({ ...prev, purpose: event.target.value }))}
                       className="w-full rounded-xl border border-slate-300 px-3 py-3 dark:border-slate-700 dark:bg-slate-900"
-                      placeholder="e.g. Package delivery"
-                      rows={3}
                       required
-                    />
+                    >
+                      <option value="visitor">Visitor</option>
+                      <option value="delivery">Delivery</option>
+                      <option value="guest">Guest</option>
+                    </select>
                   </label>
+                  {visitorForm.purpose === "delivery" ? (
+                    <label className="block text-sm">
+                      <span className="mb-1 block font-medium">Delivery instruction</span>
+                      <select
+                        value={visitorForm.deliveryOption}
+                        onChange={(event) => setVisitorForm((prev) => ({ ...prev, deliveryOption: event.target.value }))}
+                        className="w-full rounded-xl border border-slate-300 px-3 py-3 dark:border-slate-700 dark:bg-slate-900"
+                      >
+                        <option value="allow_entry">Request entry</option>
+                        <option value="drop_at_gate">Drop at gate</option>
+                      </select>
+                    </label>
+                  ) : null}
+                  <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300">
+                    The homeowner can reply by message, audio, or video to you, and can also instruct the gateman directly if needed.
+                  </div>
                   <label className="block text-sm">
                     <span className="mb-1 block font-medium">Door</span>
                     <select
                       value={doorId}
                       onChange={(event) => setDoorId(event.target.value)}
                       className="w-full rounded-xl border border-slate-300 px-3 py-3 dark:border-slate-700 dark:bg-slate-900"
+                      required
                     >
                       {(doorOptions.length ? doorOptions : (qr.doors ?? []).map((id) => ({ id, name: id }))).map((door) => (
                         <option key={door.id} value={door.id}>

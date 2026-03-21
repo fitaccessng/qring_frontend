@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
+import { Wrench } from "lucide-react";
 import AppShell from "../../layouts/AppShell";
 import { getEstateOverview, listEstateAlerts, listMaintenanceAudits, updateEstateAlert } from "../../services/estateService";
 import { showError, showSuccess } from "../../utils/flash";
 import { useSocketEvents } from "../../hooks/useSocketEvents";
 import { getDashboardSocket } from "../../services/socketClient";
 import CardSurface from "../../components/CardSurface";
+import EstateManagerPageShell, { EstateManagerSection, estateFieldClassName } from "../../components/mobile/EstateManagerPageShell";
+import MobileBottomSheet from "../../components/mobile/MobileBottomSheet";
 
 export default function EstateMaintenancePage() {
   const [overview, setOverview] = useState(null);
@@ -17,6 +20,7 @@ export default function EstateMaintenancePage() {
   const [activeTab, setActiveTab] = useState("requests");
   const [auditStatusFilter, setAuditStatusFilter] = useState("all");
   const [auditHomeownerFilter, setAuditHomeownerFilter] = useState("");
+  const [controlsOpen, setControlsOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -181,24 +185,30 @@ export default function EstateMaintenancePage() {
 
   return (
     <AppShell title="Maintenance Requests">
-      <div className="mx-auto w-full max-w-4xl space-y-5">
-        <CardSurface accent="from-cyan-100/80 via-white/10 to-transparent" glow="bg-cyan-300/50">
+      <EstateManagerPageShell
+        eyebrow="Estate Operations"
+        title="Maintenance"
+        description="Handle maintenance requests and audit activity in a mobile-first operations inbox."
+        icon={<Wrench size={22} />}
+        accent="from-cyan-500 to-sky-500"
+        stats={[
+          { label: "Requests", value: requests.length, helper: "Current maintenance items" },
+          { label: "Audit Logs", value: audits.length, helper: "Change history entries" }
+        ]}
+      >
+        <EstateManagerSection title="Maintenance inbox" subtitle="Requests submitted by homeowners and the audit trail behind them.">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-lg font-bold text-slate-900 dark:text-white">Maintenance inbox</h2>
-              <p className="mt-1 text-xs text-slate-500">Requests submitted by homeowners.</p>
+              <p className="text-sm font-bold text-slate-900 dark:text-white">Live request control</p>
+              <p className="mt-1 text-xs text-slate-500">Switch between requests and audit activity without losing context.</p>
             </div>
-            <select
-              value={estateId}
-              onChange={(event) => setEstateId(event.target.value)}
-              className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-300"
+            <button
+              type="button"
+              onClick={() => setControlsOpen(true)}
+              className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition-all active:scale-95 dark:bg-white dark:text-slate-900"
             >
-              {estateOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+              Open Controls
+            </button>
           </div>
           <div className="mt-4 flex items-center gap-2">
             {["requests", "audits"].map((tab) => (
@@ -221,7 +231,7 @@ export default function EstateMaintenancePage() {
               <select
                 value={auditStatusFilter}
                 onChange={(event) => setAuditStatusFilter(event.target.value)}
-                className="rounded-2xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-200"
+                className={estateFieldClassName}
               >
                 <option value="all">All statuses</option>
                 <option value="pending">Pending only</option>
@@ -230,7 +240,7 @@ export default function EstateMaintenancePage() {
               <select
                 value={auditHomeownerFilter}
                 onChange={(event) => setAuditHomeownerFilter(event.target.value)}
-                className="rounded-2xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-200"
+                className={estateFieldClassName}
               >
                 <option value="">All admins</option>
                 {auditHomeownerOptions.map((option) => (
@@ -241,9 +251,9 @@ export default function EstateMaintenancePage() {
               </select>
             </div>
           ) : null}
-        </CardSurface>
+        </EstateManagerSection>
 
-        <CardSurface accent="from-slate-100/80 via-white/10 to-transparent" glow="bg-slate-300/50">
+        <EstateManagerSection title={activeTab === "requests" ? "Open requests" : "Audit trail"} subtitle={activeTab === "requests" ? "Update status quickly from the same screen." : "See exactly who changed what and when."}>
           {loading ? <p className="text-sm text-slate-500">Loading...</p> : null}
           {activeTab === "requests" ? (
             <>
@@ -335,8 +345,63 @@ export default function EstateMaintenancePage() {
               </div>
             </>
           )}
-        </CardSurface>
-      </div>
+        </EstateManagerSection>
+      </EstateManagerPageShell>
+      <MobileBottomSheet open={controlsOpen} title="Maintenance Controls" onClose={() => setControlsOpen(false)} width="720px" height="82dvh">
+        <div className="grid gap-3">
+          <label className="block">
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Estate</span>
+            <select value={estateId} onChange={(event) => setEstateId(event.target.value)} className={estateFieldClassName}>
+              {estateOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">View</p>
+            <div className="flex flex-wrap items-center gap-2">
+              {["requests", "audits"].map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setActiveTab(tab)}
+                  className={`rounded-full border px-3 py-2 text-xs font-semibold ${activeTab === tab ? "border-indigo-500 bg-indigo-600 text-white" : "border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-200"}`}
+                >
+                  {tab === "requests" ? "Requests" : "Audit Trail"}
+                </button>
+              ))}
+            </div>
+          </div>
+          {activeTab === "audits" ? (
+            <>
+              <label className="block">
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Status filter</span>
+                <select value={auditStatusFilter} onChange={(event) => setAuditStatusFilter(event.target.value)} className={estateFieldClassName}>
+                  <option value="all">All statuses</option>
+                  <option value="pending">Pending only</option>
+                  <option value="solved">Solved only</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Admin filter</span>
+                <select value={auditHomeownerFilter} onChange={(event) => setAuditHomeownerFilter(event.target.value)} className={estateFieldClassName}>
+                  <option value="">All admins</option>
+                  {auditHomeownerOptions.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
+            </>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => setControlsOpen(false)}
+            className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition-all active:scale-95 dark:bg-white dark:text-slate-900"
+          >
+            Apply Controls
+          </button>
+        </div>
+      </MobileBottomSheet>
     </AppShell>
   );
 }

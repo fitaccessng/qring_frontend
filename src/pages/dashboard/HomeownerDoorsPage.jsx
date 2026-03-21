@@ -220,7 +220,7 @@ export default function HomeownerDoorsPage() {
           <div className="mt-5 grid grid-cols-3 gap-2 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 p-2 text-white sm:gap-3 sm:p-3">
             <StatTile label="Doors" value={doors.length} />
             <StatTile label="QR Codes" value={doors.reduce((acc, door) => acc + (door.qr?.length || 0), 0)} />
-            <StatTile label="Plan" value={(subscription?.plan || "Free").toUpperCase()} />
+            <StatTile label={managedByEstate ? "Access" : "Plan"} value={managedByEstate ? "ESTATE" : (subscription?.plan || "Free").toUpperCase()} />
           </div>
         </section>
 
@@ -230,7 +230,7 @@ export default function HomeownerDoorsPage() {
           </div>
         ) : null}
 
-        {subscription ? (
+        {subscription && !managedByEstate ? (
           <section className="rounded-[2rem] border border-slate-200 bg-white/95 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/90">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -280,7 +280,7 @@ export default function HomeownerDoorsPage() {
           </div>
         ) : doors.length === 0 ? (
           <div className="rounded-[2rem] border border-slate-200 bg-white/95 p-4 text-sm text-slate-500 shadow-sm dark:border-slate-800 dark:bg-slate-900/90 sm:p-5">
-            No doors configured yet.
+            {managedByEstate ? "No door has been assigned to your account yet." : "No doors configured yet."}
           </div>
         ) : (
           <section className="space-y-3">

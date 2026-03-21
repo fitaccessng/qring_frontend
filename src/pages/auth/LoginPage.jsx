@@ -6,7 +6,8 @@ import { useAuth } from "../../state/AuthContext";
 const rolePath = {
   homeowner: "/dashboard/homeowner/overview",
   admin: "/dashboard/admin",
-  estate: "/dashboard/estate"
+  estate: "/dashboard/estate",
+  security: "/dashboard/security"
 };
 
 function resolveTargetPath(data, fromPath) {

@@ -35,11 +35,17 @@ const navByRole = {
     { to: "/dashboard/estate/stats", label: "Visitor Stats", icon: "stats" },
     { to: "/dashboard/estate/mappings", label: "Mappings", icon: "mappings" },
     { to: "/dashboard/estate/logs", label: "Access Logs", icon: "logs" },
+    { to: "/dashboard/estate/security", label: "Security Team", icon: "shield" },
     { to: "/dashboard/estate/plan", label: "Plan Rules", icon: "plans" },
     { to: "/dashboard/estate/community", label: "Community", icon: "community" },
     { to: "/billing/paywall", label: "Billing", icon: "billing" },
     { to: "/dashboard/estate/homes", label: "Multi-Home", icon: "homes" },
     { to: "/dashboard/estate/settings", label: "Settings", icon: "settings" }
+  ],
+  security: [
+    { to: "/dashboard/security", label: "Gate Hub", icon: "shield" },
+    { to: "/dashboard/security/messages", label: "Messages", icon: "messages" },
+    { to: "/dashboard/notifications", label: "Notifications", icon: "bell_ring" }
   ],
   admin: [
     { to: "/dashboard/admin", label: "System", icon: "system" },
@@ -101,7 +107,7 @@ export default function AppShell({ title, children, showTopBar = true }) {
   const showBackHeader = useMemo(() => {
     if (!showTopBar) return false;
     if (showProfileHeader) return false;
-    return user?.role === "estate" || user?.role === "homeowner";
+    return user?.role === "estate" || user?.role === "homeowner" || user?.role === "security";
   }, [showTopBar, showProfileHeader, user?.role]);
   const isEstateManagedHomeowner = useMemo(
     () =>
@@ -149,10 +155,17 @@ export default function AppShell({ title, children, showTopBar = true }) {
         { to: "/dashboard/estate/assign", label: "Assign", icon: "assign" }
       ];
     }
+    if (user?.role === "security") {
+      return [
+        { to: "/dashboard/security", label: "Gate", icon: "shield" },
+        { to: "/dashboard/security/messages", label: "Messages", icon: "messages" },
+        { to: "/dashboard/notifications", label: "Alerts", icon: "bell_ring" }
+      ];
+    }
     return navItems.filter((item) => !item.to.endsWith("/settings")).slice(0, 4);
   }, [navItems, user?.role]);
   const isEstateMobileNav = user?.role === "estate";
-  const showHelpButton = user?.role === "estate";
+  const showHelpButton = user?.role === "estate" || user?.role === "security";
   const mobileContentBottomPaddingClass = isEstateMobileNav
     ? "pb-[calc(10.75rem+env(safe-area-inset-bottom))] sm:pb-[calc(9.5rem+env(safe-area-inset-bottom))]"
     : "pb-[calc(9.5rem+env(safe-area-inset-bottom))] sm:pb-[calc(9rem+env(safe-area-inset-bottom))]";
@@ -249,7 +262,9 @@ export default function AppShell({ title, children, showTopBar = true }) {
         ? "/dashboard/estate"
         : user?.role === "admin"
           ? "/dashboard/admin"
-          : "/dashboard/homeowner/overview";
+          : user?.role === "security"
+            ? "/dashboard/security"
+            : "/dashboard/homeowner/overview";
     navigate(fallback);
   }
 
@@ -512,6 +527,7 @@ function NavIcon({ name }) {
     dues: <path d="M3 7h18v10H3zM3 11h18M7 15h2" />,
     maintenance: <path d="M12 2l2 2-2 2-2-2 2-2zm-6 8l2 2-2 2-2-2 2-2zm12 0l2 2-2 2-2-2 2-2zM5 19h14" />,
     stats: <path d="M4 19h16M6 16V8M12 16V5M18 16v-6" />,
+    shield: <path d="M12 3l7 3v6c0 4.5-2.8 7.9-7 9-4.2-1.1-7-4.5-7-9V6l7-3zm-2.5 9 1.8 1.8L15 10.2" />,
     bell_ring: <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5M9 17a3 3 0 0 0 6 0M18 3l2 2M6 3L4 5" />,
     user_admin: <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm10 0v-2m0 0V7m0 2h-2m2 0h2" />,
     sessions: <path d="M8 7h13M8 12h13M8 17h13M3 7h.01M3 12h.01M3 17h.01" />,

@@ -1,0 +1,1 @@
+import{r as c}from"./router-GDLRgjYc.js";import{g as f}from"./index-DlyREiTv.js";function i(r){c.useEffect(()=>{const e=f(),s=Object.entries(r??{});return s.forEach(([o,t])=>e.on(o,t)),()=>{s.forEach(([o,t])=>e.off(o,t))}},[r])}export{i as u};

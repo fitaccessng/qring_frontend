@@ -2,10 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 const paletteByType = {
-  success: "border-emerald-200/70 bg-emerald-50 text-emerald-950",
-  error: "border-rose-200/70 bg-rose-50 text-rose-950",
-  warning: "border-amber-200/70 bg-amber-50 text-amber-950",
-  info: "border-sky-200/70 bg-sky-50 text-sky-950"
+  success: "border-emerald-300 bg-emerald-100 text-emerald-950",
+  error: "border-rose-300 bg-rose-100 text-rose-950",
+  warning: "border-amber-300 bg-amber-100 text-amber-950",
+  info: "border-sky-300 bg-sky-100 text-sky-950"
 };
 
 const iconByType = {
@@ -146,12 +146,12 @@ export default function ToastCenter() {
               className={`pointer-events-auto w-full overflow-hidden rounded-2xl border p-3 shadow-2xl backdrop-blur-sm transition-all ${palette}`}
             >
               <div className="flex items-start gap-3">
-                <div className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-black/5 text-xs font-black">
+                <div className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-white/65 text-xs font-black text-inherit ring-1 ring-black/5">
                   {icon}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-semibold uppercase tracking-wide opacity-80">{toast.title}</p>
-                  <p className="mt-1 break-words text-sm font-medium">{toast.message}</p>
+                  <p className="text-xs font-bold uppercase tracking-wide text-inherit opacity-90">{toast.title}</p>
+                  <p className="mt-1 break-words text-sm font-semibold text-inherit">{toast.message}</p>
                   {actionLabel ? (
                     <div className="mt-2 flex items-center gap-2">
                       <button
@@ -162,14 +162,14 @@ export default function ToastCenter() {
                           }
                           removeToast(toast.id, toast);
                         }}
-                        className="rounded-full bg-black/10 px-3 py-1 text-[12px] font-semibold transition hover:bg-black/15 active:scale-[0.99]"
+                        className="rounded-full bg-white/70 px-3 py-1 text-[12px] font-semibold text-inherit ring-1 ring-black/5 transition hover:bg-white/90 active:scale-[0.99]"
                       >
                         {actionLabel}
                       </button>
                       <button
                         type="button"
                         onClick={() => removeToast(toast.id, toast)}
-                        className="rounded-full px-2 py-1 text-[12px] font-semibold opacity-70 transition hover:opacity-100"
+                        className="rounded-full px-2 py-1 text-[12px] font-semibold text-inherit opacity-75 transition hover:opacity-100"
                       >
                         Dismiss
                       </button>
@@ -179,16 +179,16 @@ export default function ToastCenter() {
                 <button
                   type="button"
                   onClick={() => removeToast(toast.id, toast)}
-                  className="rounded-full p-1 text-xs font-bold opacity-70 transition hover:opacity-100 active:scale-95"
+                  className="rounded-full p-1 text-xs font-bold text-inherit opacity-75 transition hover:bg-white/40 hover:opacity-100 active:scale-95"
                   aria-label="Close alert"
                   title="Close"
                 >
                   ×
                 </button>
               </div>
-              <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-black/5">
+              <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-white/45 ring-1 ring-black/5">
                 <div
-                  className="h-full bg-black/20"
+                  className="h-full bg-black/25"
                   style={{
                     animation: `qring_toast_progress ${toast.duration}ms linear forwards`
                   }}
