@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">qring</string>
+    <string name="title_activity_main">qring</string>
+    <string name="package_name">com.qring.aoo</string>
+    <string name="custom_url_scheme">com.qring.aoo</string>
+</resources>

@@ -2,6 +2,20 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import { env } from "../config/env";
 import { apiRequest } from "../services/apiClient";
+import {
+  CALL_MEDIA_MODE,
+  getConnectWatchdogMs,
+  getNextFallbackAction,
+  getRingTimeoutMs
+} from "../services/callFallbackManager";
+import {
+  buildLivekitConnectOptions,
+  buildLivekitRoomOptions,
+  buildLivekitVideoCaptureOptions,
+  describeLivekitAttempt,
+  LIVEKIT_DEFAULT_CONNECT_TIMEOUT_MS,
+  LIVEKIT_DEFAULT_RING_TIMEOUT_MS
+} from "../services/livekitConnection";
 import { realtimeTransportOptions } from "../services/socketConfig";
 import { getVisitorSessionMessages } from "../services/homeownerService";
 import {
@@ -32,9 +46,18 @@ const CALL_ACCEPT_INTENT_KEY = "qring_call_accept_intent";
 const CALL_START_INTENT_KEY = "qring_call_start_intent";
 const LIVEKIT_PEER_CONNECT_TIMEOUT_MS = 30000;
 const LIVEKIT_WEBSOCKET_TIMEOUT_MS = 15000;
-const LIVEKIT_CONNECT_MAX_RETRIES = 6;
 const LIVEKIT_MANUAL_RECONNECT_DELAY_MS = 1500;
 const LIVEKIT_MANUAL_RECONNECT_MAX_ATTEMPTS = 3;
+
+function getMessageRoute({ sessionId, participantType }) {
+  if (participantType === "homeowner") {
+    return `/dashboard/homeowner/messages?sessionId=${encodeURIComponent(sessionId || "")}`;
+  }
+  if (participantType === "security") {
+    return `/dashboard/security/messages?sessionId=${encodeURIComponent(sessionId || "")}`;
+  }
+  return `/session/${sessionId}/message`;
+}
 
 function normalizeIceServerList(servers = []) {
   const fallback = [
@@ -274,6 +297,23 @@ export function useSessionRealtime(sessionId) {
   const callSessionRef = useRef("");
   const callVisitorIdRef = useRef("");
   const incomingRingTimerRef = useRef(null);
+  const livekitAttemptRef = useRef({
+    mode: CALL_MEDIA_MODE.AUDIO,
+    forceRelay: false,
+    startedAt: null
+  });
+  const livekitConnectWatchdogRef = useRef(null);
+  const callRingTimeoutRef = useRef(null);
+  const automatedFallbackMessageSentRef = useRef(false);
+  const livekitDiagnosticsRoomRef = useRef(null);
+  const livekitDiagnosticsSnapshotRef = useRef({
+    publisherConnectionState: "",
+    publisherIceConnectionState: "",
+    subscriberConnectionState: "",
+    subscriberIceConnectionState: "",
+    localCandidateType: "",
+    remoteCandidateType: ""
+  });
 
   const supportsWebRTC =
     typeof window !== "undefined" && typeof window.RTCPeerConnection !== "undefined";
@@ -327,6 +367,31 @@ export function useSessionRealtime(sessionId) {
       clearTimeout(livekitReconnectTimerRef.current);
       livekitReconnectTimerRef.current = null;
     }
+  }
+
+  function clearLivekitConnectWatchdog() {
+    if (livekitConnectWatchdogRef.current) {
+      clearTimeout(livekitConnectWatchdogRef.current);
+      livekitConnectWatchdogRef.current = null;
+    }
+  }
+
+  function clearCallRingTimeout() {
+    if (callRingTimeoutRef.current) {
+      clearTimeout(callRingTimeoutRef.current);
+      callRingTimeoutRef.current = null;
+    }
+  }
+
+  function resetFallbackState() {
+    automatedFallbackMessageSentRef.current = false;
+    livekitAttemptRef.current = {
+      mode: CALL_MEDIA_MODE.AUDIO,
+      forceRelay: false,
+      startedAt: null
+    };
+    clearLivekitConnectWatchdog();
+    clearCallRingTimeout();
   }
 
   function clearInviteRetryTimer() {
@@ -693,6 +758,7 @@ export function useSessionRealtime(sessionId) {
       clearInterval(diagnosticsTimerRef.current);
       diagnosticsTimerRef.current = null;
     }
+    livekitDiagnosticsRoomRef.current = null;
   }
 
   function startDiagnosticsPolling() {
@@ -700,6 +766,129 @@ export function useSessionRealtime(sessionId) {
     refreshPeerDiagnostics();
     diagnosticsTimerRef.current = setInterval(() => {
       refreshPeerDiagnostics();
+    }, DIAGNOSTICS_POLL_MS);
+  }
+
+  async function refreshLivekitDiagnostics(room = livekitDiagnosticsRoomRef.current) {
+    const pcManager = room?.engine?.pcManager;
+    if (!pcManager) {
+      setCallDiagnostics(emptyDiagnostics());
+      return;
+    }
+
+    const publisher = pcManager.publisher;
+    const subscriber = pcManager.subscriber;
+    const statsSources = [publisher, subscriber].filter(Boolean);
+    const pairs = new Map();
+    const candidates = new Map();
+    let selectedPair = null;
+    let jitterMs = null;
+    let packetLoss = 0;
+    let hasPacketLoss = false;
+
+    try {
+      for (const transport of statsSources) {
+        const stats = await transport.getStats();
+        stats.forEach((item) => {
+          if (item.type === "candidate-pair") {
+            pairs.set(item.id, item);
+          }
+          if (item.type === "local-candidate" || item.type === "remote-candidate") {
+            candidates.set(item.id, item);
+          }
+        });
+        stats.forEach((item) => {
+          if (item.type === "transport" && item.selectedCandidatePairId && pairs.has(item.selectedCandidatePairId)) {
+            selectedPair = pairs.get(item.selectedCandidatePairId);
+          }
+          if (item.type === "inbound-rtp" && !item.isRemote) {
+            if (typeof item.jitter === "number" && jitterMs === null) {
+              jitterMs = item.jitter * 1000;
+            }
+            if (typeof item.packetsLost === "number") {
+              packetLoss += item.packetsLost;
+              hasPacketLoss = true;
+            }
+          }
+        });
+      }
+
+      if (!selectedPair) {
+        for (const pair of pairs.values()) {
+          if (pair.nominated || pair.selected || pair.state === "succeeded") {
+            selectedPair = pair;
+            break;
+          }
+        }
+      }
+
+      const localCandidate = selectedPair?.localCandidateId
+        ? candidates.get(selectedPair.localCandidateId)
+        : null;
+      const remoteCandidate = selectedPair?.remoteCandidateId
+        ? candidates.get(selectedPair.remoteCandidateId)
+        : null;
+
+      const nextSnapshot = {
+        publisherConnectionState: publisher?.getConnectionState?.() || "closed",
+        publisherIceConnectionState: publisher?.getICEConnectionState?.() || "closed",
+        subscriberConnectionState: subscriber?.getConnectionState?.() || "closed",
+        subscriberIceConnectionState: subscriber?.getICEConnectionState?.() || "closed",
+        localCandidateType: localCandidate?.candidateType || "-",
+        remoteCandidateType: remoteCandidate?.candidateType || "-"
+      };
+      const previousSnapshot = livekitDiagnosticsSnapshotRef.current;
+      if (
+        nextSnapshot.publisherConnectionState !== previousSnapshot.publisherConnectionState ||
+        nextSnapshot.publisherIceConnectionState !== previousSnapshot.publisherIceConnectionState ||
+        nextSnapshot.subscriberConnectionState !== previousSnapshot.subscriberConnectionState ||
+        nextSnapshot.subscriberIceConnectionState !== previousSnapshot.subscriberIceConnectionState ||
+        nextSnapshot.localCandidateType !== previousSnapshot.localCandidateType ||
+        nextSnapshot.remoteCandidateType !== previousSnapshot.remoteCandidateType
+      ) {
+        logCall("info", "LiveKit ICE diagnostics updated", nextSnapshot);
+      }
+      livekitDiagnosticsSnapshotRef.current = nextSnapshot;
+
+      setCallDiagnostics({
+        connectionState:
+          nextSnapshot.publisherConnectionState !== "closed"
+            ? nextSnapshot.publisherConnectionState
+            : nextSnapshot.subscriberConnectionState,
+        iceConnectionState:
+          nextSnapshot.publisherIceConnectionState !== "closed"
+            ? nextSnapshot.publisherIceConnectionState
+            : nextSnapshot.subscriberIceConnectionState,
+        signalingState: room?.state || "connected",
+        localCandidateType: nextSnapshot.localCandidateType,
+        remoteCandidateType: nextSnapshot.remoteCandidateType,
+        roundTripTimeMs:
+          typeof selectedPair?.currentRoundTripTime === "number"
+            ? Math.round(selectedPair.currentRoundTripTime * 1000)
+            : null,
+        packetLoss: hasPacketLoss ? packetLoss : null,
+        jitterMs: jitterMs !== null ? Math.round(jitterMs) : null,
+        updatedAt: new Date().toISOString()
+      });
+    } catch (error) {
+      logCall("warn", "Unable to refresh LiveKit diagnostics", error?.message || error);
+      setCallDiagnostics((prev) => ({
+        ...prev,
+        connectionState: publisher?.getConnectionState?.() || subscriber?.getConnectionState?.() || prev.connectionState,
+        iceConnectionState:
+          publisher?.getICEConnectionState?.() || subscriber?.getICEConnectionState?.() || prev.iceConnectionState,
+        updatedAt: new Date().toISOString()
+      }));
+    }
+  }
+
+  function startLivekitDiagnosticsPolling(room) {
+    livekitDiagnosticsRoomRef.current = room;
+    stopDiagnosticsPolling();
+    livekitDiagnosticsRoomRef.current = room;
+    void refreshLivekitDiagnostics(room);
+    diagnosticsTimerRef.current = setInterval(() => {
+      void refreshLivekitDiagnostics(room);
     }, DIAGNOSTICS_POLL_MS);
   }
 
@@ -801,6 +990,52 @@ export function useSessionRealtime(sessionId) {
     emitRealtimeTextAlert(payload);
   }
 
+  function sendAutomatedFallbackMessage(reason) {
+    if (automatedFallbackMessageSentRef.current) return;
+    automatedFallbackMessageSentRef.current = true;
+    sendMessage(`Network issue: ${reason}. Continue here in chat while the call stabilizes.`);
+  }
+
+  function routeToAsyncFallback(kind) {
+    if (typeof window === "undefined") return;
+    const baseRoute = getMessageRoute({ sessionId, participantType });
+    const separator = baseRoute.includes("?") ? "&" : "?";
+    const nextRoute = `${baseRoute}${separator}fallback=${encodeURIComponent(kind || "text")}`;
+    if (`${window.location.pathname}${window.location.search}` === nextRoute) return;
+    window.setTimeout(() => {
+      if (typeof window === "undefined") return;
+      window.location.assign(nextRoute);
+    }, 250);
+  }
+
+  function scheduleLivekitConnectWatchdog({ mode, forceRelay }) {
+    clearLivekitConnectWatchdog();
+    const watchdogMs = Math.min(
+      getConnectWatchdogMs({
+        lowBandwidth: autoLowBandwidthActive,
+        forceRelay
+      }),
+      env.callConnectTimeoutMs || LIVEKIT_DEFAULT_CONNECT_TIMEOUT_MS
+    );
+    livekitConnectWatchdogRef.current = setTimeout(() => {
+      if (callStateRef.current === "connected") return;
+      if (!livekitRoomRef.current) return;
+      logCall("warn", "LiveKit connection watchdog fired", {
+        mode,
+        forceRelay,
+        watchdogMs
+      });
+      void handleLivekitFallback(
+        new Error("Call connection timed out before media stabilized."),
+        {
+          currentMode: mode,
+          forceRelay,
+          phase: "connect-timeout"
+        }
+      );
+    }, watchdogMs);
+  }
+
   async function getLivekitModule() {
     return import("livekit-client");
   }
@@ -827,6 +1062,64 @@ export function useSessionRealtime(sessionId) {
       video: Boolean(video)
     });
     stream.getTracks().forEach((track) => track.stop());
+  }
+
+  async function handleLivekitFallback(error, { currentMode, forceRelay, phase }) {
+    const nextAction = getNextFallbackAction({
+      currentMode,
+      forceRelay,
+      preferVoiceNote: env.preferVoiceNoteFallback
+    });
+
+    logCall("warn", "LiveKit fallback triggered", {
+      phase,
+      currentMode,
+      forceRelay,
+      nextAction,
+      error: error?.message || error
+    });
+
+    clearLivekitConnectWatchdog();
+    setStatus(nextAction.status);
+    markNetworkSlow(nextAction.detail);
+
+    if (nextAction.kind === "retry") {
+      disconnectLivekitRoom();
+      const nextIsVideo = nextAction.nextMode === CALL_MEDIA_MODE.VIDEO;
+      const nextForceRelay = Boolean(nextAction.forceRelay);
+      forceRelayRef.current = nextForceRelay;
+      setCallState("reconnecting");
+      setCallLaunchStage("connecting");
+      if (!canStartCall) {
+        setAcceptedCallMode(nextIsVideo ? "video" : "audio");
+      }
+      const auth = await fetchLivekitToken();
+      return connectLivekitRoom({
+        video: nextIsVideo,
+        auth,
+        retryOnAuthError: false,
+        forceRelay: nextForceRelay,
+        source: "fallback"
+      });
+    }
+
+    disconnectLivekitRoom();
+    setCallState("failed");
+    setCallLaunchStage("idle");
+    setCallLaunchStartedAt(null);
+    notifyWithCooldown("livekit_terminal_fallback", {
+      title: "Network Fallback",
+      message: nextAction.status,
+      type: "warning",
+      route: getMessageRoute({ sessionId, participantType })
+    });
+    sendAutomatedFallbackMessage(
+      nextAction.kind === "voice-note"
+        ? "voice note fallback activated"
+        : "switched to text chat"
+    );
+    routeToAsyncFallback(nextAction.kind);
+    return false;
   }
 
   function attachTrackToElements(track) {
@@ -882,19 +1175,10 @@ export function useSessionRealtime(sessionId) {
     if (!room || localVideoTrackRef.current) return;
     const [videoTrack] = await createLocalTracks({
       audio: false,
-      video: lowBandwidth
-        ? {
-            width: 320,
-            height: 240,
-            frameRate: 12,
-            facingMode: "user"
-          }
-        : {
-            width: 640,
-            height: 360,
-            frameRate: 15,
-            facingMode: "user"
-          }
+      video: buildLivekitVideoCaptureOptions({
+        lowBandwidth,
+        facingMode: "user"
+      })
     });
     if (!videoTrack) return;
     await room.localParticipant.publishTrack(videoTrack);
@@ -925,12 +1209,24 @@ export function useSessionRealtime(sessionId) {
     setStatus("Video connected");
   }
 
-  async function connectLivekitRoom({ video, auth = null, retryOnAuthError = true }) {
+  async function connectLivekitRoom({
+    video,
+    auth = null,
+    retryOnAuthError = true,
+    forceRelay = forceRelayRef.current,
+    source = "manual"
+  }) {
     if (!livekitEnabled) {
       throw new Error("LiveKit is not enabled. Configure VITE_LIVEKIT_URL.");
     }
     if (livekitConnectingRef.current) return;
     livekitConnectingRef.current = true;
+    const requestedMode = video ? CALL_MEDIA_MODE.VIDEO : CALL_MEDIA_MODE.AUDIO;
+    livekitAttemptRef.current = {
+      mode: requestedMode,
+      forceRelay: Boolean(forceRelay),
+      startedAt: Date.now()
+    };
     try {
       if (livekitRoomRef.current) {
         disconnectLivekitRoom();
@@ -959,29 +1255,41 @@ export function useSessionRealtime(sessionId) {
         }
       }
 
-      const { Room, RoomEvent, createLocalTracks } = await getLivekitModule();
+      if (!shouldPublishAudio && !shouldPublishVideo) {
+        return handleLivekitFallback(
+          new Error("Camera and microphone are unavailable on this device."),
+          {
+            currentMode: requestedMode,
+            forceRelay,
+            phase: "media-permission"
+          }
+        );
+      }
+
+      const { EngineEvent, Room, RoomEvent, createLocalTracks } = await getLivekitModule();
       const effectiveAuth = auth || (await fetchLivekitToken());
       logCall("info", "Connecting to LiveKit room", {
         roomName: effectiveAuth?.roomName,
         url: effectiveAuth?.url || env.livekitUrl,
         participantType,
+        source,
+        attempt: describeLivekitAttempt({
+          mode: shouldPublishVideo ? CALL_MEDIA_MODE.VIDEO : CALL_MEDIA_MODE.AUDIO,
+          forceRelay
+        })
       });
-      const room = new Room({
-        adaptiveStream: true,
-        dynacast: true,
-        rtcConfig: {
+      const room = new Room(
+        buildLivekitRoomOptions({
           iceServers: livekitIceServers,
-          iceCandidatePoolSize: 8
-        },
-        publishDefaults: {
-          simulcast: true,
-          videoEncoding: {
-            maxBitrate: autoLowBandwidthActive ? 250_000 : 500_000,
-            maxFramerate: autoLowBandwidthActive ? 12 : 15
-          }
-        }
-      });
+          lowBandwidth: autoLowBandwidthActive,
+          forceRelay
+        })
+      );
       livekitRoomRef.current = room;
+      scheduleLivekitConnectWatchdog({
+        mode: shouldPublishVideo ? CALL_MEDIA_MODE.VIDEO : CALL_MEDIA_MODE.AUDIO,
+        forceRelay
+      });
 
       room.on(RoomEvent.TrackSubscribed, (track, _publication, participant) => {
         if (livekitDisconnectingRef.current) return;
@@ -1023,6 +1331,8 @@ export function useSessionRealtime(sessionId) {
         if (state === "connected") {
           livekitReconnectAttemptsRef.current = 0;
           clearLivekitReconnectTimer();
+          clearLivekitConnectWatchdog();
+          startLivekitDiagnosticsPolling(room);
           markNetworkGood("LiveKit room connected.");
           setStatus("Call connected");
           setCallState("connected");
@@ -1034,10 +1344,23 @@ export function useSessionRealtime(sessionId) {
             });
           }
         } else if (state === "reconnecting") {
+          startLivekitDiagnosticsPolling(room);
           markNetworkReconnecting("LiveKit reconnecting...");
+          setStatus("Reconnecting...");
         } else if (state === "disconnected" && !livekitDisconnectingRef.current) {
           markNetworkSlow("LiveKit disconnected.");
-          queueLivekitReconnect(room);
+          setStatus("Reconnecting...");
+          clearLivekitConnectWatchdog();
+          void handleLivekitFallback(
+            new Error("LiveKit connection was disconnected."),
+            {
+              currentMode: livekitAttemptRef.current.mode,
+              forceRelay: livekitAttemptRef.current.forceRelay,
+              phase: "state-disconnected"
+            }
+          ).catch(() => {
+            queueLivekitReconnect(room);
+          });
         }
       });
       room.on(RoomEvent.ParticipantConnected, (participant) => {
@@ -1045,6 +1368,10 @@ export function useSessionRealtime(sessionId) {
       });
       room.on(RoomEvent.ParticipantDisconnected, (participant) => {
         logCall("warn", "Participant left", participant?.identity || participant?.name || participant?.sid);
+      });
+      room.engine?.on?.(EngineEvent.TransportsCreated, () => {
+        logCall("info", "LiveKit transports created");
+        startLivekitDiagnosticsPolling(room);
       });
       room.localParticipant?.on?.("connectionQualityChanged", (quality) => {
         const level = Number(quality ?? 0);
@@ -1057,11 +1384,14 @@ export function useSessionRealtime(sessionId) {
       });
 
       try {
-        await room.connect(effectiveAuth.url || env.livekitUrl, effectiveAuth.token, {
-          maxRetries: LIVEKIT_CONNECT_MAX_RETRIES,
-          websocketTimeout: LIVEKIT_WEBSOCKET_TIMEOUT_MS,
-          peerConnectionTimeout: LIVEKIT_PEER_CONNECT_TIMEOUT_MS
-        });
+        await room.connect(
+          effectiveAuth.url || env.livekitUrl,
+          effectiveAuth.token,
+          buildLivekitConnectOptions({
+            websocketTimeoutMs: LIVEKIT_WEBSOCKET_TIMEOUT_MS,
+            peerConnectionTimeoutMs: LIVEKIT_PEER_CONNECT_TIMEOUT_MS
+          })
+        );
         logCall("info", "Connected to room", effectiveAuth?.roomName);
       } catch (error) {
         logCall("error", "LiveKit room connection failed", error?.message || error);
@@ -1069,10 +1399,19 @@ export function useSessionRealtime(sessionId) {
           const freshAuth = await fetchLivekitToken();
           disconnectLivekitRoom();
           livekitConnectingRef.current = false;
-          await connectLivekitRoom({ video: shouldPublishVideo, auth: freshAuth, retryOnAuthError: false });
-          return;
+          return connectLivekitRoom({
+            video: shouldPublishVideo,
+            auth: freshAuth,
+            retryOnAuthError: false,
+            forceRelay,
+            source
+          });
         }
-        throw error;
+        return handleLivekitFallback(error, {
+          currentMode: shouldPublishVideo ? CALL_MEDIA_MODE.VIDEO : CALL_MEDIA_MODE.AUDIO,
+          forceRelay,
+          phase: "connect-error"
+        });
       }
 
       if (shouldPublishAudio) {
@@ -1116,6 +1455,7 @@ export function useSessionRealtime(sessionId) {
         localVideoRef.current.play().catch(() => {});
       }
       setCameraOn(Boolean(shouldPublishVideo));
+      return true;
     } finally {
       livekitConnectingRef.current = false;
     }
@@ -1125,6 +1465,7 @@ export function useSessionRealtime(sessionId) {
     livekitDisconnectingRef.current = true;
     livekitConnectingRef.current = false;
     clearLivekitReconnectTimer();
+    clearLivekitConnectWatchdog();
     livekitReconnectAttemptsRef.current = 0;
     try {
       if (localAudioTrackRef.current) localAudioTrackRef.current.stop();
@@ -1149,6 +1490,14 @@ export function useSessionRealtime(sessionId) {
       logCall("info", "Call ended");
       livekitRoomRef.current = null;
       livekitDisconnectingRef.current = false;
+      livekitDiagnosticsSnapshotRef.current = {
+        publisherConnectionState: "",
+        publisherIceConnectionState: "",
+        subscriberConnectionState: "",
+        subscriberIceConnectionState: "",
+        localCandidateType: "",
+        remoteCandidateType: ""
+      };
     }
     detachRemoteTracks();
   }
@@ -1332,6 +1681,7 @@ export function useSessionRealtime(sessionId) {
     pendingLivekitStartRef.current = null;
     (async () => {
       try {
+        resetFallbackState();
         setStatus("");
         setCallLaunchStage("preparing");
         setCallLaunchStartedAt(Date.now());
@@ -1406,6 +1756,7 @@ export function useSessionRealtime(sessionId) {
       setStatus("Call service is unavailable. LiveKit URL is not configured.");
       return;
     }
+    forceRelayRef.current = false;
     pendingVideoUpgradeRef.current = false;
     startLivekitCall(false);
   }
@@ -1426,6 +1777,7 @@ export function useSessionRealtime(sessionId) {
         return;
       }
       const startWithVideo = !lowBandwidthMode;
+      forceRelayRef.current = false;
       pendingVideoUpgradeRef.current = !startWithVideo;
       pendingHomeownerVideoRef.current = startWithVideo;
       if (!startWithVideo) {
@@ -1535,6 +1887,7 @@ export function useSessionRealtime(sessionId) {
       return;
     }
     try {
+      resetFallbackState();
       setStatus("");
       const allowVideo = incomingSnapshot.hasVideo && !lowBandwidthMode;
       pendingVideoUpgradeRef.current = Boolean(incomingSnapshot.hasVideo) && !allowVideo;
@@ -1565,7 +1918,14 @@ export function useSessionRealtime(sessionId) {
       });
       setCallConnectedAt(joinedAt);
       setCallState("connecting");
-      await connectLivekitRoom({ video: allowVideo, auth: auth?.data ?? auth });
+      const connected = await connectLivekitRoom({
+        video: allowVideo,
+        auth: auth?.data ?? auth
+      });
+      if (!connected) {
+        acceptingCallRef.current = false;
+        return;
+      }
       setCallState("connected");
       setCallLaunchStage("idle");
       setCallLaunchStartedAt(null);
@@ -1618,6 +1978,7 @@ export function useSessionRealtime(sessionId) {
       pendingOfferRef.current = null;
       pendingVideoUpgradeRef.current = false;
       clearSessionCallAccess(sessionId);
+      resetFallbackState();
       return;
     }
     if (!livekitEnabled) {
@@ -1883,6 +2244,7 @@ export function useSessionRealtime(sessionId) {
     audioOnlyModalKeyRef.current = "";
     pendingHomeownerVideoRef.current = false;
     clearSessionCallAccess(sessionId);
+    resetFallbackState();
   }
 
   useEffect(() => {
@@ -1916,6 +2278,33 @@ export function useSessionRealtime(sessionId) {
     applyAudioOutputPreference();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [speakerOn, callState]);
+
+  useEffect(() => {
+    clearCallRingTimeout();
+    if (!livekitEnabled || !canStartCall || callState !== "ringing" || !callSessionRef.current) {
+      return undefined;
+    }
+    const timeoutMs = getRingTimeoutMs(
+      env.callRingTimeoutMs,
+      LIVEKIT_DEFAULT_RING_TIMEOUT_MS
+    );
+    callRingTimeoutRef.current = setTimeout(() => {
+      logCall("warn", "Call unanswered before timeout", {
+        callSessionId: callSessionRef.current,
+        timeoutMs
+      });
+      setStatus("No answer. Call cancelled.");
+      notifyWithCooldown("call_timeout", {
+        title: "Call Timeout",
+        message: "Nobody answered within 30 seconds.",
+        type: "warning",
+        route: `/session/${sessionId}/message`
+      });
+      endCall(true);
+    }, timeoutMs);
+    return () => clearCallRingTimeout();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [callState, canStartCall, livekitEnabled, sessionId]);
 
   useEffect(() => {
     const socket = acquireSignalingSocket(sessionId);
@@ -2050,7 +2439,9 @@ export function useSessionRealtime(sessionId) {
         setCallState("connecting");
         setStatus("Participant joined. Connecting call...");
         stopLocalPreview();
-        connectLivekitRoom({ video: allowVideo }).catch((error) => {
+        connectLivekitRoom({ video: allowVideo }).then((connected) => {
+          if (connected === false) return;
+        }).catch((error) => {
           setStatus(error?.message || "Unable to connect call");
           setCallState("failed");
         });
