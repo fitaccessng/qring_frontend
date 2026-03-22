@@ -14,6 +14,7 @@ import { normalizeNotification, parseNotificationPayload } from "../utils/notifi
 import { resolveNotificationRoute } from "../utils/notificationRouting";
 import { notify } from "../utils/notifier";
 import { registerFcmPushSubscription, setupForegroundMessageListener } from "../services/pushMessagingService";
+import { isNativeApp } from "../utils/nativeRuntime";
 
 const NotificationsContext = createContext(null);
 const POLL_INTERVAL_MS = 45000;
@@ -43,6 +44,7 @@ function toNotification(raw, role) {
 
 export function NotificationsProvider({ children }) {
   const { user } = useAuth();
+  const nativeApp = isNativeApp();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [connected, setConnected] = useState(false);
@@ -167,6 +169,7 @@ export function NotificationsProvider({ children }) {
   }, [user?.id, user?.role]);
 
   useEffect(() => {
+    if (nativeApp) return () => {};
     let dispose = () => {};
     setupForegroundMessageListener(() => {
       refresh({ silent: true });
@@ -176,12 +179,13 @@ export function NotificationsProvider({ children }) {
     return () => {
       dispose();
     };
-  }, []);
+  }, [nativeApp]);
 
   useEffect(() => {
+    if (nativeApp) return;
     if (permission !== "granted") return;
     registerFcmPushSubscription().catch(() => {});
-  }, [permission]);
+  }, [nativeApp, permission]);
 
   useEffect(() => {
     items

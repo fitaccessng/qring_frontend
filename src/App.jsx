@@ -86,6 +86,24 @@ const SessionMessagePage = lazy(() => import("./pages/visitor/SessionMessagePage
 const SessionAudioPage = lazy(() => import("./pages/visitor/SessionAudioPage"));
 const SessionVideoPage = lazy(() => import("./pages/visitor/SessionVideoPage"));
 
+const MARKETING_ROUTES = [
+  "/",
+  "/about",
+  "/pricing",
+  "/contact",
+  "/platform",
+  "/security",
+  "/api-docs",
+  "/company",
+  "/blog",
+  "/careers",
+  "/legal",
+  "/privacy",
+  "/terms",
+  "/compliance",
+  "/request-demo"
+];
+
 export default function App() {
   return (
     <ThemeProvider>
@@ -102,6 +120,8 @@ export default function App() {
 
 function AppRoutes() {
   const location = useLocation();
+  const nativeApp = isNativeCapacitorApp();
+  const nativeEntryRoute = getNativeEntryRoute();
   const [showPreloader, setShowPreloader] = useState(() => {
     if (typeof window === "undefined") return true;
     return sessionStorage.getItem("qring_preloader_seen") !== "true";
@@ -134,6 +154,7 @@ function AppRoutes() {
   return (
     <>
       <SpaRedirectRecovery />
+      {nativeApp ? <NativeRouteGuard currentPath={location.pathname} entryRoute={nativeEntryRoute} /> : null}
       {showPreloader ? (
         <AppPreloader />
       ) : (
@@ -141,21 +162,21 @@ function AppRoutes() {
           <GlobalNotifications />
           <div className="animate-screen-enter">
             <Routes location={location}>
-              <Route path="/" element={<LandingPage />} />
-              <Route path="/about" element={<AboutPage />} />
-              <Route path="/pricing" element={<PricingPage />} />
-              <Route path="/contact" element={<ContactPage />} />
-              <Route path="/platform" element={<PlatformPage />} />
-              <Route path="/security" element={<SecurityPage />} />
-              <Route path="/api-docs" element={<ApiDocsPage />} />
-              <Route path="/company" element={<CompanyPage />} />
-              <Route path="/blog" element={<BlogPage />} />
-              <Route path="/careers" element={<CareersPage />} />
-              <Route path="/legal" element={<LegalPage />} />
-              <Route path="/privacy" element={<PrivacyPage />} />
-              <Route path="/terms" element={<TermsPage />} />
-              <Route path="/compliance" element={<CompliancePage />} />
-              <Route path="/request-demo" element={<RequestDemoPage />} />
+              <Route path="/" element={nativeApp ? <Navigate to={nativeEntryRoute} replace /> : <LandingPage />} />
+              {!nativeApp ? <Route path="/about" element={<AboutPage />} /> : null}
+              {!nativeApp ? <Route path="/pricing" element={<PricingPage />} /> : null}
+              {!nativeApp ? <Route path="/contact" element={<ContactPage />} /> : null}
+              {!nativeApp ? <Route path="/platform" element={<PlatformPage />} /> : null}
+              {!nativeApp ? <Route path="/security" element={<SecurityPage />} /> : null}
+              {!nativeApp ? <Route path="/api-docs" element={<ApiDocsPage />} /> : null}
+              {!nativeApp ? <Route path="/company" element={<CompanyPage />} /> : null}
+              {!nativeApp ? <Route path="/blog" element={<BlogPage />} /> : null}
+              {!nativeApp ? <Route path="/careers" element={<CareersPage />} /> : null}
+              {!nativeApp ? <Route path="/legal" element={<LegalPage />} /> : null}
+              {!nativeApp ? <Route path="/privacy" element={<PrivacyPage />} /> : null}
+              {!nativeApp ? <Route path="/terms" element={<TermsPage />} /> : null}
+              {!nativeApp ? <Route path="/compliance" element={<CompliancePage />} /> : null}
+              {!nativeApp ? <Route path="/request-demo" element={<RequestDemoPage />} /> : null}
               <Route element={<PublicOnlyRoute />}>
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/admin/login" element={<AdminLoginPage />} />
@@ -292,6 +313,43 @@ function GlobalNotifications() {
       <BlockingModal />
     </>
   );
+}
+
+function NativeRouteGuard({ currentPath, entryRoute }) {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!MARKETING_ROUTES.includes(currentPath)) return;
+    navigate(entryRoute, { replace: true });
+  }, [currentPath, entryRoute, navigate]);
+
+  return null;
+}
+
+function isNativeCapacitorApp() {
+  try {
+    return Boolean(window?.Capacitor?.isNativePlatform?.());
+  } catch {
+    return false;
+  }
+}
+
+function getNativeEntryRoute() {
+  if (typeof window === "undefined") return "/login";
+  try {
+    const token = localStorage.getItem("qring_access_token");
+    const rawUser = localStorage.getItem("qring_user");
+    const user = rawUser ? JSON.parse(rawUser) : null;
+    if (!token || !user?.role) return "/login";
+    const role = String(user.role).toLowerCase();
+    if (role === "homeowner") return "/dashboard/homeowner/overview";
+    if (role === "estate") return "/dashboard/estate";
+    if (role === "security") return "/dashboard/security";
+    if (role === "admin") return "/dashboard/admin";
+  } catch {
+    // Fall back to auth entry route below.
+  }
+  return "/login";
 }
 
 function SpaRedirectRecovery() {

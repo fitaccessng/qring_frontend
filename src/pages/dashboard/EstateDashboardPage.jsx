@@ -3,6 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { BarChart3, BellRing, Building2, ClipboardList, DoorClosed, FileText, Home, LogOut, MapPinned, Megaphone, Plus, Settings2, Shield, Users, Vote } from "lucide-react";
 import NotificationBell from "../../components/notifications/NotificationBell";
 import NotificationPanel from "../../components/notifications/NotificationPanel";
+import RenewNowModal from "../../components/subscription/RenewNowModal";
+import SubscriptionStatusBanner from "../../components/subscription/SubscriptionStatusBanner";
 import AppShell from "../../layouts/AppShell";
 import { getEstateOverview, listEstateAlerts } from "../../services/estateService";
 import { showError } from "../../utils/flash";
@@ -54,6 +56,7 @@ export default function EstateDashboardPage() {
   const [logoutBusy, setLogoutBusy] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [setupModalOpen, setSetupModalOpen] = useState(true);
+  const [renewModalOpen, setRenewModalOpen] = useState(false);
   const notificationsPanelRef = useRef(null);
   const notificationsButtonRef = useRef(null);
 
@@ -208,6 +211,7 @@ export default function EstateDashboardPage() {
   return (
     <AppShell title="Estate Hub" showTopBar={false}>
       <div className="mx-auto w-full max-w-4xl space-y-8 px-2 py-3 sm:px-3 sm:py-4">
+        <SubscriptionStatusBanner subscription={subscription} onPrimaryAction={() => setRenewModalOpen(true)} />
         <section className="rounded-[1.6rem] border border-slate-200/70 bg-white/95 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/90 sm:p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
@@ -396,6 +400,7 @@ export default function EstateDashboardPage() {
           </button>
         </div>
       </MobileBottomSheet>
+      <RenewNowModal open={renewModalOpen} subscription={subscription} onClose={() => setRenewModalOpen(false)} />
     </AppShell>
   );
 }

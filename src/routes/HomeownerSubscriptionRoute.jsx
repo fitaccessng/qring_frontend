@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
-import { getMySubscription } from "../services/paymentService";
+import { getSubscriptionSummary } from "../services/paymentService";
+import { normalizeSubscriptionSummary } from "../utils/subscription";
 
 export default function HomeownerSubscriptionRoute() {
   const [loading, setLoading] = useState(true);
@@ -12,9 +13,9 @@ export default function HomeownerSubscriptionRoute() {
     async function checkSubscription() {
       setLoading(true);
       try {
-        const subscription = await getMySubscription();
+        const subscription = normalizeSubscriptionSummary(await getSubscriptionSummary());
         if (!active) return;
-        setAllowed(subscription?.status === "active");
+        setAllowed(subscription?.can?.("view_dashboard") ?? subscription?.status === "active");
       } catch {
         if (!active) return;
         setAllowed(false);

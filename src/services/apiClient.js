@@ -146,6 +146,17 @@ function emitFlash(message, type = "error") {
   );
 }
 
+function emitBlockingSubscription(detail = {}) {
+  if (typeof window === "undefined") return;
+  const message = String(detail.message ?? "").trim();
+  if (!message) return;
+  window.dispatchEvent(
+    new CustomEvent("qring:blocking", {
+      detail
+    })
+  );
+}
+
 async function refreshAccessToken() {
   if (refreshPromise) return refreshPromise;
   const refreshToken = localStorage.getItem("qring_refresh_token");
@@ -297,10 +308,20 @@ export async function apiRequest(path, options = {}, attempt = 0) {
       emitFlash("Session timeout. Please login again.", "warning");
       redirectToLogin();
     }
+    const isSubscriptionBlocked = response.status === 403 && payload?.code === "SUBSCRIPTION_ACTION_BLOCKED";
     const message = shouldHandleSessionTimeout
       ? "Session timeout. Please login again."
       : payload?.message ?? payload?.detail ?? `Request failed (${response.status})`;
-    if (!silent) emitFlash(message, "error");
+    if (isSubscriptionBlocked) {
+      emitBlockingSubscription({
+        title: payload?.subscription?.status === "suspended" ? "Service paused" : "Subscription restriction",
+        message,
+        actionLabel: payload?.subscription?.is_bill_payer ?? payload?.subscription?.isBillPayer ? "Renew Now" : "",
+        actionRoute: payload?.renew_url ?? payload?.subscription?.renew_url ?? payload?.subscription?.renewUrl ?? "/billing/paywall"
+      });
+    } else if (!silent) {
+      emitFlash(message, "error");
+    }
     throw new ApiError(
       message,
       response.status,

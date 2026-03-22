@@ -5,6 +5,18 @@ export async function getMySubscription() {
   return response?.data ?? null;
 }
 
+export async function getSubscriptionSummary() {
+  try {
+    const response = await apiRequest("/payment/subscription/summary", { silent: true });
+    return response?.data ?? null;
+  } catch (error) {
+    if (error?.status && error.status !== 404) {
+      throw error;
+    }
+    return getMySubscription();
+  }
+}
+
 export async function getBillingPlans() {
   const response = await apiRequest("/payment/plans");
   return Array.isArray(response?.data) ? response.data : [];

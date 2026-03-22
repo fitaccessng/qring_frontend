@@ -3,6 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { Activity, Clock3, DoorOpen, FileText, Info, LogOut, MessageSquare, Phone, Settings2 } from "lucide-react";
 import NotificationBell from "../../components/notifications/NotificationBell";
 import NotificationPanel from "../../components/notifications/NotificationPanel";
+import RenewNowModal from "../../components/subscription/RenewNowModal";
+import SubscriptionStatusBanner from "../../components/subscription/SubscriptionStatusBanner";
 import AppShell from "../../layouts/AppShell";
 import { useDashboardData } from "../../hooks/useDashboardData";
 import useSubscription from "../../hooks/useSubscription";
@@ -12,13 +14,14 @@ import { useNotifications } from "../../state/NotificationsContext";
 import { useSocketEvents } from "../../hooks/useSocketEvents";
 
 export default function HomeownerDashboardPage() {
-  const { subscription } = useSubscription();
+  const { subscription, can } = useSubscription();
   const { user, logout } = useAuth();
   const { unreadCount } = useNotifications();
   const navigate = useNavigate();
   const [managedByEstate, setManagedByEstate] = useState(false);
   const [logoutBusy, setLogoutBusy] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [renewModalOpen, setRenewModalOpen] = useState(false);
   const notificationsPanelRef = useRef(null);
   const notificationsButtonRef = useRef(null);
   const {
@@ -256,6 +259,7 @@ export default function HomeownerDashboardPage() {
   return (
     <AppShell title="Homeowner Overview" showTopBar={false}>
       <div className="mx-auto w-full max-w-4xl space-y-8 px-2 py-3 sm:px-3 sm:py-4">
+        <SubscriptionStatusBanner subscription={subscription} onPrimaryAction={() => setRenewModalOpen(true)} />
         <section className="rounded-[1.6rem] border border-slate-200/70 bg-white/95 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/90 sm:p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
@@ -401,6 +405,7 @@ export default function HomeownerDashboardPage() {
               <Link
                 key={group.label}
                 to={group.to}
+                title={!can("view_dashboard") ? "This action is limited by your current subscription state." : ""}
                 className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-4 transition-all active:scale-[0.99] dark:border-slate-700 dark:bg-slate-900/80"
               >
                 <div className="flex items-center gap-3">
@@ -425,7 +430,12 @@ export default function HomeownerDashboardPage() {
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {actionCards.map((action) => (
-              <ActionCard key={action.label} {...action} />
+              <ActionCard
+                key={action.label}
+                {...action}
+                disabled={!managedByEstate && action.label === "Digital Access" && !can("create_qr")}
+                disabledReason="This action is currently limited by your subscription."
+              />
             ))}
           </div>
         </section>
@@ -466,6 +476,7 @@ export default function HomeownerDashboardPage() {
           {/* <p className="text-xs text-slate-500">Session: {session?.state || "Idle"}</p> */}
         </section>
       </div>
+      <RenewNowModal open={renewModalOpen} subscription={subscription} onClose={() => setRenewModalOpen(false)} />
     </AppShell>
   );
 }
@@ -516,7 +527,28 @@ function PercentPill({ value }) {
   );
 }
 
-function ActionCard({ label, to, icon, accent, glow }) {
+function ActionCard({ label, to, icon, accent, glow, disabled = false, disabledReason = "" }) {
+  if (disabled) {
+    return (
+      <div
+        title={disabledReason}
+        className="relative overflow-hidden rounded-[1.6rem] border border-slate-200 bg-slate-100/80 p-4 opacity-70 dark:border-slate-700 dark:bg-slate-800/70"
+      >
+        <div className={`absolute inset-0 bg-gradient-to-br ${accent}`} />
+        <div className={`absolute -right-6 top-4 h-16 w-16 rounded-full blur-2xl ${glow}`} />
+        <div className="relative flex items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-black text-slate-900 dark:text-white">{label}</p>
+            <p className="mt-2 text-xs font-medium text-slate-500 dark:text-slate-300">{disabledReason}</p>
+          </div>
+          <span className="grid h-10 w-10 place-items-center rounded-2xl bg-white/80 text-slate-500 shadow-sm dark:bg-slate-900/70">
+            {icon}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <Link
       to={to}

@@ -1,4 +1,5 @@
 import { apiRequest } from "./apiClient";
+import { isNativeApp } from "../utils/nativeRuntime";
 
 export async function getNotifications() {
   const response = await apiRequest("/notifications/", { silent: true });
@@ -45,6 +46,9 @@ export async function clearNotifications() {
 }
 
 export async function requestBrowserNotificationPermission() {
+  if (isNativeApp()) {
+    return "unsupported";
+  }
   if (typeof window === "undefined" || typeof window.Notification === "undefined") {
     return "unsupported";
   }

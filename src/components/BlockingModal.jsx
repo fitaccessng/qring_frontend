@@ -9,7 +9,9 @@ export default function BlockingModal() {
       const message = String(detail.message ?? "").trim();
       if (!message) return;
       const title = String(detail.title ?? "Notice").trim() || "Notice";
-      setModal({ title, message });
+      const actionLabel = String(detail.actionLabel ?? "").trim();
+      const actionRoute = String(detail.actionRoute ?? "").trim();
+      setModal({ title, message, actionLabel, actionRoute });
     };
 
     window.addEventListener("qring:blocking", handleOpen);
@@ -31,6 +33,18 @@ export default function BlockingModal() {
         </p>
         <p className="mt-3 text-base font-semibold text-slate-900">{modal.message}</p>
         <div className="mt-5 flex justify-end">
+          {modal.actionLabel && modal.actionRoute ? (
+            <button
+              type="button"
+              onClick={() => {
+                window.location.assign(modal.actionRoute);
+                setModal(null);
+              }}
+              className="mr-3 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
+            >
+              {modal.actionLabel}
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={() => setModal(null)}
