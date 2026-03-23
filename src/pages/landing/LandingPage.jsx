@@ -290,6 +290,8 @@ const Navbar = () => {
         <Link to="/signup" className="hidden md:block bg-[#2563eb] text-white px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-[#1d4ed8] transition-all">
           Get Started
         </Link>
+        
+       
       </nav>
     </>
   );
@@ -409,7 +411,9 @@ Reception teams can manage visitor check-ins, monitor building access, and keep 
           </div>
         </section>
 
-        {/* SECTION 3: KEY FEATURES */}
+       
+
+        {/* SECTION 4: KEY FEATURES */}
         <section className="py-32 bg-white px-6" id="features">
           <div className="max-w-7xl mx-auto">
             <motion.div {...fadeInUp} className="max-w-3xl">
@@ -783,7 +787,101 @@ Reception teams can manage visitor check-ins, monitor building access, and keep 
             })()}
           </div>
         </section>
+ {/* SECTION 3: APP DOWNLOADS */}
+        <section className="bg-white px-6 py-28" id="downloads">
+          <div className="mx-auto max-w-7xl">
+            <motion.div {...fadeInUp} className="max-w-3xl">
+              <span className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-[10px] font-black uppercase tracking-[0.3em] text-blue-800">
+                Mobile Apps
+              </span>
+              <h2 className="mt-6 text-3xl font-black italic uppercase tracking-tighter text-slate-900 sm:text-4xl md:text-5xl">
+                Download QRing for your device
+              </h2>
+              <p className="mt-5 text-lg font-medium leading-relaxed text-slate-600">
+                Install the Android app directly now. The iOS app section is ready on the site and will switch live once the App Store build is available.
+              </p>
+            </motion.div>
 
+            <div className="mt-14 grid gap-6 lg:grid-cols-2">
+              <motion.div
+                initial={{ opacity: 0, y: 24 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.25 }}
+                transition={{ duration: 0.75, ease: [0.22, 1, 0.36, 1] }}
+                className="relative overflow-hidden rounded-[2.5rem] border border-blue-200 bg-[linear-gradient(135deg,#071226_0%,#0f274f_52%,#2563eb_100%)] p-8 text-white shadow-[0_28px_90px_rgba(37,99,235,0.22)] sm:p-10"
+              >
+                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(255,255,255,0.18),transparent_28%),radial-gradient(circle_at_78%_80%,rgba(255,255,255,0.14),transparent_32%)]" />
+                <div className="relative">
+                  <div className="inline-flex rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.28em] text-white/90">
+                    Android
+                  </div>
+                  <h3 className="mt-6 text-3xl font-black italic uppercase tracking-tighter sm:text-4xl">APK Download</h3>
+                  <p className="mt-4 max-w-xl text-sm font-medium leading-relaxed text-white/80 sm:text-base">
+                    Download the latest QRing Android installer and sideload it on supported devices for homeowner and estate access.
+                  </p>
+
+                  <div className="mt-8 flex flex-wrap gap-3 text-[10px] font-black uppercase tracking-[0.24em] text-white/80">
+                    <span className="rounded-full border border-white/20 bg-white/10 px-4 py-2">Direct Install</span>
+                    <span className="rounded-full border border-white/20 bg-white/10 px-4 py-2">Latest Bundled APK</span>
+                    <span className="rounded-full border border-white/20 bg-white/10 px-4 py-2">Device Ready</span>
+                  </div>
+
+                  <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:items-center">
+                    <a
+                      href="/qring.apk"
+                      download="qring.apk"
+                      className="inline-flex items-center justify-center gap-3 rounded-full bg-white px-8 py-4 text-xs font-black uppercase tracking-widest text-slate-950 transition-transform hover:scale-[1.02]"
+                    >
+                      Download Android APK
+                      <ArrowRight className="h-4 w-4" />
+                    </a>
+                    <div className="text-xs font-bold text-white/70">
+                      Best for Android phones, tablets, and managed estate devices.
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 24 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.25 }}
+                transition={{ duration: 0.75, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
+                className="relative overflow-hidden rounded-[2.5rem] border border-slate-200 bg-slate-50 p-8 shadow-[0_24px_70px_rgba(2,6,23,0.06)] sm:p-10"
+              >
+                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_22%_18%,rgba(37,99,235,0.10),transparent_26%),radial-gradient(circle_at_82%_78%,rgba(15,23,42,0.08),transparent_28%)]" />
+                <div className="relative">
+                  <div className="inline-flex rounded-full border border-slate-200 bg-white px-4 py-2 text-[10px] font-black uppercase tracking-[0.28em] text-slate-700">
+                    iOS
+                  </div>
+                  <h3 className="mt-6 text-3xl font-black italic uppercase tracking-tighter text-slate-900 sm:text-4xl">Coming Soon</h3>
+                  <p className="mt-4 max-w-xl text-sm font-medium leading-relaxed text-slate-600 sm:text-base">
+                    The iPhone version is being prepared for release. This section is already in place and will switch to an App Store download as soon as it is ready.
+                  </p>
+
+                  <div className="mt-8 flex flex-wrap gap-3 text-[10px] font-black uppercase tracking-[0.24em] text-slate-500">
+                    <span className="rounded-full border border-slate-200 bg-white px-4 py-2">App Store Release</span>
+                    <span className="rounded-full border border-slate-200 bg-white px-4 py-2">Same QRing Experience</span>
+                    <span className="rounded-full border border-slate-200 bg-white px-4 py-2">In Review Pipeline</span>
+                  </div>
+
+                  <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:items-center">
+                    <button
+                      type="button"
+                      disabled
+                      className="inline-flex items-center justify-center rounded-full bg-slate-200 px-8 py-4 text-xs font-black uppercase tracking-widest text-slate-500"
+                    >
+                      iOS Coming Soon
+                    </button>
+                    <div className="text-xs font-bold text-slate-500">
+                      Share this page with iPhone users so they can check back when the release goes live.
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          </div>
+        </section>
         {/* SECTION 7: FAQ */}
         <section className="py-32 bg-white px-6" id="faq">
           <div className="max-w-4xl mx-auto">
