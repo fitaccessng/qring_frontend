@@ -1,0 +1,1 @@
+import{a}from"./index-D1BVixCN.js";async function o(){const t=await a("/homeowner/settings");return(t==null?void 0:t.data)??null}async function i(t){const n=await a("/homeowner/settings",{method:"PUT",body:JSON.stringify(t)});return(n==null?void 0:n.data)??null}export{o as g,i as u};

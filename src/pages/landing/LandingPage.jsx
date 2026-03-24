@@ -812,8 +812,13 @@ Reception teams can manage visitor check-ins, monitor building access, and keep 
               >
                 <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(255,255,255,0.18),transparent_28%),radial-gradient(circle_at_78%_80%,rgba(255,255,255,0.14),transparent_32%)]" />
                 <div className="relative">
-                  <div className="inline-flex rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.28em] text-white/90">
-                    Android
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-[1.35rem] bg-white p-3 shadow-[0_14px_32px_rgba(15,23,42,0.18)]">
+                      <img src="/qring_logo.png" alt="QRing logo" className="h-full w-full object-contain" />
+                    </div>
+                    <div className="inline-flex rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.28em] text-white/90">
+                      Android
+                    </div>
                   </div>
                   <h3 className="mt-6 text-3xl font-black italic uppercase tracking-tighter sm:text-4xl">APK Download</h3>
                   <p className="mt-4 max-w-xl text-sm font-medium leading-relaxed text-white/80 sm:text-base">
@@ -839,7 +844,7 @@ Reception teams can manage visitor check-ins, monitor building access, and keep 
                       <ArrowRight className="h-4 w-4" />
                     </a>
                     <div className="text-xs font-bold text-white/70">
-                      Best for Android phones, tablets, and managed estate devices. Download size about 9.4 MB.
+                      Best for Android phones, tablets, and managed estate devices. Download size about 19.3 MB.
                     </div>
                   </div>
                 </div>
