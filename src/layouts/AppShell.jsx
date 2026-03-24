@@ -10,6 +10,7 @@ import { useNotifications } from "../state/NotificationsContext";
 const navByRole = {
   homeowner: [
     { to: "/dashboard/homeowner/overview", label: "Overview", icon: "overview" },
+    { to: "/dashboard/homeowner/safety", label: "Safety", icon: "shield" },
     { to: "/dashboard/homeowner/appointments", label: "Appointments", icon: "appointments" },
     { to: "/dashboard/homeowner/visits", label: "Visits", icon: "visits" },
     { to: "/dashboard/homeowner/messages", label: "Messages", icon: "messages" },
@@ -36,6 +37,7 @@ const navByRole = {
     { to: "/dashboard/estate/mappings", label: "Mappings", icon: "mappings" },
     { to: "/dashboard/estate/logs", label: "Access Logs", icon: "logs" },
     { to: "/dashboard/estate/security", label: "Security Team", icon: "shield" },
+    { to: "/dashboard/estate/emergency", label: "Emergency", icon: "bell_ring" },
     { to: "/dashboard/estate/plan", label: "Plan Rules", icon: "plans" },
     { to: "/dashboard/estate/community", label: "Community", icon: "community" },
     { to: "/billing/paywall", label: "Billing", icon: "billing" },
@@ -44,6 +46,7 @@ const navByRole = {
   ],
   security: [
     { to: "/dashboard/security", label: "Gate Hub", icon: "shield" },
+    { to: "/dashboard/security/emergency", label: "Emergency", icon: "bell_ring" },
     { to: "/dashboard/security/messages", label: "Messages", icon: "messages" },
     { to: "/dashboard/notifications", label: "Notifications", icon: "bell_ring" }
   ],
@@ -240,17 +243,18 @@ export default function AppShell({ title, children, showTopBar = true }) {
     const handleEscape = (event) => {
       if (event.key === "Escape") setNotificationsOpen(false);
     };
-    document.addEventListener("mousedown", handleOutside, true);
-    document.addEventListener("click", handleOutside, true);
-    document.addEventListener("touchstart", handleOutside, { passive: true });
+    document.addEventListener("pointerdown", handleOutside, true);
     document.addEventListener("keydown", handleEscape);
     return () => {
-      document.removeEventListener("mousedown", handleOutside, true);
-      document.removeEventListener("click", handleOutside, true);
-      document.removeEventListener("touchstart", handleOutside);
+      document.removeEventListener("pointerdown", handleOutside, true);
       document.removeEventListener("keydown", handleEscape);
     };
   }, [notificationsOpen]);
+
+  function handleNotificationsToggle(event) {
+    event?.stopPropagation?.();
+    setNotificationsOpen((prev) => !prev);
+  }
 
   function handleBack() {
     if (canGoBack) {
@@ -388,7 +392,7 @@ export default function AppShell({ title, children, showTopBar = true }) {
                       <NotificationBell
                         unreadCount={unreadCount}
                         isOpen={notificationsOpen}
-                        onClick={() => setNotificationsOpen((prev) => !prev)}
+                        onClick={handleNotificationsToggle}
                       />
                     </div>
                     {isEstateUser ? (

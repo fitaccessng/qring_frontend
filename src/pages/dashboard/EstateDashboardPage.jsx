@@ -113,15 +113,11 @@ export default function EstateDashboardPage() {
       if (event.key === "Escape") setNotificationsOpen(false);
     }
 
-    document.addEventListener("mousedown", handleOutside, true);
-    document.addEventListener("click", handleOutside, true);
-    document.addEventListener("touchstart", handleOutside, { passive: true });
+    document.addEventListener("pointerdown", handleOutside, true);
     document.addEventListener("keydown", handleEscape);
 
     return () => {
-      document.removeEventListener("mousedown", handleOutside, true);
-      document.removeEventListener("click", handleOutside, true);
-      document.removeEventListener("touchstart", handleOutside);
+      document.removeEventListener("pointerdown", handleOutside, true);
       document.removeEventListener("keydown", handleEscape);
     };
   }, [notificationsOpen]);
@@ -152,6 +148,11 @@ export default function EstateDashboardPage() {
       []
     )
   );
+
+  function handleNotificationsToggle(event) {
+    event?.stopPropagation?.();
+    setNotificationsOpen((prev) => !prev);
+  }
 
   const counts = useMemo(
     () => ({
@@ -228,7 +229,7 @@ export default function EstateDashboardPage() {
                 <NotificationBell
                   unreadCount={unreadCount}
                   isOpen={notificationsOpen}
-                  onClick={() => setNotificationsOpen((prev) => !prev)}
+                  onClick={handleNotificationsToggle}
                 />
               </div>
               <button

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Activity, Clock3, DoorOpen, FileText, Info, LogOut, MessageSquare, Phone, Settings2 } from "lucide-react";
+import { Activity, Clock3, DoorOpen, FileText, Info, LogOut, MessageSquare, Phone, Settings2, Siren } from "lucide-react";
 import NotificationBell from "../../components/notifications/NotificationBell";
 import NotificationPanel from "../../components/notifications/NotificationPanel";
 import RenewNowModal from "../../components/subscription/RenewNowModal";
@@ -103,15 +103,11 @@ export default function HomeownerDashboardPage() {
       if (event.key === "Escape") setNotificationsOpen(false);
     }
 
-    document.addEventListener("mousedown", handleOutside, true);
-    document.addEventListener("click", handleOutside, true);
-    document.addEventListener("touchstart", handleOutside, { passive: true });
+    document.addEventListener("pointerdown", handleOutside, true);
     document.addEventListener("keydown", handleEscape);
 
     return () => {
-      document.removeEventListener("mousedown", handleOutside, true);
-      document.removeEventListener("click", handleOutside, true);
-      document.removeEventListener("touchstart", handleOutside);
+      document.removeEventListener("pointerdown", handleOutside, true);
       document.removeEventListener("keydown", handleEscape);
     };
   }, [notificationsOpen]);
@@ -141,120 +137,99 @@ export default function HomeownerDashboardPage() {
     }
   }
 
+  function handleNotificationsToggle(event) {
+    event?.stopPropagation?.();
+    setNotificationsOpen((prev) => !prev);
+  }
+
   const taskGroups = [
     {
       label: "Approvals",
-      subtitle: `${metrics.pendingApprovals} pending`,
       to: "/dashboard/homeowner/visits",
       icon: <Activity size={14} />,
       percent: totalSignals > 0 ? Math.round(((Number(metrics.pendingApprovals) || 0) / totalSignals) * 100) : 0
     },
     {
       label: "Visits",
-      subtitle: `${metrics.activeVisitors} active`,
       to: "/dashboard/homeowner/visits",
       icon: <Activity size={14} />,
       percent: totalSignals > 0 ? Math.round(((Number(metrics.activeVisitors) || 0) / totalSignals) * 100) : 0
     },
     {
       label: "Messages",
-      subtitle: `${metrics.unreadMessages} unread`,
       to: "/dashboard/homeowner/messages",
       icon: <MessageSquare size={14} />,
       percent: totalSignals > 0 ? Math.round(((Number(metrics.unreadMessages) || 0) / totalSignals) * 100) : 0
     },
     {
       label: "Doors",
-      subtitle: "Manage access",
       to: "/dashboard/homeowner/doors",
       icon: <DoorOpen size={14} />,
       percent: connected || !realtimeEnabled ? 100 : loading ? 40 : 0
     },
     {
       label: "Calls",
-      subtitle: `${metrics.callsToday} today`,
       to: "/dashboard/homeowner/messages",
       icon: <Phone size={14} />,
       percent: totalSignals > 0 ? Math.round(((Number(metrics.callsToday) || 0) / totalSignals) * 100) : 0
     }
   ];
-  const actionCards = useMemo(() => {
-    const base = [];
+  const actionItems = useMemo(() => {
+    const base = [
+      ...taskGroups,
+      {
+        label: "Panic",
+        to: "/dashboard/homeowner/safety",
+        icon: <Siren size={14} />,
+        percent: 100
+      },
+      {
+        label: "Settings",
+        to: "/dashboard/homeowner/settings",
+        icon: <Settings2 size={14} />,
+        percent: 100
+      }
+    ];
 
     if (managedByEstate) {
       base.push(
         {
           label: "Live Queue",
           to: "/dashboard/homeowner/live-queue",
-          icon: <Activity size={18} />,
-          eyebrow: "Real-time",
-          description: "Track visitor arrivals and approvals as they happen.",
-          badge: "Live",
-          accent: "from-emerald-100/80 via-white/10 to-transparent",
-          glow: "bg-emerald-300/50"
+          icon: <Activity size={14} />,
+          percent: 100
         },
         {
           label: "Receipts",
           to: "/dashboard/homeowner/receipts",
-          icon: <FileText size={18} />,
-          eyebrow: "Payments",
-          description: "Keep your payment history and receipts organized.",
-          badge: "Records",
-          accent: "from-amber-100/80 via-white/10 to-transparent",
-          glow: "bg-amber-300/50"
+          icon: <FileText size={14} />,
+          percent: 100
+        },
+        {
+          label: "Automation",
+          to: "/dashboard/homeowner/automation",
+          icon: <Settings2 size={14} />,
+          percent: 100
+        },
+        {
+          label: "Digital Access",
+          to: "/dashboard/homeowner/access-passes",
+          icon: <DoorOpen size={14} />,
+          percent: 100,
+          disabled: !can("create_qr")
         }
       );
     } else {
       base.push({
         label: "Billing",
         to: "/billing/paywall",
-        icon: <MessageSquare size={18} />,
-        eyebrow: "Subscription",
-        description: "Manage your plan and payment methods.",
-        badge: "Plan",
-        accent: "from-violet-100/80 via-white/10 to-transparent",
-        glow: "bg-violet-300/50"
+        icon: <FileText size={14} />,
+        percent: 100
       });
     }
 
-    base.push({
-      label: "Settings",
-      to: "/dashboard/homeowner/settings",
-      icon: <Settings2 size={18} />,
-      eyebrow: "Profile",
-      description: "Update profile details, alerts, and preferences.",
-      badge: "Manage",
-      accent: "from-slate-100/80 via-white/10 to-transparent",
-      glow: "bg-slate-300/50"
-    });
-
-    if (managedByEstate) {
-      base.push(
-        {
-          label: "Automation",
-          to: "/dashboard/homeowner/automation",
-          icon: <Settings2 size={18} />,
-          eyebrow: "Rules",
-          description: "Tune trusted visitor approval, delivery options, and fallback alerts.",
-          badge: "Smart",
-          accent: "from-emerald-100/80 via-white/10 to-transparent",
-          glow: "bg-emerald-300/50"
-        },
-        {
-          label: "Digital Access",
-          to: "/dashboard/homeowner/access-passes",
-          icon: <DoorOpen size={18} />,
-          eyebrow: "QR / PIN",
-          description: "Issue temporary QR and PIN passes for visitors and deliveries.",
-          badge: "Fast",
-          accent: "from-sky-100/80 via-white/10 to-transparent",
-          glow: "bg-sky-300/50"
-        }
-      );
-    }
-
     return base;
-  }, [managedByEstate]);
+  }, [taskGroups, managedByEstate, can]);
 
   return (
     <AppShell title="Homeowner Overview" showTopBar={false}>
@@ -276,7 +251,7 @@ export default function HomeownerDashboardPage() {
                 <NotificationBell
                   unreadCount={unreadCount}
                   isOpen={notificationsOpen}
-                  onClick={() => setNotificationsOpen((prev) => !prev)}
+                  onClick={handleNotificationsToggle}
                 />
               </div>
               <button
@@ -400,41 +375,15 @@ export default function HomeownerDashboardPage() {
 
         <section className="space-y-4">
           <h3 className="text-2xl font-black text-slate-900 dark:text-white">Action Items</h3>
-          <div className="space-y-4">
-            {taskGroups.map((group) => (
-              <Link
+          <div className="grid grid-cols-3 gap-3">
+            {actionItems.map((group) => (
+              <ActionItemGridCard
                 key={group.label}
                 to={group.to}
-                title={!can("view_dashboard") ? "This action is limited by your current subscription state." : ""}
-                className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-4 transition-all active:scale-[0.99] dark:border-slate-700 dark:bg-slate-900/80"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="grid h-8 w-8 place-items-center rounded-xl bg-violet-100 text-violet-600 dark:bg-violet-500/20 dark:text-violet-300">
-                    {group.icon}
-                  </span>
-                  <div>
-                    <p className="text-sm font-bold text-slate-900 dark:text-white">{group.label}</p>
-                    <p className="text-xs text-slate-500">{group.subtitle}</p>
-                  </div>
-                </div>
-                <PercentPill value={loading ? 0 : group.percent} />
-              </Link>
-            ))}
-          </div>
-        </section>
-
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xl font-black text-slate-900 dark:text-white">Quick Actions</h3>
-            <span className="text-xs font-semibold text-slate-500">Homeowner tools</span>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {actionCards.map((action) => (
-              <ActionCard
-                key={action.label}
-                {...action}
-                disabled={!managedByEstate && action.label === "Digital Access" && !can("create_qr")}
-                disabledReason="This action is currently limited by your subscription."
+                icon={group.icon}
+                label={group.label}
+                title={group.disabled ? "This action is currently limited by your subscription." : ""}
+                disabled={Boolean(group.disabled)}
               />
             ))}
           </div>
@@ -527,24 +476,19 @@ function PercentPill({ value }) {
   );
 }
 
-function ActionCard({ label, to, icon, accent, glow, disabled = false, disabledReason = "" }) {
+function ActionItemGridCard({ label, to, icon, title = "", disabled = false }) {
   if (disabled) {
     return (
       <div
-        title={disabledReason}
-        className="relative overflow-hidden rounded-[1.6rem] border border-slate-200 bg-slate-100/80 p-4 opacity-70 dark:border-slate-700 dark:bg-slate-800/70"
+        title={title}
+        className="rounded-[1.4rem] border border-slate-200 bg-slate-100/80 px-3 py-4 text-center opacity-70 shadow-sm dark:border-slate-700 dark:bg-slate-900/60"
       >
-        <div className={`absolute inset-0 bg-gradient-to-br ${accent}`} />
-        <div className={`absolute -right-6 top-4 h-16 w-16 rounded-full blur-2xl ${glow}`} />
-        <div className="relative flex items-start justify-between gap-3">
-          <div>
-            <p className="text-sm font-black text-slate-900 dark:text-white">{label}</p>
-            <p className="mt-2 text-xs font-medium text-slate-500 dark:text-slate-300">{disabledReason}</p>
-          </div>
-          <span className="grid h-10 w-10 place-items-center rounded-2xl bg-white/80 text-slate-500 shadow-sm dark:bg-slate-900/70">
+        <div className="mx-auto flex w-full max-w-[4.25rem] items-center justify-center">
+          <span className="grid h-12 w-12 place-items-center rounded-2xl bg-slate-200 text-slate-500 shadow-sm dark:bg-slate-800 dark:text-slate-400">
             {icon}
           </span>
         </div>
+        <p className="mt-3 text-xs font-bold leading-5 text-slate-700 dark:text-slate-200">{label}</p>
       </div>
     );
   }
@@ -552,16 +496,15 @@ function ActionCard({ label, to, icon, accent, glow, disabled = false, disabledR
   return (
     <Link
       to={to}
-      className="group relative overflow-hidden rounded-[1.6rem] border border-slate-200/80 bg-white p-4 text-sm text-slate-900 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md active:translate-y-0 active:shadow-sm dark:border-slate-700 dark:bg-slate-900/90 dark:text-slate-100"
+      title={title}
+      className="group rounded-[1.4rem] border border-slate-200 bg-white px-3 py-4 text-center shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md active:translate-y-0 active:shadow-sm dark:border-slate-700 dark:bg-slate-900/80"
     >
-      <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${accent} opacity-70`} />
-      <div className={`pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full ${glow} blur-2xl opacity-70`} />
-      <div className="relative flex items-center gap-3">
-        <span className="grid h-11 w-11 place-items-center rounded-2xl bg-white/92 text-slate-900 shadow-sm ring-1 ring-slate-200/80 transition group-hover:-rotate-3 dark:bg-slate-950 dark:text-slate-100 dark:ring-slate-700">
+      <div className="mx-auto flex w-full max-w-[4.25rem] items-center justify-center">
+        <span className="grid h-12 w-12 place-items-center rounded-2xl bg-violet-100 text-violet-600 shadow-sm transition group-hover:scale-105 dark:bg-violet-500/20 dark:text-violet-300">
           {icon}
         </span>
-        <p className="text-base font-black tracking-tight">{label}</p>
       </div>
+      <p className="mt-3 text-xs font-bold leading-5 text-slate-900 dark:text-white">{label}</p>
     </Link>
   );
 }

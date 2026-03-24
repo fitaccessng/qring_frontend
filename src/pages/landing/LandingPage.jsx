@@ -819,6 +819,9 @@ Reception teams can manage visitor check-ins, monitor building access, and keep 
                   <p className="mt-4 max-w-xl text-sm font-medium leading-relaxed text-white/80 sm:text-base">
                     Download the latest QRing Android installer and sideload it on supported devices for homeowner and estate access.
                   </p>
+                  <p className="mt-3 text-xs font-bold uppercase tracking-[0.24em] text-blue-100/90">
+                    Updated build: March 24, 2026
+                  </p>
 
                   <div className="mt-8 flex flex-wrap gap-3 text-[10px] font-black uppercase tracking-[0.24em] text-white/80">
                     <span className="rounded-full border border-white/20 bg-white/10 px-4 py-2">Direct Install</span>
@@ -836,7 +839,7 @@ Reception teams can manage visitor check-ins, monitor building access, and keep 
                       <ArrowRight className="h-4 w-4" />
                     </a>
                     <div className="text-xs font-bold text-white/70">
-                      Best for Android phones, tablets, and managed estate devices.
+                      Best for Android phones, tablets, and managed estate devices. Download size about 9.4 MB.
                     </div>
                   </div>
                 </div>

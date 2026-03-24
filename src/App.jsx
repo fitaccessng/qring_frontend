@@ -52,6 +52,8 @@ const HomeownerLiveQueuePage = lazy(() => import("./pages/dashboard/HomeownerLiv
 const HomeownerReceiptsPage = lazy(() => import("./pages/dashboard/HomeownerReceiptsPage"));
 const BillingCallbackPage = lazy(() => import("./pages/dashboard/BillingCallbackPage"));
 const HomeownerAlertsPage = lazy(() => import("./pages/dashboard/HomeownerAlertsPage"));
+const HomeownerSafetyPage = lazy(() => import("./pages/dashboard/HomeownerSafetyPage"));
+const HomeownerEmergencyContactsPage = lazy(() => import("./pages/dashboard/HomeownerEmergencyContactsPage"));
 const HomeownerMaintenancePage = lazy(() => import("./pages/dashboard/HomeownerMaintenancePage"));
 const EstateDashboardPage = lazy(() => import("./pages/dashboard/EstateDashboardPage"));
 const EstateCreatePage = lazy(() => import("./pages/dashboard/EstateCreatePage"));
@@ -63,6 +65,7 @@ const EstateLogsPage = lazy(() => import("./pages/dashboard/EstateLogsPage"));
 const EstatePlanPage = lazy(() => import("./pages/dashboard/EstatePlanPage"));
 const EstateHomesPage = lazy(() => import("./pages/dashboard/EstateHomesPage"));
 const EstateSecurityPage = lazy(() => import("./pages/dashboard/EstateSecurityPage"));
+const EstateEmergencyPage = lazy(() => import("./pages/dashboard/EstateEmergencyPage"));
 const EstateSettingsPage = lazy(() => import("./pages/dashboard/EstateSettingsPage"));
 const EstateCommunityBoardPage = lazy(() => import("./pages/dashboard/EstateCommunityBoardPage"));
 const EstateBroadcastsPage = lazy(() => import("./pages/dashboard/EstateBroadcastsPage"));
@@ -72,6 +75,7 @@ const EstateDuesPage = lazy(() => import("./pages/dashboard/EstateDuesPage"));
 const EstateMaintenancePage = lazy(() => import("./pages/dashboard/EstateMaintenancePage"));
 const EstateStatsPage = lazy(() => import("./pages/dashboard/EstateStatsPage"));
 const SecurityDashboardPage = lazy(() => import("./pages/dashboard/SecurityDashboardPage"));
+const SecurityEmergencyPage = lazy(() => import("./pages/dashboard/SecurityEmergencyPage"));
 const SecurityMessagesPage = lazy(() => import("./pages/dashboard/SecurityMessagesPage"));
 const AdminDashboardPage = lazy(() => import("./pages/dashboard/AdminDashboardPage"));
 const AdminPaymentsPage = lazy(() => import("./pages/dashboard/AdminPaymentsPage"));
@@ -235,6 +239,8 @@ function AppRoutes() {
                   <Route path="/dashboard/homeowner/visits" element={<LazyRoute><HomeownerVisitsPage /></LazyRoute>} />
                   <Route path="/dashboard/homeowner/messages" element={<LazyRoute><HomeownerMessagesPage /></LazyRoute>} />
                   <Route path="/dashboard/homeowner/doors" element={<LazyRoute><HomeownerDoorsPage /></LazyRoute>} />
+                  <Route path="/dashboard/homeowner/safety" element={<LazyRoute><HomeownerSafetyPage /></LazyRoute>} />
+                  <Route path="/dashboard/homeowner/emergency-contacts" element={<LazyRoute><HomeownerEmergencyContactsPage /></LazyRoute>} />
                   <Route element={<EstateManagedHomeownerRoute />}>
                     <Route path="/dashboard/homeowner/automation" element={<LazyRoute><HomeownerAutomationPage /></LazyRoute>} />
                     <Route path="/dashboard/homeowner/access-passes" element={<LazyRoute><HomeownerAccessPassesPage /></LazyRoute>} />
@@ -256,6 +262,7 @@ function AppRoutes() {
                   <Route path="/dashboard/estate/plan" element={<LazyRoute><EstatePlanPage /></LazyRoute>} />
                   <Route path="/dashboard/estate/homes" element={<LazyRoute><EstateHomesPage /></LazyRoute>} />
                   <Route path="/dashboard/estate/security" element={<LazyRoute><EstateSecurityPage /></LazyRoute>} />
+                  <Route path="/dashboard/estate/emergency" element={<LazyRoute><EstateEmergencyPage /></LazyRoute>} />
                   <Route path="/dashboard/estate/community" element={<LazyRoute><EstateCommunityBoardPage /></LazyRoute>} />
                   <Route path="/dashboard/estate/settings" element={<LazyRoute><EstateSettingsPage /></LazyRoute>} />
                   <Route path="/dashboard/estate/broadcasts" element={<LazyRoute><EstateBroadcastsPage /></LazyRoute>} />
@@ -267,6 +274,7 @@ function AppRoutes() {
                 </Route>
                 <Route element={<RoleRoute allowedRoles={["security"]} />}>
                   <Route path="/dashboard/security" element={<LazyRoute><SecurityDashboardPage /></LazyRoute>} />
+                  <Route path="/dashboard/security/emergency" element={<LazyRoute><SecurityEmergencyPage /></LazyRoute>} />
                   <Route path="/dashboard/security/messages" element={<LazyRoute><SecurityMessagesPage /></LazyRoute>} />
                 </Route>
                 <Route element={<RoleRoute allowedRoles={["admin"]} />}>

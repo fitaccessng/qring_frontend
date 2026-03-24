@@ -61,11 +61,10 @@ function toDateValue(...values) {
   return null;
 }
 
-function truncateMessage(message) {
+function normalizeMessage(message) {
   const text = String(message || "").trim().replace(/\s+/g, " ");
   if (!text) return "You have a new notification.";
-  if (text.length <= 110) return text;
-  return `${text.slice(0, 107).trimEnd()}...`;
+  return text;
 }
 
 function toTitleCase(value) {
@@ -104,7 +103,7 @@ export function normalizeNotification(raw, route = "/dashboard/notifications") {
   const createdAt = toDateValue(raw?.createdAt, raw?.created_at, raw?.timestamp, payload?.createdAt);
   const readAt = toDateValue(raw?.readAt, raw?.read_at, payload?.readAt);
   const title = String(raw?.title || meta.title || "Notification").trim();
-  const message = truncateMessage(raw?.message || raw?.body || raw?.description || payload?.message || payload?.body);
+  const message = normalizeMessage(raw?.message || raw?.body || raw?.description || payload?.message || payload?.body);
   const sessionId = String(payload?.sessionId || payload?.visitId || payload?.session_id || "").trim();
   const status = String(payload?.status || payload?.decision || "").toLowerCase();
   const canRespondToVisit = kind.startsWith("visitor.request") && Boolean(sessionId) && !["approved", "rejected", "denied"].includes(status);

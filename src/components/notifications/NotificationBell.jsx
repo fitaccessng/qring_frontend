@@ -4,13 +4,15 @@ export default function NotificationBell({ unreadCount, onClick, isOpen = false 
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={(event) => onClick?.(event)}
       className={`group relative grid h-12 w-12 place-items-center rounded-full border backdrop-blur-sm transition-all duration-200 ${
         isOpen
           ? "border-sky-700/80 bg-slate-900 text-white shadow-[0_16px_36px_rgba(15,23,42,0.24)] dark:border-sky-400/70 dark:bg-sky-300 dark:text-slate-950"
           : "border-slate-200/80 bg-white/90 text-slate-600 shadow-[0_10px_24px_rgba(15,23,42,0.06)] hover:-translate-y-0.5 hover:border-sky-300/70 hover:text-sky-800 hover:shadow-[0_16px_34px_rgba(15,23,42,0.12)] dark:border-slate-700/80 dark:bg-slate-900/90 dark:text-slate-200 dark:hover:border-sky-500/70 dark:hover:text-white"
       }`}
       aria-label="Notifications"
+      aria-expanded={isOpen}
+      aria-haspopup="dialog"
       title="Notifications"
     >
       <span

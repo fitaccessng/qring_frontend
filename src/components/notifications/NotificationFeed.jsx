@@ -187,10 +187,12 @@ export default function NotificationFeed({
                         <div className="flex flex-wrap items-start justify-between gap-2">
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                              <p className="truncate text-sm font-black text-slate-900 dark:text-white">{item.title}</p>
+                              <p className="text-sm font-black text-slate-900 dark:text-white">{item.title}</p>
                               {item.unread ? <span className="h-2.5 w-2.5 rounded-full bg-sky-500" aria-hidden="true" /> : null}
                             </div>
-                            <p className="mt-1 line-clamp-2 text-sm text-slate-600 dark:text-slate-300">{item.message}</p>
+                            <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-600 dark:text-slate-300">
+                              {item.message}
+                            </p>
                           </div>
                           <div className="shrink-0 text-right">
                             <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
