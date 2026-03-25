@@ -59,6 +59,7 @@ export default function EstateSettingsPage() {
   });
   const [overview, setOverview] = useState(null);
   const [selectedEstateId, setSelectedEstateId] = useState("");
+  const [joinCode, setJoinCode] = useState("");
   const [reminderFrequencyDays, setReminderFrequencyDays] = useState(1);
   const [reminderMode, setReminderMode] = useState("daily");
   const [securityRules, setSecurityRules] = useState({
@@ -132,6 +133,7 @@ export default function EstateSettingsPage() {
         if (!active) return;
         const days = Number(data?.reminderFrequencyDays ?? 1);
         const safeDays = Number.isFinite(days) && days > 0 ? days : 1;
+        setJoinCode(String(data?.joinCode || ""));
         setReminderFrequencyDays(safeDays);
         setReminderMode(safeDays === 1 ? "daily" : safeDays === 7 ? "weekly" : "custom");
         setSecurityRules({
@@ -289,6 +291,34 @@ export default function EstateSettingsPage() {
                   </div>
                 ))}
               </div>
+
+              {joinCode ? (
+                <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/40">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">Resident join code</p>
+                      <p className="mt-1 truncate text-sm font-extrabold tracking-wide text-slate-900 dark:text-white">{joinCode}</p>
+                      <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                        Share this with residents so they can link their unit during onboarding.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard?.writeText(joinCode);
+                          showSuccess("Join code copied.");
+                        } catch {
+                          showError("Unable to copy join code.");
+                        }
+                      }}
+                      className="shrink-0 rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                </div>
+              ) : null}
 
               <button
                 type="button"

@@ -2,6 +2,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import AuthCard from "../../components/AuthCard";
 import { useAuth } from "../../state/AuthContext";
+import { requestEmailVerification } from "../../services/authService";
 
 const MOBILE_ONBOARDING_INTENT_KEY = "qring_mobile_onboarding_intent";
 
@@ -20,6 +21,7 @@ export default function SignupPage() {
   const [continuing, setContinuing] = useState(false);
   const [signupSuccess, setSignupSuccess] = useState(false);
   const [pendingCredentials, setPendingCredentials] = useState(null);
+  const [verification, setVerification] = useState({ sending: false, status: "" });
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -55,6 +57,27 @@ export default function SignupPage() {
       await signup(form);
       setPendingCredentials({ email: form.email, password: form.password });
       setSignupSuccess(true);
+      // Backend already attempts sending verification mail, but we also trigger a best-effort resend
+      // so the user immediately gets a link (and we can show clear UI feedback).
+      setVerification({ sending: true, status: "" });
+      try {
+        const response = await requestEmailVerification({ email: String(form.email || "").trim().toLowerCase() });
+        const status = response?.data?.emailStatus ?? response?.emailStatus ?? "unknown";
+        const reason = response?.data?.emailReason ?? response?.emailReason ?? "";
+        if (String(status).toLowerCase() === "sent") {
+          setVerification({ sending: false, status: "Verification email sent. Check your inbox and spam." });
+        } else {
+          setVerification({
+            sending: false,
+            status: `Verification email could not be sent (${status}${reason ? `: ${reason}` : ""}).`
+          });
+        }
+      } catch (err) {
+        setVerification({
+          sending: false,
+          status: err?.message || "Unable to send verification email right now. Use Resend to try again."
+        });
+      }
     } catch (submitError) {
       setError(submitError.message ?? "Signup failed");
     } finally {
@@ -71,7 +94,13 @@ export default function SignupPage() {
       localStorage.setItem(MOBILE_ONBOARDING_INTENT_KEY, "1");
       navigate("/onboarding", { replace: true });
     } catch (submitError) {
-      setError(submitError.message ?? "Login failed after signup");
+      const status = Number(submitError?.status ?? 0);
+      const message = String(submitError?.message ?? "");
+      if (status === 403 && message.toLowerCase().includes("not verified")) {
+        setError("Email is not verified yet. Please verify your email, then tap “I’ve verified, continue”.");
+      } else {
+        setError(submitError.message ?? "Login failed after signup");
+      }
     } finally {
       setContinuing(false);
     }
@@ -172,16 +201,60 @@ export default function SignupPage() {
             <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Congratulations</p>
             <h2 className="mt-2 text-2xl font-extrabold text-slate-900">Account Created</h2>
             <p className="mt-3 text-sm font-medium text-slate-700">
-              Your account is ready. Click continue to start onboarding.
+              Verify your email to activate login, then continue to onboarding.
             </p>
+            <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-xs font-semibold text-slate-800">Email verification</p>
+              <p className="mt-1 text-xs text-slate-600">
+                We sent a verification link to <span className="font-semibold">{pendingCredentials?.email}</span>.
+              </p>
+              {verification.status ? <p className="mt-2 text-xs text-slate-600">{verification.status}</p> : null}
+              <button
+                type="button"
+                disabled={verification.sending}
+                onClick={async () => {
+                  const email = String(pendingCredentials?.email || "").trim().toLowerCase();
+                  if (!email) return;
+                  setVerification({ sending: true, status: "" });
+                  try {
+                    const response = await requestEmailVerification({ email });
+                    const status = response?.data?.emailStatus ?? response?.emailStatus ?? "unknown";
+                    const reason = response?.data?.emailReason ?? response?.emailReason ?? "";
+                    if (String(status).toLowerCase() === "sent") {
+                      setVerification({ sending: false, status: "Verification email sent. Check your inbox and spam." });
+                    } else {
+                      setVerification({
+                        sending: false,
+                        status: `Verification email could not be sent (${status}${reason ? `: ${reason}` : ""}).`
+                      });
+                    }
+                  } catch (err) {
+                    setVerification({
+                      sending: false,
+                      status: err?.message || "Unable to resend verification email."
+                    });
+                  }
+                }}
+                className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 hover:bg-slate-100 disabled:opacity-60"
+              >
+                {verification.sending ? "Sending..." : "Resend verification email"}
+              </button>
+            </div>
+            {error ? <p className="mt-3 text-sm text-danger">{error}</p> : null}
             <button
               type="button"
               onClick={onContinueAfterSignup}
               disabled={continuing}
               className="mt-6 w-full rounded-xl bg-brand-500 px-4 py-3 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-60"
             >
-              {continuing ? "Please wait..." : "Continue"}
+              {continuing ? "Please wait..." : "I’ve verified, continue"}
             </button>
+            <Link
+              to={`/login?email=${encodeURIComponent(String(pendingCredentials?.email || ""))}`}
+              className="mt-3 text-center text-xs font-semibold text-slate-600 hover:text-brand-600"
+            >
+              Go to login instead
+            </Link>
           </div>
         </div>
       ) : null}

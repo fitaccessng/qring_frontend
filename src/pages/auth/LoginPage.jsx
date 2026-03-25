@@ -2,6 +2,7 @@ import { Link, useLocation, useNavigate, useSearchParams } from "react-router-do
 import { useEffect, useState } from "react";
 import AuthCard from "../../components/AuthCard";
 import { useAuth } from "../../state/AuthContext";
+import { requestEmailVerification } from "../../services/authService";
 
 const rolePath = {
   homeowner: "/dashboard/homeowner/overview",
@@ -40,6 +41,7 @@ export default function LoginPage() {
   const [form, setForm] = useState({ email: initialLogin, password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [verificationState, setVerificationState] = useState({ needed: false, sending: false, status: "" });
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -80,6 +82,7 @@ export default function LoginPage() {
   const onSubmit = async (event) => {
     event.preventDefault();
     setError("");
+    setVerificationState({ needed: false, sending: false, status: "" });
     try {
       const data = await login(form);
       const target = resolveTargetPath(data, location.state?.from?.pathname);
@@ -88,6 +91,13 @@ export default function LoginPage() {
       }
       navigate(target, { replace: true });
     } catch (submitError) {
+      const status = Number(submitError?.status ?? 0);
+      const message = String(submitError?.message || "");
+      if (status === 403 && message.toLowerCase().includes("not verified")) {
+        setError("Email is not verified. Please verify your email to sign in.");
+        setVerificationState((prev) => ({ ...prev, needed: true }));
+        return;
+      }
       setError(resolveLoginErrorMessage(submitError));
     }
   };
@@ -128,6 +138,46 @@ export default function LoginPage() {
             onChange={(value) => setForm((prev) => ({ ...prev, password: value }))}
           />
           {error ? <p className="text-sm text-danger">{error}</p> : null}
+          {verificationState.needed ? (
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-xs font-semibold text-slate-800">Verify your email</p>
+              <p className="mt-1 text-xs text-slate-600">
+                Tap resend to get a new verification link, then try signing in again.
+              </p>
+              <button
+                type="button"
+                disabled={verificationState.sending}
+                onClick={async () => {
+                  const email = String(form.email || "").trim().toLowerCase();
+                  if (!email) {
+                    setVerificationState({ needed: true, sending: false, status: "Enter your email first." });
+                    return;
+                  }
+                  setVerificationState({ needed: true, sending: true, status: "" });
+                  try {
+                    const response = await requestEmailVerification({ email });
+                    const status = response?.data?.emailStatus ?? response?.emailStatus ?? "unknown";
+                    const reason = response?.data?.emailReason ?? response?.emailReason ?? "";
+                    if (String(status).toLowerCase() === "sent") {
+                      setVerificationState({ needed: true, sending: false, status: "Verification email sent. Check your inbox and spam." });
+                    } else {
+                      setVerificationState({
+                        needed: true,
+                        sending: false,
+                        status: `Verification email could not be sent (${status}${reason ? `: ${reason}` : ""}).`
+                      });
+                    }
+                  } catch (err) {
+                    setVerificationState({ needed: true, sending: false, status: err?.message || "Unable to resend verification email." });
+                  }
+                }}
+                className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 hover:bg-slate-100 disabled:opacity-60"
+              >
+                {verificationState.sending ? "Sending..." : "Resend verification email"}
+              </button>
+              {verificationState.status ? <p className="mt-2 text-xs text-slate-600">{verificationState.status}</p> : null}
+            </div>
+          ) : null}
           <button
             type="submit"
             disabled={loading}

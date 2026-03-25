@@ -60,6 +60,13 @@ export async function resetPassword(payload) {
   });
 }
 
+export async function requestEmailVerification(payload) {
+  return apiRequest("/auth/request-email-verification", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
 export async function refreshToken(payload) {
   return apiRequest("/auth/refresh-token", {
     method: "POST",

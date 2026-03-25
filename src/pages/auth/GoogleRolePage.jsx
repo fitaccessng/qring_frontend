@@ -18,13 +18,21 @@ export default function GoogleRolePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const intent = location.state?.intent ?? "signin-fallback";
+  const onboardingIntentKey = "qring_onboarding_role_intent";
 
   async function onContinue(event) {
     event.preventDefault();
     setError("");
 
     try {
-      const data = await googleSignUp(role);
+      const mappedRole = role === "resident" ? "homeowner" : role;
+      if (role === "resident") {
+        localStorage.setItem(onboardingIntentKey, "resident");
+      } else {
+        localStorage.removeItem(onboardingIntentKey);
+      }
+
+      const data = await googleSignUp(mappedRole);
       if (intent === "signup") {
         setShowSuccess(true);
         localStorage.setItem(MOBILE_ONBOARDING_INTENT_KEY, "1");
@@ -71,7 +79,8 @@ export default function GoogleRolePage() {
               className="w-full rounded-xl border border-slate-300 bg-white px-3 py-3 outline-none ring-brand-500 focus:ring-2 dark:border-slate-700 dark:bg-slate-900"
             >
               <option value="homeowner">Homeowner</option>
-              <option value="estate">Estate User</option>
+              <option value="estate">Estate Manager</option>
+              <option value="resident">Resident</option>
             </select>
           </label>
 

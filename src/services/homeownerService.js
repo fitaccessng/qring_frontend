@@ -123,6 +123,14 @@ export async function getHomeownerContext() {
   };
 }
 
+export async function joinEstate(payload) {
+  const response = await apiRequest("/homeowner/join-estate", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+  return response?.data ?? null;
+}
+
 export async function getHomeownerMessages() {
   const response = await apiRequest("/homeowner/messages");
   return Array.isArray(response?.data) ? response.data : [];
