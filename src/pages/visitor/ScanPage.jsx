@@ -5,6 +5,7 @@ import { apiRequest } from "../../services/apiClient";
 import { env } from "../../config/env";
 import { realtimeTransportOptions } from "../../services/socketConfig";
 import { getVisitorSessionStatus } from "../../services/homeownerService";
+import { storeVisitorSessionToken, getVisitorSessionToken } from "../../services/visitorSessionToken";
 
 const RETRYABLE_STATUSES = new Set([0, 502, 503, 504]);
 const MAX_SUBMIT_RETRIES = 2;
@@ -261,7 +262,12 @@ export default function ScanPage() {
     socketRef.current = socket;
 
     socket.on("connect", () => {
-      socket.emit("session.join", { sessionId: requestState.sessionId, displayName: "Visitor" });
+      const visitorToken = getVisitorSessionToken(requestState.sessionId);
+      socket.emit("session.join", {
+        sessionId: requestState.sessionId,
+        displayName: "Visitor",
+        visitorToken: visitorToken || undefined
+      });
     });
 
     socket.on("session.status", (payload) => {
@@ -331,6 +337,9 @@ export default function ScanPage() {
       );
       const data = response?.data ?? response;
       const latencyMs = Date.now() - startedAt;
+      if (data?.sessionId && data?.visitorToken) {
+        storeVisitorSessionToken(data.sessionId, data.visitorToken);
+      }
       setRequestState({
         sending: false,
         retrying: false,

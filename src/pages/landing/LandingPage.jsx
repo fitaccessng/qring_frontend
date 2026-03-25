@@ -284,15 +284,123 @@ const Navbar = () => {
           </div>
         <div className="hidden md:flex gap-8 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
           {[ "Security", "Pricing", "FAQ"].map((item) => (
-            <a key={item} href={`#${item.toLowerCase()}`} className="hover:text-[#3b82f6] transition-colors">{item}</a>
+            <a
+              key={item}
+              href={item === "Security" ? "#features" : `#${item.toLowerCase()}`}
+              className="hover:text-[#3b82f6] transition-colors"
+            >
+              {item}
+            </a>
           ))}
         </div>
-        <Link to="/signup" className="hidden md:block bg-[#2563eb] text-white px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-[#1d4ed8] transition-all">
-          Get Started
-        </Link>
-        
-       
+        <div className="hidden md:flex items-center gap-3">
+          <Link
+            to="/login"
+            className="rounded-full border border-slate-200 bg-white px-5 py-2 text-[10px] font-black uppercase tracking-widest text-slate-700 hover:bg-slate-50 transition-all"
+          >
+            Login
+          </Link>
+          <Link
+            to="/signup"
+            className="bg-[#2563eb] text-white px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-[#1d4ed8] transition-all"
+          >
+            Get Started
+          </Link>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setIsOpen((v) => !v)}
+          className="md:hidden inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white/80 text-slate-900 shadow-sm active:scale-[0.99]"
+          aria-label={isOpen ? "Close menu" : "Open menu"}
+        >
+          {isOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        </button>
       </nav>
+
+      <AnimatePresence>
+        {isOpen ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[120] md:hidden"
+          >
+            <button
+              type="button"
+              aria-label="Close menu"
+              onClick={() => setIsOpen(false)}
+              className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ y: -16, opacity: 0, scale: 0.98 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              exit={{ y: -16, opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.22, ease: "easeOut" }}
+              className="absolute left-3 right-3 top-3 rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_40px_120px_rgba(2,6,23,0.18)]"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="h-9 w-9 rounded-2xl flex items-center justify-center bg-slate-50 border border-slate-200">
+                    <BrandMark tone="light" className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">Menu</div>
+                    <div className="text-sm font-black uppercase tracking-tighter text-slate-900">QRing</div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsOpen(false)}
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-900"
+                  aria-label="Close menu"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="mt-4 grid gap-2">
+                {[
+                  { label: "Security", href: "#features" },
+                  { label: "Pricing", href: "#pricing" },
+                  { label: "FAQ", href: "#faq" }
+                ].map((item) => (
+                  <a
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setIsOpen(false)}
+                    className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900"
+                  >
+                    <span>{item.label}</span>
+                    <ChevronRight className="h-4 w-4 text-slate-400" />
+                  </a>
+                ))}
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <Link
+                  to="/login"
+                  onClick={() => setIsOpen(false)}
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-center text-xs font-black uppercase tracking-widest text-slate-700"
+                >
+                  Login
+                </Link>
+                <Link
+                  to="/signup"
+                  onClick={() => setIsOpen(false)}
+                  className="rounded-2xl bg-[#2563eb] px-4 py-3 text-center text-xs font-black uppercase tracking-widest text-white"
+                >
+                  Get Started
+                </Link>
+              </div>
+
+              <p className="mt-3 text-[11px] font-medium text-slate-500">
+                QRing facilitates secure visitor access and emergency coordination for estates and homes.
+              </p>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </>
   );
 };
@@ -646,44 +754,51 @@ Reception teams can manage visitor check-ins, monitor building access, and keep 
               const estatePlans = [
                 {
                   name: 'Starter Estate',
-                  tagline: 'Up to 3 doors (trial only, 30 days)',
+                  tagline: 'Up to 3 houses (trial only, 30 days)',
                   price: '₦0',
                   period: '/month',
-                  features: ['Up to 3 doors', 'Trial only - 30 days'],
+                  features: ['Up to 3 houses', 'Full system access (limited scale)', 'Trial only - 30 days'],
                   cta: 'Start Free Trial',
                 },
                 {
                   name: 'Estate Basic',
-                  tagline: 'Up to 10 doors',
-                  price: '₦8,000',
+                  tagline: 'Up to 10 houses',
+                  price: '₦6,000',
                   period: '/month',
-                  features: ['Up to 10 doors', 'Realtime alerts', 'Visitor logs', 'Resident management', 'Mobile dashboard'],
+                  features: ['Up to 10 houses', 'Realtime alerts', 'Visitor logs', 'Resident management', 'Mobile dashboard'],
                   cta: 'Start Basic',
                 },
                 {
+                  name: 'Estate Plus',
+                  tagline: 'Up to 15 houses',
+                  price: '₦9,000',
+                  period: '/month',
+                  features: ['Everything in Basic', 'Visitor scheduling', 'Access time windows', 'Chat + call verification'],
+                  cta: 'Choose Plus',
+                },
+                {
                   name: 'Estate Growth',
-                  tagline: 'Up to 25 doors',
+                  badge: 'Popular',
+                  tagline: 'Up to 30 houses',
                   price: '₦18,000',
                   period: '/month',
-                  features: ['Up to 25 doors', 'Chat + call access', 'Multi-admin roles', 'Visitor scheduling', 'Access windows', 'Analytics'],
+                  features: ['Everything in Plus', 'Multi-admin roles', 'Analytics dashboard', 'Activity tracking'],
                   cta: 'Choose Growth',
                 },
                 {
                   name: 'Estate Pro',
-                  badge: 'Popular',
-                  tagline: 'Up to 60 doors',
-                  price: '₦35,000',
+                  tagline: 'Up to 50 houses',
+                  price: '₦30,000',
                   period: '/month',
-                  highlight: true,
-                  features: ['Advanced analytics', 'Security audit logs', 'Multi-location control', 'Role permissions', 'Priority support'],
+                  features: ['Everything in Growth', 'Advanced analytics', 'Security audit logs', 'Role permissions', 'Priority support'],
                   cta: 'Start Pro',
                 },
                 {
                   name: 'Enterprise Estate',
-                  tagline: 'Custom annual contract - unlimited doors',
-                  price: 'Custom',
+                  tagline: 'Custom plan for large estates',
+                  price: 'Custom Pricing',
                   period: '',
-                  features: ['Unlimited doors', 'SLA + API access'],
+                  features: ['Unlimited houses', 'SLA + API access', 'Multi-location control', 'Dedicated support'],
                   cta: 'Contact Sales',
                 },
               ];

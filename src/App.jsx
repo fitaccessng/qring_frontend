@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { BrowserRouter, HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { Suspense, lazy, useEffect, useState } from "react";
 import LandingPage from "./pages/landing/LandingPage";
 import AboutPage from "./pages/landing/AboutPage";
@@ -21,6 +21,7 @@ import AdminSignupPage from "./pages/auth/AdminSignupPage";
 import SignupPage from "./pages/auth/SignupPage";
 import GoogleRolePage from "./pages/auth/GoogleRolePage";
 import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
+import VerifyEmailPage from "./pages/auth/VerifyEmailPage";
 import UnauthorizedPage from "./pages/common/UnauthorizedPage";
 import NotFoundPage from "./pages/common/NotFoundPage";
 import LoaderPage from "./pages/common/LoaderPage";
@@ -109,17 +110,28 @@ const MARKETING_ROUTES = [
 ];
 
 export default function App() {
+  const Router = shouldUseHashRouter() ? HashRouter : BrowserRouter;
   return (
     <ThemeProvider>
       <AuthProvider>
         <NotificationsProvider>
-          <BrowserRouter>
+          <Router>
             <AppRoutes />
-          </BrowserRouter>
+          </Router>
         </NotificationsProvider>
       </AuthProvider>
     </ThemeProvider>
   );
+}
+
+function shouldUseHashRouter() {
+  if (typeof window === "undefined") return false;
+  const mode = String(env.routerMode || "auto").toLowerCase();
+  if (mode === "hash") return true;
+  if (mode === "browser") return false;
+  // Auto: if a user arrives on a hash route (common on static hosts without rewrite rules),
+  // keep using hash routing to avoid full-page reload loops.
+  return String(window.location.hash || "").startsWith("#/");
 }
 
 function AppRoutes() {
@@ -188,6 +200,7 @@ function AppRoutes() {
                 <Route path="/signup" element={<SignupPage />} />
                 <Route path="/google-role" element={<GoogleRolePage />} />
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                <Route path="/verify-email" element={<VerifyEmailPage />} />
               </Route>
               <Route path="/loader" element={<LoaderPage />} />
 
@@ -365,15 +378,6 @@ function SpaRedirectRecovery() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const hash = typeof window !== "undefined" ? window.location.hash || "" : "";
-    if (hash.startsWith("#/")) {
-      const hashRoute = hash.slice(1);
-      const routeOnly = hashRoute.split("?")[0] || "/";
-      if (routeOnly.startsWith("/")) {
-        navigate(hashRoute, { replace: true });
-        return;
-      }
-    }
     const params = new URLSearchParams(location.search);
     const redirect = params.get("redirect");
     if (!redirect) return;

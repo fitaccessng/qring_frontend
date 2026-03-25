@@ -1,4 +1,5 @@
 import { env } from "../config/env";
+import { getVisitorSessionToken } from "./visitorSessionToken";
 
 function buildUrl(path) {
   if (!path) return "";
@@ -6,11 +7,11 @@ function buildUrl(path) {
   return `${env.apiBaseUrl}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
-async function uploadVoiceNote({ url, token, file }) {
+async function uploadVoiceNote({ url, token, file, headers: extraHeaders }) {
   const form = new FormData();
   form.append("media", file);
 
-  const headers = {};
+  const headers = { ...(extraHeaders || {}) };
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
@@ -29,9 +30,11 @@ async function uploadVoiceNote({ url, token, file }) {
 }
 
 export async function uploadVisitorVoiceNote(sessionId, file) {
+  const token = getVisitorSessionToken(sessionId);
   return uploadVoiceNote({
     url: `/visitor/sessions/${encodeURIComponent(sessionId)}/voice-notes`,
     token: "",
+    headers: token ? { "X-Visitor-Token": token } : {},
     file
   });
 }

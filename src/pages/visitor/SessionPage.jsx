@@ -4,6 +4,7 @@ import { io } from "socket.io-client";
 import { env } from "../../config/env";
 import { realtimeTransportOptions } from "../../services/socketConfig";
 import { getVisitorSessionMessages } from "../../services/homeownerService";
+import { getVisitorSessionToken } from "../../services/visitorSessionToken";
 import {
   playIncomingCallNotificationSound,
   playMessageNotificationSound
@@ -202,11 +203,13 @@ export default function SessionPage({ mode = "message" }) {
     event.preventDefault();
     const body = text.trim();
     if (!body || !socketRef.current || !joined) return;
+    const visitorToken = getVisitorSessionToken(sessionId);
     socketRef.current.emit("chat.message", {
       sessionId,
       text: body,
       displayName,
-      senderType: user?.role || "visitor"
+      senderType: user?.role || "visitor",
+      visitorToken: visitorToken || undefined
     });
     setText("");
   }
@@ -288,7 +291,8 @@ export default function SessionPage({ mode = "message" }) {
 
     socket.on("connect", () => {
       setConnected(true);
-      socket.emit("session.join", { sessionId, displayName });
+      const visitorToken = getVisitorSessionToken(sessionId);
+      socket.emit("session.join", { sessionId, displayName, visitorToken: visitorToken || undefined });
     });
     socket.on("disconnect", () => {
       setConnected(false);

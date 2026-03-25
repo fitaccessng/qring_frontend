@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useState } from "react";
 import AuthCard from "../../components/AuthCard";
 import { useAuth } from "../../state/AuthContext";
@@ -6,7 +6,9 @@ import { resetPassword } from "../../services/authService";
 
 export default function ForgotPasswordPage() {
   const { forgotPassword } = useAuth();
+  const [searchParams] = useSearchParams();
   const [email, setEmail] = useState("");
+  const [token, setToken] = useState(() => searchParams.get("token") || "");
   const [newPassword, setNewPassword] = useState("");
   const [step, setStep] = useState(1);
   const [state, setState] = useState({ loading: false, error: "", done: false, message: "" });
@@ -21,9 +23,12 @@ export default function ForgotPasswordPage() {
         loading: false,
         error: "",
         done: true,
-        message: data?.status === "email_verified" ? "Email found. Set your new password." : "Email verified."
+        message: data?.debugToken
+          ? "Check your email for a reset link, or use the debug token shown below."
+          : "If an account exists for this email, a reset link has been sent."
       });
       setStep(2);
+      if (data?.debugToken) setToken(String(data.debugToken));
     } catch (submitError) {
       setState({
         loading: false,
@@ -38,7 +43,7 @@ export default function ForgotPasswordPage() {
     event.preventDefault();
     setState((prev) => ({ ...prev, loading: true, error: "" }));
     try {
-      await resetPassword({ email, newPassword });
+      await resetPassword({ email, token, newPassword });
       setState({ loading: false, error: "", done: true, message: "Password reset successful. You can now login." });
       setStep(3);
     } catch (submitError) {
@@ -81,6 +86,16 @@ export default function ForgotPasswordPage() {
             <p className="rounded-xl bg-slate-100 p-3 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">
               {state.message || "Set your new password."}
             </p>
+            <label className="block text-sm">
+              <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">Reset Token</span>
+              <input
+                required
+                value={token}
+                onChange={(event) => setToken(event.target.value)}
+                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-3 outline-none ring-brand-500 focus:ring-2 dark:border-slate-700 dark:bg-slate-900"
+                placeholder="Paste the token from your email"
+              />
+            </label>
             <label className="block text-sm">
               <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">New Password</span>
               <input

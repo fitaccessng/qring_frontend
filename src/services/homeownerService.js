@@ -1,4 +1,5 @@
 import { apiRequest, apiUpload } from "./apiClient";
+import { getVisitorSessionToken } from "./visitorSessionToken";
 
 function getStoredHomeownerIdentity() {
   if (typeof localStorage === "undefined") return {};
@@ -236,12 +237,18 @@ export async function decideVisit(sessionId, action, options = {}) {
 }
 
 export async function getVisitorSessionStatus(sessionId) {
-  const response = await apiRequest(`/visitor/sessions/${sessionId}`);
+  const token = getVisitorSessionToken(sessionId);
+  const response = await apiRequest(`/visitor/sessions/${sessionId}`, {
+    headers: token ? { "X-Visitor-Token": token } : undefined
+  });
   return response?.data ?? null;
 }
 
 export async function getVisitorSessionMessages(sessionId) {
-  const response = await apiRequest(`/visitor/sessions/${sessionId}/messages`);
+  const token = getVisitorSessionToken(sessionId);
+  const response = await apiRequest(`/visitor/sessions/${sessionId}/messages`, {
+    headers: token ? { "X-Visitor-Token": token } : undefined
+  });
   return Array.isArray(response?.data) ? response.data : [];
 }
 

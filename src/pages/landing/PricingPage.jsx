@@ -8,42 +8,50 @@ const estatePlans = [
     id: "estate_starter",
     name: "Starter Estate",
     monthly: 0,
-    bestFor: "Up to 3 doors (trial only, 30 days)",
+    bestFor: "Up to 3 houses (trial only, 30 days)",
     cta: "Start Free Trial",
-    features: ["Up to 3 doors", "Trial only - 30 days"]
+    features: ["Up to 3 houses", "Full system access (limited scale)", "Trial only - 30 days"]
   },
   {
     id: "estate_basic",
     name: "Estate Basic",
-    monthly: 8000,
-    bestFor: "Up to 10 doors",
+    monthly: 6000,
+    bestFor: "Up to 10 houses",
     cta: "Start Basic",
-    features: ["Up to 10 doors", "Realtime alerts", "Visitor logs", "Resident management", "Mobile dashboard"]
+    features: ["Up to 10 houses", "Realtime alerts", "Visitor logs", "Resident management", "Mobile dashboard"]
+  },
+  {
+    id: "estate_plus",
+    name: "Estate Plus",
+    monthly: 9000,
+    bestFor: "Up to 15 houses",
+    cta: "Choose Plus",
+    features: ["Everything in Basic", "Visitor scheduling", "Access time windows", "Chat + call verification"]
   },
   {
     id: "estate_growth",
     name: "Estate Growth",
     monthly: 18000,
-    bestFor: "Up to 25 doors",
+    bestFor: "Up to 30 houses",
     cta: "Choose Growth",
-    features: ["Up to 25 doors", "Chat + call access", "Multi-admin roles", "Visitor scheduling", "Access windows", "Analytics"]
+    features: ["Everything in Plus", "Multi-admin roles", "Analytics dashboard", "Activity tracking"],
+    popular: true
   },
   {
     id: "estate_pro",
     name: "Estate Pro",
-    monthly: 35000,
-    bestFor: "Up to 60 doors",
+    monthly: 30000,
+    bestFor: "Up to 50 houses",
     cta: "Start Pro",
-    features: ["Advanced analytics", "Security audit logs", "Multi-location control", "Role permissions", "Priority support"],
-    popular: true
+    features: ["Everything in Growth", "Advanced analytics", "Security audit logs", "Role permissions", "Priority support"]
   },
   {
     id: "estate_enterprise",
     name: "Enterprise Estate",
     monthly: null,
-    bestFor: "Custom annual contract - unlimited doors",
+    bestFor: "Custom plan for large estates",
     cta: "Contact Sales",
-    features: ["Unlimited doors", "SLA + API access"]
+    features: ["Unlimited houses", "SLA + API access", "Multi-location control", "Dedicated support"]
   }
 ];
 
@@ -82,7 +90,7 @@ export default function PricingPage() {
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">Pricing</p>
           <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl lg:text-5xl">Plans for estates and homeowners</h1>
           <p className="mt-4 max-w-2xl text-sm text-slate-600 sm:text-base dark:text-slate-300">
-            Choose a plan based on property size. Estate plans scale by doors, homeowners get flexible personal tiers.
+            Choose a plan based on property size. Estate plans scale by houses, homeowners get flexible personal tiers.
           </p>
         </div>
       </section>
@@ -110,7 +118,7 @@ export default function PricingPage() {
               </div>
               <p className={`mt-2 text-sm ${plan.popular ? "text-white/70" : "text-slate-500"}`}>{plan.bestFor}</p>
               <div className="mt-4 text-3xl font-black">
-                {plan.monthly === null ? "Custom" : `${NAIRA}${plan.monthly.toLocaleString()}`}
+                {plan.monthly === null ? "Custom Pricing" : `${NAIRA}${plan.monthly.toLocaleString()}`}
                 {plan.monthly === null ? null : <span className="text-sm font-semibold text-slate-500">/month</span>}
               </div>
               <ul className={`mt-4 space-y-2 text-sm ${plan.popular ? "text-white/80" : "text-slate-600 dark:text-slate-300"}`}>

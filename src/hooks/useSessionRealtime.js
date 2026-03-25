@@ -18,6 +18,7 @@ import {
 } from "../services/livekitConnection";
 import { realtimeTransportOptions } from "../services/socketConfig";
 import { getVisitorSessionMessages } from "../services/homeownerService";
+import { getVisitorSessionToken } from "../services/visitorSessionToken";
 import {
   clearSessionCallAccess,
   grantSessionCallAccess
@@ -1049,7 +1050,8 @@ export function useSessionRealtime(sessionId) {
       body: JSON.stringify({
         callSessionId: callSessionRef.current,
         participantType,
-        visitorId: participantType === "visitor" ? incomingCall.visitorId || getVisitorIdentity() : undefined
+        visitorId: participantType === "visitor" ? incomingCall.visitorId || getVisitorIdentity() : undefined,
+        visitorToken: participantType === "visitor" ? (getVisitorSessionToken(sessionId) || undefined) : undefined
       })
     });
     return response?.data ?? response;
@@ -1694,7 +1696,8 @@ export function useSessionRealtime(sessionId) {
             sessionId,
             visitorId: visitorIdentity,
             visitorName: participantType === "visitor" ? displayName : undefined,
-            hasVideo: Boolean(requestVideo)
+            hasVideo: Boolean(requestVideo),
+            visitorToken: participantType === "visitor" ? (getVisitorSessionToken(sessionId) || undefined) : undefined
           })
         });
         const startedCall = startResponse?.data ?? startResponse;
@@ -1724,7 +1727,8 @@ export function useSessionRealtime(sessionId) {
               body: JSON.stringify({
                 callSessionId: callSessionRef.current,
                 participantType,
-                visitorId: participantType === "visitor" ? getVisitorIdentity() : undefined
+                visitorId: participantType === "visitor" ? getVisitorIdentity() : undefined,
+                visitorToken: participantType === "visitor" ? (getVisitorSessionToken(sessionId) || undefined) : undefined
               })
             });
           } catch {
@@ -1996,7 +2000,8 @@ export function useSessionRealtime(sessionId) {
           body: JSON.stringify({
             callSessionId: incomingCall.callSessionId,
             participantType,
-            visitorId: participantType === "visitor" ? incomingCall.visitorId || getVisitorIdentity() : undefined
+            visitorId: participantType === "visitor" ? incomingCall.visitorId || getVisitorIdentity() : undefined,
+            visitorToken: participantType === "visitor" ? (getVisitorSessionToken(sessionId) || undefined) : undefined
           })
         });
       } catch {
@@ -2057,7 +2062,8 @@ export function useSessionRealtime(sessionId) {
       text: body,
       displayName,
       senderType: user?.role || "visitor",
-      clientId
+      clientId,
+      visitorToken: getVisitorSessionToken(sessionId) || undefined
     });
     return true;
   }
@@ -2156,7 +2162,8 @@ export function useSessionRealtime(sessionId) {
             body: JSON.stringify({
               callSessionId: callSessionRef.current,
               participantType,
-              visitorId: participantType === "visitor" ? incomingCall.visitorId || getVisitorIdentity() : undefined
+              visitorId: participantType === "visitor" ? incomingCall.visitorId || getVisitorIdentity() : undefined,
+              visitorToken: participantType === "visitor" ? (getVisitorSessionToken(sessionId) || undefined) : undefined
             })
           });
         } catch {
@@ -2315,7 +2322,8 @@ export function useSessionRealtime(sessionId) {
       setConnected(true);
       connectedOnceRef.current = true;
       markNetworkReconnecting("Connected to signaling. Joining session room...");
-      socket.emit("session.join", { sessionId, displayName });
+      const visitorToken = getVisitorSessionToken(sessionId);
+      socket.emit("session.join", { sessionId, displayName, visitorToken: visitorToken || undefined });
     });
     socket.on("disconnect", () => {
       logCall("warn", "Disconnected from signaling room");

@@ -5,6 +5,7 @@ import {
   resolveVisitorAppointment,
   signalVisitorAppointmentArrival
 } from "../../services/homeownerService";
+import { storeVisitorSessionToken } from "../../services/visitorSessionToken";
 import {
   clearDeviceLocationWatch,
   checkLocationPermission,
@@ -307,6 +308,9 @@ export default function AppointmentPage() {
         deviceId,
         visitorName: visitorName.trim() || appointment.visitorName
       });
+      if (data?.sessionId && data?.visitorToken) {
+        storeVisitorSessionToken(data.sessionId, data.visitorToken);
+      }
       const scanToken = String(data?.scanQrToken || "").trim();
       const geofence = data?.geofence;
       const armed = await armGeofenceAndSignal(geofence, appointment.id, () => {
