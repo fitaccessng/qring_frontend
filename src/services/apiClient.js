@@ -309,9 +309,14 @@ export async function apiRequest(path, options = {}, attempt = 0) {
       redirectToLogin();
     }
     const isSubscriptionBlocked = response.status === 403 && payload?.code === "SUBSCRIPTION_ACTION_BLOCKED";
-    const message = shouldHandleSessionTimeout
+    const baseMessage = shouldHandleSessionTimeout
       ? "Session timeout. Please login again."
       : payload?.message ?? payload?.detail ?? `Request failed (${response.status})`;
+    const requestId = payload?.requestId ? String(payload.requestId) : "";
+    const message =
+      response.status >= 500 && !shouldHandleSessionTimeout
+        ? `${baseMessage}${requestId ? ` (ref: ${requestId})` : ""} • ${path}`
+        : baseMessage;
     if (isSubscriptionBlocked) {
       emitBlockingSubscription({
         title: payload?.subscription?.status === "suspended" ? "Service paused" : "Subscription restriction",
