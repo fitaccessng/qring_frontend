@@ -313,10 +313,18 @@ export async function apiRequest(path, options = {}, attempt = 0) {
       ? "Session timeout. Please login again."
       : payload?.message ?? payload?.detail ?? `Request failed (${response.status})`;
     const requestId = payload?.requestId ? String(payload.requestId) : "";
-    const message =
-      response.status >= 500 && !shouldHandleSessionTimeout
-        ? `${baseMessage}${requestId ? ` (ref: ${requestId})` : ""} • ${path}`
-        : baseMessage;
+    const isServerError = response.status >= 500 && !shouldHandleSessionTimeout;
+    if (isServerError) {
+      // Keep the UI friendly; log details for debugging/support.
+      // eslint-disable-next-line no-console
+      console.error("API 5xx", { path, status: response.status, requestId, payload });
+    }
+
+    const message = isServerError
+      ? path === "/homeowner/settings"
+        ? "We couldn't load your settings right now. Please try again."
+        : "Something went wrong. Please try again."
+      : baseMessage;
     if (isSubscriptionBlocked) {
       emitBlockingSubscription({
         title: payload?.subscription?.status === "suspended" ? "Service paused" : "Subscription restriction",
