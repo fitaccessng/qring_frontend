@@ -158,13 +158,18 @@ export default function LoginPage() {
                     const response = await requestEmailVerification({ email });
                     const status = response?.data?.emailStatus ?? response?.emailStatus ?? "unknown";
                     const reason = response?.data?.emailReason ?? response?.emailReason ?? "";
+                    const messageId = response?.data?.emailMessageId ?? response?.emailMessageId ?? "";
                     if (String(status).toLowerCase() === "sent") {
-                      setVerificationState({ needed: true, sending: false, status: "Verification email sent. Check your inbox and spam." });
+                      setVerificationState({
+                        needed: true,
+                        sending: false,
+                        status: `Verification email sent. Check your inbox and spam.${messageId ? ` Message-ID: ${messageId}` : ""}`
+                      });
                     } else {
                       setVerificationState({
                         needed: true,
                         sending: false,
-                        status: `Verification email could not be sent (${status}${reason ? `: ${reason}` : ""}).`
+                        status: `Verification email could not be sent (${status}${reason ? `: ${reason}` : ""}).${messageId ? ` Message-ID: ${messageId}` : ""}`
                       });
                     }
                   } catch (err) {
