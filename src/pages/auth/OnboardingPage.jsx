@@ -834,9 +834,6 @@ export default function OnboardingPage() {
 
             <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
               <span>Step {step + 1} of {totalSteps}</span>
-              <span className="truncate">
-                API: {env.apiBaseUrl}
-              </span>
             </div>
           </div>
         </section>
