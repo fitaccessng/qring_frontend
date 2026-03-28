@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Check } from "lucide-react";
 
@@ -5,8 +6,10 @@ const estatePlans = [
   {
     id: "starter-estate",
     name: "Starter Estate",
-    price: "₦0",
-    billing: "/month",
+    monthlyPrice: 0,
+    yearlyPrice: 0,
+    monthlyBilling: "/month",
+    yearlyBilling: "/year",
     intro: "Up to 3 houses",
     subsidy: "Trial only",
     note: "30 days of full system access at limited scale.",
@@ -17,8 +20,10 @@ const estatePlans = [
   {
     id: "estate-basic",
     name: "Estate Basic",
-    price: "₦300",
-    billing: "/house/month",
+    monthlyPrice: 300,
+    yearlyPrice: 3600,
+    monthlyBilling: "/house/month",
+    yearlyBilling: "/house/year",
     intro: "Core tools for daily estate operations",
     subsidy: "First 2 houses free",
     note: "Typical 10-house estate: ~₦2,400/month",
@@ -29,8 +34,10 @@ const estatePlans = [
   {
     id: "estate-plus",
     name: "Estate Plus",
-    price: "₦300",
-    billing: "/house/month",
+    monthlyPrice: 300,
+    yearlyPrice: 3600,
+    monthlyBilling: "/house/month",
+    yearlyBilling: "/house/year",
     intro: "Adds scheduling and verified access flow",
     subsidy: "First 2 houses free",
     note: "Typical 15-house estate: ~₦3,900/month",
@@ -41,8 +48,10 @@ const estatePlans = [
   {
     id: "estate-growth",
     name: "Estate Growth",
-    price: "₦300",
-    billing: "/house/month",
+    monthlyPrice: 300,
+    yearlyPrice: 3600,
+    monthlyBilling: "/house/month",
+    yearlyBilling: "/house/year",
     intro: "Built for growing estates that need more oversight",
     subsidy: "First 2 houses free",
     note: "Typical 30-house estate: ~₦8,400/month",
@@ -54,8 +63,10 @@ const estatePlans = [
   {
     id: "estate-pro",
     name: "Estate Pro",
-    price: "₦300",
-    billing: "/house/month",
+    monthlyPrice: 300,
+    yearlyPrice: 3600,
+    monthlyBilling: "/house/month",
+    yearlyBilling: "/house/year",
     intro: "More control for larger and security-focused estates",
     subsidy: "First 2 houses free",
     note: "Typical 50-house estate: ~₦14,400/month",
@@ -69,8 +80,10 @@ const homeownerPlans = [
   {
     id: "home-pro",
     name: "Home Pro",
-    price: "₦300",
-    billing: "/month",
+    monthlyPrice: 300,
+    yearlyPrice: 3600,
+    monthlyBilling: "/month",
+    yearlyBilling: "/year",
     note: "Included for residents in QRing-enabled estates",
     cta: "Choose Home Pro",
     to: "/signup",
@@ -79,8 +92,10 @@ const homeownerPlans = [
   {
     id: "home-premium",
     name: "Home Premium",
-    price: "₦1,000",
-    billing: "/month",
+    monthlyPrice: 1000,
+    yearlyPrice: 12000,
+    monthlyBilling: "/month",
+    yearlyBilling: "/year",
     note: "For households that want more control across entry points",
     cta: "Choose Home Premium",
     to: "/signup",
@@ -110,7 +125,14 @@ function PlanFeatureList({ items, subtle = false }) {
   );
 }
 
-function EstatePlanRow({ plan }) {
+function formatPrice(amount) {
+  return `₦${amount.toLocaleString()}`;
+}
+
+function EstatePlanRow({ plan, billingCycle }) {
+  const price = billingCycle === "yearly" ? plan.yearlyPrice : plan.monthlyPrice;
+  const billing = billingCycle === "yearly" ? plan.yearlyBilling : plan.monthlyBilling;
+
   return (
     <article
       className={[
@@ -130,14 +152,16 @@ function EstatePlanRow({ plan }) {
         <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600 dark:text-slate-300">{plan.intro}</p>
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <div className="flex items-end gap-1.5 text-slate-950 dark:text-white">
-            <span className="text-4xl font-black tracking-tight sm:text-[2.6rem]">{plan.price}</span>
-            <span className="pb-1 text-sm font-semibold text-slate-500 dark:text-slate-400">{plan.billing}</span>
+            <span className="text-4xl font-black tracking-tight sm:text-[2.6rem]">{formatPrice(price)}</span>
+            <span className="pb-1 text-sm font-semibold text-slate-500 dark:text-slate-400">{billing}</span>
           </div>
           <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-200">
             {plan.subsidy}
           </span>
         </div>
-        <p className="mt-3 text-sm font-medium text-slate-500 dark:text-slate-400">{plan.note}</p>
+        <p className="mt-3 text-sm font-medium text-slate-500 dark:text-slate-400">
+          {billingCycle === "yearly" ? plan.note.replace("/month", "/month equivalent") : plan.note}
+        </p>
       </div>
 
       <PlanFeatureList items={plan.features} />
@@ -168,15 +192,18 @@ function EstatePlanRow({ plan }) {
   );
 }
 
-function HomeownerPlanBlock({ plan }) {
+function HomeownerPlanBlock({ plan, billingCycle }) {
+  const price = billingCycle === "yearly" ? plan.yearlyPrice : plan.monthlyPrice;
+  const billing = billingCycle === "yearly" ? plan.yearlyBilling : plan.monthlyBilling;
+
   return (
     <article className="grid gap-5 border-t border-slate-200/80 py-6 first:border-t-0 md:grid-cols-[minmax(0,1fr)_auto] md:items-start md:gap-8 dark:border-slate-800">
       <div>
         <div className="flex flex-wrap items-end gap-3">
           <h3 className="text-xl font-black tracking-tight text-slate-950 dark:text-white">{plan.name}</h3>
           <div className="flex items-end gap-1 text-slate-950 dark:text-white">
-            <span className="text-3xl font-black tracking-tight">{plan.price}</span>
-            <span className="pb-1 text-sm font-semibold text-slate-500 dark:text-slate-400">{plan.billing}</span>
+            <span className="text-3xl font-black tracking-tight">{formatPrice(price)}</span>
+            <span className="pb-1 text-sm font-semibold text-slate-500 dark:text-slate-400">{billing}</span>
           </div>
         </div>
         <p className="mt-3 text-sm font-medium text-slate-500 dark:text-slate-400">{plan.note}</p>
@@ -199,6 +226,10 @@ function HomeownerPlanBlock({ plan }) {
 }
 
 export function PricingShowcase({ compact = false }) {
+  const [billingCycle, setBillingCycle] = useState("monthly");
+  const anchorPrice = billingCycle === "yearly" ? "₦3,600" : "₦300";
+  const anchorBilling = billingCycle === "yearly" ? "/ house / year" : "/ house / month";
+
   return (
     <section id="pricing" className={compact ? "py-16 sm:py-20" : "pb-16 pt-8 sm:pb-20 sm:pt-10"}>
       <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-10">
@@ -212,13 +243,42 @@ export function PricingShowcase({ compact = false }) {
           </p>
         </div>
 
-        <div className="mt-8 rounded-2xl border border-blue-100 bg-[linear-gradient(180deg,rgba(239,246,255,0.9),rgba(255,255,255,1))] px-5 py-5 sm:px-7 dark:border-blue-900/40 dark:bg-[linear-gradient(180deg,rgba(2,132,199,0.14),rgba(2,6,23,0.24))]">
+        <div className="mt-8 flex justify-start">
+          <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1 dark:border-slate-800 dark:bg-slate-900">
+            <button
+              type="button"
+              onClick={() => setBillingCycle("monthly")}
+              className={[
+                "rounded-lg px-4 py-2 text-sm font-semibold transition",
+                billingCycle === "monthly"
+                  ? "bg-white text-slate-950 shadow-sm dark:bg-slate-950 dark:text-white"
+                  : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white",
+              ].join(" ")}
+            >
+              Monthly
+            </button>
+            <button
+              type="button"
+              onClick={() => setBillingCycle("yearly")}
+              className={[
+                "rounded-lg px-4 py-2 text-sm font-semibold transition",
+                billingCycle === "yearly"
+                  ? "bg-white text-slate-950 shadow-sm dark:bg-slate-950 dark:text-white"
+                  : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white",
+              ].join(" ")}
+            >
+              Yearly
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-6 rounded-2xl border border-blue-100 bg-[linear-gradient(180deg,rgba(239,246,255,0.9),rgba(255,255,255,1))] px-5 py-5 sm:px-7 dark:border-blue-900/40 dark:bg-[linear-gradient(180deg,rgba(2,132,199,0.14),rgba(2,6,23,0.24))]">
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:items-center">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.28em] text-blue-700 dark:text-blue-300">Estate pricing anchor</p>
               <div className="mt-3 flex flex-wrap items-end gap-2 text-slate-950 dark:text-white">
-                <span className="text-5xl font-black tracking-tight sm:text-6xl">₦300</span>
-                <span className="pb-2 text-base font-semibold text-slate-500 dark:text-slate-400">/ house / month</span>
+                <span className="text-5xl font-black tracking-tight sm:text-6xl">{anchorPrice}</span>
+                <span className="pb-2 text-base font-semibold text-slate-500 dark:text-slate-400">{anchorBilling}</span>
               </div>
             </div>
             <div className="space-y-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
@@ -240,7 +300,7 @@ export function PricingShowcase({ compact = false }) {
 
           <div className="mt-6 rounded-2xl border border-slate-200 bg-white px-5 sm:px-7 dark:border-slate-800 dark:bg-slate-950">
             {estatePlans.map((plan) => (
-              <EstatePlanRow key={plan.id} plan={plan} />
+              <EstatePlanRow key={plan.id} plan={plan} billingCycle={billingCycle} />
             ))}
           </div>
 
@@ -258,7 +318,7 @@ export function PricingShowcase({ compact = false }) {
 
           <div className="mt-6 rounded-2xl border border-white bg-white px-5 sm:px-7 dark:border-slate-800 dark:bg-slate-950">
             {homeownerPlans.map((plan) => (
-              <HomeownerPlanBlock key={plan.id} plan={plan} />
+              <HomeownerPlanBlock key={plan.id} plan={plan} billingCycle={billingCycle} />
             ))}
           </div>
         </div>
