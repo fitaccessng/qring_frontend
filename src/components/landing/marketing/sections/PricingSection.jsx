@@ -1,130 +1,272 @@
 import { Link } from "react-router-dom";
-import { CheckCircle2 } from "lucide-react";
+import { ArrowRight, Check } from "lucide-react";
 
-const tiers = [
+const estatePlans = [
   {
+    id: "starter-estate",
     name: "Starter Estate",
     price: "₦0",
-    period: "/month",
-    description: "Up to 3 houses with full system access at limited scale for 30 days.",
+    billing: "/month",
+    intro: "Up to 3 houses",
+    subsidy: "Trial only",
+    note: "30 days of full system access at limited scale.",
+    cta: "Start Free Trial",
+    to: "/signup",
     features: ["Up to 3 houses", "Full system access (limited scale)", "Trial only - 30 days"],
-    cta: { label: "Start Free Trial", to: "/signup" },
-    featured: false,
   },
   {
+    id: "estate-basic",
     name: "Estate Basic",
-    price: "₦6,000",
-    period: "/month",
-    description: "Up to 10 houses with the core tools estates need every day.",
-    features: ["Up to 10 houses", "Realtime alerts", "Visitor logs", "Resident management", "Mobile dashboard"],
-    cta: { label: "Start Basic", to: "/signup" },
-    featured: false,
+    price: "₦300",
+    billing: "/house/month",
+    intro: "Core tools for daily estate operations",
+    subsidy: "First 2 houses free",
+    note: "Typical 10-house estate: ~₦2,400/month",
+    cta: "Start Basic",
+    to: "/signup",
+    features: ["Visitor logs", "Resident management", "Mobile dashboard", "Real-time alerts"],
   },
   {
+    id: "estate-plus",
     name: "Estate Plus",
-    price: "₦9,000",
-    period: "/month",
-    description: "Up to 15 houses with scheduling and verification workflows.",
-    features: ["Everything in Basic", "Visitor scheduling", "Access time windows", "Chat + call verification"],
-    cta: { label: "Choose Plus", to: "/signup" },
-    featured: false,
+    price: "₦300",
+    billing: "/house/month",
+    intro: "Adds scheduling and verified access flow",
+    subsidy: "First 2 houses free",
+    note: "Typical 15-house estate: ~₦3,900/month",
+    cta: "Choose Plus",
+    to: "/signup",
+    features: ["Everything in Basic", "Visitor scheduling", "Access time windows", "Chat & call verification"],
   },
   {
+    id: "estate-growth",
     name: "Estate Growth",
-    price: "₦18,000",
-    period: "/month",
-    description: "Up to 30 houses for growing estates with richer oversight.",
-    features: ["Everything in Plus", "Multi-admin roles", "Analytics dashboard", "Activity tracking"],
-    cta: { label: "Choose Growth", to: "/signup" },
-    featured: true,
+    price: "₦300",
+    billing: "/house/month",
+    intro: "Built for growing estates that need more oversight",
+    subsidy: "First 2 houses free",
+    note: "Typical 30-house estate: ~₦8,400/month",
+    cta: "Choose Growth",
+    to: "/signup",
+    popular: true,
+    features: ["Everything in Plus", "Multi-admin roles", "Activity tracking", "Analytics dashboard"],
   },
   {
+    id: "estate-pro",
     name: "Estate Pro",
-    price: "₦30,000",
-    period: "/month",
-    description: "Up to 50 houses with advanced controls and capped monthly pricing.",
+    price: "₦300",
+    billing: "/house/month",
+    intro: "More control for larger and security-focused estates",
+    subsidy: "First 2 houses free",
+    note: "Typical 50-house estate: ~₦14,400/month",
+    cta: "Choose Pro",
+    to: "/signup",
     features: ["Everything in Growth", "Advanced analytics", "Security audit logs", "Role permissions", "Priority support"],
-    cta: { label: "Start Pro", to: "/signup" },
-    featured: false,
-  },
-  {
-    name: "Enterprise Estate",
-    price: "Custom Pricing",
-    period: "",
-    description: "Custom plan for large estates that need central control and support.",
-    features: ["Unlimited houses", "SLA + API access", "Multi-location control", "Dedicated support"],
-    cta: { label: "Contact Sales", to: "/contact" },
-    featured: false,
   },
 ];
 
-export default function PricingSection() {
+const homeownerPlans = [
+  {
+    id: "home-pro",
+    name: "Home Pro",
+    price: "₦300",
+    billing: "/month",
+    note: "Included for residents in QRing-enabled estates",
+    cta: "Choose Home Pro",
+    to: "/signup",
+    features: ["Visitor history", "Visitor scheduling", "Chat & call verification", "Real-time notifications"],
+  },
+  {
+    id: "home-premium",
+    name: "Home Premium",
+    price: "₦1,000",
+    billing: "/month",
+    note: "For households that want more control across entry points",
+    cta: "Choose Home Premium",
+    to: "/signup",
+    features: ["Everything in Home Pro", "Multiple door access", "Access time windows", "Advanced privacy controls", "Priority support"],
+  },
+];
+
+function PlanFeatureList({ items, subtle = false }) {
   return (
-    <section id="pricing" className="bg-white py-16 dark:bg-slate-950 sm:py-20">
-      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-10">
-        <div className="max-w-2xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500 dark:text-slate-400">Pricing</p>
-          <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl dark:text-white">Simple pricing that scales</h2>
-          <p className="mt-4 text-base leading-relaxed text-slate-600 dark:text-slate-300">
-            Choose a plan that fits your estate today. Upgrade when you grow.
+    <ul className="grid gap-2 text-sm leading-6 text-slate-600 dark:text-slate-300 sm:grid-cols-2 xl:grid-cols-1">
+      {items.map((item) => (
+        <li key={item} className="flex items-start gap-2.5">
+          <span
+            className={[
+              "mt-1 inline-flex h-5 w-5 flex-none items-center justify-center rounded-full border",
+              subtle
+                ? "border-blue-100 bg-white text-blue-700 dark:border-blue-900/60 dark:bg-slate-950"
+                : "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/30",
+            ].join(" ")}
+          >
+            <Check className="h-3.5 w-3.5" aria-hidden="true" />
+          </span>
+          <span>{item}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function EstatePlanRow({ plan }) {
+  return (
+    <article
+      className={[
+        "grid gap-6 border-t border-slate-200/80 py-8 first:border-t-0 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)_minmax(0,1.1fr)_auto] lg:items-start lg:gap-8",
+        plan.popular ? "bg-blue-50/70 px-5 -mx-5 rounded-xl border border-blue-100/80" : "",
+      ].join(" ")}
+    >
+      <div>
+        <div className="flex flex-wrap items-center gap-3">
+          <h3 className="text-2xl font-black tracking-tight text-slate-950 dark:text-white">{plan.name}</h3>
+          {plan.popular ? (
+            <span className="inline-flex items-center rounded-full bg-blue-600 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.24em] text-white">
+              Most Popular
+            </span>
+          ) : null}
+        </div>
+        <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600 dark:text-slate-300">{plan.intro}</p>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <div className="flex items-end gap-1.5 text-slate-950 dark:text-white">
+            <span className="text-4xl font-black tracking-tight sm:text-[2.6rem]">{plan.price}</span>
+            <span className="pb-1 text-sm font-semibold text-slate-500 dark:text-slate-400">{plan.billing}</span>
+          </div>
+          <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-200">
+            {plan.subsidy}
+          </span>
+        </div>
+        <p className="mt-3 text-sm font-medium text-slate-500 dark:text-slate-400">{plan.note}</p>
+      </div>
+
+      <PlanFeatureList items={plan.features} />
+
+      <div className="border-t border-slate-200/70 pt-4 lg:border-t-0 lg:border-l lg:border-slate-200/70 lg:pl-8 dark:border-slate-800">
+        <p className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-500 dark:text-slate-400">Why it works</p>
+        <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
+          Affordable, predictable pricing for estates that want secure visitor access without heavy setup costs.
+        </p>
+        <p className="mt-4 text-sm font-semibold text-blue-700 dark:text-blue-300">Less than the cost of airtime per household</p>
+      </div>
+
+      <div className="lg:min-w-[180px]">
+        <Link
+          to={plan.to}
+          className={[
+            "inline-flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition",
+            plan.popular
+              ? "bg-blue-600 text-white hover:bg-blue-700"
+              : "border border-slate-300 bg-white text-slate-900 hover:border-blue-200 hover:text-blue-700 dark:border-slate-700 dark:bg-slate-950 dark:text-white",
+          ].join(" ")}
+        >
+          {plan.cta}
+          <ArrowRight className="h-4 w-4" aria-hidden="true" />
+        </Link>
+      </div>
+    </article>
+  );
+}
+
+function HomeownerPlanBlock({ plan }) {
+  return (
+    <article className="grid gap-5 border-t border-slate-200/80 py-6 first:border-t-0 md:grid-cols-[minmax(0,1fr)_auto] md:items-start md:gap-8 dark:border-slate-800">
+      <div>
+        <div className="flex flex-wrap items-end gap-3">
+          <h3 className="text-xl font-black tracking-tight text-slate-950 dark:text-white">{plan.name}</h3>
+          <div className="flex items-end gap-1 text-slate-950 dark:text-white">
+            <span className="text-3xl font-black tracking-tight">{plan.price}</span>
+            <span className="pb-1 text-sm font-semibold text-slate-500 dark:text-slate-400">{plan.billing}</span>
+          </div>
+        </div>
+        <p className="mt-3 text-sm font-medium text-slate-500 dark:text-slate-400">{plan.note}</p>
+        <div className="mt-5">
+          <PlanFeatureList items={plan.features} subtle />
+        </div>
+      </div>
+
+      <div className="md:min-w-[190px]">
+        <Link
+          to={plan.to}
+          className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-blue-200 bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition hover:border-blue-300 hover:text-blue-700 dark:border-blue-900/60 dark:bg-slate-950 dark:text-white"
+        >
+          {plan.cta}
+          <ArrowRight className="h-4 w-4" aria-hidden="true" />
+        </Link>
+      </div>
+    </article>
+  );
+}
+
+export function PricingShowcase({ compact = false }) {
+  return (
+    <section id="pricing" className={compact ? "py-16 sm:py-20" : "pb-16 pt-8 sm:pb-20 sm:pt-10"}>
+      <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-10">
+        <div className="max-w-3xl">
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">Pricing</p>
+          <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl lg:text-5xl dark:text-white">
+            Clear pricing for estates and homeowners
+          </h2>
+          <p className="mt-4 text-base leading-7 text-slate-600 dark:text-slate-300">
+            Start small, scale by household, and keep costs predictable as your community grows.
           </p>
         </div>
 
-        <div className="mt-10 grid gap-4 lg:grid-cols-3">
-          {tiers.map((tier) => (
-            <div
-              key={tier.name}
-              className={[
-                "relative overflow-hidden rounded-[2rem] border p-7 shadow-soft transition hover:-translate-y-1 hover:shadow-lg",
-                tier.featured
-                  ? "border-brand-200 bg-slate-950 text-white dark:border-slate-800"
-                  : "border-slate-200 bg-white text-slate-900 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100",
-              ].join(" ")}
-            >
-              {tier.featured ? (
-                <span className="absolute right-6 top-6 rounded-full bg-brand-600/20 px-3 py-1 text-xs font-semibold text-brand-100 ring-1 ring-brand-500/30">
-                  Most popular
-                </span>
-              ) : null}
-
-              <p className="text-sm font-semibold tracking-tight">{tier.name}</p>
-              <p className={tier.featured ? "mt-2 text-sm text-white/70" : "mt-2 text-sm text-slate-600 dark:text-slate-300"}>{tier.description}</p>
-
-              <div className="mt-6 flex items-end gap-2">
-                <p className="text-4xl font-black tracking-tight">{tier.price}</p>
-                {tier.period ? <p className={tier.featured ? "pb-1 text-sm text-white/60" : "pb-1 text-sm text-slate-500"}>{tier.period}</p> : null}
-              </div>
-
-              <div className={tier.featured ? "mt-6 h-px bg-white/10" : "mt-6 h-px bg-slate-200 dark:bg-slate-800"} />
-
-              <ul className="mt-6 space-y-3 text-sm">
-                {tier.features.map((f) => (
-                  <li key={f} className="flex items-start gap-2">
-                    <CheckCircle2 className={tier.featured ? "mt-0.5 h-4 w-4 text-emerald-300" : "mt-0.5 h-4 w-4 text-emerald-600"} aria-hidden="true" />
-                    <span className={tier.featured ? "text-white/80" : "text-slate-700 dark:text-slate-200"}>{f}</span>
-                  </li>
-                ))}
-              </ul>
-
-              <Link
-                to={tier.cta.to}
-                className={[
-                  "mt-8 inline-flex w-full items-center justify-center rounded-full px-6 py-3 text-sm font-semibold transition",
-                  tier.featured
-                    ? "bg-white text-slate-950 hover:bg-slate-100"
-                    : "border border-slate-300 bg-white text-slate-900 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:hover:bg-slate-900",
-                ].join(" ")}
-              >
-                {tier.cta.label}
-              </Link>
-
-              <div className="pointer-events-none absolute inset-0 opacity-0 transition hover:opacity-100">
-                <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[radial-gradient(circle_at_center,rgba(36,86,245,0.25),transparent_65%)]" />
+        <div className="mt-8 rounded-2xl border border-blue-100 bg-[linear-gradient(180deg,rgba(239,246,255,0.9),rgba(255,255,255,1))] px-5 py-5 sm:px-7 dark:border-blue-900/40 dark:bg-[linear-gradient(180deg,rgba(2,132,199,0.14),rgba(2,6,23,0.24))]">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:items-center">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-blue-700 dark:text-blue-300">Estate pricing anchor</p>
+              <div className="mt-3 flex flex-wrap items-end gap-2 text-slate-950 dark:text-white">
+                <span className="text-5xl font-black tracking-tight sm:text-6xl">₦300</span>
+                <span className="pb-2 text-base font-semibold text-slate-500 dark:text-slate-400">/ house / month</span>
               </div>
             </div>
-          ))}
+            <div className="space-y-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+              <p className="font-semibold text-slate-900 dark:text-white">First 2 houses free on every estate plan.</p>
+              <p>That means many estates get started at a very low monthly cost while keeping the same trusted QRing workflow.</p>
+              <p className="font-semibold text-blue-700 dark:text-blue-300">Less than the cost of airtime per household.</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-10">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500 dark:text-slate-400">Section 1</p>
+              <h3 className="mt-2 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl dark:text-white">Estate Plans</h3>
+            </div>
+            <p className="hidden text-sm font-medium text-slate-500 lg:block dark:text-slate-400">Simple monthly billing. Scale only when the estate grows.</p>
+          </div>
+
+          <div className="mt-6 rounded-2xl border border-slate-200 bg-white px-5 sm:px-7 dark:border-slate-800 dark:bg-slate-950">
+            {estatePlans.map((plan) => (
+              <EstatePlanRow key={plan.id} plan={plan} />
+            ))}
+          </div>
+
+          <p className="mt-4 text-sm font-medium text-slate-500 dark:text-slate-400">Minimum monthly billing: ₦2,000 per estate</p>
+        </div>
+
+        <div className="mt-14 rounded-2xl border border-slate-200/90 bg-slate-50/70 px-5 py-6 sm:px-7 sm:py-8 dark:border-slate-800 dark:bg-slate-900/40">
+          <div className="max-w-2xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500 dark:text-slate-400">Section 2</p>
+            <h3 className="mt-2 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl dark:text-white">Homeowner Plans</h3>
+            <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
+              Personal plans for households that want extra control, with simple monthly pricing and the same trusted visitor flow.
+            </p>
+          </div>
+
+          <div className="mt-6 rounded-2xl border border-white bg-white px-5 sm:px-7 dark:border-slate-800 dark:bg-slate-950">
+            {homeownerPlans.map((plan) => (
+              <HomeownerPlanBlock key={plan.id} plan={plan} />
+            ))}
+          </div>
         </div>
       </div>
     </section>
   );
+}
+
+export default function PricingSection() {
+  return <PricingShowcase compact />;
 }
