@@ -464,6 +464,8 @@ const FAQItem = ({ question, answer }) => {
 };
 
 export default function LandingPage() {
+  const [pricingCycle, setPricingCycle] = useState('monthly');
+
   return (
     <div className="bg-white text-slate-900 selection:bg-[#3b82f6] selection:text-white font-sans antialiased">
       <Navbar />
@@ -744,41 +746,58 @@ Reception teams can manage visitor check-ins, monitor building access, and keep 
           <div className="max-w-7xl mx-auto text-center">
             <div className="mb-14">
               <h2 className="text-5xl font-black italic tracking-tighter mb-6 uppercase">Estate Plans</h2>
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white/90 backdrop-blur">
-                <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1">
-                  <span className="h-1.5 w-1.5 rounded-full bg-[#2563eb]" />
-                  Monthly
-                </span>
-                <span className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-white/75">
-                  <span className="h-1.5 w-1.5 rounded-full bg-white/40" />
-                  Yearly
-                </span>
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 p-1 text-[10px] font-black uppercase tracking-widest text-white/90 backdrop-blur">
+                {['monthly', 'yearly'].map((cycle) => {
+                  const active = pricingCycle === cycle;
+                  return (
+                    <button
+                      key={cycle}
+                      type="button"
+                      onClick={() => setPricingCycle(cycle)}
+                      className={[
+                        'inline-flex items-center gap-2 rounded-full px-4 py-2 transition',
+                        active ? 'bg-white text-[#071226]' : 'text-white/75 hover:text-white',
+                      ].join(' ')}
+                    >
+                      <span className={`h-1.5 w-1.5 rounded-full ${active ? 'bg-[#2563eb]' : 'bg-white/40'}`} />
+                      {cycle}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
             {(() => {
+              const formatPrice = (value) => (typeof value === 'number' ? `₦${value.toLocaleString()}` : value);
+
               const estatePlans = [
                 {
                   name: 'Starter Estate',
                   tagline: 'Up to 3 houses (trial only, 30 days)',
-                  price: '₦0',
-                  period: '/month',
+                  monthlyPrice: 0,
+                  yearlyPrice: 0,
+                  monthlyPeriod: '/month',
+                  yearlyPeriod: '/year',
                   features: ['Up to 3 houses', 'Full system access (limited scale)', 'Trial only - 30 days'],
                   cta: 'Start Free Trial',
                 },
                 {
                   name: 'Estate Basic',
                   tagline: 'Up to 10 houses',
-                  price: '₦6,000',
-                  period: '/month',
+                  monthlyPrice: 6000,
+                  yearlyPrice: 72000,
+                  monthlyPeriod: '/month',
+                  yearlyPeriod: '/year',
                   features: ['Up to 10 houses', 'Realtime alerts', 'Visitor logs', 'Resident management', 'Mobile dashboard'],
                   cta: 'Start Basic',
                 },
                 {
                   name: 'Estate Plus',
                   tagline: 'Up to 15 houses',
-                  price: '₦9,000',
-                  period: '/month',
+                  monthlyPrice: 9000,
+                  yearlyPrice: 108000,
+                  monthlyPeriod: '/month',
+                  yearlyPeriod: '/year',
                   features: ['Everything in Basic', 'Visitor scheduling', 'Access time windows', 'Chat + call verification'],
                   cta: 'Choose Plus',
                 },
@@ -786,24 +805,30 @@ Reception teams can manage visitor check-ins, monitor building access, and keep 
                   name: 'Estate Growth',
                   badge: 'Popular',
                   tagline: 'Up to 30 houses',
-                  price: '₦18,000',
-                  period: '/month',
+                  monthlyPrice: 18000,
+                  yearlyPrice: 216000,
+                  monthlyPeriod: '/month',
+                  yearlyPeriod: '/year',
                   features: ['Everything in Plus', 'Multi-admin roles', 'Analytics dashboard', 'Activity tracking'],
                   cta: 'Choose Growth',
                 },
                 {
                   name: 'Estate Pro',
                   tagline: 'Up to 50 houses',
-                  price: '₦30,000',
-                  period: '/month',
+                  monthlyPrice: 30000,
+                  yearlyPrice: 360000,
+                  monthlyPeriod: '/month',
+                  yearlyPeriod: '/year',
                   features: ['Everything in Growth', 'Advanced analytics', 'Security audit logs', 'Role permissions', 'Priority support'],
                   cta: 'Start Pro',
                 },
                 {
                   name: 'Enterprise Estate',
                   tagline: 'Custom plan for large estates',
-                  price: 'Custom Pricing',
-                  period: '',
+                  monthlyPrice: 'Custom Pricing',
+                  yearlyPrice: 'Custom Pricing',
+                  monthlyPeriod: '',
+                  yearlyPeriod: '',
                   features: ['Unlimited houses', 'SLA + API access', 'Multi-location control', 'Dedicated support'],
                   cta: 'Contact Sales',
                 },
@@ -813,16 +838,20 @@ Reception teams can manage visitor check-ins, monitor building access, and keep 
                 {
                   name: 'Free',
                   tagline: '1 door',
-                  price: 'Free',
-                  period: '',
+                  monthlyPrice: 'Free',
+                  yearlyPrice: 'Free',
+                  monthlyPeriod: '',
+                  yearlyPeriod: '',
                   features: ['1 door', 'Basic notifications', 'Limited logs'],
                   cta: 'Get Started Free',
                 },
                 {
                   name: 'Home Pro',
                   tagline: 'Smart homeowner controls',
-                  price: '₦2,500',
-                  period: '/month',
+                  monthlyPrice: 2500,
+                  yearlyPrice: 30000,
+                  monthlyPeriod: '/month',
+                  yearlyPeriod: '/year',
                   highlight: true,
                   features: ['Chat + call verification', 'Visitor history', 'Visitor scheduling', 'Advanced notifications'],
                   cta: 'Choose Home Pro',
@@ -830,8 +859,10 @@ Reception teams can manage visitor check-ins, monitor building access, and keep 
                 {
                   name: 'Home Premium',
                   tagline: 'Advanced access and privacy',
-                  price: '₦4,500',
-                  period: '/month',
+                  monthlyPrice: 4500,
+                  yearlyPrice: 54000,
+                  monthlyPeriod: '/month',
+                  yearlyPeriod: '/year',
                   features: ['Multiple doors', 'Access time windows', 'Priority support', 'Advanced privacy controls'],
                   cta: 'Choose Home Premium',
                 },
@@ -861,8 +892,14 @@ Reception teams can manage visitor check-ins, monitor building access, and keep 
                         <p className="mt-3 text-sm font-medium text-white/70">{plan.tagline}</p>
 
                         <div className="mt-8 flex items-end gap-3">
-                          <div className="text-5xl font-black italic tracking-tighter">{plan.price}</div>
-                          {plan.period && <div className="pb-2 text-xs font-black uppercase tracking-widest text-white/50">{plan.period}</div>}
+                          <div className="text-5xl font-black italic tracking-tighter">
+                            {formatPrice(pricingCycle === 'yearly' ? plan.yearlyPrice : plan.monthlyPrice)}
+                          </div>
+                          {(pricingCycle === 'yearly' ? plan.yearlyPeriod : plan.monthlyPeriod) && (
+                            <div className="pb-2 text-xs font-black uppercase tracking-widest text-white/50">
+                              {pricingCycle === 'yearly' ? plan.yearlyPeriod : plan.monthlyPeriod}
+                            </div>
+                          )}
                         </div>
 
                         <ul className="mt-10 space-y-4">
@@ -894,15 +931,24 @@ Reception teams can manage visitor check-ins, monitor building access, and keep 
 
                   <div className="mt-20 text-center">
                     <h3 className="text-4xl font-black italic tracking-tighter mb-6 uppercase">Homeowner Plans</h3>
-                    <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white/90 backdrop-blur">
-                      <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1">
-                        <span className="h-1.5 w-1.5 rounded-full bg-[#2563eb]" />
-                        Monthly
-                      </span>
-                      <span className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-white/75">
-                        <span className="h-1.5 w-1.5 rounded-full bg-white/40" />
-                        Yearly
-                      </span>
+                    <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 p-1 text-[10px] font-black uppercase tracking-widest text-white/90 backdrop-blur">
+                      {['monthly', 'yearly'].map((cycle) => {
+                        const active = pricingCycle === cycle;
+                        return (
+                          <button
+                            key={cycle}
+                            type="button"
+                            onClick={() => setPricingCycle(cycle)}
+                            className={[
+                              'inline-flex items-center gap-2 rounded-full px-4 py-2 transition',
+                              active ? 'bg-white text-[#071226]' : 'text-white/75 hover:text-white',
+                            ].join(' ')}
+                          >
+                            <span className={`h-1.5 w-1.5 rounded-full ${active ? 'bg-[#2563eb]' : 'bg-white/40'}`} />
+                            {cycle}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
 
