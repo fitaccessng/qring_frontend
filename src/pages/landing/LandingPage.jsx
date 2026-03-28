@@ -744,9 +744,15 @@ Reception teams can manage visitor check-ins, monitor building access, and keep 
           <div className="max-w-7xl mx-auto text-center">
             <div className="mb-14">
               <h2 className="text-5xl font-black italic tracking-tighter mb-6 uppercase">Estate Plans</h2>
-              <div className="inline-flex items-center gap-3 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white/90 backdrop-blur">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#2563eb]" />
-                Monthly
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white/90 backdrop-blur">
+                <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#2563eb]" />
+                  Monthly
+                </span>
+                <span className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-white/75">
+                  <span className="h-1.5 w-1.5 rounded-full bg-white/40" />
+                  Yearly
+                </span>
               </div>
             </div>
 
@@ -888,9 +894,15 @@ Reception teams can manage visitor check-ins, monitor building access, and keep 
 
                   <div className="mt-20 text-center">
                     <h3 className="text-4xl font-black italic tracking-tighter mb-6 uppercase">Homeowner Plans</h3>
-                    <div className="inline-flex items-center gap-3 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white/90 backdrop-blur">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[#2563eb]" />
-                      Monthly
+                    <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white/90 backdrop-blur">
+                      <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1">
+                        <span className="h-1.5 w-1.5 rounded-full bg-[#2563eb]" />
+                        Monthly
+                      </span>
+                      <span className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-white/75">
+                        <span className="h-1.5 w-1.5 rounded-full bg-white/40" />
+                        Yearly
+                      </span>
                     </div>
                   </div>
 
