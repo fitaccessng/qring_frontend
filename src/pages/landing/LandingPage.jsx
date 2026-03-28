@@ -463,9 +463,232 @@ const FAQItem = ({ question, answer }) => {
   );
 };
 
-export default function LandingPage() {
+function LandingPricingSection() {
   const [pricingCycle, setPricingCycle] = useState('monthly');
 
+  return (
+    <section className="py-32 bg-[#071226] text-white px-6" id="pricing">
+      <div className="max-w-7xl mx-auto text-center">
+        <div className="mb-14">
+          <h2 className="text-5xl font-black italic tracking-tighter mb-6 uppercase">Estate Plans</h2>
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 p-1 text-[10px] font-black uppercase tracking-widest text-white/90 backdrop-blur">
+            {['monthly', 'yearly'].map((cycle) => {
+              const active = pricingCycle === cycle;
+              return (
+                <button
+                  key={cycle}
+                  type="button"
+                  onClick={() => setPricingCycle(cycle)}
+                  className={[
+                    'inline-flex items-center gap-2 rounded-full px-4 py-2 transition',
+                    active ? 'bg-white text-[#071226]' : 'text-white/75 hover:text-white',
+                  ].join(' ')}
+                >
+                  <span className={`h-1.5 w-1.5 rounded-full ${active ? 'bg-[#2563eb]' : 'bg-white/40'}`} />
+                  {cycle}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {(() => {
+          const formatPrice = (value) => (typeof value === 'number' ? `₦${value.toLocaleString()}` : value);
+
+          const estatePlans = [
+            {
+              name: 'Starter Estate',
+              tagline: 'Up to 3 houses (trial only, 30 days)',
+              monthlyPrice: 0,
+              yearlyPrice: 0,
+              monthlyPeriod: '/month',
+              yearlyPeriod: '/year',
+              features: ['Up to 3 houses', 'Full system access (limited scale)', 'Trial only - 30 days'],
+              cta: 'Start Free Trial',
+            },
+            {
+              name: 'Estate Basic',
+              tagline: 'Up to 10 houses',
+              monthlyPrice: 6000,
+              yearlyPrice: 72000,
+              monthlyPeriod: '/month',
+              yearlyPeriod: '/year',
+              features: ['Up to 10 houses', 'Realtime alerts', 'Visitor logs', 'Resident management', 'Mobile dashboard'],
+              cta: 'Start Basic',
+            },
+            {
+              name: 'Estate Plus',
+              tagline: 'Up to 15 houses',
+              monthlyPrice: 9000,
+              yearlyPrice: 108000,
+              monthlyPeriod: '/month',
+              yearlyPeriod: '/year',
+              features: ['Everything in Basic', 'Visitor scheduling', 'Access time windows', 'Chat + call verification'],
+              cta: 'Choose Plus',
+            },
+            {
+              name: 'Estate Growth',
+              badge: 'Popular',
+              tagline: 'Up to 30 houses',
+              monthlyPrice: 18000,
+              yearlyPrice: 216000,
+              monthlyPeriod: '/month',
+              yearlyPeriod: '/year',
+              features: ['Everything in Plus', 'Multi-admin roles', 'Analytics dashboard', 'Activity tracking'],
+              cta: 'Choose Growth',
+            },
+            {
+              name: 'Estate Pro',
+              tagline: 'Up to 50 houses',
+              monthlyPrice: 30000,
+              yearlyPrice: 360000,
+              monthlyPeriod: '/month',
+              yearlyPeriod: '/year',
+              features: ['Everything in Growth', 'Advanced analytics', 'Security audit logs', 'Role permissions', 'Priority support'],
+              cta: 'Start Pro',
+            },
+            {
+              name: 'Enterprise Estate',
+              tagline: 'Custom plan for large estates',
+              monthlyPrice: 'Custom Pricing',
+              yearlyPrice: 'Custom Pricing',
+              monthlyPeriod: '',
+              yearlyPeriod: '',
+              features: ['Unlimited houses', 'SLA + API access', 'Multi-location control', 'Dedicated support'],
+              cta: 'Contact Sales',
+            },
+          ];
+
+          const homeownerPlans = [
+            {
+              name: 'Free',
+              tagline: '1 door',
+              monthlyPrice: 'Free',
+              yearlyPrice: 'Free',
+              monthlyPeriod: '',
+              yearlyPeriod: '',
+              features: ['1 door', 'Basic notifications', 'Limited logs'],
+              cta: 'Get Started Free',
+            },
+            {
+              name: 'Home Pro',
+              tagline: 'Smart homeowner controls',
+              monthlyPrice: 2500,
+              yearlyPrice: 30000,
+              monthlyPeriod: '/month',
+              yearlyPeriod: '/year',
+              highlight: true,
+              features: ['Chat + call verification', 'Visitor history', 'Visitor scheduling', 'Advanced notifications'],
+              cta: 'Choose Home Pro',
+            },
+            {
+              name: 'Home Premium',
+              tagline: 'Advanced access and privacy',
+              monthlyPrice: 4500,
+              yearlyPrice: 54000,
+              monthlyPeriod: '/month',
+              yearlyPeriod: '/year',
+              features: ['Multiple doors', 'Access time windows', 'Priority support', 'Advanced privacy controls'],
+              cta: 'Choose Home Premium',
+            },
+          ];
+
+          const PricingGrid = ({ plans }) => (
+            <div className="grid gap-8 text-left md:grid-cols-2 lg:grid-cols-3">
+              {plans.map((plan) => (
+                <div
+                  key={plan.name}
+                  className={[
+                    'relative overflow-hidden rounded-[3rem] border p-10 transition-all',
+                    plan.highlight
+                      ? 'border-[#2563eb] bg-[linear-gradient(180deg,rgba(37,99,235,0.20),rgba(7,18,38,0.85))] shadow-[0_40px_140px_rgba(37,99,235,0.22)]'
+                      : 'border-white/12 bg-white/5',
+                  ].join(' ')}
+                >
+                  <div className="pointer-events-none absolute inset-0 opacity-60 [background-image:radial-gradient(circle_at_20%_15%,rgba(255,255,255,0.10),transparent_50%)]" />
+                  {plan.badge && (
+                    <div className="absolute right-8 top-8 rounded-full bg-white px-4 py-2 text-[10px] font-black uppercase tracking-[0.28em] text-[#071226]">
+                      {plan.badge}
+                    </div>
+                  )}
+
+                  <div className="relative">
+                    <h3 className="text-xl font-black italic uppercase tracking-tighter">{plan.name}</h3>
+                    <p className="mt-3 text-sm font-medium text-white/70">{plan.tagline}</p>
+
+                    <div className="mt-8 flex items-end gap-3">
+                      <div className="text-5xl font-black italic tracking-tighter">
+                        {formatPrice(pricingCycle === 'yearly' ? plan.yearlyPrice : plan.monthlyPrice)}
+                      </div>
+                      {(pricingCycle === 'yearly' ? plan.yearlyPeriod : plan.monthlyPeriod) && (
+                        <div className="pb-2 text-xs font-black uppercase tracking-widest text-white/50">
+                          {pricingCycle === 'yearly' ? plan.yearlyPeriod : plan.monthlyPeriod}
+                        </div>
+                      )}
+                    </div>
+
+                    <ul className="mt-10 space-y-4">
+                      {plan.features.map((f) => (
+                        <li key={f} className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-white/80">
+                          <CheckCircle2 size={14} className="text-[#2563eb]" /> {f}
+                        </li>
+                      ))}
+                    </ul>
+
+                    <button
+                      type="button"
+                      className={[
+                        'mt-10 w-full rounded-2xl py-4 text-xs font-black uppercase tracking-widest transition-colors',
+                        plan.highlight ? 'bg-white text-[#071226] hover:bg-white/90' : 'bg-[#2563eb] text-white hover:bg-[#1d4ed8]',
+                      ].join(' ')}
+                    >
+                      {plan.cta}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          );
+
+          return (
+            <div>
+              <PricingGrid plans={estatePlans} />
+
+              <div className="mt-20 text-center">
+                <h3 className="text-4xl font-black italic tracking-tighter mb-6 uppercase">Homeowner Plans</h3>
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 p-1 text-[10px] font-black uppercase tracking-widest text-white/90 backdrop-blur">
+                  {['monthly', 'yearly'].map((cycle) => {
+                    const active = pricingCycle === cycle;
+                    return (
+                      <button
+                        key={cycle}
+                        type="button"
+                        onClick={() => setPricingCycle(cycle)}
+                        className={[
+                          'inline-flex items-center gap-2 rounded-full px-4 py-2 transition',
+                          active ? 'bg-white text-[#071226]' : 'text-white/75 hover:text-white',
+                        ].join(' ')}
+                      >
+                        <span className={`h-1.5 w-1.5 rounded-full ${active ? 'bg-[#2563eb]' : 'bg-white/40'}`} />
+                        {cycle}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="mt-12">
+                <PricingGrid plans={homeownerPlans} />
+              </div>
+            </div>
+          );
+        })()}
+      </div>
+    </section>
+  );
+}
+
+export default function LandingPage() {
   return (
     <div className="bg-white text-slate-900 selection:bg-[#3b82f6] selection:text-white font-sans antialiased">
       <Navbar />
@@ -741,225 +964,7 @@ Reception teams can manage visitor check-ins, monitor building access, and keep 
           </div>
         </section>
 
-        {/* SECTION 6: PRICING */}
-        <section className="py-32 bg-[#071226] text-white px-6" id="pricing">
-          <div className="max-w-7xl mx-auto text-center">
-            <div className="mb-14">
-              <h2 className="text-5xl font-black italic tracking-tighter mb-6 uppercase">Estate Plans</h2>
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 p-1 text-[10px] font-black uppercase tracking-widest text-white/90 backdrop-blur">
-                {['monthly', 'yearly'].map((cycle) => {
-                  const active = pricingCycle === cycle;
-                  return (
-                    <button
-                      key={cycle}
-                      type="button"
-                      onClick={() => setPricingCycle(cycle)}
-                      className={[
-                        'inline-flex items-center gap-2 rounded-full px-4 py-2 transition',
-                        active ? 'bg-white text-[#071226]' : 'text-white/75 hover:text-white',
-                      ].join(' ')}
-                    >
-                      <span className={`h-1.5 w-1.5 rounded-full ${active ? 'bg-[#2563eb]' : 'bg-white/40'}`} />
-                      {cycle}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {(() => {
-              const formatPrice = (value) => (typeof value === 'number' ? `₦${value.toLocaleString()}` : value);
-
-              const estatePlans = [
-                {
-                  name: 'Starter Estate',
-                  tagline: 'Up to 3 houses (trial only, 30 days)',
-                  monthlyPrice: 0,
-                  yearlyPrice: 0,
-                  monthlyPeriod: '/month',
-                  yearlyPeriod: '/year',
-                  features: ['Up to 3 houses', 'Full system access (limited scale)', 'Trial only - 30 days'],
-                  cta: 'Start Free Trial',
-                },
-                {
-                  name: 'Estate Basic',
-                  tagline: 'Up to 10 houses',
-                  monthlyPrice: 6000,
-                  yearlyPrice: 72000,
-                  monthlyPeriod: '/month',
-                  yearlyPeriod: '/year',
-                  features: ['Up to 10 houses', 'Realtime alerts', 'Visitor logs', 'Resident management', 'Mobile dashboard'],
-                  cta: 'Start Basic',
-                },
-                {
-                  name: 'Estate Plus',
-                  tagline: 'Up to 15 houses',
-                  monthlyPrice: 9000,
-                  yearlyPrice: 108000,
-                  monthlyPeriod: '/month',
-                  yearlyPeriod: '/year',
-                  features: ['Everything in Basic', 'Visitor scheduling', 'Access time windows', 'Chat + call verification'],
-                  cta: 'Choose Plus',
-                },
-                {
-                  name: 'Estate Growth',
-                  badge: 'Popular',
-                  tagline: 'Up to 30 houses',
-                  monthlyPrice: 18000,
-                  yearlyPrice: 216000,
-                  monthlyPeriod: '/month',
-                  yearlyPeriod: '/year',
-                  features: ['Everything in Plus', 'Multi-admin roles', 'Analytics dashboard', 'Activity tracking'],
-                  cta: 'Choose Growth',
-                },
-                {
-                  name: 'Estate Pro',
-                  tagline: 'Up to 50 houses',
-                  monthlyPrice: 30000,
-                  yearlyPrice: 360000,
-                  monthlyPeriod: '/month',
-                  yearlyPeriod: '/year',
-                  features: ['Everything in Growth', 'Advanced analytics', 'Security audit logs', 'Role permissions', 'Priority support'],
-                  cta: 'Start Pro',
-                },
-                {
-                  name: 'Enterprise Estate',
-                  tagline: 'Custom plan for large estates',
-                  monthlyPrice: 'Custom Pricing',
-                  yearlyPrice: 'Custom Pricing',
-                  monthlyPeriod: '',
-                  yearlyPeriod: '',
-                  features: ['Unlimited houses', 'SLA + API access', 'Multi-location control', 'Dedicated support'],
-                  cta: 'Contact Sales',
-                },
-              ];
-
-              const homeownerPlans = [
-                {
-                  name: 'Free',
-                  tagline: '1 door',
-                  monthlyPrice: 'Free',
-                  yearlyPrice: 'Free',
-                  monthlyPeriod: '',
-                  yearlyPeriod: '',
-                  features: ['1 door', 'Basic notifications', 'Limited logs'],
-                  cta: 'Get Started Free',
-                },
-                {
-                  name: 'Home Pro',
-                  tagline: 'Smart homeowner controls',
-                  monthlyPrice: 2500,
-                  yearlyPrice: 30000,
-                  monthlyPeriod: '/month',
-                  yearlyPeriod: '/year',
-                  highlight: true,
-                  features: ['Chat + call verification', 'Visitor history', 'Visitor scheduling', 'Advanced notifications'],
-                  cta: 'Choose Home Pro',
-                },
-                {
-                  name: 'Home Premium',
-                  tagline: 'Advanced access and privacy',
-                  monthlyPrice: 4500,
-                  yearlyPrice: 54000,
-                  monthlyPeriod: '/month',
-                  yearlyPeriod: '/year',
-                  features: ['Multiple doors', 'Access time windows', 'Priority support', 'Advanced privacy controls'],
-                  cta: 'Choose Home Premium',
-                },
-              ];
-
-              const PricingGrid = ({ plans }) => (
-                <div className="grid gap-8 text-left md:grid-cols-2 lg:grid-cols-3">
-                  {plans.map((plan) => (
-                    <div
-                      key={plan.name}
-                      className={[
-                        'relative overflow-hidden rounded-[3rem] border p-10 transition-all',
-                        plan.highlight
-                          ? 'border-[#2563eb] bg-[linear-gradient(180deg,rgba(37,99,235,0.20),rgba(7,18,38,0.85))] shadow-[0_40px_140px_rgba(37,99,235,0.22)]'
-                          : 'border-white/12 bg-white/5',
-                      ].join(' ')}
-                    >
-                      <div className="pointer-events-none absolute inset-0 opacity-60 [background-image:radial-gradient(circle_at_20%_15%,rgba(255,255,255,0.10),transparent_50%)]" />
-                      {plan.badge && (
-                        <div className="absolute right-8 top-8 rounded-full bg-white px-4 py-2 text-[10px] font-black uppercase tracking-[0.28em] text-[#071226]">
-                          {plan.badge}
-                        </div>
-                      )}
-
-                      <div className="relative">
-                        <h3 className="text-xl font-black italic uppercase tracking-tighter">{plan.name}</h3>
-                        <p className="mt-3 text-sm font-medium text-white/70">{plan.tagline}</p>
-
-                        <div className="mt-8 flex items-end gap-3">
-                          <div className="text-5xl font-black italic tracking-tighter">
-                            {formatPrice(pricingCycle === 'yearly' ? plan.yearlyPrice : plan.monthlyPrice)}
-                          </div>
-                          {(pricingCycle === 'yearly' ? plan.yearlyPeriod : plan.monthlyPeriod) && (
-                            <div className="pb-2 text-xs font-black uppercase tracking-widest text-white/50">
-                              {pricingCycle === 'yearly' ? plan.yearlyPeriod : plan.monthlyPeriod}
-                            </div>
-                          )}
-                        </div>
-
-                        <ul className="mt-10 space-y-4">
-                          {plan.features.map((f) => (
-                            <li key={f} className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-white/80">
-                              <CheckCircle2 size={14} className="text-[#2563eb]" /> {f}
-                            </li>
-                          ))}
-                        </ul>
-
-                        <button
-                          type="button"
-                          className={[
-                            'mt-10 w-full rounded-2xl py-4 text-xs font-black uppercase tracking-widest transition-colors',
-                            plan.highlight ? 'bg-white text-[#071226] hover:bg-white/90' : 'bg-[#2563eb] text-white hover:bg-[#1d4ed8]',
-                          ].join(' ')}
-                        >
-                          {plan.cta}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              );
-
-              return (
-                <div>
-                  <PricingGrid plans={estatePlans} />
-
-                  <div className="mt-20 text-center">
-                    <h3 className="text-4xl font-black italic tracking-tighter mb-6 uppercase">Homeowner Plans</h3>
-                    <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 p-1 text-[10px] font-black uppercase tracking-widest text-white/90 backdrop-blur">
-                      {['monthly', 'yearly'].map((cycle) => {
-                        const active = pricingCycle === cycle;
-                        return (
-                          <button
-                            key={cycle}
-                            type="button"
-                            onClick={() => setPricingCycle(cycle)}
-                            className={[
-                              'inline-flex items-center gap-2 rounded-full px-4 py-2 transition',
-                              active ? 'bg-white text-[#071226]' : 'text-white/75 hover:text-white',
-                            ].join(' ')}
-                          >
-                            <span className={`h-1.5 w-1.5 rounded-full ${active ? 'bg-[#2563eb]' : 'bg-white/40'}`} />
-                            {cycle}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="mt-12">
-                    <PricingGrid plans={homeownerPlans} />
-                  </div>
-                </div>
-              );
-            })()}
-          </div>
-        </section>
+        <LandingPricingSection />
  {/* SECTION 3: APP DOWNLOADS */}
         <section className="bg-white px-6 py-28" id="downloads">
           <div className="mx-auto max-w-7xl">
