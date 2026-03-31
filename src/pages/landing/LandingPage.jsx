@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import BrandMark from '../../components/BrandMark';
@@ -6,7 +6,7 @@ import {
   Shield, ArrowRight, Menu, X, CheckCircle2, User, Clock, 
   MapPin, Smartphone, Zap, Lock, AlertCircle, ChevronRight, 
   Bell, FileText, SmartphoneIcon, Users, Database, PieChart,
-  QrCode, Video, ListOrdered, History, LayoutDashboard
+  QrCode, ScanLine, PhoneCall, Video, ListOrdered, History, LayoutDashboard
 } from 'lucide-react';
 
 // --- Shared Animation Variants ---
@@ -688,6 +688,149 @@ function LandingPricingSection() {
   );
 }
 
+const qrFlowSteps = [
+  {
+    title: 'Generate QR Code',
+    desc: 'Homeowner creates a secure QR access code from the app.',
+    icon: QrCode,
+  },
+  {
+    title: 'Place at Gate',
+    desc: 'Print or display the QR code at your estate entrance.',
+    icon: QrCode,
+  },
+  {
+    title: 'Visitor Scans',
+    desc: 'Visitor scans the QR code to request access.',
+    icon: ScanLine,
+  },
+  {
+    title: 'Approve + Video Call',
+    desc: 'Homeowner verifies and approves with optional video call.',
+    icon: PhoneCall,
+  },
+];
+
+const QRFlowSection = () => {
+  const [active, setActive] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setActive((prev) => (prev + 1) % qrFlowSteps.length);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <section className="relative py-32 px-6 bg-gradient-to-b from-white to-slate-50 overflow-hidden">
+      {/* background glow */}
+      <div className="absolute inset-0 -z-10">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 h-[400px] w-[800px] bg-blue-100/40 blur-3xl rounded-full" />
+      </div>
+
+      <div className="max-w-7xl mx-auto grid md:grid-cols-2 gap-20 items-center">
+        {/* LEFT CONTENT */}
+        <div>
+          <span className="text-xs uppercase tracking-[0.3em] text-blue-600 font-semibold">
+            How it works
+          </span>
+
+          <h2 className="mt-6 text-5xl font-extrabold tracking-tight text-slate-900 leading-tight">
+            Access control in{' '}
+            <span className="bg-gradient-to-r from-blue-600 to-indigo-500 text-transparent bg-clip-text">
+              4 simple steps
+            </span>
+          </h2>
+
+          <p className="mt-6 text-lg text-slate-600">
+            QRing simplifies visitor access into a seamless, secure flow—from QR generation to real-time approval.
+          </p>
+
+          {/* Steps list */}
+          <div className="mt-10 space-y-4">
+            {qrFlowSteps.map((step, i) => (
+              <div
+                key={step.title}
+                className={`flex items-start gap-4 p-4 rounded-xl transition ${
+                  active === i
+                    ? 'bg-blue-50 border border-blue-200'
+                    : 'bg-white border border-slate-200'
+                }`}
+              >
+                <step.icon
+                  className={`w-5 h-5 mt-1 ${
+                    active === i ? 'text-blue-600' : 'text-slate-400'
+                  }`}
+                />
+
+                <div>
+                  <div className="text-sm font-semibold text-slate-900">
+                    {step.title}
+                  </div>
+                  <div className="text-sm text-slate-600 mt-1">
+                    {step.desc}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* RIGHT VISUAL ANIMATION */}
+        <div className="relative flex justify-center">
+          <div className="relative w-full max-w-sm h-[420px]">
+            {qrFlowSteps.map((step, i) => (
+              <motion.div
+                key={step.title}
+                initial={{ opacity: 0, scale: 0.9, y: 40 }}
+                animate={
+                  active === i
+                    ? { opacity: 1, scale: 1, y: 0 }
+                    : { opacity: 0, scale: 0.9, y: 40 }
+                }
+                transition={{ duration: 0.5 }}
+                className="absolute inset-0 rounded-3xl border border-slate-200 bg-white p-8 shadow-xl flex flex-col items-center justify-center text-center"
+              >
+                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-500 flex items-center justify-center text-white mb-6">
+                  <step.icon className="w-6 h-6" />
+                </div>
+
+                <h3 className="text-lg font-semibold text-slate-900">
+                  {step.title}
+                </h3>
+
+                <p className="text-sm text-slate-600 mt-3 max-w-xs">
+                  {step.desc}
+                </p>
+
+                {/* simulated UI */}
+                {i === 0 && (
+                  <div className="mt-6 w-32 h-32 bg-slate-100 rounded-lg flex items-center justify-center text-xs text-slate-400">
+                    QR CODE
+                  </div>
+                )}
+
+                {i === 2 && (
+                  <div className="mt-6 text-xs text-slate-500">
+                    Scanning...
+                  </div>
+                )}
+
+                {i === 3 && (
+                  <div className="mt-6 flex items-center gap-2 text-green-600 text-xs font-semibold">
+                    <CheckCircle2 className="w-4 h-4" />
+                    Approved
+                  </div>
+                )}
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
 export default function LandingPage() {
   return (
     <div className="bg-white text-slate-900 selection:bg-[#3b82f6] selection:text-white font-sans antialiased">
@@ -747,178 +890,313 @@ Reception teams can manage visitor check-ins, monitor building access, and keep 
        
 
         {/* SECTION 4: KEY FEATURES */}
-        <section className="py-32 bg-white px-6" id="features">
-          <div className="max-w-7xl mx-auto">
-            <motion.div {...fadeInUp} className="max-w-3xl">
-              <span className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-4 py-2 text-[10px] font-black uppercase tracking-[0.3em] text-blue-700">
-                Key Features
-              </span>
-              <h2 className="mt-6 text-3xl sm:text-4xl md:text-5xl font-black italic uppercase tracking-tighter text-slate-900">Built for every gate shift.</h2>
-              <p className="mt-5 text-lg font-medium leading-relaxed text-slate-600">
-                QRing combines verification, approvals, and audit trails into one workflow—so guards move faster and residents stay in control.
-              </p>
-            </motion.div>
+     <section className="relative py-32 px-6 bg-gradient-to-b from-white to-slate-50 overflow-hidden" id="features">
+  {/* subtle background glow */}
+  <div className="absolute inset-0 -z-10">
+    <div className="absolute top-0 left-1/2 -translate-x-1/2 h-[400px] w-[800px] bg-blue-100/40 blur-3xl rounded-full" />
+  </div>
 
-            <div className="mt-14 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {keyFeatures.map((f, i) => (
-                <motion.div
-                  key={f.title}
-                  initial={{ opacity: 0, y: 30 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, amount: 0.2 }}
-                  transition={{ duration: 0.7, delay: i * 0.05, ease: [0.22, 1, 0.36, 1] }}
-                  className="group rounded-[2.5rem] border border-slate-200 bg-white p-8 shadow-[0_20px_60px_rgba(2,6,23,0.06)] transition-all hover:-translate-y-1 hover:shadow-[0_30px_90px_rgba(37,99,235,0.16)]"
-                >
-                  <div className="mb-6 flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-[0_12px_30px_rgba(37,99,235,0.35)]">
-                    <f.icon className="h-5 w-5 sm:h-6 sm:w-6" />
-                  </div>
-                  <h3 className="text-xl font-black italic uppercase tracking-tighter text-slate-900">{f.title}</h3>
-                  <p className="mt-3 text-sm font-medium leading-relaxed text-slate-600">{f.description}</p>
-                  <div className="mt-6 inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.22em] text-blue-700/70">
-                    Explore <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
-                  </div>
-                </motion.div>
-              ))}
-            </div>
+  <div className="max-w-7xl mx-auto">
+    {/* Header */}
+    <motion.div {...fadeInUp} className="max-w-3xl">
+      <span className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-white/70 backdrop-blur px-4 py-2 text-[10px] font-bold uppercase tracking-[0.3em] text-blue-700 shadow-sm">
+        Key Features
+      </span>
+
+      <h2 className="mt-6 text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight text-slate-900 leading-[1.05]">
+        Built for{" "}
+        <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-500">
+          every gate shift
+        </span>
+      </h2>
+
+      <p className="mt-6 text-lg text-slate-600 leading-relaxed max-w-2xl">
+        QRing unifies verification, approvals, and audit trails into a single intelligent workflow—so guards move faster and residents stay fully in control.
+      </p>
+    </motion.div>
+
+    {/* Features Grid */}
+    <div className="mt-20 grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+      {keyFeatures.map((f, i) => (
+        <motion.div
+          key={f.title}
+          initial={{ opacity: 0, y: 40 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.2 }}
+          transition={{
+            duration: 0.6,
+            delay: i * 0.06,
+            ease: [0.22, 1, 0.36, 1],
+          }}
+          className="group relative rounded-3xl border border-slate-200/70 bg-white/80 backdrop-blur-xl p-8 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-2"
+        >
+          {/* glow effect */}
+          <div className="absolute inset-0 rounded-3xl opacity-0 group-hover:opacity-100 transition bg-gradient-to-br from-blue-500/10 to-indigo-500/10 blur-xl" />
+
+          {/* Icon */}
+          <div className="relative mb-6 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-500 text-white shadow-lg group-hover:scale-105 transition">
+            <f.icon className="h-6 w-6" />
           </div>
-        </section>
+
+          {/* Title */}
+          <h3 className="relative text-xl font-semibold text-slate-900">
+            {f.title}
+          </h3>
+
+          {/* Description */}
+          <p className="relative mt-3 text-sm leading-relaxed text-slate-600">
+            {f.description}
+          </p>
+
+          {/* CTA */}
+          <div className="relative mt-6 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-blue-600">
+            Learn more
+            <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+          </div>
+        </motion.div>
+      ))}
+    </div>
+  </div>
+</section>
 
         {/* SECTION 4: ESTATE MANAGEMENT (PROPERTY MANAGERS) */}
-        <section className="relative overflow-hidden bg-slate-50 px-6 py-32" id="managers">
-          <div className="pointer-events-none absolute inset-0">
-            <div className="absolute -left-28 top-10 h-[34rem] w-[34rem] rounded-full bg-[radial-gradient(circle_at_center,rgba(37,99,235,0.20),transparent_60%)] blur-2xl" />
-            <div className="absolute -right-32 bottom-0 h-[32rem] w-[32rem] rounded-full bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.14),transparent_58%)] blur-2xl" />
-            <div className="absolute inset-0 opacity-[0.22] [background-image:linear-gradient(to_right,rgba(15,23,42,0.10)_1px,transparent_1px),linear-gradient(to_bottom,rgba(15,23,42,0.10)_1px,transparent_1px)] [background-size:34px_34px]" />
+      <section className="relative py-32 px-6 bg-gradient-to-b from-slate-50 to-white overflow-hidden" id="managers">
+  {/* Background glow */}
+  <div className="absolute inset-0 -z-10">
+    <div className="absolute top-[-120px] left-1/2 -translate-x-1/2 h-[500px] w-[900px] bg-blue-100/40 blur-3xl rounded-full" />
+  </div>
+
+  <div className="max-w-7xl mx-auto">
+    {/* Header */}
+    <motion.div {...fadeInUp} className="max-w-3xl">
+      <span className="inline-flex items-center rounded-full border border-blue-200 bg-white/80 backdrop-blur px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.3em] text-blue-700">
+        Estate Management
+      </span>
+
+      <h2 className="mt-6 text-5xl md:text-6xl font-extrabold tracking-tight text-slate-900 leading-[1.05]">
+        Built for{" "}
+        <span className="bg-gradient-to-r from-blue-600 to-indigo-500 text-transparent bg-clip-text">
+          modern estate teams
+        </span>
+      </h2>
+
+      <p className="mt-6 text-lg text-slate-600 max-w-2xl leading-relaxed">
+        Manage residents, security workflows, and compliance from a single intelligent dashboard designed for speed and clarity.
+      </p>
+    </motion.div>
+
+    {/* Dashboard Preview (Hero) */}
+    <motion.div {...fadeInUp} className="mt-16 relative">
+      <div className="relative rounded-[2.5rem] border border-slate-200/70 bg-white/70 backdrop-blur-xl p-4 shadow-[0_40px_120px_rgba(2,6,23,0.12)]">
+        <div className="rounded-[2rem] bg-white overflow-hidden">
+          <LaptopPreview className="w-full" />
+        </div>
+      </div>
+
+      {/* Floating stats */}
+      <div className="mt-6 grid grid-cols-3 gap-4 max-w-xl">
+        {[
+          { k: "Operations", v: "Unified dashboard" },
+          { k: "Communication", v: "Instant alerts" },
+          { k: "Compliance", v: "Audit-ready logs" },
+        ].map((stat) => (
+          <div
+            key={stat.k}
+            className="rounded-2xl border border-slate-200 bg-white/80 backdrop-blur px-4 py-4 shadow-sm hover:shadow-md transition"
+          >
+            <div className="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">
+              {stat.k}
+            </div>
+            <div className="mt-2 text-sm font-semibold text-slate-900">
+              {stat.v}
+            </div>
           </div>
+        ))}
+      </div>
+    </motion.div>
 
-          <div className="relative mx-auto max-w-7xl">
-            <motion.div {...fadeInUp} className="max-w-3xl">
-              <span className="inline-flex items-center gap-2 rounded-full border border-blue-200/80 bg-blue-50/80 px-4 py-2 text-[10px] font-black uppercase tracking-[0.3em] text-blue-900">
-                Estate Management
-              </span>
+    {/* Features */}
+    <div className="mt-20 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      {estateManagerFeatures.map((f, idx) => (
+        <motion.div
+          key={f.title}
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6, delay: idx * 0.05 }}
+          className="group relative rounded-3xl border border-slate-200 bg-white/80 backdrop-blur-xl p-6 hover:-translate-y-2 transition-all duration-300 shadow-sm hover:shadow-xl"
+        >
+          {/* glow */}
+          <div className="absolute inset-0 rounded-3xl opacity-0 group-hover:opacity-100 bg-gradient-to-br from-blue-500/10 to-indigo-500/10 blur-xl transition" />
 
-              <h2 className="mt-6 text-3xl font-black italic uppercase tracking-tighter text-slate-900 sm:text-4xl md:text-5xl">
-                Built for Estate Managers
-              </h2>
-              <p className="mt-5 text-lg font-medium leading-relaxed text-slate-600">
-                Run resident operations, security workflows, and compliance logging from one dashboard—designed for busy property teams.
+          <div className="relative flex items-start gap-4">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-500 text-white shadow-md">
+              <f.icon className="h-5 w-5" />
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold text-slate-900">
+                {f.title}
+              </h3>
+              <p className="mt-2 text-sm text-slate-600 leading-relaxed">
+                {f.description}
               </p>
-
-              <div className="mt-8 flex flex-wrap gap-2">
-                {[
-                  'Multi‑estate control',
-                  'Role‑based access',
-                  'Export‑ready logs',
-                  'Real‑time visibility',
-                ].map((label) => (
-                  <div
-                    key={label}
-                    className="rounded-full border border-slate-200 bg-white/70 px-4 py-2 text-[10px] font-black uppercase tracking-[0.22em] text-slate-700 backdrop-blur"
-                  >
-                    {label}
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-
-            <motion.div {...fadeInUp} className="mt-12">
-              <div className="relative">
-                <div className="absolute -inset-8 -z-10 rounded-[3rem] bg-[radial-gradient(circle_at_30%_20%,rgba(37,99,235,0.22),transparent_58%),radial-gradient(circle_at_75%_70%,rgba(59,130,246,0.12),transparent_55%)] blur-2xl" />
-                <div className="rounded-[3rem] border border-slate-200/70 bg-white/60 p-3 shadow-[0_40px_120px_rgba(2,6,23,0.12)] backdrop-blur">
-                  <div className="rounded-[2.6rem] bg-white">
-                    <LaptopPreview className="max-w-5xl" />
-                  </div>
-                </div>
-
-                <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                  {[
-                    { k: 'Ops', v: 'One dashboard' },
-                    { k: 'Comms', v: 'Instant blasts' },
-                    { k: 'Logs', v: 'Audit‑ready' },
-                  ].map((stat) => (
-                    <div
-                      key={stat.k}
-                      className="rounded-2xl border border-slate-200 bg-white/80 px-4 py-4 shadow-[0_18px_50px_rgba(2,6,23,0.06)] backdrop-blur"
-                    >
-                      <div className="text-[10px] font-black uppercase tracking-[0.28em] text-slate-500">{stat.k}</div>
-                      <div className="mt-2 text-sm font-black uppercase tracking-tight text-slate-900">{stat.v}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-
-            <div className="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {estateManagerFeatures.map((f, idx) => {
-                const isHero = idx === 0;
-                return (
-                  <motion.div
-                    key={f.title}
-                    initial={{ opacity: 0, y: 14 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true, amount: 0.35 }}
-                    transition={{ duration: 0.7, delay: idx * 0.06, ease: [0.22, 1, 0.36, 1] }}
-                    className={[
-                      'group relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_24px_70px_rgba(2,6,23,0.06)]',
-                      isHero ? 'md:col-span-2 lg:col-span-2 lg:row-span-2 sm:p-7' : '',
-                    ].join(' ')}
-                  >
-                    {isHero && (
-                      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_15%,rgba(37,99,235,0.18),transparent_52%),radial-gradient(circle_at_80%_75%,rgba(59,130,246,0.10),transparent_55%)]" />
-                    )}
-
-                    <div className="relative flex items-start gap-4">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-[0_12px_30px_rgba(37,99,235,0.28)] sm:h-11 sm:w-11">
-                        <f.icon className="h-5 w-5 sm:h-6 sm:w-6" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="text-xs font-black uppercase tracking-[0.18em] text-slate-900">{f.title}</div>
-                        <div className="mt-2 text-sm font-medium leading-relaxed text-slate-600">{f.description}</div>
-                      </div>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
-
-            <div className="mt-12 flex flex-col gap-3 sm:flex-row">
-              <Link to="/request-demo" className="inline-flex items-center justify-center gap-3 rounded-full bg-blue-600 px-8 py-4 text-xs font-black uppercase tracking-widest text-white shadow-[0_18px_60px_rgba(37,99,235,0.30)] transition-colors hover:bg-blue-700">
-                Request Demo <ArrowRight className="h-4 w-4" />
-              </Link>
-              <Link to="/dashboard/estate" className="rounded-full border border-slate-300 bg-white/80 px-8 py-4 text-xs font-black uppercase tracking-widest text-slate-900 backdrop-blur transition-colors hover:bg-white">
-                View Manager Tools
-              </Link>
             </div>
           </div>
-        </section>
+        </motion.div>
+      ))}
+    </div>
+
+    {/* CTA */}
+    <div className="mt-16 flex flex-col sm:flex-row gap-4">
+      <Link
+        to="/request-demo"
+        className="inline-flex items-center justify-center gap-3 rounded-full bg-gradient-to-r from-blue-600 to-indigo-500 px-8 py-4 text-xs font-semibold uppercase tracking-widest text-white shadow-lg hover:opacity-90 transition"
+      >
+        Request Demo <ArrowRight className="h-4 w-4" />
+      </Link>
+
+      <Link
+        to="/dashboard/estate"
+        className="rounded-full border border-slate-300 bg-white/80 backdrop-blur px-8 py-4 text-xs font-semibold uppercase tracking-widest text-slate-900 hover:bg-white transition"
+      >
+        View Manager Tools
+      </Link>
+    </div>
+  </div>
+</section>
 
         {/* SECTION 5: EVOLUTION COMPARISON */}
-        <section className="py-32 bg-slate-50 px-6">
-          <div className="max-w-5xl mx-auto">
-            <div className="grid md:grid-cols-2 gap-1 px-4 md:px-0">
-              <div className="bg-white p-10 rounded-t-[2.5rem] md:rounded-l-[2.5rem] md:rounded-tr-none border border-slate-200">
-                <h4 className="text-slate-500 font-black text-[10px] uppercase mb-8 tracking-[0.3em]">Traditional Logbooks</h4>
-                <div className="space-y-6">
-                  {["Illegible handwriting", "Manual radio/phone calls", "Zero digital audit trail"].map(item => (
-                    <div key={item} className="flex items-center gap-4 text-slate-600 font-medium">
-                      <AlertCircle size={18} className="text-red-500 shrink-0" /> {item}
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="bg-[#2563eb] p-10 rounded-b-[2.5rem] md:rounded-r-[2.5rem] md:rounded-bl-none text-white border border-[#2563eb]">
-                <h4 className="text-white/30 font-black text-[10px] uppercase mb-8 tracking-[0.3em]">QRing Ecosystem</h4>
-                <div className="space-y-6">
-                  {["Encrypted Cloud Logs", "Instant Push Alerts", "Immutable History"].map(item => (
-                    <div key={item} className="flex items-center gap-4 font-black italic">
-                      <CheckCircle2 size={18} className="text-white shrink-0" /> {item}
-                    </div>
-                  ))}
-                </div>
-              </div>
+      <section className="relative py-32 px-6 bg-gradient-to-b from-white to-slate-50 overflow-hidden">
+  {/* subtle background glow */}
+  <div className="absolute inset-0 -z-10">
+    <div className="absolute top-0 left-1/2 -translate-x-1/2 h-[400px] w-[800px] bg-blue-100/40 blur-3xl rounded-full" />
+  </div>
+
+  <div className="max-w-6xl mx-auto">
+    {/* Header */}
+    <div className="text-center max-w-2xl mx-auto">
+      <span className="inline-block text-xs font-semibold uppercase tracking-[0.3em] text-blue-600">
+        Transformation
+      </span>
+
+      <h3 className="mt-4 text-4xl md:text-5xl font-extrabold tracking-tight text-slate-900 leading-tight">
+        From outdated logs to{" "}
+        <span className="bg-gradient-to-r from-blue-600 to-indigo-500 text-transparent bg-clip-text">
+          intelligent access control
+        </span>
+      </h3>
+
+      <p className="mt-5 text-lg text-slate-600">
+        Replace manual processes with a secure, automated system designed for speed, clarity, and accountability.
+      </p>
+    </div>
+
+    {/* Comparison */}
+    <div className="mt-20 grid md:grid-cols-2 gap-10 items-stretch">
+      {/* OLD SYSTEM */}
+      <div className="relative rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+        <div className="mb-8">
+          <h4 className="text-xs uppercase tracking-widest text-slate-500 font-semibold">
+            Traditional System
+          </h4>
+          <p className="mt-2 text-sm text-slate-500">
+            Fragmented, manual, and prone to errors.
+          </p>
+        </div>
+
+        <div className="space-y-5">
+          {[
+            "Illegible handwriting and human errors",
+            "Manual phone calls slow down access",
+            "No centralized or secure audit trail",
+            "Difficult to track visitor history",
+            "No real-time visibility for residents",
+          ].map((item) => (
+            <div key={item} className="flex items-start gap-3 text-slate-600">
+              <AlertCircle className="text-red-500 w-5 h-5 mt-0.5" />
+              <span>{item}</span>
             </div>
+          ))}
+        </div>
+      </div>
+
+      {/* QRING SYSTEM */}
+      <div className="relative rounded-3xl p-8 text-white bg-gradient-to-br from-blue-600 to-indigo-600 shadow-xl overflow-hidden">
+        {/* glow */}
+        <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_top,white,transparent)]" />
+
+        <div className="relative mb-8">
+          <h4 className="text-xs uppercase tracking-widest text-white/70 font-semibold">
+            QRing System
+          </h4>
+          <p className="mt-2 text-sm text-white/80">
+            Secure, automated, and built for modern estates.
+          </p>
+        </div>
+
+        <div className="space-y-5 relative">
+          {[
+            "Encrypted cloud-based visitor logs",
+            "Instant approvals and real-time alerts",
+            "Immutable and searchable history",
+            "Centralized dashboard for all estates",
+            "Full visibility for residents and managers",
+          ].map((item) => (
+            <div key={item} className="flex items-start gap-3 font-medium">
+              <CheckCircle2 className="w-5 h-5 mt-0.5" />
+              <span>{item}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+
+    {/* Value Highlights */}
+    <div className="mt-20 grid sm:grid-cols-3 gap-6">
+      {[
+        { title: "Faster Access", desc: "Reduce gate delays with instant approvals and automation." },
+        { title: "Better Security", desc: "Track every entry with encrypted and verifiable logs." },
+        { title: "Full Control", desc: "Residents and managers stay in control at all times." },
+      ].map((item) => (
+        <div
+          key={item.title}
+          className="rounded-2xl border border-slate-200 bg-white/80 backdrop-blur p-6 text-center shadow-sm hover:shadow-md transition"
+        >
+          <h5 className="text-sm font-semibold text-slate-900">{item.title}</h5>
+          <p className="mt-2 text-sm text-slate-600">{item.desc}</p>
+        </div>
+      ))}
+    </div>
+
+    {/* Metrics / Proof */}
+    <div className="mt-16 grid grid-cols-3 gap-6 text-center max-w-3xl mx-auto">
+      {[
+        { value: "90%", label: "Faster check-ins" },
+        { value: "100%", label: "Digital logs" },
+        { value: "24/7", label: "Real-time monitoring" },
+      ].map((stat) => (
+        <div key={stat.label}>
+          <div className="text-2xl font-bold text-slate-900">{stat.value}</div>
+          <div className="text-xs uppercase tracking-widest text-slate-500 mt-1">
+            {stat.label}
           </div>
-        </section>
+        </div>
+      ))}
+    </div>
+
+    {/* CTA */}
+    <div className="mt-16 flex flex-col sm:flex-row justify-center gap-4">
+      <button className="rounded-full bg-gradient-to-r from-blue-600 to-indigo-500 px-8 py-4 text-xs font-semibold uppercase tracking-widest text-white shadow-lg hover:opacity-90 transition">
+        Get Started
+      </button>
+
+      <button className="rounded-full border border-slate-300 bg-white/80 backdrop-blur px-8 py-4 text-xs font-semibold uppercase tracking-widest text-slate-900 hover:bg-white transition">
+        See How It Works
+      </button>
+    </div>
+  </div>
+</section>
 
         {/* SECTION 4: 3-STEP WORKFLOW */}
         <section className="py-32 bg-white text-slate-900 px-6">
@@ -940,134 +1218,169 @@ Reception teams can manage visitor check-ins, monitor building access, and keep 
           </div>
         </section>
 
-        {/* SECTION 5: INCIDENT RECEIPT */}
-        <section className="py-32 bg-slate-50 border-y border-slate-200 px-6">
-          <div className="max-w-7xl mx-auto grid md:grid-cols-2 gap-20 items-center">
-            <div>
-              <h2 className="text-5xl font-black italic tracking-tighter mb-8 leading-none uppercase text-slate-900">Digital <br/> Receipts.</h2>
-              <p className="text-slate-500 text-lg mb-10 font-medium">Every scan generates a cryptographically signed digital receipt, ensuring total accountability for every entry.</p>
-              <div className="space-y-4">
-                <div className="flex items-center gap-4 font-black italic text-slate-700"><CheckCircle2 className="text-blue-600" /> Tamper-Proof Timestamps</div>
-                <div className="flex items-center gap-4 font-black italic text-slate-700"><CheckCircle2 className="text-blue-600" /> High-Res Visitor Photos</div>
-              </div>
-            </div>
-            <motion.div animate={{ y: [0, -20, 0] }} transition={{ duration: 6, repeat: Infinity }} className="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-8 border border-slate-100 mx-auto">
-              <div className="flex justify-between items-center mb-8 pb-4 border-b border-dashed border-slate-200">
-                <Shield className="text-blue-600" />
-                <span className="text-[10px] font-black text-slate-400">RECEIPT #QR-4402</span>
-              </div>
-              <div className="space-y-4">
-                <div className="flex justify-between text-xs font-bold uppercase"><span className="text-slate-400">Visitor</span><span className="text-slate-900">Marcus Cole</span></div>
-                <div className="mt-6 bg-blue-600 text-white p-4 rounded-xl text-center text-[10px] font-black tracking-widest uppercase">Verified Entry Successful</div>
-              </div>
-            </motion.div>
-          </div>
-        </section>
+        <QRFlowSection />
 
         <LandingPricingSection />
- {/* SECTION 3: APP DOWNLOADS */}
-        <section className="bg-white px-6 py-28" id="downloads">
-          <div className="mx-auto max-w-7xl">
-            <motion.div {...fadeInUp} className="max-w-3xl">
-              <span className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-[10px] font-black uppercase tracking-[0.3em] text-blue-800">
-                Mobile Apps
+<section className="relative py-32 px-6 bg-gradient-to-b from-white to-slate-50 overflow-hidden" id="downloads">
+  {/* background glow */}
+  <div className="absolute inset-0 -z-10">
+    <div className="absolute top-0 left-1/2 -translate-x-1/2 h-[400px] w-[800px] bg-blue-100/40 blur-3xl rounded-full" />
+  </div>
+
+  <div className="max-w-7xl mx-auto">
+    {/* HEADER */}
+    <motion.div {...fadeInUp} className="max-w-3xl">
+      <span className="inline-flex rounded-full border border-blue-200 bg-white/80 backdrop-blur px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.3em] text-blue-700">
+        Mobile Apps
+      </span>
+
+      <h2 className="mt-6 text-5xl md:text-6xl font-extrabold tracking-tight text-slate-900 leading-[1.05]">
+        Get QRing on{" "}
+        <span className="bg-gradient-to-r from-blue-600 to-indigo-500 text-transparent bg-clip-text">
+          your device
+        </span>
+      </h2>
+
+      <p className="mt-6 text-lg text-slate-600 max-w-2xl">
+        Install QRing to manage visitor access, approvals, and real-time monitoring—anytime, anywhere.
+      </p>
+    </motion.div>
+
+    {/* PLATFORM GRID */}
+    <div className="mt-20 grid gap-8 lg:grid-cols-2">
+      
+      {/* ANDROID CARD */}
+      <motion.div
+        initial={{ opacity: 0, y: 30 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+        className="group relative rounded-[2.5rem] overflow-hidden bg-gradient-to-br from-[#0b1b34] via-[#102a54] to-[#2563eb] p-10 text-white shadow-[0_40px_120px_rgba(37,99,235,0.25)]"
+      >
+        {/* glow */}
+        <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_20%_20%,white,transparent_30%)]" />
+
+        <div className="relative">
+          {/* top */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="h-14 w-14 rounded-xl bg-white p-2 shadow-md">
+                <img src="/qring_logo.png" className="h-full w-full object-contain" />
+              </div>
+              <span className="text-xs uppercase tracking-widest text-white/70">
+                Android
               </span>
-              <h2 className="mt-6 text-3xl font-black italic uppercase tracking-tighter text-slate-900 sm:text-4xl md:text-5xl">
-                Download QRing for your device
-              </h2>
-              <p className="mt-5 text-lg font-medium leading-relaxed text-slate-600">
-                Install the Android app directly now. The iOS app section is ready on the site and will switch live once the App Store build is available.
-              </p>
-            </motion.div>
-
-            <div className="mt-14 grid gap-6 lg:grid-cols-2">
-              <motion.div
-                initial={{ opacity: 0, y: 24 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, amount: 0.25 }}
-                transition={{ duration: 0.75, ease: [0.22, 1, 0.36, 1] }}
-                className="relative overflow-hidden rounded-[2.5rem] border border-blue-200 bg-[linear-gradient(135deg,#071226_0%,#0f274f_52%,#2563eb_100%)] p-8 text-white shadow-[0_28px_90px_rgba(37,99,235,0.22)] sm:p-10"
-              >
-                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(255,255,255,0.18),transparent_28%),radial-gradient(circle_at_78%_80%,rgba(255,255,255,0.14),transparent_32%)]" />
-                <div className="relative">
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-16 w-16 items-center justify-center rounded-[1.35rem] bg-white p-3 shadow-[0_14px_32px_rgba(15,23,42,0.18)]">
-                      <img src="/qring_logo.png" alt="QRing logo" className="h-full w-full object-contain" />
-                    </div>
-                    <div className="inline-flex rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.28em] text-white/90">
-                      Android
-                    </div>
-                  </div>
-                  <h3 className="mt-6 text-3xl font-black italic uppercase tracking-tighter sm:text-4xl">APK Download</h3>
-                  <p className="mt-4 max-w-xl text-sm font-medium leading-relaxed text-white/80 sm:text-base">
-                    Download the latest QRing Android installer and sideload it on supported devices for homeowner and estate access.
-                  </p>
-                  <p className="mt-3 text-xs font-bold uppercase tracking-[0.24em] text-blue-100/90">
-                    Updated build: March 24, 2026
-                  </p>
-
-                  <div className="mt-8 flex flex-wrap gap-3 text-[10px] font-black uppercase tracking-[0.24em] text-white/80">
-                    <span className="rounded-full border border-white/20 bg-white/10 px-4 py-2">Direct Install</span>
-                    <span className="rounded-full border border-white/20 bg-white/10 px-4 py-2">Latest Bundled APK</span>
-                    <span className="rounded-full border border-white/20 bg-white/10 px-4 py-2">Device Ready</span>
-                  </div>
-
-                  <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:items-center">
-                    <a
-                      href="/qring.apk"
-                      download="qring.apk"
-                      className="inline-flex items-center justify-center gap-3 rounded-full bg-white px-8 py-4 text-xs font-black uppercase tracking-widest text-slate-950 transition-transform hover:scale-[1.02]"
-                    >
-                      Download Android APK
-                      <ArrowRight className="h-4 w-4" />
-                    </a>
-                    <div className="text-xs font-bold text-white/70">
-                      Best for Android phones, tablets, and managed estate devices. Download size about 19.3 MB.
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-
-              <motion.div
-                initial={{ opacity: 0, y: 24 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, amount: 0.25 }}
-                transition={{ duration: 0.75, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
-                className="relative overflow-hidden rounded-[2.5rem] border border-slate-200 bg-slate-50 p-8 shadow-[0_24px_70px_rgba(2,6,23,0.06)] sm:p-10"
-              >
-                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_22%_18%,rgba(37,99,235,0.10),transparent_26%),radial-gradient(circle_at_82%_78%,rgba(15,23,42,0.08),transparent_28%)]" />
-                <div className="relative">
-                  <div className="inline-flex rounded-full border border-slate-200 bg-white px-4 py-2 text-[10px] font-black uppercase tracking-[0.28em] text-slate-700">
-                    iOS
-                  </div>
-                  <h3 className="mt-6 text-3xl font-black italic uppercase tracking-tighter text-slate-900 sm:text-4xl">Coming Soon</h3>
-                  <p className="mt-4 max-w-xl text-sm font-medium leading-relaxed text-slate-600 sm:text-base">
-                    The iPhone version is being prepared for release. This section is already in place and will switch to an App Store download as soon as it is ready.
-                  </p>
-
-                  <div className="mt-8 flex flex-wrap gap-3 text-[10px] font-black uppercase tracking-[0.24em] text-slate-500">
-                    <span className="rounded-full border border-slate-200 bg-white px-4 py-2">App Store Release</span>
-                    <span className="rounded-full border border-slate-200 bg-white px-4 py-2">Same QRing Experience</span>
-                    <span className="rounded-full border border-slate-200 bg-white px-4 py-2">In Review Pipeline</span>
-                  </div>
-
-                  <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:items-center">
-                    <button
-                      type="button"
-                      disabled
-                      className="inline-flex items-center justify-center rounded-full bg-slate-200 px-8 py-4 text-xs font-black uppercase tracking-widest text-slate-500"
-                    >
-                      iOS Coming Soon
-                    </button>
-                    <div className="text-xs font-bold text-slate-500">
-                      Share this page with iPhone users so they can check back when the release goes live.
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
             </div>
+
+            <span className="text-[10px] bg-white/10 px-3 py-1 rounded-full tracking-widest uppercase">
+              Live
+            </span>
           </div>
-        </section>
+
+          {/* title */}
+          <h3 className="mt-8 text-3xl font-bold">
+            Download APK
+          </h3>
+
+          <p className="mt-4 text-white/80 max-w-md">
+            Get the latest QRing Android build and install instantly on supported devices for homeowners and estate managers.
+          </p>
+
+          {/* features */}
+          <div className="mt-6 flex flex-wrap gap-2 text-[10px] uppercase tracking-wider">
+            {["Direct Install", "Fast Setup", "Offline Ready"].map(tag => (
+              <span key={tag} className="bg-white/10 border border-white/20 px-3 py-1 rounded-full">
+                {tag}
+              </span>
+            ))}
+          </div>
+
+          {/* CTA */}
+          <div className="mt-10 flex flex-col sm:flex-row gap-4 sm:items-center">
+            <a
+              href="/qring.apk"
+              download
+              className="inline-flex items-center justify-center gap-2 bg-white text-slate-900 px-8 py-4 rounded-full text-xs font-semibold uppercase tracking-widest hover:scale-[1.02] transition"
+            >
+              Download APK <ArrowRight className="w-4 h-4" />
+            </a>
+
+            <span className="text-xs text-white/70">
+              ~19MB • Works on most Android devices
+            </span>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* IOS CARD */}
+      <motion.div
+        initial={{ opacity: 0, y: 30 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, delay: 0.1 }}
+        className="relative rounded-[2.5rem] border border-slate-200 bg-white/80 backdrop-blur-xl p-10 shadow-lg"
+      >
+        {/* badge */}
+        <div className="flex justify-between items-center">
+          <span className="text-xs uppercase tracking-widest text-slate-500">
+            iOS
+          </span>
+
+          <span className="text-[10px] bg-slate-100 px-3 py-1 rounded-full uppercase tracking-widest text-slate-500">
+            Coming Soon
+          </span>
+        </div>
+
+        <h3 className="mt-8 text-3xl font-bold text-slate-900">
+          App Store Release
+        </h3>
+
+        <p className="mt-4 text-slate-600 max-w-md">
+          The iOS version is currently in preparation and will be available on the App Store soon with the full QRing experience.
+        </p>
+
+        {/* features */}
+        <div className="mt-6 flex flex-wrap gap-2 text-[10px] uppercase tracking-wider text-slate-500">
+          {["App Store Launch", "Same Features", "Optimized UI"].map(tag => (
+            <span key={tag} className="bg-slate-100 border border-slate-200 px-3 py-1 rounded-full">
+              {tag}
+            </span>
+          ))}
+        </div>
+
+        {/* CTA */}
+        <div className="mt-10 flex flex-col sm:flex-row gap-4 sm:items-center">
+          <button
+            disabled
+            className="bg-slate-200 text-slate-500 px-8 py-4 rounded-full text-xs font-semibold uppercase tracking-widest"
+          >
+            Coming Soon
+          </button>
+
+          <span className="text-xs text-slate-500">
+            Join waitlist or check back soon
+          </span>
+        </div>
+      </motion.div>
+    </div>
+
+    {/* TRUST / SUPPORT */}
+    <div className="mt-20 grid sm:grid-cols-3 gap-6 text-center max-w-4xl mx-auto">
+      {[
+        { title: "Secure Install", desc: "Verified and safe application build" },
+        { title: "Fast Setup", desc: "Get started in under 2 minutes" },
+        { title: "Always Connected", desc: "Real-time access control anywhere" },
+      ].map((item) => (
+        <div key={item.title}>
+          <h4 className="text-sm font-semibold text-slate-900">
+            {item.title}
+          </h4>
+          <p className="text-sm text-slate-600 mt-2">
+            {item.desc}
+          </p>
+        </div>
+      ))}
+    </div>
+  </div>
+</section>
         {/* SECTION 7: FAQ */}
         <section className="py-32 bg-white px-6" id="faq">
           <div className="max-w-4xl mx-auto">
