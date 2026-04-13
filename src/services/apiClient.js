@@ -16,6 +16,7 @@ const GET_CACHE_TTL_MS = 20 * 1000;
 const GET_CACHE_STALE_TTL_MS = 2 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 30000;
 const getResponseCache = new Map();
+const inFlightGetRequests = new Map();
 const protectedPathPrefixes = [
   "/dashboard",
   "/homeowner",
@@ -240,6 +241,10 @@ export async function apiRequest(path, options = {}, attempt = 0) {
     if (cached && cached.ageMs < GET_CACHE_TTL_MS) {
       return cached.row.payload;
     }
+    const inFlight = inFlightGetRequests.get(cacheKey);
+    if (inFlight) {
+      return inFlight;
+    }
   }
 
   const headers = {
@@ -252,101 +257,113 @@ export async function apiRequest(path, options = {}, attempt = 0) {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  let response;
-  try {
-    response = await performHttpRequest(`${env.apiBaseUrl}${path}`, {
-      method: options.method ?? "GET",
-      headers,
-      body: options.body
-    });
-  } catch (networkError) {
-    if (isGet) {
-      const cached = readGetCache(cacheKey);
-      if (cached && cached.ageMs < GET_CACHE_STALE_TTL_MS) {
-        emitFlash("Connection unstable. Showing recent cached data.", "warning");
-        return cached.row.payload;
-      }
-    }
-    if (attempt < 1) {
-      await new Promise((resolve) => setTimeout(resolve, 1200));
-      return apiRequest(path, options, attempt + 1);
-    }
-    const message =
-      "We couldn't connect right now. Please check your internet and try again in a moment.";
-    throw new ApiError(
-      message,
-      0,
-      {
-        reason: networkError?.message ?? "fetch failed",
-        apiBaseUrl: env.apiBaseUrl,
-        path
-      }
-    );
-  }
-
-  const raw = response.raw;
-  const payload = response.payload;
-
-  if (response.ok && !payload) {
-    const message = `API returned an empty/non-JSON success response. Check VITE_API_BASE_URL (${env.apiBaseUrl}) and backend routing.`;
-    if (!silent) emitFlash(message, "error");
-    throw new ApiError(
-      message,
-      response.status,
-      { raw }
-    );
-  }
-
-  if (!response.ok) {
-    const shouldHandleSessionTimeout = response.status === 401 && (Boolean(token) || requiresAuthenticatedUser(path));
-    if (shouldHandleSessionTimeout && attempt === 0) {
-      const newToken = await refreshAccessToken();
-      if (newToken) {
-        return apiRequest(path, options, 1);
-      }
-      clearAuthStorage();
-      emitFlash("Session timeout. Please login again.", "warning");
-      redirectToLogin();
-    }
-    const isSubscriptionBlocked = response.status === 403 && payload?.code === "SUBSCRIPTION_ACTION_BLOCKED";
-    const baseMessage = shouldHandleSessionTimeout
-      ? "Session timeout. Please login again."
-      : payload?.message ?? payload?.detail ?? `Request failed (${response.status})`;
-    const requestId = payload?.requestId ? String(payload.requestId) : "";
-    const isServerError = response.status >= 500 && !shouldHandleSessionTimeout;
-    if (isServerError) {
-      // Keep the UI friendly; log details for debugging/support.
-      // eslint-disable-next-line no-console
-      console.error("API 5xx", { path, status: response.status, requestId, payload });
-    }
-
-    const message = isServerError
-      ? path === "/homeowner/settings"
-        ? "We couldn't load your settings right now. Please try again."
-        : "Something went wrong. Please try again."
-      : baseMessage;
-    if (isSubscriptionBlocked) {
-      emitBlockingSubscription({
-        title: payload?.subscription?.status === "suspended" ? "Service paused" : "Subscription restriction",
-        message,
-        actionLabel: payload?.subscription?.is_bill_payer ?? payload?.subscription?.isBillPayer ? "Renew Now" : "",
-        actionRoute: payload?.renew_url ?? payload?.subscription?.renew_url ?? payload?.subscription?.renewUrl ?? "/billing/paywall"
+  const requestRunner = async () => {
+    let response;
+    try {
+      response = await performHttpRequest(`${env.apiBaseUrl}${path}`, {
+        method: options.method ?? "GET",
+        headers,
+        body: options.body
       });
-    } else if (!silent) {
-      emitFlash(message, "error");
+    } catch (networkError) {
+      if (isGet) {
+        const cached = readGetCache(cacheKey);
+        if (cached && cached.ageMs < GET_CACHE_STALE_TTL_MS) {
+          emitFlash("Connection unstable. Showing recent cached data.", "warning");
+          return cached.row.payload;
+        }
+      }
+      if (attempt < 1) {
+        await new Promise((resolve) => setTimeout(resolve, 350));
+        return apiRequest(path, options, attempt + 1);
+      }
+      const message =
+        "We couldn't connect right now. Please check your internet and try again in a moment.";
+      throw new ApiError(
+        message,
+        0,
+        {
+          reason: networkError?.message ?? "fetch failed",
+          apiBaseUrl: env.apiBaseUrl,
+          path
+        }
+      );
     }
-    throw new ApiError(
-      message,
-      response.status,
-      payload
-    );
-  }
+
+    const raw = response.raw;
+    const payload = response.payload;
+
+    if (response.ok && !payload) {
+      const message = `API returned an empty/non-JSON success response. Check VITE_API_BASE_URL (${env.apiBaseUrl}) and backend routing.`;
+      if (!silent) emitFlash(message, "error");
+      throw new ApiError(
+        message,
+        response.status,
+        { raw }
+      );
+    }
+
+    if (!response.ok) {
+      const shouldHandleSessionTimeout = response.status === 401 && (Boolean(token) || requiresAuthenticatedUser(path));
+      if (shouldHandleSessionTimeout && attempt === 0) {
+        const newToken = await refreshAccessToken();
+        if (newToken) {
+          return apiRequest(path, options, 1);
+        }
+        clearAuthStorage();
+        emitFlash("Session timeout. Please login again.", "warning");
+        redirectToLogin();
+      }
+      const isSubscriptionBlocked = response.status === 403 && payload?.code === "SUBSCRIPTION_ACTION_BLOCKED";
+      const baseMessage = shouldHandleSessionTimeout
+        ? "Session timeout. Please login again."
+        : payload?.message ?? payload?.detail ?? `Request failed (${response.status})`;
+      const requestId = payload?.requestId ? String(payload.requestId) : "";
+      const isServerError = response.status >= 500 && !shouldHandleSessionTimeout;
+      if (isServerError) {
+        // Keep the UI friendly; log details for debugging/support.
+        // eslint-disable-next-line no-console
+        console.error("API 5xx", { path, status: response.status, requestId, payload });
+      }
+
+      const message = isServerError
+        ? path === "/homeowner/settings"
+          ? "We couldn't load your settings right now. Please try again."
+          : "Something went wrong. Please try again."
+        : baseMessage;
+      if (isSubscriptionBlocked) {
+        emitBlockingSubscription({
+          title: payload?.subscription?.status === "suspended" ? "Service paused" : "Subscription restriction",
+          message,
+          actionLabel: payload?.subscription?.is_bill_payer ?? payload?.subscription?.isBillPayer ? "Renew Now" : "",
+          actionRoute: payload?.renew_url ?? payload?.subscription?.renew_url ?? payload?.subscription?.renewUrl ?? "/billing/paywall"
+        });
+      } else if (!silent) {
+        emitFlash(message, "error");
+      }
+      throw new ApiError(
+        message,
+        response.status,
+        payload
+      );
+    }
+
+    if (isGet && !noCache) {
+      getResponseCache.set(cacheKey, { payload, at: Date.now() });
+    }
+
+    return payload;
+  };
 
   if (isGet && !noCache) {
-    getResponseCache.set(cacheKey, { payload, at: Date.now() });
+    const pendingRequest = requestRunner().finally(() => {
+      inFlightGetRequests.delete(cacheKey);
+    });
+    inFlightGetRequests.set(cacheKey, pendingRequest);
+    return pendingRequest;
   }
 
-  return payload;
+  return requestRunner();
 }
 
 export async function apiUpload(path, formData) {

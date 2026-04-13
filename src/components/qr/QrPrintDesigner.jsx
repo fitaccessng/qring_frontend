@@ -355,7 +355,7 @@ export default function QrPrintDesigner({ preview, defaultLabel = "" }) {
           <input
             type="file"
             accept="image/*"
-            className="mt-1 block w-full text-xs"
+            className="mt-1 p-4 block w-full text-xs"
             onChange={(event) => handleFileAsDataUrl(event.target.files?.[0], (value) => setDesign((prev) => ({ ...prev, branding: { ...prev.branding, logo: value } })))}
           />
           {design.branding.logo ? (

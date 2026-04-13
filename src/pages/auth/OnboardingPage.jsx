@@ -1,31 +1,53 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "../../state/AuthContext";
-import BrandMark from "../../components/BrandMark";
-import { env } from "../../config/env";
-import { getHomeownerContext, getHomeownerDoors, joinEstate } from "../../services/homeownerService";
-import { getEstateOverview } from "../../services/estateService";
-import * as authService from "../../services/authService";
-import { requestBrowserNotificationPermission } from "../../services/notificationService";
-import { checkLocationPermission, requestLocationPermission } from "../../utils/locationService";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
-  Bell,
-  Camera,
+  ArrowRight,
+  BatteryFull,
   CheckCircle2,
-  ChevronRight,
-  Globe,
+  History,
   Lock,
-  Mail,
-  MapPin,
-  Mic,
+  QrCode,
+  Search,
   Shield,
-  Siren,
-  Users
+  ShieldCheck,
+  UserPlus,
+  Wifi,
 } from "lucide-react";
+import { useAuth } from "../../state/AuthContext";
+
+const ONBOARDING_STEPS = [
+  {
+    eyebrow: "Sentinel Active",
+    title: "Your Home,\nYour Rules",
+    body: "Take control of your gate from anywhere. No more missed calls or security guesswork.",
+    image:
+      "https://lh3.googleusercontent.com/aida-public/AB6AXuAYlQyfk2hf4ZM7KZEfhaIMvQ9bso2v7eYerPGZDnGmi_VZOPKllFr-MDPUek6cAado-mzm6VQLQi9yS5DIkfcj869WrhYJ3igY8HLwRxh45IBgF6M7eRphmghzNwMZ5zMq4M_ICWpzvw2cwJNVw1Awqh0Lkd-Kz7LQQT0G6fOi4gCBFrx-v-Y7TUsN2fXLaIg20TeuBOxIXoNBgosPgjr0Ht0xr034sglGAhEDIw0FyKyiNbLawLN6G_6SAeDDR10yf_PisTjBe6Ad",
+  },
+  {
+    eyebrow: "Verification Active",
+    title: "See & Verify\nInstantly",
+    body: "Receive real-time alerts and video feeds when someone arrives. Verify identity before you even open the second gate.",
+    image:
+      "https://lh3.googleusercontent.com/aida-public/AB6AXuBzmB0rWzn8yPOJmzUGOCBgoaVuNHzMPdyuyjQsaOiFc-b921EUMftnghUFAkoFVx5TVUQ3XFSgCRxa2aJtXDKqRsbW6AzHUOdLVd8Pr8ZhiC7mH3DWLlHSYAalSA_r_vbI-Bwnh_n9Dpp2LduKGYfnUHx-3jJGc0Ygd74xp_c3Kg_8VyyD4kv0VmOrY1sULDSCTl2ff7SMijJjMfNl7PjOzmNdqvliQmizcZ10pytkLIfPGStHoXb98wCdQbPJ1iB2a6eO5Ba1CLdw",
+  },
+  {
+    eyebrow: "Guest Access",
+    title: "Invite Guests in Seconds",
+    body: "Generate unique QR passes for visitors, delivery agents, or domestic staff. Set time windows for total security.",
+    image:
+      "https://lh3.googleusercontent.com/aida-public/AB6AXuDB8N7uING40cWx4-OZXUN1-AJe8V6_E80y6XLC0uVAhypjRSMBg81sPVfx8dJWm6TnUg_hNnnW5fIMMoeHRtS6cFsgoq7ReDC28GBXHSBIQSiZ1tDUroxduZ4z12I3K49i_cYoYGOTlvwkMXm7kIPi6_UVHayXoglt3ARdDmMqW-GOEUttJkVVjgtF_FBuCjCYfprYABOJstEy_kYGiUlMOp5cVhnYUZrmMiC3v1V1h2b1KvT_wvLUK06nAxf8iYA3gINeWDhtWBg3",
+  },
+  {
+    eyebrow: "Audit Log",
+    title: "A Clear Record of Every Visit",
+    body: "Access a complete, searchable history of every entry and exit. Full visibility and accountability for total peace of mind.",
+  },
+];
 
 function getDashboardRoute(role) {
   if (role === "estate") return "/dashboard/estate";
   if (role === "admin") return "/dashboard/admin";
+  if (role === "security") return "/dashboard/security";
   return "/dashboard/homeowner/overview";
 }
 
@@ -38,140 +60,19 @@ function getIdentity(user) {
 export default function OnboardingPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const accountRole = user?.role === "estate" ? "estate" : "homeowner";
+  const accountRole = user?.role === "estate" ? "estate" : user?.role === "security" ? "security" : "homeowner";
   const [step, setStep] = useState(0);
-  const [onboardingRole, setOnboardingRole] = useState(() => {
-    if (accountRole === "estate") return "estate";
-    try {
-      return localStorage.getItem("qring_onboarding_role_intent") === "resident" ? "resident" : "homeowner";
-    } catch {
-      return "homeowner";
-    }
-  });
-  const [onboardingRoleTouched, setOnboardingRoleTouched] = useState(false);
-  const [homeownerContext, setHomeownerContext] = useState(null);
-  const [loadingContext, setLoadingContext] = useState(false);
-  const [permissionState, setPermissionState] = useState({
-    notifications: "unknown",
-    location: "unknown",
-    camera: "unknown",
-    microphone: "unknown"
-  });
-  const [verificationBusy, setVerificationBusy] = useState(false);
-  const [verificationStatus, setVerificationStatus] = useState("");
-  const [estateJoinState, setEstateJoinState] = useState({
-    joinToken: "",
-    unitName: "",
-    busy: false,
-    status: ""
-  });
-  const [scenarioState, setScenarioState] = useState({
-    running: false,
-    stage: "idle",
-    secondsLeft: 0,
-    cancelled: false
-  });
-  const [previewState, setPreviewState] = useState({ loading: false, data: null, error: "" });
+  const isLast = step === ONBOARDING_STEPS.length - 1;
 
   useEffect(() => {
-    if (accountRole !== "homeowner") return;
-    try {
-      localStorage.removeItem("qring_onboarding_role_intent");
-    } catch {
-      // ignore
-    }
-  }, [accountRole]);
-
-  const onboardingPersona = useMemo(() => {
-    if (accountRole === "estate") return "estate";
-    if (onboardingRole === "resident") return "resident";
-    return "homeowner";
-  }, [accountRole, onboardingRole]);
-
-  const persona = useMemo(() => {
-    if (onboardingPersona === "estate") {
-      return {
-        label: "Estate Manager",
-        subtitle: "Run access, security teams, and resident operations from one place.",
-        icon: Users
-      };
-    }
-    if (onboardingPersona === "resident") {
-      return {
-        label: "Resident",
-        subtitle: "Connected to estate security for faster response and coordination.",
-        icon: Shield
-      };
-    }
-    return {
-      label: "Homeowner",
-      subtitle: "Approve visitors fast, keep logs, and trigger emergency alerts when needed.",
-      icon: Lock
-    };
-  }, [onboardingPersona]);
-
-  const totalSteps = 6;
-
-  useEffect(() => {
-    if (step !== totalSteps - 1) return;
-    let active = true;
-
-    async function loadPreview() {
-      setPreviewState({ loading: true, data: null, error: "" });
-      try {
-        if (onboardingPersona === "estate") {
-          const overview = await getEstateOverview();
-          const estates = Array.isArray(overview?.estates) ? overview.estates : [];
-          const homes = Array.isArray(overview?.homes) ? overview.homes : [];
-          const doors = Array.isArray(overview?.doors) ? overview.doors : [];
-          if (!active) return;
-          setPreviewState({
-            loading: false,
-            error: "",
-            data: {
-              status: estates.length > 0 ? "Live" : "Setup",
-              homes: homes.length,
-              doors: doors.length
-            }
-          });
-          return;
-        }
-
-        const doorData = await getHomeownerDoors();
-        const doors = Array.isArray(doorData?.doors) ? doorData.doors : [];
-        const plan = doorData?.subscription?.plan || "Free";
-        if (!active) return;
-        setPreviewState({
-          loading: false,
-          error: "",
-          data: {
-            status: "Live",
-            doors: doors.length,
-            plan: String(plan).toUpperCase()
-          }
-        });
-      } catch (error) {
-        if (!active) return;
-        setPreviewState({
-          loading: false,
-          data: null,
-          error: error?.message || "Unable to load preview."
-        });
-      }
-    }
-
-    loadPreview();
-    return () => {
-      active = false;
-    };
-  }, [onboardingPersona, step, totalSteps]);
-  const isLast = step >= totalSteps - 1;
+    if (typeof window === "undefined") return;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [step]);
 
   function markSeen() {
     const identity = getIdentity(user);
     localStorage.setItem(`qring_dashboard_welcome_seen_${accountRole}_${identity}`, "true");
     localStorage.setItem(`qring_onboarding_seen_${accountRole}_${identity}`, "true");
-    // Backward-compatible keys to avoid re-showing onboarding for existing users.
     if (user?.email) {
       const email = String(user.email).trim().toLowerCase();
       localStorage.setItem(`qring_dashboard_welcome_seen_${accountRole}_${email}`, "true");
@@ -190,822 +91,409 @@ export default function OnboardingPage() {
     navigate(getDashboardRoute(user?.role), { replace: true });
   }
 
+  function handleNext() {
+    if (isLast) {
+      completeOnboarding();
+      return;
+    }
+    setStep((prev) => Math.min(prev + 1, ONBOARDING_STEPS.length - 1));
+  }
+
   function handleSkip() {
     completeOnboarding();
   }
 
-  useEffect(() => {
-    if (accountRole !== "homeowner") return;
-    let active = true;
-    setLoadingContext(true);
-    getHomeownerContext()
-      .then((data) => {
-        if (!active) return;
-        setHomeownerContext(data);
-        if (!onboardingRoleTouched) {
-          setOnboardingRole(data?.managedByEstate ? "resident" : "homeowner");
-        }
-      })
-      .catch(() => {
-        if (!active) return;
-        setHomeownerContext(null);
-      })
-      .finally(() => {
-        if (!active) return;
-        setLoadingContext(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [accountRole, onboardingRoleTouched]);
-
-  useEffect(() => {
-    let active = true;
-
-    async function refreshPermissionState() {
-      const notifications =
-        typeof window !== "undefined" && typeof window.Notification !== "undefined"
-          ? window.Notification.permission
-          : "unsupported";
-      const location = (await checkLocationPermission().catch(() => ({ state: "prompt" })))?.state ?? "prompt";
-      if (!active) return;
-      setPermissionState((prev) => ({
-        ...prev,
-        notifications,
-        location
-      }));
-    }
-
-    refreshPermissionState();
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  async function requestNotifications() {
-    const result = await requestBrowserNotificationPermission();
-    setPermissionState((prev) => ({ ...prev, notifications: result || "default" }));
-  }
-
-  async function requestLocation() {
-    const result = await requestLocationPermission();
-    setPermissionState((prev) => ({ ...prev, location: result?.state || "prompt" }));
-  }
-
-  async function requestMedia(kind) {
-    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
-      setPermissionState((prev) => ({ ...prev, [kind]: "unsupported" }));
-      return;
-    }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: kind === "camera",
-        audio: kind === "microphone"
-      });
-      stream.getTracks().forEach((track) => track.stop());
-      setPermissionState((prev) => ({ ...prev, [kind]: "granted" }));
-    } catch {
-      setPermissionState((prev) => ({ ...prev, [kind]: "denied" }));
-    }
-  }
-
-  function isEmailVerified() {
-    return Boolean(user?.emailVerified ?? user?.email_verified ?? user?.email_verified_at ?? user?.verified);
-  }
-
-  async function sendVerificationEmail() {
-    if (!user?.email) {
-      setVerificationStatus("Missing email on your account.");
-      return;
-    }
-    setVerificationBusy(true);
-    setVerificationStatus("");
-    try {
-      await authService.requestEmailVerification({ email: String(user.email).trim().toLowerCase() });
-      setVerificationStatus("Verification email sent. Check your inbox (and spam).");
-    } catch (error) {
-      setVerificationStatus(error?.message || "Unable to send verification email.");
-    } finally {
-      setVerificationBusy(false);
-    }
-  }
-
-  async function runScenarioDemo() {
-    if (scenarioState.running) return;
-    setScenarioState({ running: true, stage: "arming", secondsLeft: 3, cancelled: false });
-    for (let i = 3; i >= 1; i -= 1) {
-      // eslint-disable-next-line no-await-in-loop
-      await new Promise((r) => setTimeout(r, 1000));
-      setScenarioState((prev) => ({ ...prev, secondsLeft: Math.max(0, i - 1) }));
-    }
-    setScenarioState((prev) => ({ ...prev, stage: "cancel_window", secondsLeft: 8 }));
-    for (let i = 8; i >= 1; i -= 1) {
-      // eslint-disable-next-line no-await-in-loop
-      await new Promise((r) => setTimeout(r, 1000));
-      setScenarioState((prev) => ({ ...prev, secondsLeft: Math.max(0, i - 1) }));
-      if (scenarioState.cancelled) break;
-    }
-    setScenarioState((prev) => ({
-      ...prev,
-      stage: prev.cancelled ? "cancelled" : "sent",
-      running: false,
-      secondsLeft: 0
-    }));
-  }
-
-  function cancelScenario() {
-    setScenarioState((prev) => ({ ...prev, cancelled: true, stage: "cancelled", running: false, secondsLeft: 0 }));
-  }
-
-  const headerHint = useMemo(() => {
-    if (onboardingPersona === "estate") return "Built for estate operations in Nigeria: fast, reliable, auditable.";
-    if (onboardingPersona === "resident") return `Linked to an estate for coordinated security response.`;
-    return "Built for everyday gate access and real emergencies.";
-  }, [onboardingPersona]);
-
-  const nextLabel = isLast ? "Open Dashboard" : "Continue";
-
   return (
-    <div className="safe-content min-h-[100dvh] bg-[radial-gradient(circle_at_12%_10%,rgba(37,99,235,0.18),transparent_38%),radial-gradient(circle_at_86%_86%,rgba(20,184,166,0.14),transparent_40%),linear-gradient(180deg,#f8fafc_0%,#eef2ff_45%,#f1f5f9_100%)] px-4 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-[calc(1.25rem+env(safe-area-inset-top))]">
-      <div className="mx-auto w-full max-w-md">
-        <header className="mb-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="grid h-11 w-11 place-items-center rounded-2xl border border-white/60 bg-white/80 shadow-soft">
-              <BrandMark tone="light" className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-500">QRing Onboarding</div>
-              <div className="text-sm font-extrabold text-slate-900">{persona.label}</div>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={handleSkip}
-            className="rounded-full border border-white/60 bg-white/70 px-4 py-2 text-[11px] font-black uppercase tracking-[0.22em] text-slate-700"
-          >
-            Skip
-          </button>
-        </header>
-
-        <section className="overflow-hidden rounded-[28px] border border-white/60 bg-white/85 shadow-[0_24px_80px_rgba(2,6,23,0.12)] backdrop-blur">
-          <div className="border-b border-slate-200/70 bg-white/70 px-5 py-4">
-            <p className="text-xs font-semibold text-slate-600">{headerHint}</p>
-            <div className="mt-3 flex items-center gap-2">
-              {Array.from({ length: totalSteps }).map((_, idx) => (
-                <div
-                  key={idx}
-                  className={`h-2.5 flex-1 rounded-full ${idx <= step ? "bg-brand-500" : "bg-slate-200"}`}
-                />
-              ))}
-            </div>
-          </div>
-
-          <div className="p-5">
-            {step === 0 ? (
-              <div>
-                <h1 className="font-heading text-2xl font-black tracking-tight text-slate-900">I am a:</h1>
-                <p className="mt-1 text-sm text-slate-600">
-                  Choose the onboarding path that matches how you’ll use QRing. This only changes what we show you here.
-                </p>
-
-                <div className="mt-5 grid gap-3">
-                  <RoleCard
-                    active={onboardingPersona === "homeowner"}
-                    disabled={accountRole !== "homeowner"}
-                    icon={Lock}
-                    title="Homeowner"
-                    body="Approve visitors, manage logs, and alert your trusted contacts."
-                    onClick={() => {
-                      setOnboardingRoleTouched(true);
-                      setOnboardingRole("homeowner");
-                    }}
-                  />
-                  <RoleCard
-                    active={onboardingPersona === "estate"}
-                    disabled={accountRole !== "estate"}
-                    icon={Users}
-                    title="Estate Manager"
-                    body="Run security workflow, live queue, and resident operations."
-                    onClick={() => {
-                      setOnboardingRoleTouched(true);
-                      setOnboardingRole("estate");
-                    }}
-                  />
-                  <RoleCard
-                    active={onboardingPersona === "resident"}
-                    disabled={accountRole !== "homeowner"}
-                    icon={Shield}
-                    title="Resident"
-                    body="Link to your estate so emergencies route to security first."
-                    onClick={() => {
-                      setOnboardingRoleTouched(true);
-                      setOnboardingRole("resident");
-                    }}
-                  />
-                </div>
-
-                {accountRole === "estate" ? (
-                  <p className="mt-4 text-xs text-slate-500">
-                    This account is registered as an Estate Manager. To onboard as a homeowner or resident, create a homeowner account.
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
-
-            {step === 1 ? (
-              <div>
-                <div className="flex items-start gap-4">
-                  <div className="grid h-12 w-12 place-items-center rounded-2xl bg-brand-50 text-brand-700">
-                    <persona.icon className="h-6 w-6" />
-                  </div>
-                  <div className="min-w-0">
-                    <h1 className="font-heading text-2xl font-black tracking-tight text-slate-900">
-                      Welcome to QRing
-                    </h1>
-                    <p className="mt-1 text-sm font-medium text-slate-600">{persona.subtitle}</p>
-                  </div>
-                </div>
-
-                <div className="mt-5 grid gap-3">
-                  {onboardingPersona === "estate" ? (
-                    <>
-                      <ValueCard icon={Users} title="Visitor logs and live queue" body="See what’s waiting, approved, and denied across your estate in real time." />
-                      <ValueCard icon={Shield} title="Security dashboard workflow" body="Guards get clarity. Admins track decisions. Every action is auditable." />
-                      <ValueCard icon={Siren} title="Emergency coordination" body="A resident can trigger an alert that routes to guards, admins, and escalation contacts." />
-                    </>
-                  ) : (
-                    <>
-                      <ValueCard icon={Shield} title="Emergency alerts that coordinate help" body="Hold to trigger an alert. Built for unstable networks and real emergencies." />
-                      <ValueCard icon={Globe} title="Works under poor network" body="Realtime first, fallback channels when connectivity is weak." />
-                      <ValueCard icon={Lock} title="Verifiable activity trail" body="Visitor requests, messages, and security actions are recorded for accountability." />
-                    </>
-                  )}
-                </div>
-
-                {accountRole === "homeowner" ? (
-                  <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <p className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-500">Mode</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-900">
-                      {loadingContext
-                        ? "Checking estate link..."
-                        : onboardingPersona === "resident"
-                          ? homeownerContext?.managedByEstate
-                            ? `Resident under ${homeownerContext?.estateName || "an estate"}`
-                            : "Resident (not linked yet)"
-                          : "Independent homeowner"}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-600">
-                      You can update safety preferences anytime from the Safety page.
-                    </p>
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-
-            {step === 2 ? (
-              <div>
-                <h2 className="text-xl font-black tracking-tight text-slate-900">Permissions, explained</h2>
-                <p className="mt-1 text-sm text-slate-600">
-                  QRing asks only for what makes access and emergencies work smoothly.
-                </p>
-
-                <div className="mt-5 grid gap-3">
-                  <PermissionCard
-                    icon={Bell}
-                    title="Notifications"
-                    description="So visitor requests and emergency alerts show instantly, even when the app is in the background."
-                    status={permissionState.notifications}
-                    actionLabel="Enable"
-                    onAction={requestNotifications}
-                  />
-                  <PermissionCard
-                    icon={MapPin}
-                    title="Location"
-                    description="So emergency alerts can include your last known location for faster coordination."
-                    status={permissionState.location}
-                    actionLabel="Enable"
-                    onAction={requestLocation}
-                  />
-                  <PermissionCard
-                    icon={Camera}
-                    title="Camera"
-                    description="Used for snapshot verification and call verification when needed."
-                    status={permissionState.camera}
-                    actionLabel="Test"
-                    onAction={() => requestMedia("camera")}
-                  />
-                  <PermissionCard
-                    icon={Mic}
-                    title="Microphone"
-                    description="Used for call verification and voice notes when network is unstable."
-                    status={permissionState.microphone}
-                    actionLabel="Test"
-                    onAction={() => requestMedia("microphone")}
-                  />
-                  {onboardingPersona !== "estate" ? (
-                    <PermissionCard
-                      icon={Users}
-                      title="Emergency contacts (optional)"
-                      description="Add trusted people now so independent alerts can reach someone fast."
-                      status="optional"
-                      actionLabel="Set up"
-                      onAction={() => navigate("/dashboard/homeowner/emergency-contacts")}
-                    />
-                  ) : null}
-                </div>
-
-                <p className="mt-4 text-xs text-slate-500">
-                  Tip: You can proceed without enabling everything now. QRing will ask again only when required.
-                </p>
-              </div>
-            ) : null}
-
-            {step === 3 ? (
-              <div>
-                <h2 className="text-xl font-black tracking-tight text-slate-900">Secure your account</h2>
-                <p className="mt-1 text-sm text-slate-600">
-                  Verification makes alerts more reliable and reduces abuse.
-                </p>
-
-                <div className="mt-5 grid gap-3">
-                  {onboardingPersona === "resident" ? (
-                    <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                      <div className="flex items-start gap-3">
-                        <div className="grid h-10 w-10 place-items-center rounded-2xl bg-brand-50 text-brand-700">
-                          <Shield className="h-5 w-5" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-slate-900">Estate verification (optional)</p>
-                          <p className="mt-1 text-xs text-slate-600">
-                            Enter a join code or estate ID to link your unit. If you don’t have one, ask your estate admin.
-                          </p>
-                        </div>
-                      </div>
-
-                      {homeownerContext?.managedByEstate ? (
-                        <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-semibold text-emerald-800">
-                          Linked to {homeownerContext?.estateName || "your estate"}.
-                        </div>
-                      ) : (
-                        <form
-                          className="mt-4 grid gap-2"
-                          onSubmit={async (event) => {
-                            event.preventDefault();
-                            if (estateJoinState.busy) return;
-                            setEstateJoinState((prev) => ({ ...prev, busy: true, status: "" }));
-                            try {
-                              await joinEstate({
-                                joinToken: estateJoinState.joinToken,
-                                unitName: estateJoinState.unitName
-                              });
-                              const refreshed = await getHomeownerContext();
-                              setHomeownerContext(refreshed);
-                              setEstateJoinState((prev) => ({ ...prev, busy: false, status: "Estate linked successfully." }));
-                            } catch (error) {
-                              setEstateJoinState((prev) => ({
-                                ...prev,
-                                busy: false,
-                                status: error?.message || "Unable to link estate."
-                              }));
-                            }
-                          }}
-                        >
-                          <label className="grid gap-1 text-xs font-semibold text-slate-700">
-                            Estate code or ID
-                            <input
-                              value={estateJoinState.joinToken}
-                              onChange={(event) => setEstateJoinState((prev) => ({ ...prev, joinToken: event.target.value }))}
-                              placeholder="e.g. QR-EST-XXXXXX"
-                              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500"
-                            />
-                          </label>
-                          <label className="grid gap-1 text-xs font-semibold text-slate-700">
-                            Unit / house label
-                            <input
-                              value={estateJoinState.unitName}
-                              onChange={(event) => setEstateJoinState((prev) => ({ ...prev, unitName: event.target.value }))}
-                              placeholder="e.g. Block C, Flat 12"
-                              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500"
-                            />
-                          </label>
-                          <button
-                            type="submit"
-                            disabled={estateJoinState.busy}
-                            className="mt-1 rounded-2xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
-                          >
-                            {estateJoinState.busy ? "Linking..." : "Link estate"}
-                          </button>
-                          {estateJoinState.status ? (
-                            <p className="text-xs font-medium text-slate-600">{estateJoinState.status}</p>
-                          ) : null}
-                        </form>
-                      )}
-                    </div>
-                  ) : null}
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-3">
-                        <div className="grid h-10 w-10 place-items-center rounded-2xl bg-white text-slate-800 shadow-sm">
-                          <Mail className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-slate-900">Email verification</p>
-                          <p className="mt-1 text-xs text-slate-600">
-                            {isEmailVerified()
-                              ? "Verified. You’re good to go."
-                              : "Not verified yet. Please verify to keep emergency actions trusted."}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="shrink-0">
-                        {isEmailVerified() ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700">
-                            <CheckCircle2 className="h-4 w-4" />
-                            Verified
-                          </span>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={sendVerificationEmail}
-                            disabled={verificationBusy}
-                            className="rounded-full bg-brand-600 px-4 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-white disabled:opacity-60"
-                          >
-                            {verificationBusy ? "Sending..." : "Send link"}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                    {verificationStatus ? (
-                      <p className="mt-3 text-xs font-medium text-slate-600">{verificationStatus}</p>
-                    ) : null}
-                  </div>
-
-                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                    <div className="flex items-start gap-3">
-                      <div className="grid h-10 w-10 place-items-center rounded-2xl bg-brand-50 text-brand-700">
-                        <Shield className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-slate-900">Safety first, no false promises</p>
-                        <p className="mt-1 text-xs text-slate-600">
-                          QRing facilitates emergency alerting and coordination. It does not guarantee external service response.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-
-            {step === 4 ? (
-              <div>
-                <h2 className="text-xl font-black tracking-tight text-slate-900">Quick practice</h2>
-                <p className="mt-1 text-sm text-slate-600">
-                  A short simulation so you know what to do under pressure.
-                </p>
-
-                {onboardingPersona === "estate" ? (
-                  <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <p className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-500">Scenario</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-900">Visitor arrival at Gate B</p>
-                    <p className="mt-1 text-xs text-slate-600">
-                      You’ll see it in the live queue, then guards and homeowners can act fast.
-                    </p>
-                    <div className="mt-4 grid gap-2">
-                      <DemoRow label="Status" value="Waiting" />
-                      <DemoRow label="Next action" value="Notify guard, contact homeowner" />
-                      <DemoRow label="Audit trail" value="Recorded automatically" />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4">
-                    <div className="flex items-start gap-3">
-                      <div className="grid h-10 w-10 place-items-center rounded-2xl bg-rose-500/10 text-rose-600">
-                        <Siren className="h-5 w-5" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-slate-900">Emergency alert (demo)</p>
-                        <p className="mt-1 text-xs text-slate-600">
-                          Hold to trigger. There’s a short cancel window to prevent false alarms.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                      <p className="text-xs font-semibold text-slate-700">
-                        {scenarioState.stage === "idle"
-                          ? "Ready"
-                          : scenarioState.stage === "arming"
-                            ? `Holding... ${scenarioState.secondsLeft}s`
-                            : scenarioState.stage === "cancel_window"
-                              ? `Cancel window... ${scenarioState.secondsLeft}s`
-                              : scenarioState.stage === "sent"
-                                ? "Alert sent (demo)"
-                                : "Cancelled (demo)"}
-                      </p>
-                      <div className="mt-3 grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={runScenarioDemo}
-                          disabled={scenarioState.running}
-                          className="rounded-2xl bg-rose-600 px-4 py-3 text-xs font-black uppercase tracking-widest text-white disabled:opacity-60"
-                        >
-                          Hold to Test
-                        </button>
-                        <button
-                          type="button"
-                          onClick={cancelScenario}
-                          disabled={!scenarioState.running && scenarioState.stage !== "cancel_window"}
-                          className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs font-black uppercase tracking-widest text-slate-700 disabled:opacity-60"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                      <p className="mt-3 text-[11px] text-slate-500">
-                        Demo only. No messages are sent from this screen.
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : null}
-
-            {step === 5 ? (
-              <div>
-                <h2 className="text-xl font-black tracking-tight text-slate-900">Make it useful now</h2>
-                <p className="mt-1 text-sm text-slate-600">
-                  Optional setup. You can skip and return later.
-                </p>
-
-                <div className="mt-5 grid gap-3">
-                  {onboardingPersona === "estate" ? (
-                    <>
-                      <SetupLink
-                        to="/dashboard/estate/security"
-                        title="Add your security team"
-                        subtitle="Assign guards and set gate responsibilities."
-                      />
-                      <SetupLink
-                        to="/dashboard/estate/doors"
-                        title="Create doors and access points"
-                        subtitle="Set up Gate A, Gate B, and checkpoints."
-                      />
-                      <SetupLink
-                        to="/dashboard/estate/invites"
-                        title="Invite homeowners and residents"
-                        subtitle="Link units to the right people so alerts route correctly."
-                      />
-                    </>
-                  ) : (
-                    <>
-                      <SetupLink
-                        to="/dashboard/homeowner/emergency-contacts"
-                        title="Add emergency contacts"
-                        subtitle="So independent alerts can reach trusted people fast."
-                      />
-                      <SetupLink
-                        to="/dashboard/homeowner/safety"
-                        title="Set panic preferences"
-                        subtitle="Silent trigger, cancel window, and alert type."
-                      />
-                      <SetupLink
-                        to="/dashboard/homeowner/settings"
-                        title="Tune notification sounds"
-                        subtitle="Pick alert sounds and push settings that you won’t ignore."
-                      />
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                        <p className="text-sm font-semibold text-slate-900">Network reality</p>
-                        <p className="mt-1 text-xs text-slate-600">
-                          In Nigeria, internet can drop. QRing prioritizes realtime, then fallback channels where available.
-                        </p>
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-500">Motivation</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-900">Finish setup to react faster</p>
-                  <p className="mt-1 text-xs text-slate-600">
-                    When something goes wrong, you won’t have time to learn the app. This walkthrough is here so you’re ready.
-                  </p>
-                </div>
-
-                <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
-                  <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-500">Preview</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-900">You’re ready.</p>
-                  <p className="mt-1 text-xs text-slate-600">
-                    Open the dashboard to see live data and start using QRing.
-                  </p>
-                  <DashboardPreview
-                    persona={onboardingPersona}
-                    homeownerContext={homeownerContext}
-                    previewState={previewState}
-                  />
-                </div>
-              </div>
-            ) : null}
-          </div>
-
-          <div className="border-t border-slate-200/70 bg-white/70 p-5">
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setStep((prev) => Math.max(0, prev - 1))}
-                disabled={step === 0}
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 disabled:opacity-60"
-              >
-                Back
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (isLast) {
-                    completeOnboarding();
-                    return;
-                  }
-                  setStep((prev) => Math.min(totalSteps - 1, prev + 1));
-                }}
-                className="rounded-2xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white shadow-soft hover:bg-brand-700 active:scale-[0.99]"
-              >
-                {nextLabel}
-              </button>
-            </div>
-
-            <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
-              <span>Step {step + 1} of {totalSteps}</span>
-            </div>
-          </div>
-        </section>
-
-        <footer className="mt-4 text-center text-xs text-slate-500">
-          Need help?{" "}
-          <Link to="/contact" className="font-semibold text-brand-700">
-            Contact support
-          </Link>
-        </footer>
-      </div>
+    <div className="min-h-[100dvh] overflow-x-hidden bg-[#f8f9fa] text-[#191c1d]">
+      {step === 0 ? <SlideOne onNext={handleNext} onSkip={handleSkip} /> : null}
+      {step === 1 ? <SlideTwo onNext={handleNext} onSkip={handleSkip} /> : null}
+      {step === 2 ? <SlideThree onNext={handleNext} onSkip={handleSkip} /> : null}
+      {step === 3 ? <SlideFour onNext={handleNext} onSkip={handleSkip} /> : null}
     </div>
   );
 }
 
-function ValueCard({ icon: Icon, title, body }) {
+function StepDots({ active, variant = "default" }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4">
-      <div className="flex items-start gap-3">
-        <div className="grid h-10 w-10 place-items-center rounded-2xl bg-brand-50 text-brand-700">
-          <Icon className="h-5 w-5" />
-        </div>
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-slate-900">{title}</p>
-          <p className="mt-1 text-xs text-slate-600">{body}</p>
-        </div>
-      </div>
+    <div className="flex items-center gap-2">
+      {ONBOARDING_STEPS.map((_, index) => {
+        const isActive = index === active;
+        const isPast = index < active;
+        const widthClass =
+          variant === "wide"
+            ? isActive
+              ? "w-12"
+              : "w-6"
+            : isActive
+              ? "w-8"
+              : "w-1.5";
+        return (
+          <div
+            key={index}
+            className={`h-1.5 rounded-full transition-all ${widthClass} ${
+              isActive ? "bg-[#00346f]" : isPast ? "bg-[#90acd9]" : "bg-[#d7dce2]"
+            }`}
+          />
+        );
+      })}
     </div>
   );
 }
 
-function normalizePermissionStatus(raw) {
-  const value = String(raw || "").toLowerCase();
-  if (value === "optional") return { label: "Optional", tone: "warn" };
-  if (value === "granted") return { label: "Enabled", tone: "ok" };
-  if (value === "denied") return { label: "Blocked", tone: "bad" };
-  if (value === "unsupported") return { label: "Unsupported", tone: "muted" };
-  if (value === "default" || value === "prompt" || value === "unknown") return { label: "Not set", tone: "warn" };
-  return { label: "Not set", tone: "warn" };
-}
-
-function RoleCard({ active, disabled, icon: Icon, title, body, onClick }) {
+function PrimaryButton({ children, onClick }) {
   return (
     <button
       type="button"
-      disabled={disabled}
-      onClick={disabled ? undefined : onClick}
-      className={`w-full rounded-2xl border px-4 py-4 text-left transition ${
-        active
-          ? "border-brand-500 bg-brand-50"
-          : disabled
-            ? "border-slate-200 bg-slate-50 opacity-60"
-            : "border-slate-200 bg-white hover:bg-slate-50"
-      }`}
+      onClick={onClick}
+      className="w-full rounded-[1.75rem] bg-[linear-gradient(135deg,#00346f_0%,#004a99_100%)] px-5 py-4 text-sm font-extrabold uppercase tracking-[0.24em] text-white shadow-[0_20px_40px_rgba(0,52,111,0.22)] transition active:scale-[0.98]"
     >
-      <div className="flex items-start gap-3">
-        <div className={`grid h-10 w-10 place-items-center rounded-2xl ${active ? "bg-brand-600 text-white" : "bg-slate-50 text-slate-800"}`}>
-          <Icon className="h-5 w-5" />
-        </div>
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-slate-900">{title}</p>
-          <p className="mt-1 text-xs text-slate-600">{body}</p>
-        </div>
-      </div>
+      {children}
     </button>
   );
 }
 
-function DashboardPreview({ persona, homeownerContext, previewState }) {
-  const hasData = Boolean(previewState?.data);
-  const headline =
-    persona === "estate"
-      ? "Estate snapshot"
-      : homeownerContext?.managedByEstate
-        ? "Resident snapshot"
-        : "Home snapshot";
+function SecondaryButton({ children, onClick }) {
   return (
-    <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold text-slate-700">{headline}</p>
-        {previewState?.loading ? (
-          <span className="text-[11px] font-semibold text-slate-500">Loading…</span>
-        ) : null}
-      </div>
-      {previewState?.error ? <p className="mt-2 text-xs text-rose-700">{previewState.error}</p> : null}
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <PreviewTile label="Status" value={hasData ? previewState.data.status : "Ready"} />
-        <PreviewTile label="Mode" value={persona === "estate" ? "Estate" : homeownerContext?.managedByEstate ? "Resident" : "Homeowner"} />
-        {persona === "estate" ? (
-          <>
-            <PreviewTile label="Homes" value={hasData ? String(previewState.data.homes ?? 0) : "0"} />
-            <PreviewTile label="Doors" value={hasData ? String(previewState.data.doors ?? 0) : "0"} />
-          </>
-        ) : (
-          <>
-            <PreviewTile label="Doors" value={hasData ? String(previewState.data.doors ?? 0) : "0"} />
-            <PreviewTile label="Plan" value={hasData ? String(previewState.data.plan ?? "Free") : "Free"} />
-          </>
-        )}
-      </div>
-    </div>
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full rounded-[1.75rem] bg-[#eef1f4] px-5 py-4 text-sm font-extrabold uppercase tracking-[0.24em] text-[#00346f] transition active:scale-[0.98]"
+    >
+      {children}
+    </button>
   );
 }
 
-function PreviewTile({ label, value }) {
+function SlideOne({ onNext, onSkip }) {
+  const item = ONBOARDING_STEPS[0];
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3">
-      <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">{label}</p>
-      <p className="mt-1 text-sm font-extrabold text-slate-900">{value}</p>
-    </div>
-  );
-}
+    <main className="mx-auto flex min-h-[100dvh] w-full max-w-6xl flex-col px-5 pb-8 pt-6 sm:px-6 lg:px-8 lg:py-8">
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={onSkip}
+          className="rounded-full px-2 py-1 text-sm font-semibold text-[#737783] transition hover:text-[#00346f]"
+        >
+          Skip
+        </button>
+      </div>
 
-function PermissionCard({ icon: Icon, title, description, status, actionLabel, onAction }) {
-  const meta = normalizePermissionStatus(status);
-  const badge =
-    meta.tone === "ok"
-      ? "bg-emerald-500/10 text-emerald-700"
-      : meta.tone === "bad"
-        ? "bg-rose-500/10 text-rose-700"
-        : meta.tone === "muted"
-          ? "bg-slate-200 text-slate-600"
-          : "bg-amber-500/10 text-amber-700";
-
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <div className="grid h-10 w-10 place-items-center rounded-2xl bg-slate-50 text-slate-800">
-            <Icon className="h-5 w-5" />
+      <div className="relative mt-4 w-full flex-1 lg:mt-6">
+        <div className="absolute inset-0 rounded-full bg-[#00346f]/8 blur-3xl" />
+        <div className="relative mx-auto aspect-square max-w-[min(100%,26rem)] overflow-hidden rounded-[2rem] bg-white p-2 shadow-[0_18px_60px_rgba(0,0,0,0.06)] lg:max-w-[min(58vh,32rem)]">
+          <img src={item.image} alt="Modern architectural home" className="h-full w-full rounded-[1.4rem] object-cover" />
+          <div className="absolute right-4 top-4 flex items-center gap-3 rounded-2xl border border-white/60 bg-white/80 px-3 py-2.5 shadow-sm backdrop-blur-xl sm:right-6 sm:top-6 sm:px-4 sm:py-3">
+            <div className="grid h-8 w-8 place-items-center rounded-full bg-[#9bf0d3]/50 sm:h-9 sm:w-9">
+              <ShieldCheck className="h-5 w-5 text-[#016b54]" />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-[#016b54]">{item.eyebrow}</p>
+              <p className="text-xs font-extrabold text-[#00346f]">Encrypted Access</p>
+            </div>
           </div>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-slate-900">{title}</p>
-            <p className="mt-1 text-xs text-slate-600">{description}</p>
+          <div className="absolute bottom-4 left-4 right-4 rounded-2xl border border-white/40 bg-white/80 p-3 backdrop-blur-xl sm:bottom-6 sm:left-6 sm:right-6 sm:p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.22em] text-[#737783]">Status</p>
+                <p className="text-sm font-extrabold text-[#191c1d]">Main Gate Locked</p>
+              </div>
+              <Lock className="h-5 w-5 text-[#00346f]" />
+            </div>
           </div>
         </div>
-        <div className="shrink-0 text-right">
-          <span className={`inline-flex rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] ${badge}`}>
-            {meta.label}
-          </span>
-          {meta.tone !== "ok" && meta.tone !== "muted" ? (
+      </div>
+
+      <div className="mt-5 w-full space-y-4 px-1 text-center lg:text-left">
+        <h1 className="whitespace-pre-line font-heading text-3xl font-extrabold leading-tight tracking-tight text-[#00346f] sm:text-4xl lg:max-w-xl">
+          {item.title}
+        </h1>
+        <p className="mx-auto max-w-[92%] text-sm leading-relaxed text-[#424751] sm:text-base lg:mx-0 lg:max-w-xl">{item.body}</p>
+      </div>
+
+      <div className="flex w-full justify-center py-4 lg:justify-start">
+        <StepDots active={0} />
+      </div>
+
+      <div className="mt-auto grid w-full gap-3 sm:grid-cols-2 lg:max-w-md">
+        <SecondaryButton onClick={onSkip}>Skip</SecondaryButton>
+        <PrimaryButton onClick={onNext}>Next</PrimaryButton>
+      </div>
+    </main>
+  );
+}
+
+function SlideTwo({ onNext, onSkip }) {
+  const item = ONBOARDING_STEPS[1];
+  return (
+    <div className="min-h-[100dvh] bg-[#f8f9fa]">
+      <header className="sticky top-0 z-10 mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-5">
+        <div className="text-[11px] font-extrabold uppercase tracking-[0.24em] text-[#00346f]">Step 2 of 4</div>
+        <button
+          type="button"
+          onClick={onSkip}
+          className="text-sm font-semibold text-[#737783] transition hover:text-[#00346f]"
+        >
+          Skip
+        </button>
+      </header>
+
+      <main className="mx-auto flex w-full max-w-6xl flex-col items-center justify-center gap-8 px-5 pb-24 pt-4 sm:px-6 lg:min-h-[calc(100dvh-6rem)] lg:flex-row lg:gap-10 lg:px-8 lg:pb-10">
+        <div className="relative w-full max-w-md lg:max-w-[min(48vw,40rem)]">
+          <div className="absolute inset-0 rotate-[-4deg] rounded-[2.8rem] bg-[#eef1f4]" />
+          <div className="relative aspect-[4/5] max-h-[62dvh] overflow-hidden rounded-[2.5rem] bg-[#e7e8e9] shadow-sm lg:max-h-[70dvh]">
+            <img src={item.image} alt="Real-time security interface" className="h-full w-full object-cover" />
+            <div className="absolute left-1/2 top-6 w-[90%] -translate-x-1/2 rounded-[1.6rem] border border-white/30 bg-white/80 p-4 shadow-2xl backdrop-blur-xl sm:top-10 sm:rounded-[1.8rem] sm:p-5">
+              <div className="mb-4 flex items-center gap-4">
+                <div className="grid h-12 w-12 place-items-center rounded-full bg-[#004a99]">
+                  <Shield className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <p className="mb-0.5 text-[10px] font-bold uppercase tracking-[0.24em] text-[#00346f]">Incoming Alert</p>
+                  <p className="font-heading text-lg font-extrabold leading-tight text-[#191c1d]">Marcus Sterling, Delivery</p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <button type="button" className="flex-1 rounded-xl bg-[#016b54] px-4 py-3 text-sm font-bold uppercase tracking-wide text-white">
+                  Approve
+                </button>
+                <button type="button" className="flex-1 rounded-xl bg-[#ba1a1a] px-4 py-3 text-sm font-bold uppercase tracking-wide text-white">
+                  Deny
+                </button>
+              </div>
+            </div>
+            <div className="absolute bottom-6 left-6 rounded-xl bg-black/45 px-3 py-2 backdrop-blur-md">
+              <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.24em] text-white">
+                <span className="h-2 w-2 rounded-full bg-[#ba1a1a]" />
+                Live, Main Gate
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="w-full max-w-md space-y-6 lg:space-y-8">
+          <div className="space-y-4">
+            <div className="inline-flex items-center gap-2 rounded-full bg-[#9bf0d3] px-3 py-1.5">
+              <ShieldCheck className="h-4 w-4 text-[#0c7058]" />
+              <span className="text-[11px] font-extrabold uppercase tracking-[0.22em] text-[#0c7058]">{item.eyebrow}</span>
+            </div>
+            <h1 className="whitespace-pre-line font-heading text-3xl font-extrabold leading-[1.08] tracking-tight text-[#00346f] sm:text-4xl lg:text-5xl">
+              {item.title}
+            </h1>
+            <p className="text-base leading-relaxed text-[#424751] sm:text-lg">{item.body}</p>
+          </div>
+
+          <StepDots active={1} variant="wide" />
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <SecondaryButton onClick={onSkip}>Skip</SecondaryButton>
+            <PrimaryButton onClick={onNext}>Next</PrimaryButton>
+          </div>
+        </div>
+      </main>
+
+    </div>
+  );
+}
+
+function SlideThree({ onNext, onSkip }) {
+  const item = ONBOARDING_STEPS[2];
+  return (
+    <div className="relative min-h-[100dvh] overflow-hidden bg-[#f8f9fa] pb-28 pt-8 sm:pt-10">
+      <div className="pointer-events-none absolute right-0 top-0 opacity-5">
+        <div className="h-[40rem] w-40 bg-[linear-gradient(180deg,#00346f_0%,transparent_100%)]" />
+      </div>
+
+      <main className="mx-auto flex min-h-[100dvh] max-w-6xl flex-col items-center justify-center px-5 pb-12 sm:px-8 lg:min-h-[calc(100dvh-2rem)] lg:flex-row lg:gap-12 lg:px-8">
+        <div className="absolute left-0 top-8 flex w-full items-center justify-between px-5 sm:px-8">
+          <div className="text-[11px] font-extrabold uppercase tracking-[0.24em] text-[#00346f]">Step 3 of 4</div>
+          <button
+            type="button"
+            onClick={onSkip}
+            className="text-sm font-semibold text-[#737783] transition hover:text-[#00346f]"
+          >
+            Skip
+          </button>
+        </div>
+
+        <div className="relative mb-10 mt-16 flex aspect-[4/5] w-full max-w-sm items-center justify-center lg:mb-0 lg:mt-0 lg:max-w-[min(40vw,24rem)]">
+          <div className="absolute inset-0 scale-105 rotate-[-4deg] rounded-[3rem] bg-[#eef1f4]" />
+          <div className="relative flex h-[min(31rem,62dvh)] w-[min(16rem,72vw)] flex-col overflow-hidden rounded-[2.5rem] border-[6px] border-[#edeeef] bg-white shadow-[0_20px_50px_rgba(0,52,111,0.08)] sm:w-64 lg:h-[min(34rem,72dvh)] lg:w-[18rem]">
+            <div className="flex items-center justify-between px-6 pt-4 text-[10px] font-bold">
+              <span>9:41</span>
+              <div className="flex items-center gap-1 text-[#191c1d]">
+                <div className="flex gap-[2px]">
+                  <span className="h-2 w-1 rounded-sm bg-current opacity-70" />
+                  <span className="h-2.5 w-1 rounded-sm bg-current opacity-80" />
+                  <span className="h-3 w-1 rounded-sm bg-current opacity-90" />
+                  <span className="h-3.5 w-1 rounded-sm bg-current" />
+                </div>
+                <Wifi className="h-3.5 w-3.5" />
+                <BatteryFull className="h-3.5 w-3.5" />
+              </div>
+            </div>
+
+            <div className="flex flex-1 flex-col p-4">
+              <div className="mb-6 flex items-center gap-2">
+                <div className="h-8 w-8 overflow-hidden rounded-full bg-[#e7e8e9]">
+                  <img src={item.image} alt="Delivery person" className="h-full w-full object-cover" />
+                </div>
+                <div className="flex-1">
+                  <div className="mb-1 h-2 w-20 rounded-full bg-[#e7e8e9]" />
+                  <div className="h-1.5 w-12 rounded-full bg-[#e7e8e9]/70" />
+                </div>
+              </div>
+
+              <div className="flex flex-col items-center gap-4 rounded-3xl bg-[#00346f] p-4 shadow-lg">
+                <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-[#9bbdff]">Guest Access Pass</p>
+                <div className="rounded-2xl bg-white p-4">
+                  <QrCode className="h-20 w-20 text-[#00346f]" strokeWidth={1.75} />
+                </div>
+                <div className="text-center">
+                  <p className="text-xs font-semibold text-white">Valid: 14:00 - 18:00</p>
+                  <p className="text-[10px] text-[#9bbdff]">Building A, Entrance 4</p>
+                </div>
+              </div>
+
+              <div className="mt-4 self-end rounded-t-xl rounded-bl-xl bg-[#9bf0d3]/35 px-3 py-2">
+                <div className="flex items-center gap-2 text-[10px] font-bold text-[#0c7058]">
+                  <CheckCircle2 className="h-4 w-4" />
+                  Pass Shared Successfully
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="absolute -right-4 top-1/4 grid h-16 w-16 rotate-12 place-items-center rounded-2xl bg-[#9bf0d3] shadow-xl">
+            <UserPlus className="h-7 w-7 text-[#0c7058]" />
+          </div>
+          <div className="absolute -left-6 bottom-1/4 grid h-14 w-14 -rotate-12 place-items-center rounded-full bg-[#d7e2ff] shadow-lg">
+            <Shield className="h-6 w-6 text-[#00346f]" />
+          </div>
+        </div>
+
+        <div className="w-full max-w-sm text-center lg:max-w-md lg:text-left">
+          <p className="mb-3 text-[11px] font-extrabold uppercase tracking-[0.24em] text-[#016b54]">{item.eyebrow}</p>
+          <h1 className="mb-4 font-heading text-3xl font-extrabold tracking-tight text-[#00346f] sm:text-4xl">{item.title}</h1>
+          <p className="px-4 text-sm leading-relaxed text-[#424751] sm:text-base lg:px-0">{item.body}</p>
+        </div>
+
+        <div className="mt-8 lg:mt-10 lg:self-start">
+          <StepDots active={2} />
+        </div>
+      </main>
+
+      <footer className="w-full px-6 pb-10 pt-4 md:px-8 md:pb-8 md:pt-0">
+        <div className="mx-auto max-w-md lg:max-w-6xl lg:px-0">
+          <div className="grid gap-3 sm:grid-cols-2 lg:max-w-md">
+            <SecondaryButton onClick={onSkip}>Skip</SecondaryButton>
             <button
               type="button"
-              onClick={onAction}
-              className="mt-2 inline-flex items-center justify-center rounded-full bg-brand-600 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.18em] text-white"
+              onClick={onNext}
+              className="flex w-full items-center justify-center gap-3 rounded-[1.35rem] bg-[linear-gradient(135deg,#00346f_0%,#004a99_100%)] py-5 font-heading text-sm font-extrabold uppercase tracking-[0.24em] text-white shadow-xl transition active:scale-[0.98]"
             >
-              {actionLabel}
+              Next
+              <ArrowRight className="h-4 w-4" />
             </button>
-          ) : null}
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+function SlideFour({ onNext, onSkip }) {
+  const item = ONBOARDING_STEPS[3];
+  const entries = [
+    {
+      title: "Marcus Aurelius",
+      subtitle: "Main Entrance Gate, Access Granted",
+      time: "14:02",
+      tone: "text-[#016b54]",
+      icon: CheckCircle2,
+    },
+    {
+      title: "Elena Fisher",
+      subtitle: "North Service Exit, Logged Out",
+      time: "13:45",
+      tone: "text-[#00346f]",
+      icon: ArrowRight,
+    },
+    {
+      title: "Delivery Service #492",
+      subtitle: "Visitor Pass, QR Scanned",
+      time: "12:20",
+      tone: "text-[#016b54]",
+      icon: QrCode,
+    },
+    {
+      title: "Guest Invitation Sent",
+      subtitle: "Resident App, Julia Smith",
+      time: "11:55",
+      tone: "text-[#737783]",
+      icon: Shield,
+    },
+  ];
+
+  return (
+    <div className="min-h-[100dvh] bg-[#f8f9fa] pb-32 md:pb-12">
+      <main className="mx-auto flex min-h-[100dvh] w-full max-w-6xl flex-col items-center justify-center px-5 pt-10 sm:px-6 md:min-h-[calc(100dvh-1rem)] md:justify-center lg:flex-row lg:gap-12 lg:px-8">
+        <div className="mb-8 w-full max-w-lg overflow-hidden rounded-[2rem] bg-[#f3f4f5] p-4 shadow-[0_-4px_24px_rgba(0,0,0,0.04)] sm:p-6 lg:mb-0 lg:max-w-[min(46vw,34rem)]">
+          <div className="mb-8 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="grid h-10 w-10 place-items-center rounded-full bg-[#004a99] text-white">
+                <History className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#00346f]">{item.eyebrow}</p>
+                <p className="text-[10px] text-[#737783]">Live Updates</p>
+              </div>
+            </div>
+            <div className="grid h-8 w-8 place-items-center rounded-lg bg-[#e1e3e4]">
+              <Search className="h-4 w-4 text-[#737783]" />
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            {entries.map((entry, index) => {
+              const Icon = entry.icon;
+              return (
+                <div
+                  key={entry.title}
+                  className="flex items-center gap-4 rounded-2xl border border-[#c2c6d3]/20 bg-white p-4"
+                  style={{ opacity: 1 - index * 0.18 }}
+                >
+                  <div className="grid h-12 w-12 place-items-center rounded-xl bg-[#f3f4f5]">
+                    <Icon className={`h-5 w-5 ${entry.tone}`} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="font-heading text-sm font-extrabold text-[#191c1d]">{entry.title}</p>
+                      <p className="text-[10px] font-medium text-[#737783]">{entry.time}</p>
+                    </div>
+                    <p className="text-xs text-[#424751]">{entry.subtitle}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="space-y-4 px-2 text-center lg:max-w-md lg:text-left">
+          <div className="text-[11px] font-extrabold uppercase tracking-[0.24em] text-[#00346f]">Step 4 of 4</div>
+          <h1 className="font-heading text-3xl font-extrabold leading-tight tracking-tight text-[#191c1d] sm:text-4xl">{item.title}</h1>
+          <p className="mx-auto max-w-[20rem] text-sm leading-relaxed text-[#424751] sm:text-base lg:mx-0">{item.body}</p>
+        </div>
+      </main>
+
+      <div className="w-full px-6 pb-10 pt-6 md:px-8 md:pb-8 md:pt-4">
+        <div className="mx-auto flex max-w-lg flex-col items-center gap-6">
+          <StepDots active={3} variant="wide" />
+          <div className="grid w-full gap-3 sm:grid-cols-2">
+            <SecondaryButton onClick={onSkip}>Skip</SecondaryButton>
+            <PrimaryButton onClick={onNext}>Get Started</PrimaryButton>
+          </div>
         </div>
       </div>
     </div>
-  );
-}
-
-function DemoRow({ label, value }) {
-  return (
-    <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3">
-      <span className="text-xs font-semibold text-slate-600">{label}</span>
-      <span className="text-xs font-black uppercase tracking-[0.18em] text-slate-900">{value}</span>
-    </div>
-  );
-}
-
-function SetupLink({ to, title, subtitle }) {
-  return (
-    <Link to={to} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-4">
-      <div className="min-w-0">
-        <p className="text-sm font-semibold text-slate-900">{title}</p>
-        <p className="mt-1 text-xs text-slate-600">{subtitle}</p>
-      </div>
-      <ChevronRight className="h-5 w-5 text-slate-400" />
-    </Link>
   );
 }

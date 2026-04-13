@@ -1,721 +1,436 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { BarChart3, BellRing, Building2, ClipboardList, DoorClosed, FileText, Home, LogOut, MapPinned, Megaphone, Plus, Settings2, Shield, Users, Vote } from "lucide-react";
-import NotificationBell from "../../components/notifications/NotificationBell";
-import NotificationPanel from "../../components/notifications/NotificationPanel";
-import RenewNowModal from "../../components/subscription/RenewNowModal";
-import SubscriptionStatusBanner from "../../components/subscription/SubscriptionStatusBanner";
-import AppShell from "../../layouts/AppShell";
-import { getEstateOverview, listEstateAlerts } from "../../services/estateService";
-import { showError } from "../../utils/flash";
-import { useAuth } from "../../state/AuthContext";
+import React, { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import {
+  Bell,
+  Plus,
+  UserPlus,
+  Crown,
+  Calendar,
+  DoorOpen,
+  MapPin,
+  ChevronRight,
+  Megaphone,
+  Users,
+  Vote,
+  CreditCard,
+  Wrench,
+  BarChart3,
+  LayoutDashboard,
+  MessageSquare,
+  Building2,
+  Home,
+  ShieldCheck,
+  QrCode,
+  Settings,
+  Shield,
+  Network,
+  ClipboardList,
+  ArrowDown,
+  ArrowUp
+} from "lucide-react";
 import { useNotifications } from "../../state/NotificationsContext";
-import { useSocketEvents } from "../../hooks/useSocketEvents";
-import { getDashboardSocket } from "../../services/socketClient";
-import useSubscription from "../../hooks/useSubscription";
-import MobileBottomSheet from "../../components/mobile/MobileBottomSheet";
+import { showError } from "../../utils/flash";
+import useEstateOverviewState from "../../hooks/useEstateOverviewState";
 
-const guidedSetup = [
-  {
-    step: "Step 1",
-    title: "Create Estate",
-    detail: "Start by creating your estate profile.",
-    to: "/dashboard/estate/create"
-  },
-  {
-    step: "Step 2",
-    title: "Create Homeowner",
-    detail: "Go to Create / Invite Homeowners to add resident accounts.",
-    to: "/dashboard/estate/invites"
-  },
-  {
-    step: "Step 3",
-    title: "Add Home + Doors",
-    detail: "Create home units, then add doors for access.",
-    to: "/dashboard/estate/homes"
-  },
-  {
-    step: "Step 4",
-    title: "Assign Doors",
-    detail: "Link each door to the right homeowner.",
-    to: "/dashboard/estate/assign"
-  }
+const PRIMARY_TOOLKIT_ITEMS = [
+  { label: "Broadcast", icon: <Megaphone size={20} />, to: "/dashboard/estate/broadcasts" },
+  { label: "Meetings", icon: <Users size={20} />, to: "/dashboard/estate/meetings" },
+  { label: "Polls", icon: <Vote size={20} />, to: "/dashboard/estate/polls" },
+  { label: "Dues", icon: <CreditCard size={20} />, to: "/dashboard/estate/dues" },
+  { label: "Repair", icon: <Wrench size={20} />, to: "/dashboard/estate/maintenance" },
+  { label: "Stats", icon: <BarChart3 size={20} />, to: "/dashboard/estate/stats" }
 ];
 
-export default function EstateDashboardPage() {
-  const { subscription } = useSubscription();
-  const { user, logout } = useAuth();
-  const { unreadCount } = useNotifications();
-  const navigate = useNavigate();
-  const [overview, setOverview] = useState(null);
-  const [meetingSnapshot, setMeetingSnapshot] = useState(null);
-  const [error, setError] = useState("");
-  const managerName = user?.fullName?.trim() || "Estate Manager";
-  const estateName = overview?.estates?.[0]?.name || "Estate";
-  const initials = managerName.slice(0, 1).toUpperCase();
-  const [logoutBusy, setLogoutBusy] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [setupModalOpen, setSetupModalOpen] = useState(true);
-  const [renewModalOpen, setRenewModalOpen] = useState(false);
-  const notificationsPanelRef = useRef(null);
-  const notificationsButtonRef = useRef(null);
+const EXTRA_TOOLKIT_ITEMS = [
+  { label: "Estates", icon: <Building2 size={20} />, to: "/dashboard/estate/create" },
+  { label: "Homes", icon: <Home size={20} />, to: "/dashboard/estate/homes" },
+  { label: "Doors", icon: <DoorOpen size={20} />, to: "/dashboard/estate/doors" },
+  { label: "Residents", icon: <UserPlus size={20} />, to: "/dashboard/estate/invites" },
+  { label: "Mappings", icon: <Network size={20} />, to: "/dashboard/estate/mappings" },
+  { label: "Security", icon: <Shield size={20} />, to: "/dashboard/estate/security" },
+  { label: "Logs", icon: <ClipboardList size={20} />, to: "/dashboard/estate/logs" },
+  { label: "Settings", icon: <Settings size={20} />, to: "/dashboard/estate/settings" }
+];
 
-  useEffect(() => {
-    let mounted = true;
-    async function load() {
-      try {
-        const data = await getEstateOverview();
-        if (mounted) setOverview(data);
-      } catch (err) {
-        if (mounted) setError(err.message ?? "Failed to load estate data");
-      }
-    }
-    load();
-    return () => {
-      mounted = false;
-    };
-  }, []);
+export default function EstateManagerDashboard() {
+  const { unreadCount } = useNotifications();
+  const { overview, estateId, setEstateId, loading, error } = useEstateOverviewState();
+  const [showAllToolkit, setShowAllToolkit] = useState(false);
 
   useEffect(() => {
     if (error) showError(error);
   }, [error]);
 
-  useEffect(() => {
-    let mounted = true;
-    async function loadMeetings() {
-      const estateId = overview?.estates?.[0]?.id;
-      if (!estateId) return;
-      try {
-        const rows = await listEstateAlerts(estateId, "meeting");
-        if (!mounted) return;
-        setMeetingSnapshot(rows?.[0] ?? null);
-      } catch {
-        if (mounted) setMeetingSnapshot(null);
-      }
-    }
-    loadMeetings();
-    return () => {
-      mounted = false;
-    };
-  }, [overview?.estates]);
+  const estates = overview?.estates ?? [];
+  const currentEstate = useMemo(() => {
+    if (!estates.length) return null;
+    return estates.find((row) => String(row.id) === String(estateId)) ?? estates[0];
+  }, [estateId, estates]);
 
   useEffect(() => {
-    if (!notificationsOpen) return undefined;
-
-    function handleOutside(event) {
-      const target = event.target;
-      if (notificationsPanelRef.current?.contains(target)) return;
-      if (notificationsButtonRef.current?.contains(target)) return;
-      setNotificationsOpen(false);
+    if (!estateId && currentEstate?.id) {
+      setEstateId(currentEstate.id);
     }
+  }, [currentEstate, estateId, setEstateId]);
 
-    function handleEscape(event) {
-      if (event.key === "Escape") setNotificationsOpen(false);
-    }
-
-    document.addEventListener("pointerdown", handleOutside, true);
-    document.addEventListener("keydown", handleEscape);
-
-    return () => {
-      document.removeEventListener("pointerdown", handleOutside, true);
-      document.removeEventListener("keydown", handleEscape);
-    };
-  }, [notificationsOpen]);
-
-  useEffect(() => {
-    const estateId = overview?.estates?.[0]?.id;
-    if (!estateId) return;
-    const socket = getDashboardSocket();
-    socket.emit("dashboard.subscribe", { room: `estate:${estateId}:alerts` });
-  }, [overview?.estates]);
-
-  useSocketEvents(
-    useMemo(
-      () => ({
-        ALERT_CREATED: () => {
-          getEstateOverview().then(setOverview).catch(() => {});
-        },
-        ALERT_UPDATED: () => {
-          getEstateOverview().then(setOverview).catch(() => {});
-        },
-        ALERT_DELETED: () => {
-          getEstateOverview().then(setOverview).catch(() => {});
-        },
-        PAYMENT_STATUS_UPDATED: () => {
-          getEstateOverview().then(setOverview).catch(() => {});
-        }
-      }),
-      []
-    )
+  const currentEstateId = currentEstate?.id ?? "";
+  const estateHomes = useMemo(
+    () => (overview?.homes ?? []).filter((row) => !currentEstateId || String(row.estateId) === String(currentEstateId)),
+    [currentEstateId, overview]
+  );
+  const estateHomeIds = useMemo(() => new Set(estateHomes.map((row) => String(row.id))), [estateHomes]);
+  const estateDoors = useMemo(
+    () => (overview?.doors ?? []).filter((row) => estateHomeIds.has(String(row.homeId))),
+    [estateHomeIds, overview]
+  );
+  const homeownerIds = useMemo(
+    () => new Set(estateHomes.map((row) => String(row.homeownerId || "")).filter(Boolean)),
+    [estateHomes]
+  );
+  const estateHomeowners = useMemo(
+    () => (overview?.homeowners ?? []).filter((row) => homeownerIds.has(String(row.id))),
+    [homeownerIds, overview]
+  );
+  const estateSecurityUsers = useMemo(
+    () => (overview?.securityUsers ?? []).filter((row) => !currentEstateId || String(row.estateId) === String(currentEstateId)),
+    [currentEstateId, overview]
   );
 
-  function handleNotificationsToggle(event) {
-    event?.stopPropagation?.();
-    setNotificationsOpen((prev) => !prev);
-  }
+  const planRestrictions = overview?.planRestrictions ?? {};
+  const subscription = overview?.subscription ?? {};
+  const activeDoors = Number(planRestrictions.usedDoors ?? estateDoors.length ?? 0);
+  const maxDoors = Math.max(Number(planRestrictions.maxDoors ?? 0), activeDoors, 1);
+  const usedQrCodes = Number(planRestrictions.usedQrCodes ?? 0);
+  const maxQrCodes = Math.max(Number(planRestrictions.maxQrCodes ?? 0), usedQrCodes, 1);
+  const progressPercentage = Math.min(100, (activeDoors / maxDoors) * 100);
+  const qrProgressPercentage = Math.min(100, (usedQrCodes / maxQrCodes) * 100);
 
-  const counts = useMemo(
+  const analytics = overview?.analytics ?? {};
+  const peakHour = analytics?.peakEntryTimes?.[0] ?? null;
+  const busiestHome = analytics?.mostVisitedHouses?.[0] ?? null;
+
+  const stats = useMemo(
     () => ({
-      estates: overview?.estates?.length ?? 0,
-      homes: overview?.homes?.length ?? 0,
-      doors: overview?.doors?.length ?? 0,
-      residents: overview?.homeowners?.length ?? 0,
-      assignedDoors:
-        (overview?.doors ?? []).filter((door) => door?.homeownerId || door?.assignedHomeownerId || door?.homeownerName).length,
-      unassignedDoors:
-        (overview?.doors ?? []).filter((door) => !(door?.homeownerId || door?.assignedHomeownerId || door?.homeownerName)).length
+      estateName: currentEstate?.name || "No estate yet",
+      tier: subscription?.planName || subscription?.plan || "Standard",
+      status: subscription?.status || "inactive",
+      expiryDate: formatDate(subscription?.expiresAt ?? subscription?.endsAt ?? subscription?.currentPeriodEnd),
+      portfolio: {
+        estates: estates.length,
+        homes: estateHomes.length,
+        doors: estateDoors.length,
+        residents: estateHomeowners.length
+      }
     }),
-    [overview]
+    [currentEstate, estateDoors.length, estateHomeowners.length, estateHomes.length, estates.length, subscription]
   );
 
-  const setupPercent = useMemo(() => {
-    const score =
-      Number(counts.estates > 0) * 25 +
-      Number(counts.homes > 0) * 25 +
-      Number(counts.doors > 0) * 25 +
-      Number(counts.residents > 0) * 25;
-    return Math.max(8, score);
-  }, [counts]);
-  const totalAssets = useMemo(
-    () => counts.estates + counts.homes + counts.doors + counts.residents,
-    [counts]
-  );
-
-  const inProgress = [
+  const detailProgressItems = [
     {
-      title: "Door Coverage",
-      subtitle: `${counts.doors} configured`,
-      bar: counts.homes > 0 ? Math.min(100, Math.round((counts.doors / counts.homes) * 100)) : 0,
-      tone: "bg-sky-500"
+      label: "Doors Configured",
+      value: `${activeDoors} / ${maxDoors}`,
+      helper: `${Math.max(maxDoors - activeDoors, 0)} slot${maxDoors - activeDoors === 1 ? "" : "s"} left`,
+      percent: progressPercentage,
+      tone: "indigo"
     },
     {
-      title: "Resident Onboarding",
-      subtitle: `${counts.residents} owners onboarded`,
-      bar: counts.homes > 0 ? Math.min(100, Math.round((counts.residents / counts.homes) * 100)) : 0,
-      tone: "bg-orange-400"
+      label: "QR Codes Ready",
+      value: `${usedQrCodes} / ${maxQrCodes}`,
+      helper: `${Math.max(maxQrCodes - usedQrCodes, 0)} QR slot${maxQrCodes - usedQrCodes === 1 ? "" : "s"} left`,
+      percent: qrProgressPercentage,
+      tone: "sky"
+    },
+    {
+      label: "Homes Added",
+      value: `${estateHomes.length}`,
+      helper: estateHomes.length ? "Estate properties connected" : "No homes added yet",
+      percent: estateHomes.length ? 100 : 0,
+      tone: "emerald"
+    },
+    {
+      label: "Homeowners Added",
+      value: `${estateHomeowners.length}`,
+      helper: estateHomeowners.length ? "Estate homeowners available for mapping" : "Invite estate homeowners next",
+      percent: estateHomeowners.length ? 100 : 0,
+      tone: "amber"
     }
   ];
 
-  async function handleLogout() {
-    if (logoutBusy) return;
-    setLogoutBusy(true);
-    try {
-      await logout();
-    } catch {
-      // Continue with redirect even if logout request fails.
-    } finally {
-      setLogoutBusy(false);
-      navigate("/login");
+  const taskItems = [
+    {
+      icon: <DoorOpen size={18} />,
+      title: "Door Coverage",
+      subtitle: `${activeDoors}/${maxDoors} configured`,
+      to: "/dashboard/estate/doors"
+    },
+    {
+      icon: <MapPin size={18} />,
+      title: "Resident Onboarding",
+      subtitle: `${estateHomeowners.length} estate homeowners linked`,
+      to: "/dashboard/estate/invites"
+    },
+    {
+      icon: <QrCode size={18} />,
+      title: "QR Provisioning",
+      subtitle: `${usedQrCodes}/${maxQrCodes} live access codes`,
+      to: "/dashboard/estate/doors"
+    },
+    {
+      icon: <Shield size={18} />,
+      title: "Security Team",
+      subtitle: `${estateSecurityUsers.length} guard${estateSecurityUsers.length === 1 ? "" : "s"} active`,
+      to: "/dashboard/estate/security"
     }
-  }
+  ];
+
+  const toolkitItems = showAllToolkit ? [...PRIMARY_TOOLKIT_ITEMS, ...EXTRA_TOOLKIT_ITEMS] : PRIMARY_TOOLKIT_ITEMS;
 
   return (
-    <AppShell title="Estate Hub" showTopBar={false}>
-      <div className="mx-auto w-full max-w-4xl space-y-8 px-2 py-3 sm:px-3 sm:py-4">
-        <SubscriptionStatusBanner subscription={subscription} onPrimaryAction={() => setRenewModalOpen(true)} />
-        <section className="rounded-[1.6rem] border border-slate-200/70 bg-white/95 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/90 sm:p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="grid h-11 w-11 place-items-center rounded-full bg-indigo-100 text-sm font-bold text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">
-                {initials}
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-slate-500 dark:text-slate-300">Hello!</p>
-                <p className="text-xl font-black text-slate-900 dark:text-white">{managerName}</p>
-              </div>
-            </div>
-            <div className="relative flex items-center gap-2">
-              <div ref={notificationsButtonRef}>
-                <NotificationBell
-                  unreadCount={unreadCount}
-                  isOpen={notificationsOpen}
-                  onClick={handleNotificationsToggle}
-                />
-              </div>
-              <button
-                type="button"
-                onClick={handleLogout}
-                disabled={logoutBusy}
-                aria-label={logoutBusy ? "Signing out" : "Sign out"}
-                title={logoutBusy ? "Signing out" : "Sign out"}
-                className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200/80 bg-white text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200 dark:hover:bg-slate-800"
-              >
-                <LogOut size={16} className={logoutBusy ? "animate-pulse" : ""} />
-              </button>
-              {notificationsOpen ? (
-                <div ref={notificationsPanelRef}>
-                  <NotificationPanel onClose={() => setNotificationsOpen(false)} />
-                </div>
-              ) : null}
-            </div>
+    <div className="bg-[#f8f9fa] text-slate-800 min-h-screen pb-32 font-sans overflow-x-hidden">
+      <header className="bg-white/80 backdrop-blur-xl border-b border-slate-100 fixed top-0 w-full z-50 flex justify-between items-center px-4 md:px-6 h-16">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-9 h-9 flex-shrink-0 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center">
+            <ShieldCheck size={18} className="text-indigo-600" />
           </div>
-        </section>
+          <span className="text-lg md:text-xl font-bold text-slate-900 tracking-tight truncate">
+            {stats.estateName}
+          </span>
+        </div>
+        <Link to="/dashboard/notifications" className="relative p-2.5 bg-slate-50 text-slate-500 rounded-full flex-shrink-0">
+          <Bell size={20} />
+          {unreadCount > 0 ? <span className="absolute top-2.5 right-2.5 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white" /> : null}
+        </Link>
+      </header>
 
-        <section className="rounded-[2rem] border border-slate-200/70 bg-white/95 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/90 sm:p-7">
-          <article className="rounded-[1.4rem] bg-gradient-to-br from-violet-600 to-indigo-700 p-5 text-white shadow-lg shadow-violet-500/20 sm:p-6">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xl text-violet-100">{estateName} Overview</p>
-                <p className="mt-1 text-xs font-semibold uppercase tracking-wider text-violet-200">Access control status</p>
-              </div>
-              <ProgressRing value={setupPercent} />
-            </div>
-            <div className="mt-4 flex items-center gap-2">
-              <Link
-                to="/dashboard/estate/create"
-                className="inline-flex min-w-0 flex-1 items-center justify-center gap-2 rounded-xl bg-white/90 px-4 py-3 text-sm font-bold text-indigo-700 transition-all hover:bg-white active:scale-95 sm:flex-none"
-              >
-                <Plus size={14} />
-                Create Estate
-              </Link>
-              <Link
-                to="/dashboard/estate/invites"
-                className="inline-flex min-w-0 flex-1 items-center justify-center gap-2 rounded-xl bg-white/20 px-4 py-3 text-sm font-bold text-white transition-all hover:bg-white/30 active:scale-95 sm:flex-none"
-              >
-                <Users size={14} />
-                Create Homeowner
-              </Link>
-              <Link
-                to="/billing/paywall"
-                className="inline-flex min-w-0 flex-1 items-center justify-center gap-2 rounded-xl bg-white/20 px-4 py-3 text-center text-sm font-bold text-white transition-all hover:bg-white/30 active:scale-95 sm:flex-none"
-              >
-                {subscription?.planName || "Upgrade"}
-              </Link>
-            </div>
-            {subscription ? (
-              <div className="mt-4 rounded-xl bg-white/10 px-4 py-3 text-xs text-white/90">
-                <p className="font-semibold">{subscription.planName}</p>
-                <p>
-                  Doors: {overview?.planRestrictions?.usedDoors ?? 0}/{overview?.planRestrictions?.maxDoors ?? subscription?.limits?.maxDoors ?? 0}
-                  {" · "}
-                  Status: {subscription.status}
-                  {subscription.expiresAt ? ` · Expires ${new Date(subscription.expiresAt).toLocaleDateString()}` : ""}
-                </p>
-              </div>
-            ) : null}
-          </article>
-        </section>
-
-        <section className="space-y-4">
-          <h3 className="text-2xl font-black text-slate-900 dark:text-white">In Progress</h3>
-          <div className="-mx-1 flex snap-x gap-3 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-            {inProgress.map((item) => (
-              <div key={item.title} className="min-w-[17rem] snap-start rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/70">
-                <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-200">{item.title}</p>
-                <p className="mt-1 text-base font-bold text-slate-900 dark:text-white">{item.subtitle}</p>
-                <div className="mt-3 h-1.5 w-full rounded-full bg-slate-200 dark:bg-slate-700">
-                  <div className={`h-1.5 rounded-full ${item.tone}`} style={{ width: `${item.bar}%` }} />
-                </div>
-              </div>
-            ))}
+      <main className="pt-24 px-4 md:px-6 max-w-5xl mx-auto space-y-8 md:space-y-10">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+          <div className="min-w-0">
+            <span className="text-indigo-600 font-bold uppercase tracking-[0.2em] text-[10px] mb-2 block">Executive Dashboard</span>
+            <h1 className="text-3xl md:text-4xl font-black tracking-tighter text-slate-900 truncate">Estate Overview</h1>
           </div>
-        </section>
-
-        <QuickActionGrid />
-
-        {meetingSnapshot ? (
-          <section className="rounded-[2rem] border border-slate-200/70 bg-white/95 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/90 sm:p-6">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Latest meeting</p>
-                <p className="text-lg font-bold text-slate-900 dark:text-white">{meetingSnapshot.title}</p>
-                <p className="text-xs text-slate-500">{meetingSnapshot.dueDate ? new Date(meetingSnapshot.dueDate).toLocaleString() : "Schedule TBD"}</p>
-              </div>
-              <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
-                <span className="rounded-full bg-emerald-100 px-2 py-1 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200">
-                  Attending {meetingSnapshot.meetingResponses?.attending ?? 0}
-                </span>
-                <span className="rounded-full bg-rose-100 px-2 py-1 text-rose-700 dark:bg-rose-900/40 dark:text-rose-200">
-                  Not attending {meetingSnapshot.meetingResponses?.not_attending ?? 0}
-                </span>
-                <span className="rounded-full bg-amber-100 px-2 py-1 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200">
-                  Maybe {meetingSnapshot.meetingResponses?.maybe ?? 0}
-                </span>
-              </div>
-            </div>
-          </section>
-        ) : null}
-
-        <section className="space-y-4">
-          <h3 className="text-2xl font-black text-slate-900 dark:text-white">Assets Overview</h3>
-          <div className="space-y-4">
-            <ActionRow
-              icon={<Building2 size={14} />}
-              title="Estates"
-              subtitle={`${counts.estates} total estates`}
+          <div className="flex gap-2 md:gap-3">
+            <Link
               to="/dashboard/estate/create"
-              percent={totalAssets > 0 ? Math.round((counts.estates / totalAssets) * 100) : 0}
-            />
-            <ActionRow
-              icon={<Home size={14} />}
-              title="Homes"
-              subtitle={`${counts.homes} configured homes`}
-              to="/dashboard/estate/homes"
-              percent={totalAssets > 0 ? Math.round((counts.homes / totalAssets) * 100) : 0}
-            />
-            <ActionRow
-              icon={<DoorClosed size={14} />}
-              title="Doors"
-              subtitle={`${counts.doors} linked entries`}
-              to="/dashboard/estate/doors"
-              percent={totalAssets > 0 ? Math.round((counts.doors / totalAssets) * 100) : 0}
-              meta={`${counts.assignedDoors} assigned${counts.unassignedDoors > 0 ? ` · ${counts.unassignedDoors} unassigned` : ""}`}
-            />
-            <ActionRow
-              icon={<Users size={14} />}
-              title="Residents"
-              subtitle={`${counts.residents} onboarded`}
+              className="flex-1 md:flex-none bg-white border border-slate-200 text-slate-700 px-4 md:px-5 py-3 rounded-2xl text-xs md:text-sm font-bold flex items-center justify-center gap-2 active:scale-95 transition-all"
+            >
+              <Plus size={16} /> <span className="whitespace-nowrap">Estate</span>
+            </Link>
+            <Link
               to="/dashboard/estate/invites"
-              percent={totalAssets > 0 ? Math.round((counts.residents / totalAssets) * 100) : 0}
-            />
+              className="flex-1 md:flex-none bg-indigo-600 text-white px-4 md:px-5 py-3 rounded-2xl text-xs md:text-sm font-bold shadow-lg shadow-indigo-100 flex items-center justify-center gap-2 active:scale-95 transition-all"
+            >
+              <UserPlus size={16} /> <span className="whitespace-nowrap">Homeowner</span>
+            </Link>
           </div>
-        </section>
-      </div>
+        </div>
 
-      <MobileBottomSheet open={setupModalOpen} title="Start Here" onClose={() => setSetupModalOpen(false)} width="620px" height="78dvh" zIndex={65}>
-        <div className="space-y-4">
-          <div className="rounded-[1.6rem] bg-slate-50 p-4 dark:bg-slate-800/70">
-            <p className="text-sm font-bold text-slate-900 dark:text-white">Complete your estate setup in order.</p>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">Use these quick steps to get doors, homeowners, and assignments ready without hunting through the dashboard.</p>
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6">
+          <div className="md:col-span-5 bg-white p-6 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col justify-between">
+            <div className="min-w-0">
+              <div className="flex justify-between items-start mb-6 md:mb-8">
+                <div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600 flex-shrink-0">
+                  <Crown size={22} fill="currentColor" fillOpacity={0.2} />
+                </div>
+                <span className={`px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${loading ? "bg-slate-50 text-slate-400 border-slate-100" : badgeToneForStatus(stats.status)}`}>
+                  {loading ? "Syncing" : labelForStatus(stats.status)}
+                </span>
+              </div>
+              <h3 className="text-xl md:text-2xl font-black text-slate-900 mb-1 truncate">{stats.estateName}</h3>
+              <p className="text-slate-500 font-medium text-xs md:text-sm mb-6 md:mb-8">
+                {toTitleCase(stats.tier)} management tier
+              </p>
+            </div>
+            <div className="space-y-4 md:space-y-5">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-400 font-black uppercase tracking-tighter text-[10px]">Active Doors</span>
+                <span className="font-black text-slate-900 text-sm">{activeDoors} / {maxDoors}</span>
+              </div>
+              <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                <div className="bg-indigo-600 h-full transition-all duration-1000 ease-out rounded-full" style={{ width: `${progressPercentage}%` }} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <MiniDetail label="Homes" value={stats.portfolio.homes} />
+                <MiniDetail label="Residents" value={stats.portfolio.residents} />
+              </div>
+              <div className="pt-4 border-t border-slate-50 flex items-center gap-2 text-slate-400 text-[9px] font-black uppercase tracking-widest">
+                <Calendar size={12} /> <span>Expires {stats.expiryDate}</span>
+              </div>
+            </div>
           </div>
-          <div className="grid gap-3">
-            {guidedSetup.map((item) => (
-              <Link
-                key={item.title}
-                to={item.to}
-                onClick={() => setSetupModalOpen(false)}
-                className="rounded-2xl border border-slate-200 bg-white p-4 transition-all hover:border-indigo-300 hover:shadow-sm active:scale-[0.99] dark:border-slate-700 dark:bg-slate-900/80 dark:hover:border-indigo-700/60"
-              >
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-indigo-600 dark:text-indigo-300">{item.step}</p>
-                <p className="mt-1 text-sm font-bold text-slate-900 dark:text-white">{item.title}</p>
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">{item.detail}</p>
-              </Link>
+
+
+        </div>
+
+        <section className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.95fr)] gap-4 md:gap-6">
+
+
+
+        </section>
+
+        <section>
+          <div className="flex items-center justify-between mb-6 md:mb-8 px-1">
+            <h2 className="text-xl md:text-2xl font-black tracking-tight text-slate-900">Toolkit</h2>
+            <button
+              type="button"
+              onClick={() => setShowAllToolkit((prev) => !prev)}
+              className="inline-flex items-center gap-1 text-indigo-600 text-[10px] font-black uppercase tracking-[0.2em]"
+            >
+              {showAllToolkit ? "Show Less" : "View All"}
+              {showAllToolkit ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
+            </button>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-5">
+            {toolkitItems.map((item) => (
+              <ToolkitItem key={item.label} {...item} />
             ))}
           </div>
-          <button
-            type="button"
-            onClick={() => setSetupModalOpen(false)}
-            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200"
-          >
-            Cancel
-          </button>
-        </div>
-      </MobileBottomSheet>
-      <RenewNowModal open={renewModalOpen} subscription={subscription} onClose={() => setRenewModalOpen(false)} />
-    </AppShell>
-  );
-}
+        </section>
 
-function ActionRow({ icon, title, subtitle, to, percent, meta }) {
-  const safePercent = Math.max(0, Math.min(100, percent));
-  return (
-    <Link
-      to={to}
-      className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-3 transition-all active:scale-[0.99] dark:border-slate-700 dark:bg-slate-900/80"
-    >
-      <div className="flex items-center gap-3">
-        <span className="grid h-8 w-8 place-items-center rounded-xl bg-violet-100 text-violet-600 dark:bg-violet-500/20 dark:text-violet-300">
-          {icon}
-        </span>
-        <div>
-          <p className="text-sm font-bold text-slate-900 dark:text-white">{title}</p>
-          <p className="text-xs text-slate-500 dark:text-slate-300">{subtitle}</p>
-          {meta ? <p className="mt-1 text-[11px] font-medium text-indigo-600 dark:text-indigo-300">{meta}</p> : null}
-        </div>
-      </div>
-      <span
-        className="grid h-10 w-10 place-items-center rounded-full text-[11px] font-bold text-violet-700"
-        style={{ background: `conic-gradient(#8b5cf6 ${safePercent * 3.6}deg, #e5e7eb 0deg)` }}
-      >
-        <span className="grid h-8 w-8 place-items-center rounded-full bg-white dark:bg-slate-900">{safePercent}%</span>
-      </span>
-    </Link>
-  );
-}
+        <section className="pb-4">
+          <h2 className="text-xl md:text-2xl font-black tracking-tight mb-6 md:mb-8 px-1 text-slate-900">Assets</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-5">
+            <AssetCard count={stats.portfolio.estates} label="Estates" icon={<Building2 size={18} />} primary />
+            <AssetCard count={stats.portfolio.homes} label="Homes" icon={<Home size={18} />} />
+            <AssetCard count={stats.portfolio.doors} label="Doors" icon={<DoorOpen size={18} />} />
+            <AssetCard count={stats.portfolio.residents} label="Residents" icon={<Users size={18} />} />
+          </div>
+        </section>
+      </main>
 
-function ProgressRing({ value }) {
-  return (
-    <div
-      className="grid h-14 w-14 place-items-center rounded-full bg-white/20 text-xs font-bold text-white"
-      style={{ background: `conic-gradient(#ffffff ${value * 3.6}deg, rgba(255,255,255,0.25) 0deg)` }}
-      aria-label={`${value}%`}
-    >
-      <span className="grid h-11 w-11 place-items-center rounded-full bg-indigo-700/90">{value}%</span>
+      <nav className="fixed bottom-0 left-0 w-full flex justify-around items-center px-2 py-3 pb-8 bg-white/95 backdrop-blur-md border-t border-slate-100 z-50 shadow-[0_-10px_40px_rgba(0,0,0,0.04)]">
+        <BottomNavLink to="/dashboard/estate" icon={<LayoutDashboard size={20} />} label="Overview" active />
+        <BottomNavLink to="/dashboard/estate/invites" icon={<Users size={20} />} label="Residents" />
+        <BottomNavLink to="/dashboard/estate/broadcasts" icon={<MessageSquare size={20} />} label="Chat" />
+        <BottomNavLink to="/dashboard/estate/settings" icon={<Wrench size={20} />} label="Tools" />
+      </nav>
     </div>
   );
 }
 
-function QuickActionGrid() {
-  const navigate = useNavigate();
-  const [showMore, setShowMore] = useState(false);
-  const [activeModal, setActiveModal] = useState(null);
-  const mobileActionSheets = {
-    meetings: {
-      title: "Meetings",
-      eyebrow: "Calendar",
-      description: "Plan estate meetings with a mobile-friendly flow for agenda, venue, date, and attendance tracking.",
-      to: "/dashboard/estate/meetings",
-      primaryLabel: "Open Meetings",
-      bullets: [
-        "Schedule residents meetings without leaving the dashboard flow.",
-        "Track attendance responses quickly on smaller screens.",
-        "Keep upcoming discussions easy to review before publishing."
-      ]
-    },
-    polls: {
-      title: "Polls",
-      eyebrow: "Decisions",
-      description: "Create and review estate votes with a cleaner mobile entry point before you jump into the full page.",
-      to: "/dashboard/estate/polls",
-      primaryLabel: "Open Polls",
-      bullets: [
-        "Launch quick votes for decisions that need homeowner feedback.",
-        "See poll management as a focused sheet first on mobile.",
-        "Move into the full poll screen only when you are ready."
-      ]
-    },
-    dues: {
-      title: "Dues",
-      eyebrow: "Collections",
-      description: "Manage levies, reminders, and homeowner payment reviews from a mobile-first flow.",
-      to: "/dashboard/estate/dues",
-      primaryLabel: "Open Dues",
-      bullets: [
-        "Create payment requests and monitor collections cleanly.",
-        "Review homeowner payment status without digging through pages.",
-        "Keep dues actions reachable with one thumb on mobile."
-      ]
-    },
-    maintenance: {
-      title: "Maintenance",
-      eyebrow: "Operations",
-      description: "Track maintenance requests, updates, and audit activity with a compact management sheet.",
-      to: "/dashboard/estate/maintenance",
-      primaryLabel: "Open Maintenance",
-      bullets: [
-        "Review incoming homeowner maintenance issues quickly.",
-        "Move straight into request handling and audit history.",
-        "Keep operational actions close to the estate dashboard."
-      ]
-    },
-    community: {
-      title: "Community",
-      eyebrow: "Board",
-      description: "Open the community board to post updates, keep conversations visible, and strengthen estate engagement.",
-      to: "/dashboard/estate/community",
-      primaryLabel: "Open Community",
-      bullets: [
-        "Share estate-wide context without burying it in other tools.",
-        "Give residents a clear place for ongoing community updates.",
-        "Keep the community board reachable from the dashboard."
-      ]
-    }
-  };
-  const actionCards = [
-    {
-      label: "Broadcast",
-      to: "/dashboard/estate/broadcasts",
-      icon: <Megaphone size={18} />,
-      eyebrow: "Community",
-      description: "Push urgent updates to every homeowner in seconds.",
-      badge: "Instant",
-      accent: "from-amber-100/80 via-white/10 to-transparent",
-      glow: "bg-amber-300/50"
-    },
-    {
-      label: "Meetings",
-      icon: <BellRing size={18} />,
-      eyebrow: "Calendar",
-      description: "Schedule meetings and capture attendance in one place.",
-      badge: "Plan",
-      accent: "from-violet-100/80 via-white/10 to-transparent",
-      glow: "bg-violet-300/50",
-      modalKey: "meetings"
-    },
-    {
-      label: "Polls",
-      icon: <Vote size={18} />,
-      eyebrow: "Decisions",
-      description: "Run estate votes and get clean participation stats.",
-      badge: "Live",
-      accent: "from-rose-100/80 via-white/10 to-transparent",
-      glow: "bg-rose-300/50",
-      modalKey: "polls"
-    },
-    {
-      label: "Dues",
-      icon: <ClipboardList size={18} />,
-      eyebrow: "Collections",
-      description: "Track levies, send reminders, and watch payments land.",
-      badge: "Revenue",
-      accent: "from-emerald-100/80 via-white/10 to-transparent",
-      glow: "bg-emerald-300/50",
-      modalKey: "dues"
-    },
-    {
-      label: "Maintenance",
-      icon: <DoorClosed size={18} />,
-      eyebrow: "Operations",
-      description: "Log issues, assign vendors, and close the loop fast.",
-      badge: "Active",
-      accent: "from-cyan-100/80 via-white/10 to-transparent",
-      glow: "bg-cyan-300/50",
-      modalKey: "maintenance"
-    },
-    {
-      label: "Visitor Stats",
-      to: "/dashboard/estate/stats",
-      icon: <BarChart3 size={18} />,
-      eyebrow: "Analytics",
-      description: "Monitor visitor traffic and peak gate activity.",
-      badge: "Trends",
-      accent: "from-slate-100/80 via-white/10 to-transparent",
-      glow: "bg-slate-300/50"
-    }
-  ];
-  const moreActions = [
-    { label: "Access Logs", to: "/dashboard/estate/logs", icon: <FileText size={18} /> },
-    { label: "Assign Doors", to: "/dashboard/estate/assign", icon: <DoorClosed size={18} /> },
-    { label: "Invite Homeowners", to: "/dashboard/estate/invites", icon: <Users size={18} /> },
-    { label: "Mappings", to: "/dashboard/estate/mappings", icon: <MapPinned size={18} /> },
-    { label: "Security Team", to: "/dashboard/estate/security", icon: <Shield size={18} /> },
-    { label: "Plan Rules", to: "/dashboard/estate/plan", icon: <ClipboardList size={18} /> },
-    { label: "Community", to: "/dashboard/estate/community", modalKey: "community", icon: <Megaphone size={18} /> },
-    { label: "Settings", to: "/dashboard/estate/settings", icon: <Settings2 size={18} /> }
-  ];
-  const activeSheet = activeModal ? mobileActionSheets[activeModal] : null;
-
+function TaskItem({ icon, title, subtitle, to }) {
   return (
-    <section className="space-y-3 pb-3">
-      <div className="flex items-center justify-between">
-        <h3 className="text-xl font-black text-slate-900 dark:text-white">Quick Actions</h3>
-        <button
-          type="button"
-          onClick={() => setShowMore(true)}
-          className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200"
-        >
-          More
-        </button>
+    <Link to={to} className="bg-white p-4 md:p-5 rounded-[1.2rem] md:rounded-[1.5rem] flex items-center gap-4 border border-transparent hover:border-indigo-100 transition-all active:scale-[0.98]">
+      <div className="w-10 h-10 md:w-12 md:h-12 bg-slate-50 rounded-xl flex items-center justify-center text-indigo-600 flex-shrink-0">
+        {icon}
       </div>
-      <div className="grid grid-cols-3 gap-3">
-        {actionCards.map((action) => (
-          <ActionCard
-            key={action.label}
-            {...action}
-            onClick={action.modalKey ? () => setActiveModal(action.modalKey) : undefined}
-          />
-        ))}
+      <div className="flex-1 min-w-0">
+        <h4 className="font-black text-[13px] md:text-sm text-slate-900 truncate">{title}</h4>
+        <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest mt-0.5 truncate">{subtitle}</p>
       </div>
-
-      {showMore ? (
-        <MobileBottomSheet open={showMore} title="More Actions" onClose={() => setShowMore(false)} width="560px" height="82dvh" zIndex={55}>
-          <div className="h-full rounded-[2rem] bg-white p-1 dark:bg-slate-900/60">
-            
-            <div className="grid grid-cols-2 gap-3 overflow-y-auto pr-1 sm:grid-cols-3">
-              {moreActions.map((action) => (
-                <button
-                  key={action.label}
-                  type="button"
-                  onClick={() => {
-                    setShowMore(false);
-                    if (action.modalKey) {
-                      setActiveModal(action.modalKey);
-                    } else {
-                      navigate(action.to);
-                    }
-                  }}
-                  className="group relative flex min-h-[118px] flex-col items-center justify-center overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-white px-3 py-4 text-center text-sm text-slate-900 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md active:translate-y-0 active:shadow-sm dark:border-slate-700 dark:bg-slate-900/90 dark:text-slate-100"
-                >
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-50 text-slate-700 ring-1 ring-slate-200 transition group-hover:-rotate-3 dark:bg-slate-950 dark:text-slate-100 dark:ring-slate-700">
-                    {action.icon}
-                  </div>
-                  <span className="mt-3 text-center text-sm font-black leading-tight tracking-tight">{action.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </MobileBottomSheet>
-      ) : null}
-
-      <MobileBottomSheet
-        open={!!activeSheet}
-        title={activeSheet?.title || "Quick Action"}
-        onClose={() => setActiveModal(null)}
-        width="620px"
-        height="70dvh"
-        zIndex={60}
-      >
-        {activeSheet ? (
-          <div className="space-y-4">
-            <div className="rounded-[1.6rem] bg-slate-50 p-4 dark:bg-slate-800/70">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{activeSheet.eyebrow}</p>
-              <p className="mt-2 text-sm text-slate-700 dark:text-slate-200">{activeSheet.description}</p>
-            </div>
-            <div className="space-y-2">
-              {activeSheet.bullets.map((item) => (
-                <div key={item} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200">
-                  {item}
-                </div>
-              ))}
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveModal(null);
-                  navigate(activeSheet.to);
-                }}
-                className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-bold text-white dark:bg-white dark:text-slate-900"
-              >
-                {activeSheet.primaryLabel}
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveModal(null)}
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        ) : null}
-      </MobileBottomSheet>
-    </section>
+      <ChevronRight size={16} className="text-slate-300 flex-shrink-0" />
+    </Link>
   );
 }
 
-function ActionCard({ label, to, icon, accent, glow, eyebrow, description, badge, onClick }) {
-  const content = (
-    <>
-      <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${accent} opacity-70`} />
-      <div className={`pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full ${glow} blur-2xl opacity-70`} />
-      <div className="relative flex flex-col items-center justify-center gap-3">
-        <span className="grid h-12 w-12 place-items-center rounded-full bg-white/92 text-slate-900 shadow-sm ring-1 ring-slate-200/80 transition group-hover:-rotate-3 dark:bg-slate-950 dark:text-slate-100 dark:ring-slate-700">
-          {icon}
-        </span>
-        <p className="text-center text-sm font-black leading-tight tracking-tight">{label}</p>
-      </div>
-    </>
-  );
-
-  if (onClick) {
-    return (
-      <button
-        type="button"
-        onClick={onClick}
-        className="group relative flex min-h-[110px] flex-col items-center justify-center overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-white px-2 py-4 text-center text-sm text-slate-900 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md active:translate-y-0 active:shadow-sm dark:border-slate-700 dark:bg-slate-900/90 dark:text-slate-100"
-      >
-        {content}
-      </button>
-    );
-  }
-
+function ToolkitItem({ icon, label, to }) {
   return (
     <Link
       to={to}
-      className="group relative flex min-h-[110px] flex-col items-center justify-center overflow-hidden rounded-[1.5rem] border border-slate-200/80 bg-white px-2 py-4 text-center text-sm text-slate-900 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md active:translate-y-0 active:shadow-sm dark:border-slate-700 dark:bg-slate-900/90 dark:text-slate-100"
+      className="group bg-white p-5 md:p-7 rounded-[1.8rem] md:rounded-[2.5rem] text-center hover:bg-indigo-600 hover:text-white transition-all border border-slate-100 shadow-sm active:scale-95 flex flex-col items-center justify-center"
     >
-      {content}
+      <div className="mb-2 text-indigo-600 transition-colors group-hover:text-white">{icon}</div>
+      <span className="text-[9px] font-black uppercase tracking-tight">{label}</span>
     </Link>
   );
+}
+
+function AssetCard({ count, label, icon, primary = false }) {
+  return (
+    <div className="bg-white p-5 md:p-8 rounded-[1.8rem] md:rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col items-center text-center">
+      <div className={`mb-3 p-2 rounded-lg ${primary ? "bg-indigo-50 text-indigo-600" : "bg-slate-50 text-slate-400"}`}>
+        {icon}
+      </div>
+      <span className={`text-3xl md:text-5xl font-black mb-1 tracking-tighter ${primary ? "text-indigo-600" : "text-slate-900"}`}>{count}</span>
+      <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">{label}</span>
+    </div>
+  );
+}
+
+function BottomNavLink({ to, icon, label, active = false }) {
+  return (
+    <Link to={to} className={`flex flex-col items-center gap-1 flex-1 transition-all active:scale-90 ${active ? "text-indigo-600" : "text-slate-400"}`}>
+      <div className={`${active ? "bg-indigo-50 p-2 rounded-xl" : "p-2"}`}>{icon}</div>
+      <span className="text-[8px] font-black uppercase tracking-wider">{label}</span>
+    </Link>
+  );
+}
+
+function MiniDetail({ label, value }) {
+  return (
+    <div className="rounded-2xl bg-slate-50 px-4 py-3 border border-slate-100">
+      <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">{label}</p>
+      <p className="mt-1 text-lg font-black text-slate-900">{value}</p>
+    </div>
+  );
+}
+
+function ProgressDetailRow({ label, value, helper, percent, tone }) {
+  const barClassName = {
+    indigo: "bg-indigo-600",
+    sky: "bg-sky-500",
+    emerald: "bg-emerald-500",
+    amber: "bg-amber-500"
+  }[tone] || "bg-indigo-600";
+
+  return (
+    <div className="rounded-[1.5rem] border border-white/70 bg-white px-5 py-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">{label}</p>
+          <p className="mt-1 text-sm font-semibold text-slate-500">{helper}</p>
+        </div>
+        <p className="text-base font-black text-slate-900 whitespace-nowrap">{value}</p>
+      </div>
+      <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
+        <div className={`${barClassName} h-full rounded-full transition-all duration-1000`} style={{ width: `${Math.max(6, percent)}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function SignalCard({ label, value, helper }) {
+  return (
+    <div className="rounded-[1.5rem] bg-slate-50 border border-slate-100 px-4 py-4">
+      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">{label}</p>
+      <p className="mt-2 text-lg font-black text-slate-900 truncate">{value}</p>
+      <p className="mt-1 text-xs font-medium text-slate-500">{helper}</p>
+    </div>
+  );
+}
+
+function formatDate(value) {
+  if (!value) return "Not set";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Not set";
+  return new Intl.DateTimeFormat(undefined, { day: "2-digit", month: "short", year: "numeric" }).format(date);
+}
+
+function formatHour(hour) {
+  if (!Number.isFinite(Number(hour))) return "N/A";
+  const date = new Date();
+  date.setHours(Number(hour), 0, 0, 0);
+  return new Intl.DateTimeFormat(undefined, { hour: "numeric" }).format(date);
+}
+
+function toTitleCase(value) {
+  return String(value || "standard")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (match) => match.toUpperCase());
+}
+
+function labelForStatus(status) {
+  const value = String(status || "inactive").trim().toLowerCase();
+  if (!value) return "Inactive";
+  return value.replace(/_/g, " ");
+}
+
+function badgeToneForStatus(status) {
+  const value = String(status || "").trim().toLowerCase();
+  if (value === "active" || value === "trial" || value === "expiring_soon") {
+    return "bg-emerald-50 text-emerald-600 border-emerald-100";
+  }
+  if (value === "grace_period" || value === "payment_pending") {
+    return "bg-amber-50 text-amber-600 border-amber-100";
+  }
+  return "bg-rose-50 text-rose-600 border-rose-100";
 }

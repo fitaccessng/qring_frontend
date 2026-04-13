@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { io } from "socket.io-client";
+import { BellRing } from "lucide-react";
 import AppShell from "../../layouts/AppShell";
+import EstateManagerPageShell, {
+  EstateManagerSection,
+  estateFieldClassName,
+  estateTextareaClassName
+} from "../../components/mobile/EstateManagerPageShell";
 import { env } from "../../config/env";
 import { realtimeTransportOptions } from "../../services/socketConfig";
 import {
@@ -136,19 +142,28 @@ export default function EstateAlertsPage() {
 
   return (
     <AppShell title="Estate Alerts">
-      <div className="mx-auto max-w-5xl space-y-4">
-        <section className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900/80">
-          <h2 className="text-lg font-bold">Create Alert</h2>
+      <EstateManagerPageShell
+        eyebrow="Communication"
+        title="Estate Alerts"
+        description="Send simple notices, requests, and meetings in the same clean flow used across the estate dashboard."
+        icon={<BellRing className="h-5 w-5" />}
+        accent="from-[#4f8cff] to-[#00346f]"
+        stats={[
+          { label: "Alerts", value: String(alerts.length), helper: "Current feed" },
+          { label: "Payments", value: String(payments.length), helper: "Tracked requests" }
+        ]}
+      >
+        <EstateManagerSection title="Create Alert" subtitle="Create one clear update for homeowners.">
           <form onSubmit={handleCreateAlert} className="mt-3 grid gap-2 sm:grid-cols-2">
             <input
-              className="rounded-xl border border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+              className={estateFieldClassName}
               placeholder="Title"
               value={form.title}
               onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))}
               required
             />
             <select
-              className="rounded-xl border border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+              className={estateFieldClassName}
               value={form.alertType}
               onChange={(event) => setForm((prev) => ({ ...prev, alertType: event.target.value }))}
             >
@@ -159,7 +174,7 @@ export default function EstateAlertsPage() {
               ))}
             </select>
             <textarea
-              className="rounded-xl border border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 sm:col-span-2"
+              className={`${estateTextareaClassName} sm:col-span-2`}
               placeholder="Description"
               value={form.description}
               onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
@@ -167,7 +182,7 @@ export default function EstateAlertsPage() {
             />
             {form.alertType === "payment_request" ? (
               <input
-                className="rounded-xl border border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+                className={estateFieldClassName}
                 placeholder="Amount due (NGN)"
                 type="number"
                 min="1"
@@ -179,25 +194,25 @@ export default function EstateAlertsPage() {
               <div />
             )}
             <input
-              className="rounded-xl border border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+              className={estateFieldClassName}
               type="datetime-local"
               value={form.dueDate}
               onChange={(event) => setForm((prev) => ({ ...prev, dueDate: event.target.value }))}
             />
             <button
               type="submit"
-              className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 sm:col-span-2"
+              className="rounded-[1.15rem] bg-[#00346f] px-4 py-3 text-sm font-semibold text-white disabled:opacity-60 sm:col-span-2"
               disabled={saving || loading || !estateId}
             >
               {saving ? "Creating..." : "Create Alert"}
             </button>
           </form>
-        </section>
+        </EstateManagerSection>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900/80">
+        <EstateManagerSection title="Alert Feed" subtitle="Filter what is live in the estate right now.">
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <select
-              className="rounded-xl border border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+              className={estateFieldClassName}
               value={estateId}
               onChange={(event) => setEstateId(event.target.value)}
             >
@@ -208,7 +223,7 @@ export default function EstateAlertsPage() {
               ))}
             </select>
             <select
-              className="rounded-xl border border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+              className={estateFieldClassName}
               value={filter}
               onChange={(event) => setFilter(event.target.value)}
             >
@@ -223,10 +238,10 @@ export default function EstateAlertsPage() {
           {error ? <p className="mb-2 text-sm text-rose-600">{error}</p> : null}
           <div className="space-y-2">
             {alerts.map((item) => (
-              <article key={item.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/70">
+              <article key={item.id} className="rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/70">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <h3 className="text-sm font-bold">{item.title}</h3>
-                  <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+                  <span className="rounded-full bg-[#d7e2ff] px-2 py-0.5 text-xs font-semibold text-[#00346f] dark:bg-indigo-900/40 dark:text-indigo-300">
                     {item.alertType}
                   </span>
                 </div>
@@ -238,21 +253,20 @@ export default function EstateAlertsPage() {
             ))}
             {alerts.length === 0 ? <p className="text-sm text-slate-500">No alerts found.</p> : null}
           </div>
-        </section>
+        </EstateManagerSection>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900/80">
-          <h2 className="mb-2 text-lg font-bold">Payments Overview</h2>
+        <EstateManagerSection title="Payments Overview" subtitle="Track what has been paid and what is still pending.">
           <div className="space-y-2">
             {payments.map((item) => (
-              <article key={`payment-${item.id}`} className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/70">
+              <article key={`payment-${item.id}`} className="rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/70">
                 <h3 className="text-sm font-bold">{item.title}</h3>
                 <p className="text-xs text-slate-500">{item.homeowners?.filter((row) => row.status === "paid").length ?? 0} paid / {item.homeowners?.length ?? 0} homeowners</p>
               </article>
             ))}
             {payments.length === 0 ? <p className="text-sm text-slate-500">No payment records yet.</p> : null}
           </div>
-        </section>
-      </div>
+        </EstateManagerSection>
+      </EstateManagerPageShell>
     </AppShell>
   );
 }

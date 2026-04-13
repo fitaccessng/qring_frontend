@@ -47,7 +47,7 @@ export default function LandingShell({ children, hideHeader = false, hideFooter 
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-white text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+    <div className="flex min-h-[100dvh] flex-col overflow-x-hidden bg-white text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_15%_10%,rgba(14,116,144,0.08),transparent_45%),radial-gradient(circle_at_85%_80%,rgba(34,197,94,0.08),transparent_40%)]" />
       {!hideHeader ? (
         <header className="sticky top-0 z-50 border-b border-slate-200/70 bg-white/90 backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/90">
@@ -143,10 +143,10 @@ export default function LandingShell({ children, hideHeader = false, hideFooter 
         </header>
       ) : null}
 
-      <main className="relative">{children}</main>
+      <main className="relative flex-1">{children}</main>
 
       {!hideFooter ? (
-        <footer className="mt-16 border-t border-slate-200/70 bg-white/90 py-12 dark:border-slate-800 dark:bg-slate-950/90">
+        <footer className="mt-16 border-t border-slate-200/70 bg-white/90 pt-12 dark:border-slate-800 dark:bg-slate-950/90">
           <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-10">
             <div className="grid gap-8 lg:grid-cols-[1.2fr_2fr]">
               <div>
@@ -178,7 +178,7 @@ export default function LandingShell({ children, hideHeader = false, hideFooter 
                 ))}
               </div>
             </div>
-            <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200/70 pt-6 text-xs text-slate-500 dark:border-slate-800">
+            <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200/70 pb-[calc(1.75rem+env(safe-area-inset-bottom))] pt-6 text-xs text-slate-500 dark:border-slate-800">
               <p>© {new Date().getFullYear()} Qring Technologies. All rights reserved.</p>
               <div className="flex flex-wrap gap-4">
                 <Link to="/privacy" className="hover:text-slate-700 dark:hover:text-slate-300">
@@ -198,4 +198,3 @@ export default function LandingShell({ children, hideHeader = false, hideFooter 
     </div>
   );
 }
-

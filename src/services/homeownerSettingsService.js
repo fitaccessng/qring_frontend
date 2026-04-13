@@ -13,3 +13,10 @@ export async function updateHomeownerSettings(payload) {
   return response?.data ?? null;
 }
 
+export async function updateHomeownerProfile(payload) {
+  const response = await apiRequest("/homeowner/profile", {
+    method: "PUT",
+    body: JSON.stringify(payload)
+  });
+  return response?.data ?? null;
+}

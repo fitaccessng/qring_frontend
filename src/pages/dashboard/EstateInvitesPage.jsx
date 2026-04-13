@@ -1,215 +1,289 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import AppShell from "../../layouts/AppShell";
-import { createEstateHomeowner, getEstateOverview, inviteHomeowner } from "../../services/estateService";
-import PageSkeleton from "../../components/PageSkeleton";
+import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  ArrowLeft,
+  Bell,
+  UserPlus,
+  Send,
+  Mail,
+  ShieldCheck,
+  Filter,
+  LayoutDashboard,
+  Wallet,
+  Users,
+  Building2,
+  Settings,
+  RefreshCw
+} from 'lucide-react';
+
+import { addEstateHome, createEstateHomeowner, inviteHomeowner } from "../../services/estateService";
 import { showError, showSuccess } from "../../utils/flash";
+import useEstateOverviewState from "../../hooks/useEstateOverviewState";
 
-export default function EstateInvitesPage() {
-  const [homeowners, setHomeowners] = useState([]);
-  const [estates, setEstates] = useState([]);
-  const [error, setError] = useState("");
-  const [busyUser, setBusyUser] = useState("");
-  const [creating, setCreating] = useState(false);
-  const [createForm, setCreateForm] = useState({
-    estateId: "",
-    fullName: "",
-    email: "",
-    password: ""
-  });
-  const [loading, setLoading] = useState(true);
+const EstateInvitesPage = () => {
+  const navigate = useNavigate();
+  const { overview, setOverview, loading, refresh } = useEstateOverviewState();
 
-  async function load() {
-    setLoading(true);
+  const [form, setForm] = useState({ fullName: "", email: "", phone: "", unitNumber: "", password: "" });
+  const [busy, setBusy] = useState(false);
+  const [resendingId, setResendingId] = useState(null); // Track which specific item is resending
+
+  useEffect(() => {
+    if (overview?.error) showError(overview.error);
+  }, [overview?.error]);
+
+  const homeowners = useMemo(() => overview?.homeowners ?? [], [overview]);
+
+  const buildTemporaryPassword = (formData) => {
+    const safeName = (formData?.fullName || "resident").replace(/\s+/g, "").slice(0, 6) || "resident";
+    return `${safeName}#Qring2026`;
+  };
+  const invitePreviewPassword = form.password || buildTemporaryPassword(form);
+
+  async function handleResend(person) {
+    if (resendingId) return;
+    setResendingId(person.id);
     try {
-      const data = await getEstateOverview();
-      setHomeowners(Array.isArray(data?.homeowners) ? data.homeowners : []);
-      const estateRows = Array.isArray(data?.estates) ? data.estates : [];
-      setEstates(estateRows);
-      if (!createForm.estateId && estateRows.length > 0) {
-        setCreateForm((prev) => ({ ...prev, estateId: estateRows[0].id }));
+      const temporaryPassword = buildTemporaryPassword(person);
+      const result = await inviteHomeowner(person.id, {
+        temporaryPassword,
+        unitName: person.unitNumber || "Unassigned"
+      });
+      const emailStatus = String(result?.emailStatus || "").toLowerCase();
+      const emailReason = String(result?.emailReason || "").trim();
+      if (emailStatus !== "sent") {
+        throw new Error(
+          emailReason
+            ? `Invite email was not sent (${result?.emailStatus || "unknown"}: ${emailReason}).`
+            : `Invite email was not sent (${result?.emailStatus || "unknown"}).`
+        );
       }
+      showSuccess(`Invite resent to ${person.fullName}. They should sign in with ${person.email} and the new password from the email.`);
+    } catch (err) {
+      showError(err.message || "Failed to resend invite");
     } finally {
-      setLoading(false);
+      setResendingId(null);
     }
   }
 
-  useEffect(() => {
-    load().catch((requestError) => {
-      setError(requestError.message ?? "Failed to load homeowners");
-      setLoading(false);
-    });
-  }, []);
-  
-  useEffect(() => {
-    if (error) showError(error);
-  }, [error]);
-
-  function showNotice(message) {
-    showSuccess(message);
-  }
-
-  async function sendInvite(homeownerId) {
-    setBusyUser(homeownerId);
-    setError("");
-    try {
-      const sent = await inviteHomeowner(homeownerId);
-      const emailStatus = sent?.emailStatus ? ` Email: ${sent.emailStatus}.` : "";
-      showNotice(`Invite sent. Token: ${sent?.inviteToken ?? "-"}${emailStatus}`);
-    } catch (requestError) {
-      setError(requestError.message ?? "Failed to send invite");
-    } finally {
-      setBusyUser("");
-    }
-  }
-
-  async function createHomeowner(event) {
+  async function onSubmit(event) {
     event.preventDefault();
-    setCreating(true);
-    setError("");
+    setBusy(true);
     try {
-      const created = await createEstateHomeowner(createForm);
-      showNotice(
-        `Homeowner created: ${created?.fullName || createForm.fullName}. Login email: ${created?.email || "generated automatically"}.`
+      const estateId = overview?.estates?.[0]?.id;
+      if (!estateId) throw new Error("Create an estate first before inviting residents");
+
+      const temporaryPassword = String(form.password || buildTemporaryPassword(form)).trim();
+      const cleanEmail = form.email.trim().toLowerCase();
+      let created = null;
+      try {
+        created = await createEstateHomeowner({
+          estateId,
+          fullName: form.fullName.trim(),
+          email: cleanEmail,
+          password: temporaryPassword
+        });
+      } catch (err) {
+        if (Number(err?.status) !== 409) throw err;
+        const existingHomeowner = homeowners.find(
+          (person) => String(person?.email || "").trim().toLowerCase() === cleanEmail
+        );
+        if (!existingHomeowner?.id) {
+          throw new Error("That email is already registered. If this resident already has an account, resend their invite from the resident list.");
+        }
+        created = existingHomeowner;
+      }
+
+      const alreadyLinkedToUnit = (overview?.homes || []).some(
+        (home) =>
+          home?.homeownerId === created?.id &&
+          String(home?.name || "").trim().toLowerCase() === form.unitNumber.trim().toLowerCase()
       );
-      if (created?.id) {
-        setHomeowners((prev) => {
-          const nextRow = {
-            id: created.id,
-            fullName: created.fullName || createForm.fullName,
-            email: created.email || "Generated automatically",
-            active: true
-          };
-          return [nextRow, ...prev.filter((row) => row.id !== created.id)];
+
+      if (created?.id && form.unitNumber.trim() && !alreadyLinkedToUnit) {
+        await addEstateHome({
+          estateId,
+          homeownerId: created.id,
+          name: form.unitNumber.trim()
         });
       }
-      setCreateForm((prev) => ({
-        ...prev,
-        fullName: "",
-        email: "",
-        password: ""
-      }));
-    } catch (requestError) {
-      setError(requestError.message ?? "Failed to create homeowner");
+
+      const inviteResult = created?.id
+        ? await inviteHomeowner(created.id, {
+            temporaryPassword,
+            unitName: form.unitNumber.trim()
+          })
+        : null;
+
+      const emailStatus = String(inviteResult?.emailStatus || "").toLowerCase();
+      const emailReason = String(inviteResult?.emailReason || "").trim();
+      if (inviteResult && emailStatus !== "sent") {
+        throw new Error(
+          emailReason
+            ? `Resident account was created, but invite email was not sent (${inviteResult?.emailStatus || "unknown"}: ${emailReason}).`
+            : `Resident account was created, but invite email was not sent (${inviteResult?.emailStatus || "unknown"}).`
+        );
+      }
+
+      showSuccess(`Invite sent to ${form.fullName}. Login email: ${cleanEmail}. Password: ${temporaryPassword}`);
+
+      setForm({ fullName: "", email: "", phone: "", unitNumber: "", password: "" });
+      refresh().catch(() => {});
+    } catch (err) {
+      showError(err.message ?? "Failed to send invite");
     } finally {
-      setCreating(false);
+      setBusy(false);
     }
   }
 
   return (
-    <AppShell title="Invite Homeowners">
-      <div className="mx-auto max-w-7xl space-y-6">
+    <div className="bg-[#f8f9fa] min-h-screen font-body selection:bg-indigo-100 pb-32">
+      <header className="fixed top-0 w-full z-50 bg-[#f8f9fa]/80 backdrop-blur-xl flex justify-between items-center px-4 h-16 border-b border-slate-100">
+        <button onClick={() => navigate(-1)} className="p-2 text-[#4955b3] active:bg-indigo-50 rounded-full transition-all">
+          <ArrowLeft size={24} strokeWidth={2.5} />
+        </button>
+        <h1 className="text-[#2b3437] font-headline font-black tracking-tight text-lg">Invite Residents</h1>
+        <button className="relative p-2 text-[#4955b3] active:bg-indigo-50 rounded-full transition-all">
+          <Bell size={22} strokeWidth={2.5} />
+          <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-rose-500 rounded-full border-2 border-[#f8f9fa]" />
+        </button>
+      </header>
 
-        <section className="relative overflow-hidden rounded-[2.5rem] bg-slate-900 p-8 text-white dark:bg-indigo-600">
-          <div className="relative z-10">
-            <h2 style={{ color: "white" }} className="text-2xl font-bold tracking-tight">Create and Invite Homeowners</h2>
-            <p className="mt-2 text-sm text-slate-200 dark:text-indigo-100">
-              Create homeowner accounts here, then send invite links to residents.
-            </p>
-          </div>
-          <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/5 blur-3xl" />
-        </section>
+      <main className="pt-24 px-5 max-w-5xl mx-auto space-y-8">
+        <div className="space-y-2">
+          <h2 className="text-3xl font-headline font-black tracking-tight text-[#2b3437]">Invite Residents</h2>
+          <p className="text-slate-500 font-medium">Securely onboard your community members.</p>
+        </div>
 
-        <section className="rounded-[2rem] border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-indigo-900 dark:border-indigo-900/30 dark:bg-indigo-900/20 dark:text-indigo-100">
-          Homeowner setup flow: Create homeowner account here, then use{" "}
-          <Link to="/dashboard/estate/homes" className="font-semibold underline">
-            Multi-Home
-          </Link>{" "}
-          and{" "}
-          <Link to="/dashboard/estate/assign" className="font-semibold underline">
-            Assign Doors
-          </Link>{" "}
-          to link access.
-        </section>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Form Column */}
+          <div className="lg:col-span-7 space-y-6">
+            <section className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-50">
+              <div className="flex items-center gap-4 mb-8">
+                <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-[#4955b3]">
+                  <UserPlus size={24} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-[#2b3437]">New Invitation</h3>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-tight">Encrypted Delivery</p>
+                </div>
+              </div>
 
-        <section className="rounded-[2rem] border border-slate-200/70 bg-white/95 p-5 shadow-[0_8px_30px_rgb(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-900/90 sm:p-6">
-          <h3 className="text-base font-bold text-slate-900 dark:text-white">Create Homeowner</h3>
-          {loading ? (
-            <PageSkeleton blocks={1} className="mt-4" />
-          ) : (
-            <form onSubmit={createHomeowner} className="mt-4 grid gap-3 md:grid-cols-2">
-              <label className="block">
-                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Estate</span>
-                <select
-                  value={createForm.estateId}
-                  onChange={(event) => setCreateForm((prev) => ({ ...prev, estateId: event.target.value }))}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
-                  required
+              <form onSubmit={onSubmit} className="space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Resident Name</label>
+                    <input
+                      required
+                      value={form.fullName}
+                      onChange={(e) => setForm(p => ({ ...p, fullName: e.target.value }))}
+                      className="w-full bg-slate-50 border-none rounded-2xl py-4 px-5 focus:ring-2 focus:ring-indigo-500/20 transition-all font-bold text-sm"
+                      placeholder="Johnathan Doe"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Property Unit</label>
+                    <input
+                      required
+                      value={form.unitNumber}
+                      onChange={(e) => setForm(p => ({ ...p, unitNumber: e.target.value }))}
+                      className="w-full bg-slate-50 border-none rounded-2xl py-4 px-5 focus:ring-2 focus:ring-indigo-500/20 transition-all font-bold text-sm"
+                      placeholder="Suite 201"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Delivery Method</label>
+                  <div className="flex items-center justify-center gap-2 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest bg-[#dfe0ff] text-[#3b48a6]">
+                    <Mail size={16} strokeWidth={3} /> Email
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Contact Detail</label>
+                  <input
+                    required
+                    type="email"
+                    value={form.email}
+                    onChange={(e) => setForm(p => ({ ...p, email: e.target.value }))}
+                    className="w-full bg-slate-50 border-none rounded-2xl py-4 px-5 focus:ring-2 focus:ring-indigo-500/20 transition-all font-bold text-sm"
+                    placeholder="resident@domain.com"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Homeowner Password</label>
+                  <input
+                    type="text"
+                    value={form.password}
+                    onChange={(e) => setForm(p => ({ ...p, password: e.target.value }))}
+                    className="w-full bg-slate-50 border-none rounded-2xl py-4 px-5 focus:ring-2 focus:ring-indigo-500/20 transition-all font-bold text-sm"
+                    placeholder="Leave blank to auto-generate"
+                  />
+                  <p className="text-[11px] font-medium text-slate-500">
+                    This becomes the resident&apos;s login password. If you leave it blank, Qring generates one automatically.
+                  </p>
+                </div>
+
+
+
+                <button
+                  disabled={busy}
+                  className="w-full py-5 bg-[#4955b3] text-white rounded-[1.5rem] font-black uppercase tracking-widest flex items-center justify-center gap-3 shadow-lg shadow-indigo-100 active:scale-95 transition-all disabled:opacity-50"
                 >
-                  {estates.length === 0 ? <option value="">No estate available</option> : null}
-                  {estates.map((estate) => (
-                    <option key={estate.id} value={estate.id}>
-                      {estate.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Full Name</span>
-                <input
-                  value={createForm.fullName}
-                  onChange={(event) => setCreateForm((prev) => ({ ...prev, fullName: event.target.value }))}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
-                  required
-                />
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Email</span>
-                <input
-                  type="email"
-                  value={createForm.email}
-                  onChange={(event) => setCreateForm((prev) => ({ ...prev, email: event.target.value }))}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
-                  required
-                />
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Temporary Password</span>
-                <input
-                  type="password"
-                  value={createForm.password}
-                  onChange={(event) => setCreateForm((prev) => ({ ...prev, password: event.target.value }))}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
-                  required
-                />
-              </label>
-              <button
-                type="submit"
-                disabled={creating || estates.length === 0}
-                className="rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition-all active:scale-95 disabled:opacity-50 dark:bg-white dark:text-slate-900"
-              >
-                {creating ? "Creating..." : "Create Homeowner"}
-              </button>
-            </form>
-          )}
-        </section>
-
-        <section>
-          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <h3 className="text-base font-bold text-slate-900 dark:text-white">Homeowners</h3>
-            <span className="text-xs text-slate-500">{homeowners.length} total</span>
+                  {busy ? "Sending..." : "Send Invitation"}
+                  {!busy && <Send size={18} />}
+                </button>
+              </form>
+            </section>
           </div>
-        </section>
 
-        <section className="grid gap-3 sm:grid-cols-2">
-          {loading ? <PageSkeleton blocks={4} className="sm:col-span-2" /> : null}
-          {!loading && homeowners.map((homeowner) => (
-            <article key={homeowner.id} className="rounded-[2rem] border border-slate-200/70 bg-white/95 p-5 shadow-[0_8px_30px_rgb(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-900/90">
-              <p className="font-semibold">{homeowner.fullName}</p>
-              <p className="text-xs text-slate-500">{homeowner.email}</p>
-              <button
-                type="button"
-                onClick={() => sendInvite(homeowner.id)}
-                disabled={busyUser === homeowner.id}
-                className="mt-3 rounded-2xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition-all active:scale-95 disabled:opacity-50 dark:bg-white dark:text-slate-900"
-              >
-                {busyUser === homeowner.id ? "Sending..." : "Send Invite"}
-              </button>
-            </article>
-          ))}
-          {!loading && homeowners.length === 0 ? <p className="text-sm text-slate-500">No homeowners available yet.</p> : null}
-        </section>
-      </div>
-    </AppShell>
+          {/* Activity Column */}
+          <div className="lg:col-span-5 space-y-6">
+            <section className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-slate-50">
+              <div className="flex items-center justify-between mb-8 px-2">
+                <h3 className="text-sm font-black text-[#2b3437] uppercase tracking-wider">Recent Activity</h3>
+                <Filter size={18} className="text-slate-300 cursor-pointer" />
+              </div>
+
+              <div className="space-y-4">
+                {loading ? (
+                  <p className="text-center py-10 text-slate-400 font-bold text-xs uppercase tracking-widest">Loading residents...</p>
+                ) : homeowners.map((person) => (
+                  <div key={person.id} className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-2xl transition-all group">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-2xl overflow-hidden bg-slate-100 border-2 border-white shadow-sm flex items-center justify-center text-indigo-300">
+                        <Users size={20} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-black text-[#2b3437] truncate max-w-[120px]">{person.fullName}</p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
+                          {person.roleLabel || "Estate Homeowner"}{person.unitNumber ? ` · Unit ${person.unitNumber}` : ""}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleResend(person)}
+                      disabled={resendingId === person.id}
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-all disabled:opacity-50"
+                    >
+                      {resendingId === person.id ? (
+                        <RefreshCw size={12} className="animate-spin" />
+                      ) : 'Resend'}
+                    </button>
+                  </div>
+                ))}
+                {!loading && homeowners.length === 0 && (
+                  <p className="text-center py-10 text-slate-400 font-bold text-xs uppercase tracking-widest">No residents found</p>
+                )}
+              </div>
+            </section>
+          </div>
+        </div>
+      </main>
+    </div>
   );
-}
+};
+
+export default EstateInvitesPage;

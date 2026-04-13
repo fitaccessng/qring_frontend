@@ -1,4 +1,5 @@
-import { useEffect } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { motion, useMotionValue, animate } from "framer-motion";
 import { X } from "lucide-react";
 
 export default function MobileBottomSheet({
@@ -6,62 +7,179 @@ export default function MobileBottomSheet({
   title,
   onClose,
   children,
-  width = "720px",
-  height = "94dvh",
+  footer = null, // 🔥 sticky CTA slot
+  snapPoints = [0.4, 0.75, 1],
+  initialSnap = 2,
   zIndex = 50,
-  contentClassName = "",
-  headerActions = null
+  headerActions = null,
+  contentClassName = ""
 }) {
+  const sheetRef = useRef(null);
+  const contentRef = useRef(null);
+  const y = useMotionValue(0);
+
+  const [viewportHeight, setViewportHeight] = useState(0);
+  const [currentSnap, setCurrentSnap] = useState(initialSnap);
+
+  const resolvedSnapPoints = useMemo(
+    () =>
+      [...snapPoints]
+        .map((p) => Math.min(Math.max(Number(p) || 0, 0.3), 1))
+        .sort((a, b) => a - b),
+    [snapPoints]
+  );
+
+  const sheetHeight = viewportHeight;
+
+  // ✅ Viewport + keyboard aware
   useEffect(() => {
-    if (!open || typeof document === "undefined") return undefined;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previousOverflow;
+    const updateHeight = () => {
+      const vh = window.visualViewport?.height || window.innerHeight;
+      setViewportHeight(vh);
     };
+
+    updateHeight();
+
+    window.addEventListener("resize", updateHeight);
+    window.visualViewport?.addEventListener("resize", updateHeight);
+
+    return () => {
+      window.removeEventListener("resize", updateHeight);
+      window.visualViewport?.removeEventListener("resize", updateHeight);
+    };
+  }, []);
+
+  // ✅ Lock background scroll
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => (document.body.style.overflow = prev);
   }, [open]);
+
+  // ✅ Snap logic
+  const snapTo = (index) => {
+    const snapHeight = resolvedSnapPoints[index] * viewportHeight;
+    const targetY = Math.max(sheetHeight - snapHeight, 0);
+
+    animate(y, targetY, {
+      type: "spring",
+      stiffness: 320,
+      damping: 35
+    });
+
+    setCurrentSnap(index);
+  };
+
+  // ✅ Open → snap
+  useEffect(() => {
+    if (open && viewportHeight) {
+      requestAnimationFrame(() => snapTo(initialSnap));
+    }
+  }, [open, viewportHeight]);
+
+  // 🔥 Dynamic snap based on content height
+  useEffect(() => {
+    if (!open) return;
+
+    const el = contentRef.current;
+    if (!el) return;
+
+    const isOverflowing = el.scrollHeight > el.clientHeight;
+
+    if (isOverflowing) {
+      snapTo(resolvedSnapPoints.length - 1); // go full height
+    }
+  }, [open, viewportHeight]);
+
+  // 🔥 Auto scroll inputs into view (keyboard fix)
+  useEffect(() => {
+    const handleFocus = (e) => {
+      const target = e.target;
+
+      if (!contentRef.current?.contains(target)) return;
+
+      setTimeout(() => {
+        target.scrollIntoView({
+          behavior: "smooth",
+          block: "center"
+        });
+      }, 250);
+    };
+
+    document.addEventListener("focusin", handleFocus);
+    return () => document.removeEventListener("focusin", handleFocus);
+  }, []);
 
   if (!open) return null;
 
   return (
     <div
-      className="fixed inset-0 flex items-end justify-center overflow-y-auto bg-slate-950/55 px-3 pt-6 backdrop-blur-sm"
+      className="fixed inset-0 flex items-end justify-center bg-black/40 backdrop-blur-sm"
       style={{ zIndex }}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onClose?.();
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose?.();
       }}
     >
-      <div
-        className="flex w-full flex-col overflow-hidden rounded-t-[1.75rem] bg-white shadow-[0_28px_60px_rgba(15,23,42,0.24)] dark:bg-slate-900"
-        style={{
-          width: `min(100%, ${width})`,
-          height: `min(${height}, 960px)`,
-          maxHeight: `min(${height}, 960px)`,
-          minHeight: 0
+      <motion.div
+        ref={sheetRef}
+        style={{ y, height: sheetHeight }}
+        drag="y"
+        dragConstraints={{ top: 0, bottom: sheetHeight }}
+        dragElastic={0.2}
+        onDragEnd={(e, info) => {
+          const velocity = info.velocity.y;
+          const offset = info.offset.y;
+
+          if (velocity > 1200 || offset > sheetHeight * 0.4) {
+            onClose?.();
+            return;
+          }
+
+          const distances = resolvedSnapPoints.map((p) => {
+            const snapY = sheetHeight - p * viewportHeight;
+            return Math.abs(y.get() - snapY);
+          });
+
+          const closest = distances.indexOf(Math.min(...distances));
+          snapTo(closest);
         }}
+        className="flex w-full max-w-[720px] flex-col rounded-t-[1.75rem] bg-white shadow-xl dark:bg-slate-900"
       >
-        <div className="sticky top-0 z-[1] border-b border-slate-200/80 bg-white/95 px-4 py-3 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95">
-          <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-slate-200 dark:bg-slate-700" />
-          <div className="flex items-center justify-between gap-3">
-            <h3 className="font-heading text-base font-extrabold text-slate-900 dark:text-white">{title}</h3>
-            <div className="flex items-center gap-2">
-              {headerActions}
-              <button
-                type="button"
-                onClick={onClose}
-                className="grid h-9 w-9 place-items-center rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
+        {/* Handle */}
+        <div className="shrink-0 py-3">
+          <div className="mx-auto h-1.5 w-12 rounded-full bg-slate-300 dark:bg-slate-700" />
+        </div>
+
+        {/* Header */}
+        <div className="flex shrink-0 items-center justify-between border-b px-4 pb-2">
+          <h3 className="font-bold text-slate-900 dark:text-white">
+            {title}
+          </h3>
+
+          <div className="flex items-center gap-2">
+            {headerActions}
+            <button onClick={onClose}>
+              <X className="w-4 h-4" />
+            </button>
           </div>
         </div>
+
+        {/* Content */}
         <div
-          className={`min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-4 ${contentClassName}`.trim()}
+          ref={contentRef}
+          className={`min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-3 pb-[calc(4rem+env(safe-area-inset-bottom))] ${contentClassName}`}
         >
           {children}
         </div>
-      </div>
+
+        {/* 🔥 Sticky Footer (CTA area) */}
+        {footer && (
+          <div className="shrink-0 border-t bg-white px-4 py-3 pb-[calc(1rem+env(safe-area-inset-bottom))] dark:bg-slate-900">
+            {footer}
+          </div>
+        )}
+      </motion.div>
     </div>
   );
 }

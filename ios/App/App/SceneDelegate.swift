@@ -8,7 +8,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         guard let context = URLContexts.first else {
             return
         }
-        _ = ApplicationDelegateProxy.shared.application(UIApplication.shared, open: context.url, options: context.options.dictionaryRepresentation())
+        _ = ApplicationDelegateProxy.shared.application(UIApplication.shared, open: context.url, options: [:])
     }
 
     func scene(_ scene: UIScene, continue userActivity: NSUserActivity) {

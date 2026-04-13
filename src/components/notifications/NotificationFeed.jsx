@@ -1,4 +1,4 @@
-import { useDeferredValue, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
@@ -6,7 +6,6 @@ import {
   Check,
   CheckCheck,
   CreditCard,
-  Filter,
   ShieldAlert,
   Sparkles,
   UserRound,
@@ -18,16 +17,6 @@ import {
   groupNotificationsByDate
 } from "../../utils/notificationMeta";
 
-const FILTERS = [
-  { key: "all", label: "All" },
-  { key: "unread", label: "Unread" },
-  { key: "visitor", label: "Visitor" },
-  { key: "access", label: "Access" },
-  { key: "payment", label: "Payment" },
-  { key: "security", label: "Security" },
-  { key: "system", label: "System" }
-];
-
 function NotificationTypeIcon({ category }) {
   const icons = {
     visitor: UserRound,
@@ -38,12 +27,6 @@ function NotificationTypeIcon({ category }) {
   };
   const Icon = icons[category] || Bell;
   return <Icon className="h-4 w-4" strokeWidth={2.1} />;
-}
-
-function matchesFilter(item, filter) {
-  if (filter === "all") return true;
-  if (filter === "unread") return item.unread;
-  return item.category === filter;
 }
 
 function priorityClasses(priority) {
@@ -67,63 +50,11 @@ export default function NotificationFeed({
   onMarkRead,
   onVisitorAction
 }) {
-  const [filter, setFilter] = useState("all");
-  const deferredFilter = useDeferredValue(filter);
-
-  const counts = useMemo(() => {
-    return items.reduce(
-      (result, item) => {
-        result.all += 1;
-        if (item.unread) result.unread += 1;
-        if (result[item.category] !== undefined) result[item.category] += 1;
-        return result;
-      },
-      { all: 0, unread: 0, visitor: 0, access: 0, payment: 0, security: 0, system: 0 }
-    );
-  }, [items]);
-
-  const filtered = useMemo(
-    () => items.filter((item) => matchesFilter(item, deferredFilter)),
-    [items, deferredFilter]
-  );
-  const groups = useMemo(() => groupNotificationsByDate(filtered), [filtered]);
+  const groups = useMemo(() => groupNotificationsByDate(items), [items]);
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-lg font-black text-slate-900 dark:text-white">{compact ? "Inbox" : "Notifications"}</h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            Real-time visitor activity, access decisions, payment updates, and system signals.
-          </p>
-        </div>
-        {headerAction ? <div className="flex justify-start sm:justify-end">{headerAction}</div> : null}
-      </div>
-
-      <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
-        <Filter className="h-3.5 w-3.5" />
-        Filters
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {FILTERS.map((item) => (
-          <button
-            key={item.key}
-            type="button"
-            onClick={() => setFilter(item.key)}
-            className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-all ${
-              filter === item.key
-                ? "border-slate-900 bg-slate-900 text-white shadow-sm dark:border-white dark:bg-white dark:text-slate-950"
-                : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
-            }`}
-          >
-            <span>{item.label}</span>
-            <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] ${filter === item.key ? "bg-white/15 text-white dark:bg-slate-200 dark:text-slate-900" : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300"}`}>
-              {counts[item.key] ?? 0}
-            </span>
-          </button>
-        ))}
-      </div>
+    <div className={`space-y-${compact ? "3" : "4"}`}>
+      {!compact && headerAction ? <div className="flex justify-start sm:justify-end">{headerAction}</div> : null}
 
       {actionError ? (
         <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/30 dark:bg-rose-950/30 dark:text-rose-300">
@@ -136,12 +67,12 @@ export default function NotificationFeed({
           {[0, 1, 2].map((key) => (
             <div
               key={key}
-              className="h-24 animate-pulse rounded-3xl border border-slate-200 bg-white/80 dark:border-slate-800 dark:bg-slate-900/60"
+              className={`animate-pulse ${compact ? "h-20 rounded-[1.4rem]" : "h-24 rounded-3xl"} border border-slate-200 bg-white/80 dark:border-slate-800 dark:bg-slate-900/60`}
             />
           ))}
         </div>
       ) : groups.length === 0 ? (
-        <div className="rounded-[1.75rem] border border-dashed border-slate-300 bg-white/70 px-5 py-12 text-center dark:border-slate-700 dark:bg-slate-900/50">
+        <div className={`border border-dashed border-slate-300 bg-white/70 text-center dark:border-slate-700 dark:bg-slate-900/50 ${compact ? "rounded-[1.4rem] px-4 py-10" : "rounded-[1.75rem] px-5 py-12"}`}>
           <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
             <Bell className="h-6 w-6" />
           </div>
@@ -152,16 +83,16 @@ export default function NotificationFeed({
         </div>
       ) : (
         groups.map((group) => (
-          <div key={group.label} className="space-y-3">
-            <div className="flex items-center gap-3">
-              <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+          <div key={group.label} className={compact ? "space-y-2" : "space-y-3"}>
+            <div className={`flex items-center ${compact ? "justify-between" : "gap-3"}`}>
+              {compact ? null : <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />}
               <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
                 {group.label}
               </p>
-              <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+              {compact ? <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" /> : <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />}
             </div>
 
-            <div className="space-y-3">
+            <div className={compact ? "space-y-2" : "space-y-3"}>
               {group.items.map((item, index) => {
                 const meta = getNotificationMeta(item.kind, item.payload);
                 return (
@@ -170,15 +101,19 @@ export default function NotificationFeed({
                     initial={{ opacity: 0, y: 14 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.22, delay: Math.min(index * 0.03, 0.18) }}
-                    className={`rounded-[1.6rem] border p-4 shadow-sm transition-all ${
+                    className={`border transition-all ${
                       item.unread
-                        ? "border-sky-200 bg-white shadow-[0_14px_36px_rgba(15,23,42,0.08)] dark:border-sky-900/40 dark:bg-slate-900"
-                        : "border-slate-200 bg-white/85 dark:border-slate-800 dark:bg-slate-900/80"
+                        ? compact
+                          ? "rounded-[1.35rem] border-sky-100 bg-white px-4 py-3 shadow-[0_10px_28px_rgba(15,23,42,0.06)] dark:border-sky-900/40 dark:bg-slate-900"
+                          : "rounded-[1.6rem] border-sky-200 bg-white p-4 shadow-[0_14px_36px_rgba(15,23,42,0.08)] dark:border-sky-900/40 dark:bg-slate-900"
+                        : compact
+                          ? "rounded-[1.35rem] border-slate-200/80 bg-white/92 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/80"
+                          : "rounded-[1.6rem] border-slate-200 bg-white/85 p-4 dark:border-slate-800 dark:bg-slate-900/80"
                     }`}
                   >
                     <div className="flex gap-3">
                       <div
-                        className={`mt-0.5 grid h-11 w-11 shrink-0 place-items-center rounded-2xl border ${priorityClasses(item.priority)}`}
+                        className={`mt-0.5 grid shrink-0 place-items-center border ${compact ? "h-10 w-10 rounded-[1rem]" : "h-11 w-11 rounded-2xl"} ${priorityClasses(item.priority)}`}
                       >
                         <NotificationTypeIcon category={item.category} />
                       </div>
@@ -190,7 +125,7 @@ export default function NotificationFeed({
                               <p className="text-sm font-black text-slate-900 dark:text-white">{item.title}</p>
                               {item.unread ? <span className="h-2.5 w-2.5 rounded-full bg-sky-500" aria-hidden="true" /> : null}
                             </div>
-                            <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-600 dark:text-slate-300">
+                            <p className={`mt-1 whitespace-pre-wrap break-words text-slate-600 dark:text-slate-300 ${compact ? "text-[13px] leading-5" : "text-sm leading-6"}`}>
                               {item.message}
                             </p>
                           </div>
@@ -204,7 +139,7 @@ export default function NotificationFeed({
                           </div>
                         </div>
 
-                        <div className={`mt-4 flex flex-wrap gap-2 ${compact ? "text-[11px]" : "text-xs"}`}>
+                        <div className={`mt-3 flex flex-wrap gap-2 ${compact ? "text-[11px]" : "text-xs"}`}>
                           {item.unread ? (
                             <button
                               type="button"

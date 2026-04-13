@@ -126,6 +126,29 @@ export function normalizeNotification(raw, route = "/dashboard/notifications") {
   };
 }
 
+export function getNotificationDetailRoute(item) {
+  const route = String(item?.route || "").trim();
+  if (route && route !== "/dashboard/notifications") return route;
+
+  const sessionId = String(item?.sessionId || item?.payload?.sessionId || item?.payload?.visitId || item?.payload?.session_id || "").trim();
+  const role = (() => {
+    if (typeof window === "undefined") return "";
+    try {
+      const user = JSON.parse(window.localStorage.getItem("qring_user") || "null");
+      return String(user?.role || "").toLowerCase();
+    } catch {
+      return "";
+    }
+  })();
+
+  if (sessionId) {
+    if (role === "security") return `/dashboard/security/messages?sessionId=${encodeURIComponent(sessionId)}`;
+    if (role === "homeowner") return `/dashboard/homeowner/messages?sessionId=${encodeURIComponent(sessionId)}`;
+  }
+
+  return route || "/dashboard/notifications";
+}
+
 export function formatRelativeNotificationTime(value) {
   if (!value) return "Just now";
   const timestamp = new Date(value).getTime();

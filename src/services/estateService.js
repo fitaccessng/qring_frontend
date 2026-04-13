@@ -1,8 +1,101 @@
 import { apiRequest } from "./apiClient";
 
+const ESTATE_SERVICE_CACHE_TTL_MS = 2 * 60 * 1000;
+
+const estateServiceCache = {
+  overview: createCacheSlot(),
+  mappings: createCacheSlot(),
+  accessLogs: createCacheSlot(),
+  planRestrictions: createCacheSlot(),
+  statsSummary: createCacheSlot(),
+  settingsByEstateId: new Map(),
+  sharedQrByEstateId: new Map(),
+  alertPaymentsByEstateId: new Map()
+};
+
+function createCacheSlot() {
+  return { value: null, at: 0, promise: null };
+}
+
+function isFresh(slot, ttlMs = ESTATE_SERVICE_CACHE_TTL_MS) {
+  return Boolean(slot) && slot.at > 0 && Date.now() - slot.at < ttlMs;
+}
+
+async function resolveCached(slot, loader, { force = false } = {}) {
+  if (!force && isFresh(slot)) {
+    return slot.value;
+  }
+  if (!force && slot.promise) {
+    return slot.promise;
+  }
+  slot.promise = (async () => {
+    try {
+      const value = await loader();
+      slot.value = value;
+      slot.at = Date.now();
+      return value;
+    } finally {
+      slot.promise = null;
+    }
+  })();
+  return slot.promise;
+}
+
+function getOrCreateMapSlot(map, key) {
+  if (!map.has(key)) {
+    map.set(key, createCacheSlot());
+  }
+  return map.get(key);
+}
+
+function clearSlot(slot) {
+  if (!slot) return;
+  slot.value = null;
+  slot.at = 0;
+  slot.promise = null;
+}
+
+export function invalidateEstateServiceCache() {
+  clearSlot(estateServiceCache.overview);
+  clearSlot(estateServiceCache.mappings);
+  clearSlot(estateServiceCache.accessLogs);
+  clearSlot(estateServiceCache.planRestrictions);
+  clearSlot(estateServiceCache.statsSummary);
+  estateServiceCache.settingsByEstateId.clear();
+  estateServiceCache.sharedQrByEstateId.clear();
+  estateServiceCache.alertPaymentsByEstateId.clear();
+}
+
+export function getEstateOverviewSnapshot() {
+  return estateServiceCache.overview.value;
+}
+
+export function getEstateMappingsSnapshot() {
+  return estateServiceCache.mappings.value;
+}
+
+export function getEstateAccessLogsSnapshot() {
+  return estateServiceCache.accessLogs.value;
+}
+
+export function getEstatePlanRestrictionsSnapshot() {
+  return estateServiceCache.planRestrictions.value;
+}
+
+export function getEstateStatsSummarySnapshot() {
+  return estateServiceCache.statsSummary.value;
+}
+
+export function getEstateSettingsSnapshot(estateId) {
+  if (!estateId) return null;
+  return estateServiceCache.settingsByEstateId.get(String(estateId))?.value ?? null;
+}
+
 export async function getEstateOverview() {
-  const response = await apiRequest("/estate/overview");
-  return response?.data ?? {};
+  return resolveCached(estateServiceCache.overview, async () => {
+    const response = await apiRequest("/estate/overview");
+    return response?.data ?? {};
+  });
 }
 
 export async function createEstate(payload) {
@@ -10,6 +103,7 @@ export async function createEstate(payload) {
     method: "POST",
     body: JSON.stringify(payload)
   });
+  invalidateEstateServiceCache();
   return response?.data ?? null;
 }
 
@@ -18,6 +112,7 @@ export async function addEstateHome(payload) {
     method: "POST",
     body: JSON.stringify(payload)
   });
+  invalidateEstateServiceCache();
   return response?.data ?? null;
 }
 
@@ -26,6 +121,7 @@ export async function createEstateHomeowner(payload) {
     method: "POST",
     body: JSON.stringify(payload)
   });
+  invalidateEstateServiceCache();
   return response?.data ?? null;
 }
 
@@ -34,6 +130,7 @@ export async function addEstateDoor(payload) {
     method: "POST",
     body: JSON.stringify(payload)
   });
+  invalidateEstateServiceCache();
   return response?.data ?? null;
 }
 
@@ -42,6 +139,7 @@ export async function provisionEstateDoor(payload) {
     method: "POST",
     body: JSON.stringify(payload)
   });
+  invalidateEstateServiceCache();
   return response?.data ?? null;
 }
 
@@ -50,34 +148,44 @@ export async function assignDoorToHomeowner(doorId, homeownerId) {
     method: "POST",
     body: JSON.stringify({ homeownerId })
   });
+  invalidateEstateServiceCache();
   return response?.data ?? null;
 }
 
-export async function inviteHomeowner(homeownerId) {
+export async function inviteHomeowner(homeownerId, payload = {}) {
   const response = await apiRequest(`/estate/homeowners/${homeownerId}/invite`, {
-    method: "POST"
+    method: "POST",
+    body: JSON.stringify(payload)
   });
   return response?.data ?? null;
 }
 
 export async function getEstateMappings() {
-  const response = await apiRequest("/estate/mappings");
-  return Array.isArray(response?.data) ? response.data : [];
+  return resolveCached(estateServiceCache.mappings, async () => {
+    const response = await apiRequest("/estate/mappings");
+    return Array.isArray(response?.data) ? response.data : [];
+  });
 }
 
 export async function getEstateAccessLogs() {
-  const response = await apiRequest("/estate/access-logs");
-  return Array.isArray(response?.data) ? response.data : [];
+  return resolveCached(estateServiceCache.accessLogs, async () => {
+    const response = await apiRequest("/estate/access-logs");
+    return Array.isArray(response?.data) ? response.data : [];
+  });
 }
 
 export async function getEstatePlanRestrictions() {
-  const response = await apiRequest("/estate/plan-restrictions");
-  return response?.data ?? null;
+  return resolveCached(estateServiceCache.planRestrictions, async () => {
+    const response = await apiRequest("/estate/plan-restrictions");
+    return response?.data ?? null;
+  });
 }
 
 export async function getEstateStatsSummary() {
-  const response = await apiRequest("/estate/stats-summary");
-  return response?.data ?? null;
+  return resolveCached(estateServiceCache.statsSummary, async () => {
+    const response = await apiRequest("/estate/stats-summary");
+    return response?.data ?? null;
+  });
 }
 
 export async function updateEstateDoorAdminProfile(doorId, payload) {
@@ -85,6 +193,7 @@ export async function updateEstateDoorAdminProfile(doorId, payload) {
     method: "PUT",
     body: JSON.stringify(payload)
   });
+  invalidateEstateServiceCache();
   return response?.data ?? null;
 }
 
@@ -93,12 +202,16 @@ export async function createEstateSharedQr(estateId) {
     method: "POST",
     body: JSON.stringify({ estateId })
   });
+  invalidateEstateServiceCache();
   return response?.data ?? null;
 }
 
 export async function listEstateSharedQrs(estateId) {
-  const response = await apiRequest(`/estate/shared-qr?estateId=${encodeURIComponent(estateId)}`);
-  return Array.isArray(response?.data) ? response.data : [];
+  const slot = getOrCreateMapSlot(estateServiceCache.sharedQrByEstateId, String(estateId));
+  return resolveCached(slot, async () => {
+    const response = await apiRequest(`/estate/shared-qr?estateId=${encodeURIComponent(estateId)}`);
+    return Array.isArray(response?.data) ? response.data : [];
+  });
 }
 
 export async function createEstateAlert(payload) {
@@ -106,6 +219,7 @@ export async function createEstateAlert(payload) {
     method: "POST",
     body: JSON.stringify(payload)
   });
+  invalidateEstateServiceCache();
   return response?.data ?? null;
 }
 
@@ -125,6 +239,7 @@ export async function updateEstateAlert(alertId, payload) {
       method: "PUT",
       body: JSON.stringify(payload)
     });
+    invalidateEstateServiceCache();
     return response?.data ?? null;
   } catch (error) {
     if (error?.status === 404) {
@@ -139,6 +254,7 @@ export async function deleteEstateAlert(alertId) {
     const response = await apiRequest(`/estate/alerts/${encodeURIComponent(alertId)}`, {
       method: "DELETE"
     });
+    invalidateEstateServiceCache();
     return response?.data ?? null;
   } catch (error) {
     if (error?.status === 404) {
@@ -159,8 +275,11 @@ export async function deleteEstateAlert(alertId) {
 }
 
 export async function getEstateSettings(estateId) {
-  const response = await apiRequest(`/estate/${encodeURIComponent(estateId)}/settings`);
-  return response?.data ?? null;
+  const slot = getOrCreateMapSlot(estateServiceCache.settingsByEstateId, String(estateId));
+  return resolveCached(slot, async () => {
+    const response = await apiRequest(`/estate/${encodeURIComponent(estateId)}/settings`);
+    return response?.data ?? null;
+  });
 }
 
 export async function updateEstateSettings(estateId, payload) {
@@ -168,6 +287,7 @@ export async function updateEstateSettings(estateId, payload) {
     method: "PUT",
     body: JSON.stringify(payload)
   });
+  invalidateEstateServiceCache();
   return response?.data ?? null;
 }
 
@@ -181,6 +301,7 @@ export async function createEstateSecurityUser(payload) {
     method: "POST",
     body: JSON.stringify(payload)
   });
+  invalidateEstateServiceCache();
   return response?.data ?? null;
 }
 
@@ -192,6 +313,7 @@ export async function updateEstateSecurityUser(estateId, securityUserId, payload
       body: JSON.stringify(payload)
     }
   );
+  invalidateEstateServiceCache();
   return response?.data ?? null;
 }
 
@@ -202,6 +324,7 @@ export async function suspendEstateSecurityUser(estateId, securityUserId) {
       method: "POST"
     }
   );
+  invalidateEstateServiceCache();
   return response?.data ?? null;
 }
 
@@ -212,6 +335,7 @@ export async function unsuspendEstateSecurityUser(estateId, securityUserId) {
       method: "POST"
     }
   );
+  invalidateEstateServiceCache();
   return response?.data ?? null;
 }
 
@@ -222,6 +346,7 @@ export async function deleteEstateSecurityUser(estateId, securityUserId) {
       method: "DELETE"
     }
   );
+  invalidateEstateServiceCache();
   return response?.data ?? null;
 }
 
@@ -261,6 +386,7 @@ export async function sendEstateAlertReminder(alertId) {
     const res = await apiRequest(`/estate/alerts/${encodeURIComponent(alertId)}/remind`, {
       method: "POST"
     });
+    invalidateEstateServiceCache();
     return res?.data ?? null;
   } catch (error) {
     if (error?.status === 404) return { stale: true, alertId };
@@ -274,6 +400,7 @@ export async function verifyEstateAlertPayment(alertId, payload) {
       method: "POST",
       body: JSON.stringify(payload)
     });
+    invalidateEstateServiceCache();
     return res?.data ?? null;
   } catch (error) {
     if (error?.status === 404) return { stale: true, alertId };
@@ -287,6 +414,7 @@ export async function payEstateAlert(alertId, payload = { paymentMethod: "paysta
       method: "POST",
       body: JSON.stringify(payload)
     });
+    invalidateEstateServiceCache();
     return response?.data ?? null;
   } catch (error) {
     if (error?.status === 404) return { stale: true, alertId };
@@ -294,9 +422,12 @@ export async function payEstateAlert(alertId, payload = { paymentMethod: "paysta
   }
 }
 
-export async function listEstateAlertPayments(estateId) {
-  const response = await apiRequest(`/estate/${encodeURIComponent(estateId)}/alerts/payments`);
-  return Array.isArray(response?.data) ? response.data : [];
+export async function listEstateAlertPayments(estateId, { force = false } = {}) {
+  const slot = getOrCreateMapSlot(estateServiceCache.alertPaymentsByEstateId, String(estateId));
+  return resolveCached(slot, async () => {
+    const response = await apiRequest(`/estate/${encodeURIComponent(estateId)}/alerts/payments`);
+    return Array.isArray(response?.data) ? response.data : [];
+  }, { force });
 }
 
 export async function listMaintenanceAudits(estateId) {

@@ -1,38 +1,41 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { DoorClosed, Link2, Search, UserRound } from "lucide-react";
 import AppShell from "../../layouts/AppShell";
-import { assignDoorToHomeowner, getEstateOverview } from "../../services/estateService";
+import { assignDoorToHomeowner } from "../../services/estateService";
+import useEstateOverviewState from "../../hooks/useEstateOverviewState";
 import { showError, showSuccess } from "../../utils/flash";
-import CardSurface from "../../components/CardSurface";
+import EstateManagerPageShell, {
+  EstateBadge,
+  EstateEmptyState,
+  EstateManagerSection,
+  EstateMetricStrip,
+  estateFieldClassName,
+  estatePrimaryButtonClassName,
+  estateSecondaryButtonClassName
+} from "../../components/mobile/EstateManagerPageShell";
 
 export default function EstateAssignPage() {
-  const [overview, setOverview] = useState(null);
+  const { overview, setOverview, error, setError, refresh } = useEstateOverviewState();
   const [form, setForm] = useState({ doorId: "", homeownerId: "" });
-  const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  async function load() {
-    const data = await getEstateOverview();
-    setOverview(data);
-    setForm((prev) => ({
-      doorId:
-        (data?.doors ?? []).some((door) => String(door.id) === String(prev.doorId))
-          ? prev.doorId
-          : data?.doors?.[0]?.id || "",
-      homeownerId:
-        (data?.homeowners ?? []).some((homeowner) => String(homeowner.id) === String(prev.homeownerId))
-          ? prev.homeownerId
-          : data?.homeowners?.[0]?.id || ""
-    }));
-  }
-
-  useEffect(() => {
-    load().catch((requestError) => setError(requestError.message ?? "Failed to load assignment data"));
-  }, []);
-  
   useEffect(() => {
     if (error) showError(error);
   }, [error]);
+
+  useEffect(() => {
+    setForm((prev) => ({
+      doorId:
+        (overview?.doors ?? []).some((door) => String(door.id) === String(prev.doorId))
+          ? prev.doorId
+          : overview?.doors?.[0]?.id || "",
+      homeownerId:
+        (overview?.homeowners ?? []).some((homeowner) => String(homeowner.id) === String(prev.homeownerId))
+          ? prev.homeownerId
+          : overview?.homeowners?.[0]?.id || ""
+    }));
+  }, [overview]);
 
   async function onSubmit(event) {
     event.preventDefault();
@@ -58,7 +61,7 @@ export default function EstateAssignPage() {
         };
       });
       showSuccess("Door assigned to homeowner.");
-      await load();
+      await refresh();
     } catch (requestError) {
       setError(requestError.message ?? "Failed to assign door");
     } finally {
@@ -70,117 +73,194 @@ export default function EstateAssignPage() {
   const hasDoors = (overview?.doors?.length ?? 0) > 0;
   const selectedDoor = (overview?.doors ?? []).find((door) => String(door.id) === String(form.doorId));
   const selectedHomeowner = (overview?.homeowners ?? []).find((homeowner) => String(homeowner.id) === String(form.homeownerId));
+  const assignmentCards = useMemo(
+    () => (overview?.doors ?? []).map((door) => ({ ...door, linked: Boolean(door.homeownerName || door.homeownerId) })),
+    [overview]
+  );
 
   return (
     <AppShell title="Assign Doors">
-      <div className="mx-auto max-w-7xl space-y-6">
-
-        <section className="relative overflow-hidden rounded-[2.5rem] bg-slate-900 p-8 text-white dark:bg-indigo-600">
-          <div className="relative z-10">
-            <h2 style={{ color: "white" }} className="text-2xl font-bold tracking-tight">Assign Doors To Homeowners</h2>
-            <p className="mt-2 text-sm text-slate-200 dark:text-indigo-100">Map each door to the right resident with a clean one-step workflow.</p>
-          </div>
-          <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/5 blur-3xl" />
-        </section>
+      <EstateManagerPageShell
+        eyebrow="Estate Setup"
+        title="Assign Doors"
+        description="Securely map hardware identifiers to the right residents with a cleaner mobile-first assignment flow."
+        stats={[
+          { label: "Doors", value: overview?.doors?.length ?? 0, helper: "Available to assign" },
+          { label: "Residents", value: overview?.homeowners?.length ?? 0, helper: "Ready for linking" }
+        ]}
+      >
+        <EstateMetricStrip
+          items={[
+            { label: "Doors", value: overview?.doors?.length ?? 0, helper: "Assignable entries" },
+            { label: "Residents", value: overview?.homeowners?.length ?? 0, helper: "Selectable homeowners" },
+            { label: "Linked", value: assignmentCards.filter((door) => door.linked).length, helper: "Completed mappings" }
+          ]}
+        />
 
         {!hasHomeowners || !hasDoors ? (
-          <section className="rounded-[2rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/30 dark:bg-amber-900/20 dark:text-amber-100">
-            {!hasHomeowners ? (
-              <>
-                No homeowners yet. Create one in <Link to="/dashboard/estate/invites" className="font-semibold underline">Create / Invite Homeowners</Link>.
-              </>
-            ) : null}
-            {!hasHomeowners && !hasDoors ? " " : null}
-            {!hasDoors ? (
-              <>
-                No doors yet. Add one in <Link to="/dashboard/estate/doors" className="font-semibold underline">Estate Doors</Link>.
-              </>
-            ) : null}
-          </section>
+          <EstateManagerSection>
+            <EstateEmptyState
+              icon={<Link2 className="h-6 w-6" />}
+              title="Assignment flow needs both sides"
+              description="Create at least one homeowner and one door before linking access to a resident."
+              action={
+                <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
+                  {!hasHomeowners ? (
+                    <Link to="/dashboard/estate/invites" className={estatePrimaryButtonClassName}>
+                      Create Homeowner
+                    </Link>
+                  ) : null}
+                  {!hasDoors ? (
+                    <Link to="/dashboard/estate/doors" className={estateSecondaryButtonClassName}>
+                      Open Estate Doors
+                    </Link>
+                  ) : null}
+                </div>
+              }
+            />
+          </EstateManagerSection>
         ) : null}
 
-        <CardSurface accent="from-indigo-100/80 via-white/10 to-transparent" glow="bg-indigo-300/50" className="sm:p-6">
-          <form onSubmit={onSubmit} className="grid gap-3 md:grid-cols-2">
-            <Select
-              label="Door"
-              value={form.doorId}
-              onChange={(value) => setForm((prev) => ({ ...prev, doorId: value }))}
-              options={(overview?.doors ?? []).map((door) => ({ value: door.id, label: door.name }))}
-            />
-            <Select
-              label="Homeowner"
-              value={form.homeownerId}
-              onChange={(value) => setForm((prev) => ({ ...prev, homeownerId: value }))}
-              options={(overview?.homeowners ?? []).map((user) => ({
-                value: user.id,
-                label: `${user.fullName} (${user.email})`
-              }))}
-            />
-            <button
-              type="submit"
-              disabled={busy || !hasHomeowners || !hasDoors}
-              className="rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition-all active:scale-95 disabled:opacity-50 dark:bg-white dark:text-slate-900"
-            >
-              {busy ? "Assigning..." : "Assign Door"}
-            </button>
-          </form>
-          {selectedDoor || selectedHomeowner ? (
-            <div className="mt-4 rounded-[1.4rem] border border-indigo-100 bg-indigo-50/80 px-4 py-3 text-sm text-indigo-900 dark:border-indigo-900/40 dark:bg-indigo-950/30 dark:text-indigo-100">
-              <p className="font-semibold">Assignment preview</p>
-              <p className="mt-1 text-xs text-indigo-700 dark:text-indigo-200">
-                {selectedDoor?.name || "Door"} will be linked to {selectedHomeowner?.fullName || "selected homeowner"}.
-              </p>
+        <EstateManagerSection title="Two-step assignment" subtitle="This JSX version follows your reference layout but stays wired to the live estate data.">
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,0.85fr)]">
+            <div className="space-y-4">
+              <section className="rounded-[1.8rem] border border-white/70 bg-white/92 p-5 shadow-[0_14px_30px_rgba(15,23,42,0.08)] ring-1 ring-slate-100/70">
+                <div className="mb-5 flex items-center gap-4">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#00346f] text-sm font-bold text-white">1</span>
+                  <div>
+                    <p className="font-heading text-xl font-extrabold tracking-tight text-[#00346f]">Select Entry Hardware</p>
+                    <p className="text-sm text-slate-500">Pick the door you want to attach to a resident account.</p>
+                  </div>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {(overview?.doors ?? []).map((door) => (
+                    <button
+                      key={door.id}
+                      type="button"
+                      onClick={() => setForm((prev) => ({ ...prev, doorId: door.id }))}
+                      className={`rounded-[1.3rem] p-4 text-left transition ${
+                        String(form.doorId) === String(door.id)
+                          ? "bg-[#eef4ff] ring-2 ring-[#00346f]"
+                          : "bg-slate-50 hover:bg-slate-100"
+                      }`}
+                    >
+                      <div className="mb-4 flex items-center justify-between gap-3">
+                        <DoorClosed className={`h-5 w-5 ${String(form.doorId) === String(door.id) ? "text-[#00346f]" : "text-slate-400"}`} />
+                        {String(form.doorId) === String(door.id) ? <EstateBadge tone="blue">Selected</EstateBadge> : null}
+                      </div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{door.id}</p>
+                      <p className="mt-1 font-heading text-lg font-bold text-slate-900">{door.name}</p>
+                      <p className="text-xs text-slate-500">{door.homeName || "Unmapped home"}</p>
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              <section className="rounded-[1.8rem] border border-white/70 bg-white/92 p-5 shadow-[0_14px_30px_rgba(15,23,42,0.08)] ring-1 ring-slate-100/70">
+                <div className="mb-5 flex items-center gap-4">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-sm font-bold text-slate-900">2</span>
+                  <div>
+                    <p className="font-heading text-xl font-extrabold tracking-tight text-[#00346f]">Assign Resident Unit</p>
+                    <p className="text-sm text-slate-500">Choose the resident who should control this entry point.</p>
+                  </div>
+                </div>
+                <div className="relative mb-4">
+                  <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <div className="w-full rounded-[1.2rem] bg-slate-50 py-3 pl-11 pr-4 text-sm text-slate-500">Pick from the resident list below</div>
+                </div>
+                <div className="grid gap-3">
+                  {(overview?.homeowners ?? []).map((homeowner) => (
+                    <button
+                      key={homeowner.id}
+                      type="button"
+                      onClick={() => setForm((prev) => ({ ...prev, homeownerId: homeowner.id }))}
+                      className={`flex items-center justify-between rounded-[1.3rem] p-4 text-left transition ${
+                        String(form.homeownerId) === String(homeowner.id)
+                          ? "bg-emerald-50 ring-2 ring-emerald-500"
+                          : "bg-slate-50 hover:bg-slate-100"
+                      }`}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white font-heading text-sm font-bold text-[#00346f] shadow-sm">
+                          {(homeowner.fullName || "H").split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">{homeowner.fullName}</p>
+                          <p className="text-xs text-slate-500">{homeowner.email}</p>
+                        </div>
+                      </div>
+                      {String(form.homeownerId) === String(homeowner.id) ? <EstateBadge tone="green">Linked</EstateBadge> : null}
+                    </button>
+                  ))}
+                </div>
+              </section>
             </div>
-          ) : null}
-        </CardSurface>
 
-        <CardSurface accent="from-slate-100/80 via-white/10 to-transparent" glow="bg-slate-300/50" className="sm:p-6">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <h3 className="text-base font-bold text-slate-900 dark:text-white">Door Assignments</h3>
-            <span className="text-xs text-slate-500">{overview?.doors?.length ?? 0} total</span>
+            <section className="space-y-4">
+              <div className="rounded-[2rem] bg-[linear-gradient(135deg,#00346f_0%,#004a99_100%)] p-6 text-white shadow-[0_18px_40px_rgba(0,52,111,0.2)]">
+                <div className="mb-10 flex items-start justify-between gap-3">
+                  <Link2 className="h-9 w-9" />
+                  <div className="text-right">
+                    <p className="text-[10px] uppercase tracking-[0.22em] text-blue-100">Security Protocol</p>
+                    <p className="text-xs font-bold">QR-AES-256</p>
+                  </div>
+                </div>
+                <div className="space-y-5">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-[0.22em] text-blue-100">Current Hardware</p>
+                    <p className="mt-1 font-heading text-2xl font-extrabold tracking-tight">{selectedDoor?.name || "Select Door..."}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Link2 className="h-4 w-4" />
+                    <div className="h-px flex-1 bg-white/20" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-[0.22em] text-blue-100">Resident Assignment</p>
+                    <p className="mt-1 font-heading text-2xl font-extrabold tracking-tight text-emerald-100">
+                      {selectedHomeowner?.fullName || "Select Unit..."}
+                    </p>
+                  </div>
+                </div>
+                <form onSubmit={onSubmit} className="mt-8">
+                  <input type="hidden" value={form.doorId} readOnly />
+                  <input type="hidden" value={form.homeownerId} readOnly />
+                  <button type="submit" disabled={busy || !hasHomeowners || !hasDoors} className={`w-full bg-white text-[#00346f] ${estatePrimaryButtonClassName.replace("text-white", "text-[#00346f]").replace("bg-[linear-gradient(135deg,#00346f_0%,#004a99_100%)]", "bg-white")}`}>
+                    {busy ? "Assigning..." : "Confirm Assignment"}
+                  </button>
+                </form>
+              </div>
+
+              <div className="rounded-[1.8rem] bg-slate-50 p-5">
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Best Practices</p>
+                <div className="mt-4 space-y-4 text-sm text-slate-600">
+                  <p>Ensure the selected door name matches the physical QR sticker before confirming the link.</p>
+                  <p>Assignments can be updated later from this page if homes or residents change.</p>
+                </div>
+              </div>
+            </section>
           </div>
-          <div className="mt-4 grid gap-2 sm:grid-cols-2">
-            {(overview?.doors ?? []).map((door) => (
-              <CardSurface
-                as="div"
+        </EstateManagerSection>
+
+        <EstateManagerSection title="Door assignments" subtitle="A running list of the current mappings in your estate.">
+          <div className="grid gap-3 sm:grid-cols-2">
+            {assignmentCards.map((door) => (
+              <div
                 key={door.id}
-                className="rounded-[1.4rem] border-slate-200/80 bg-white/80 px-4 py-3 text-sm text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200"
-                accent="from-slate-100/80 via-white/10 to-transparent"
-                glow="bg-slate-300/30"
+                className="rounded-[1.5rem] border border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(243,244,245,0.92))] px-4 py-4 shadow-[0_12px_28px_rgba(15,23,42,0.08)] ring-1 ring-slate-100/70"
               >
-                <p className="font-semibold">{door.name}</p>
-                <p className="text-xs text-slate-500">
-                  {door.homeName || "Home"} · {door.homeownerName || "Unassigned"}
-                </p>
-              </CardSurface>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-slate-900">{door.name}</p>
+                    <p className="text-xs text-slate-500">{door.homeName || "Home"} · {door.homeownerName || "Unassigned"}</p>
+                  </div>
+                  <EstateBadge tone={door.linked ? "green" : "amber"}>{door.linked ? "Linked" : "Open"}</EstateBadge>
+                </div>
+              </div>
             ))}
-            {(overview?.doors ?? []).length === 0 ? (
-              <p className="text-sm text-slate-500">No doors assigned yet.</p>
-            ) : null}
+            {assignmentCards.length === 0 ? <p className="text-sm text-slate-500">No doors assigned yet.</p> : null}
           </div>
-        </CardSurface>
-      </div>
+        </EstateManagerSection>
+      </EstateManagerPageShell>
     </AppShell>
-  );
-}
-
-function Select({ label, value, onChange, options }) {
-  return (
-    <label className="block">
-      <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</span>
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
-        required
-      >
-        {options.length === 0 ? <option value="">No options available</option> : null}
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </label>
   );
 }

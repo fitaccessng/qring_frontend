@@ -1,96 +1,74 @@
-import { useEffect, useMemo, useState } from "react";
-import { ClipboardList } from "lucide-react";
-import AppShell from "../../layouts/AppShell";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  ArrowLeft,
+  Bell,
+  PlusCircle,
+  Send,
+  Wallet,
+  Timer,
+  Filter,
+  Receipt,
+  Edit3,
+  Trash2,
+  AlertCircle,
+  LayoutDashboard,
+  Users,
+  Building2,
+  Settings,
+  CheckCircle2,
+  Clock,
+  TrendingUp
+} from 'lucide-react';
 import {
   createEstateAlert,
-  deleteEstateAlert,
-  getEstateOverview,
   listEstateAlertPayments,
   listEstateAlerts,
-  sendEstateAlertReminder,
-  updateEstateAlert,
-  verifyEstateAlertPayment
 } from "../../services/estateService";
 import { showError, showSuccess } from "../../utils/flash";
 import { useSocketEvents } from "../../hooks/useSocketEvents";
 import { getDashboardSocket } from "../../services/socketClient";
-import CardSurface from "../../components/CardSurface";
 import MobileBottomSheet from "../../components/mobile/MobileBottomSheet";
-import EstateManagerPageShell, { EstateManagerSection, estateFieldClassName, estateTextareaClassName } from "../../components/mobile/EstateManagerPageShell";
+import { estateFieldClassName, estateTextareaClassName } from "../../components/mobile/EstateManagerPageShell";
+import useEstateOverviewState from "../../hooks/useEstateOverviewState";
+import { useNavigate } from "react-router-dom";
 
-export default function EstateDuesPage() {
-  const [overview, setOverview] = useState(null);
-  const [estateId, setEstateId] = useState("");
+// Helper for formatting
+const formatCurrency = (val) => `₦${Number(val).toLocaleString()}`;
+
+const EstateDuesPage = () => {
+  const { estateId, error, setError } = useEstateOverviewState();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [amountDue, setAmountDue] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [alerts, setAlerts] = useState([]);
   const [payments, setPayments] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [remindingId, setRemindingId] = useState("");
-  const [verifyingKey, setVerifyingKey] = useState("");
-  const [error, setError] = useState("");
-  const [reviewTarget, setReviewTarget] = useState(null);
-  const [reviewReference, setReviewReference] = useState("");
-  const [reviewMethod, setReviewMethod] = useState("");
-  const [reviewReceiptUrl, setReviewReceiptUrl] = useState("");
-  const [editingId, setEditingId] = useState("");
-  const [editingTitle, setEditingTitle] = useState("");
-  const [editingDescription, setEditingDescription] = useState("");
-  const [editingAmountDue, setEditingAmountDue] = useState("");
-  const [editingDueDate, setEditingDueDate] = useState("");
-  const [pendingDelete, setPendingDelete] = useState(null);
   const [composeOpen, setComposeOpen] = useState(false);
+  const [dataLoading, setDataLoading] = useState(false);
 
-  useEffect(() => {
-    let active = true;
-    async function load() {
-      setLoading(true);
-      try {
-        const data = await getEstateOverview();
-        if (!active) return;
-        setOverview(data);
-        const firstId = data?.estates?.[0]?.id || "";
-        setEstateId((prev) => prev || firstId);
-      } catch (err) {
-        if (active) setError(err?.message || "Failed to load estate data");
-      } finally {
-        if (active) setLoading(false);
-      }
-    }
-    load();
-    return () => {
-      active = false;
-    };
-  }, []);
-  
-  useEffect(() => {
-    if (error) showError(error);
-  }, [error]);
+  useEffect(() => { if (error) showError(error); }, [error]);
+  const navigate = useNavigate();
 
-  useEffect(() => {
+  const refresh = useCallback(async () => {
     if (!estateId) return;
-    let active = true;
-    async function loadAlerts() {
-      try {
-        const [rows, paymentRows] = await Promise.all([
-          listEstateAlerts(estateId, "payment_request"),
-          listEstateAlertPayments(estateId)
-        ]);
-        if (!active) return;
-        setAlerts(rows);
-        setPayments(paymentRows);
-      } catch (err) {
-        if (active) setError(err?.message || "Failed to load dues");
-      }
+    setDataLoading(true);
+    try {
+      const [rows, paymentRows] = await Promise.all([
+        listEstateAlerts(estateId, "payment_request"),
+        listEstateAlertPayments(estateId, { force: true })
+      ]);
+      setAlerts(rows);
+      setPayments(paymentRows);
+      setError("");
+    } catch (err) {
+      setError(err?.message || "Failed to load collection data");
+    } finally {
+      setDataLoading(false);
     }
-    loadAlerts();
-    return () => {
-      active = false;
-    };
-  }, [estateId]);
+  }, [estateId, setError]);
+
+  useEffect(() => { refresh(); }, [refresh]);
 
   useEffect(() => {
     if (!estateId) return;
@@ -98,67 +76,23 @@ export default function EstateDuesPage() {
     socket.emit("dashboard.subscribe", { room: `estate:${estateId}:alerts` });
   }, [estateId]);
 
-  useSocketEvents(
-    useMemo(
-      () => ({
-        ALERT_CREATED: () => {
-          if (!estateId) return;
-          Promise.all([listEstateAlerts(estateId, "payment_request"), listEstateAlertPayments(estateId)])
-            .then(([rows, paymentRows]) => {
-              setAlerts(rows);
-              setPayments(paymentRows);
-            })
-            .catch(() => {});
-        },
-        ALERT_UPDATED: () => {
-          if (!estateId) return;
-          Promise.all([listEstateAlerts(estateId, "payment_request"), listEstateAlertPayments(estateId)])
-            .then(([rows, paymentRows]) => {
-              setAlerts(rows);
-              setPayments(paymentRows);
-            })
-            .catch(() => {});
-        },
-        ALERT_DELETED: () => {
-          if (!estateId) return;
-          Promise.all([listEstateAlerts(estateId, "payment_request"), listEstateAlertPayments(estateId)])
-            .then(([rows, paymentRows]) => {
-              setAlerts(rows);
-              setPayments(paymentRows);
-            })
-            .catch(() => {});
-        },
-        PAYMENT_STATUS_UPDATED: () => {
-          if (!estateId) return;
-          Promise.all([listEstateAlerts(estateId, "payment_request"), listEstateAlertPayments(estateId)])
-            .then(([rows, paymentRows]) => {
-              setAlerts(rows);
-              setPayments(paymentRows);
-            })
-            .catch(() => {});
-        }
-      }),
-      [estateId]
-    )
-  );
+  useSocketEvents(useMemo(() => ({
+    ALERT_CREATED: refresh,
+    ALERT_UPDATED: refresh,
+    ALERT_DELETED: refresh,
+    PAYMENT_STATUS_UPDATED: refresh
+  }), [refresh]));
 
-  async function handleSubmit(event) {
-    event.preventDefault();
-    if (!estateId || !title.trim()) return false;
-    const value = Number(amountDue);
-    if (!value || value <= 0) {
-      setError("Amount is required.");
-      return false;
-    }
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     setBusy(true);
-    setError("");
     try {
       await createEstateAlert({
         estateId,
         title: title.trim(),
         description: description.trim(),
         alertType: "payment_request",
-        amountDue: value,
+        amountDue: Number(amountDue),
         dueDate: dueDate ? new Date(dueDate).toISOString() : null
       });
       showSuccess("Payment request sent.");
@@ -166,539 +100,231 @@ export default function EstateDuesPage() {
       setDescription("");
       setAmountDue("");
       setDueDate("");
-      const [rows, paymentRows] = await Promise.all([
-        listEstateAlerts(estateId, "payment_request"),
-        listEstateAlertPayments(estateId)
-      ]);
-      setAlerts(rows);
-      setPayments(paymentRows);
-      return true;
-    } catch (err) {
-      setError(err?.message || "Failed to create dues request");
-      return false;
-    } finally {
-      setBusy(false);
-    }
-  }
+      setComposeOpen(false);
+      await refresh();
+    } catch (err) { showError(err.message); }
+    finally { setBusy(false); }
+  };
 
-  function startEdit(alert) {
-    setEditingId(alert?.id || "");
-    setEditingTitle(alert?.title || "");
-    setEditingDescription(alert?.description || "");
-    setEditingAmountDue(alert?.amountDue ? String(alert.amountDue) : "");
-    setEditingDueDate(alert?.dueDate ? new Date(alert.dueDate).toISOString().slice(0, 10) : "");
-  }
+  const paymentRows = useMemo(() =>
+    payments.flatMap((alert) =>
+      (alert.homeowners ?? []).map((row) => ({
+        ...row,
+        alertId: alert.id,
+        alertTitle: alert.title,
+        amountDue: Number(alert.amountDue ?? 0),
+        dueDate: alert.dueDate,
+        createdAt: alert.createdAt
+      }))
+    ),
+  [payments]);
 
-  function closeEdit() {
-    setEditingId("");
-    setEditingTitle("");
-    setEditingDescription("");
-    setEditingAmountDue("");
-    setEditingDueDate("");
-  }
+  const totalCollected = useMemo(() =>
+    paymentRows.filter(r => r.status === "paid").reduce((s, r) => s + Number(r.amountPaid ?? r.amountDue), 0),
+  [paymentRows]);
 
-  async function handleUpdate(event) {
-    event.preventDefault();
-    if (!editingId || !editingTitle.trim()) return;
-    const value = Number(editingAmountDue);
-    if (!value || value <= 0) {
-      setError("Amount is required.");
-      return;
-    }
-    setBusy(true);
-    setError("");
-    try {
-      const updated = await updateEstateAlert(editingId, {
-        title: editingTitle.trim(),
-        description: editingDescription.trim(),
-        amountDue: value,
-        dueDate: editingDueDate ? new Date(editingDueDate).toISOString() : null
-      });
-      if (updated?.stale) {
-        const [rows, paymentRows] = await Promise.all([
-          listEstateAlerts(estateId, "payment_request"),
-          listEstateAlertPayments(estateId)
-        ]);
-        setAlerts(rows);
-        setPayments(paymentRows);
-      } else {
-        setAlerts((prev) => prev.map((row) => (row.id === editingId ? { ...row, ...updated } : row)));
-      }
-      showSuccess("Payment request updated.");
-      closeEdit();
-    } catch (err) {
-      setError(err?.message || "Failed to update payment request");
-    } finally {
-      setBusy(false);
-    }
-  }
+  const outstanding = useMemo(() =>
+    paymentRows.filter(r => r.status !== "paid").reduce((s, r) => s + Number(r.amountDue), 0),
+  [paymentRows]);
 
-  function handleDelete(alertId) {
-    const item = alerts.find((row) => row.id === alertId);
-    setPendingDelete({ id: alertId, title: item?.title || "this payment request" });
-  }
-
-  async function confirmDelete() {
-    if (!pendingDelete?.id) return;
-    setBusy(true);
-    setError("");
-    try {
-      await deleteEstateAlert(pendingDelete.id);
-      setAlerts((prev) => prev.filter((row) => row.id !== pendingDelete.id));
-      setPayments((prev) => prev.filter((row) => row.id !== pendingDelete.id));
-      showSuccess("Payment request deleted.");
-      setPendingDelete(null);
-    } catch (err) {
-      setError(err?.message || "Failed to delete payment request");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleReminder(alertId) {
-    if (remindingId) return;
-    setRemindingId(alertId);
-    setError("");
-    try {
-      const res = await sendEstateAlertReminder(alertId);
-      if (res?.stale) {
-        const [rows, paymentRows] = await Promise.all([
-          listEstateAlerts(estateId, "payment_request"),
-          listEstateAlertPayments(estateId)
-        ]);
-        setAlerts(rows);
-        setPayments(paymentRows);
-        return;
-      }
-      showSuccess(`Reminder sent to ${res?.reminded ?? 0} homeowners.`);
-    } catch (err) {
-      setError(err?.message || "Failed to send reminders");
-    } finally {
-      setRemindingId("");
-    }
-  }
-
-  async function handleVerify(alertId, homeowner) {
-    if (!alertId || !homeowner?.homeownerId || verifyingKey) return;
-    const key = `${alertId}:${homeowner.homeownerId}`;
-    setVerifyingKey(key);
-    setError("");
-    try {
-      const res = await verifyEstateAlertPayment(alertId, {
-        homeownerId: homeowner.homeownerId,
-        paymentMethod: homeowner.paymentMethod,
-        reference: homeowner.reference,
-        receiptUrl: homeowner.receiptUrl
-      });
-      if (res?.stale) {
-        const [rows, paymentRows] = await Promise.all([
-          listEstateAlerts(estateId, "payment_request"),
-          listEstateAlertPayments(estateId)
-        ]);
-        setAlerts(rows);
-        setPayments(paymentRows);
-        closeReview();
-        return;
-      }
-      showSuccess(`Marked payment as paid for ${homeowner.homeownerName || "Homeowner"}.`);
-      const [rows, paymentRows] = await Promise.all([
-        listEstateAlerts(estateId, "payment_request"),
-        listEstateAlertPayments(estateId)
-      ]);
-      setAlerts(rows);
-      setPayments(paymentRows);
-      closeReview();
-    } catch (err) {
-      setError(err?.message || "Failed to verify payment");
-    } finally {
-      setVerifyingKey("");
-    }
-  }
-
-  function openReview(alertId, homeowner) {
-    setReviewTarget({ alertId, homeowner });
-    setReviewReference(homeowner?.reference || "");
-    setReviewMethod(homeowner?.paymentMethod || "bank_transfer");
-    setReviewReceiptUrl(homeowner?.receiptUrl || "");
-  }
-
-  function closeReview() {
-    setReviewTarget(null);
-    setReviewReference("");
-    setReviewMethod("");
-    setReviewReceiptUrl("");
-  }
-
-  const estateOptions = useMemo(
-    () => (overview?.estates ?? []).map((row) => ({ value: row.id, label: row.name })),
-    [overview]
-  );
-
-  const paymentMap = useMemo(() => {
-    const map = new Map();
-    payments.forEach((alert) => map.set(alert.id, alert));
-    return map;
-  }, [payments]);
+  const complianceRate = useMemo(() => {
+    if (paymentRows.length === 0) return 0;
+    return Math.round((paymentRows.filter(r => r.status === "paid").length / paymentRows.length) * 100);
+  }, [paymentRows]);
 
   return (
-    <AppShell title="Estate Dues & Payments">
-      <EstateManagerPageShell
-        eyebrow="Estate Collections"
-        title="Dues"
-        description="Create levies, review payment proofs, and keep collection work manageable on mobile."
-        icon={<ClipboardList size={22} />}
-        accent="from-emerald-500 to-teal-500"
-        stats={[
-          { label: "Requests", value: alerts.length, helper: "Active payment requests" },
-          { label: "Reviews", value: payments.length, helper: "Payment summaries loaded" }
-        ]}
-      >
+    <div className="bg-[#f8f9fa] text-[#2b3437] min-h-screen font-sans flex flex-col selection:bg-indigo-100">
 
-        <EstateManagerSection title="Create payment request" subtitle="Use a dedicated button to open the dues form and keep collections easier to scan on mobile.">
-          <button
-            type="button"
-            onClick={() => setComposeOpen(true)}
-            className="w-full rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition-all active:scale-95 dark:bg-white dark:text-slate-900"
-          >
-            New Payment Request
-          </button>
-        </EstateManagerSection>
+      {/* Premium Mobile Header */}
+       <header className="sticky top-0 w-full z-50 bg-[#f8f9fa]/80 backdrop-blur-xl flex justify-between items-center px-4 h-16 border-b border-slate-100">
+              <button onClick={() => navigate(-1)} className="p-2 text-[#4955b3] active:bg-indigo-50 rounded-full transition-all">
+                <ArrowLeft size={24} strokeWidth={2.5} />
+              </button>
+              <h1 className="text-[#2b3437] font-black tracking-tight text-lg font-headline">Dues Management</h1>
+              <button className="relative p-2 text-[#4955b3] active:bg-indigo-50 rounded-full">
+                <Bell size={22} strokeWidth={2.5} />
+                <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-rose-500 rounded-full border-2 border-[#f8f9fa]" />
+              </button>
+            </header>
 
-        <EstateManagerSection title="Payment status" subtitle="Track homeowner payment state, proofs, and review actions in one stream.">
-          {loading ? <p className="mt-3 text-sm text-slate-500">Loading...</p> : null}
-          {!loading && alerts.length === 0 ? <p className="mt-3 text-sm text-slate-500">No payment requests yet.</p> : null}
-          <div className="mt-3 space-y-4">
-            {alerts.map((alert) => {
-              const summary = paymentMap.get(alert.id);
-              return (
-                <CardSurface
-                  as="article"
-                  key={alert.id}
-                  className="rounded-[1.6rem] border-slate-200/80 bg-white/80 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/70"
-                  accent="from-slate-100/80 via-white/10 to-transparent"
-                  glow="bg-slate-300/40"
-                >
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="min-w-0">
-                      <h4 className="truncate text-sm font-bold">{alert.title}</h4>
-                      <p className="mt-1 text-[11px] text-slate-500">
-                        {alert.dueDate ? new Date(alert.dueDate).toLocaleDateString() : "No due date"}
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => startEdit(alert)}
-                        className="rounded-full border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(alert.id)}
-                        className="rounded-full border border-rose-200 bg-rose-50 px-2 py-1 text-[11px] font-semibold text-rose-600 transition hover:bg-rose-100 dark:border-rose-700/60 dark:bg-rose-900/40 dark:text-rose-200"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                  <p className="mt-1 text-xs text-slate-500">Amount: NGN {Number(alert.amountDue || 0).toLocaleString()}</p>
-                  <div className="mt-3 grid gap-2 text-xs text-slate-600 dark:text-slate-300">
-                    {(summary?.homeowners ?? []).map((row) => (
-                      <div key={`${alert.id}-${row.homeownerId}`} className="flex items-center justify-between rounded-xl bg-white px-3 py-2 dark:bg-slate-900/70">
-                        <div>
-                          <p className="font-semibold text-slate-800 dark:text-slate-100">
-                            {row.homeownerName || "Homeowner"}
-                          </p>
-                          <p className="text-[11px] text-slate-500">
-                            {row.paymentMethod ? `Method: ${row.paymentMethod.replace("_", " ")}` : "Method: pending"}
-                            {row.reference ? ` • Ref: ${row.reference}` : ""}
-                          </p>
-                          {row.note ? <p className="text-[10px] text-slate-400">{row.note}</p> : null}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="flex flex-col items-end gap-1">
-                            <span className="text-[11px] font-semibold uppercase tracking-wide">{row.status}</span>
-                            <div className="flex items-center gap-1">
-                              {row.proofUrl ? (
-                                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
-                                  Proof
-                                </span>
-                              ) : (
-                                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">
-                                  No proof
-                                </span>
-                              )}
-                              {row.status === "paid" ? (
-                                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-                                  Paid
-                                </span>
-                              ) : (
-                                <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-semibold text-rose-700">
-                                  Pending
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          {row.status !== "paid" ? (
-                            <button
-                              type="button"
-                              onClick={() => openReview(alert.id, row)}
-                              className="rounded-lg border border-slate-200 px-2 py-1 text-[10px] font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800/60"
-                            >
-                              Review
-                            </button>
-                          ) : null}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-3 flex justify-end">
-                    <button
-                      type="button"
-                      onClick={() => handleReminder(alert.id)}
-                      disabled={remindingId === alert.id}
-                      className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800/60"
-                    >
-                      {remindingId === alert.id ? "Sending..." : "Send reminder"}
-                    </button>
-                  </div>
-                </CardSurface>
-              );
-            })}
+      <main className="flex-1 px-5 pt-24 pb-32 max-w-7xl mx-auto w-full">
+
+        {/* Page Title & Actions */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
+          <div>
+            <span className="text-[#4955b3] font-bold tracking-[0.15em] uppercase text-[10px] mb-1 block">Financial Oversight</span>
+            <h2 className="text-4xl font-black tracking-tight text-[#2b3437] font-headline">Dues Management</h2>
           </div>
-        </EstateManagerSection>
-      </EstateManagerPageShell>
-      <MobileBottomSheet open={composeOpen} title="Create Payment Request" onClose={() => setComposeOpen(false)} width="720px" height="90dvh" zIndex={70}>
-        <form onSubmit={async (event) => { const ok = await handleSubmit(event); if (ok) setComposeOpen(false); }} className="grid gap-3">
-          <label className="block">
-            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Estate</span>
-            <select value={estateId} onChange={(event) => setEstateId(event.target.value)} className={estateFieldClassName}>
-              {estateOptions.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Title</span>
-            <input value={title} onChange={(event) => setTitle(event.target.value)} className={estateFieldClassName} placeholder="January security levy" required />
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Amount (NGN)</span>
-            <input value={amountDue} onChange={(event) => setAmountDue(event.target.value)} type="number" className={estateFieldClassName} placeholder="5000" min="0" step="0.01" required />
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Due date</span>
-            <input value={dueDate} onChange={(event) => setDueDate(event.target.value)} type="date" className={estateFieldClassName} />
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Description</span>
-            <textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} className={estateTextareaClassName} placeholder="Payment covers security, waste, and generator upkeep." />
-          </label>
-          <button type="submit" disabled={busy || !estateId} className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition-all active:scale-95 disabled:opacity-50 dark:bg-white dark:text-slate-900">
-            {busy ? "Creating..." : "Create Payment Request"}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button className="bg-slate-200/50 text-[#2b3437] px-6 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 active:scale-95 transition-all w-full sm:w-auto text-sm">
+              <Send size={18} strokeWidth={2.5} />
+              Send Reminder
+            </button>
+            <button
+              onClick={() => setComposeOpen(true)}
+              className="bg-[#4955b3] text-white px-6 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-100 active:scale-95 transition-all w-full sm:w-auto text-sm"
+            >
+              <PlusCircle size={18} strokeWidth={2.5} />
+              Create Due
+            </button>
+          </div>
+        </div>
+
+        {/* Financial Bento Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+          {/* Total Received */}
+          <div className="bg-white p-8 rounded-[2.5rem] flex flex-col justify-between border border-slate-100 shadow-sm min-h-[180px]">
+            <div className="flex justify-between items-start">
+              <div className="p-3 bg-[#85f6e5]/30 text-[#005c53] rounded-2xl">
+                <Wallet size={24} />
+              </div>
+              <div className="flex items-center gap-1 text-[#006b61] bg-[#006b61]/10 px-3 py-1 rounded-full">
+                <TrendingUp size={12} />
+                <span className="text-[10px] font-black uppercase tracking-wider">Growth</span>
+              </div>
+            </div>
+            <div className="mt-4">
+              <p className="text-slate-500 text-sm font-bold uppercase tracking-tight">Total Received</p>
+              <p className="text-3xl font-black mt-1 text-[#2b3437]">{formatCurrency(totalCollected)}</p>
+            </div>
+          </div>
+
+          {/* Outstanding */}
+          <div className="bg-white p-8 rounded-[2.5rem] flex flex-col justify-between border border-slate-100 shadow-sm min-h-[180px]">
+            <div className="flex justify-between items-start">
+              <div className="p-3 bg-rose-50 text-rose-600 rounded-2xl">
+                <Timer size={24} />
+              </div>
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{paymentRows.length} Active</span>
+            </div>
+            <div className="mt-4">
+              <p className="text-slate-500 text-sm font-bold uppercase tracking-tight">Total Outstanding</p>
+              <p className="text-3xl font-black mt-1 text-rose-600">{formatCurrency(outstanding)}</p>
+            </div>
+          </div>
+
+          {/* Collection Progress */}
+          <div className="bg-[#4955b3] text-white p-8 rounded-[2.5rem] relative overflow-hidden flex flex-col justify-between shadow-lg shadow-indigo-100">
+            <div className="relative z-10">
+              <p className="text-white/70 text-sm font-bold uppercase tracking-tight">Compliance Rate</p>
+              <p className="text-4xl font-black mt-1">{complianceRate}%</p>
+            </div>
+            <div className="relative z-10 w-full bg-white/20 h-2.5 rounded-full mt-6">
+              <div className="bg-white h-full rounded-full transition-all duration-1000" style={{ width: `${complianceRate}%` }}></div>
+            </div>
+            <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-white/10 rounded-full blur-3xl"></div>
+          </div>
+        </div>
+
+        {/* List Section */}
+        <section>
+          <div className="flex items-center justify-between mb-8">
+            <h3 className="text-2xl font-black tracking-tight font-headline">Recent Activity</h3>
+            <button className="flex items-center gap-2 text-xs font-black text-[#4955b3] uppercase tracking-widest hover:opacity-70 transition-all">
+              Filter <Filter size={14} strokeWidth={3} />
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            {dataLoading && <p className="text-center py-10 font-bold text-slate-400">Syncing ledger...</p>}
+
+            {!dataLoading && paymentRows.length === 0 && (
+              <div className="bg-white border-2 border-dashed border-slate-200 rounded-[2.5rem] p-12 text-center">
+                <p className="text-slate-400 font-bold">No payment activity recorded yet.</p>
+              </div>
+            )}
+
+            {paymentRows.map((row, idx) => (
+              <div key={idx} className="group bg-white hover:border-[#4955b3]/30 border border-slate-100 transition-all duration-300 p-5 rounded-[2rem] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm active:scale-[0.99]">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-2xl bg-slate-50 flex items-center justify-center text-[#4955b3] border border-slate-100">
+                    <Users size={24} />
+                  </div>
+                  <div>
+                    <p className="font-black text-[#2b3437]">{row.homeownerName || "Resident"}</p>
+                    <p className="text-[11px] text-slate-400 font-bold uppercase tracking-tight">{row.alertTitle}</p>
+                  </div>
+                </div>
+
+                <div className="flex flex-row sm:flex-col justify-between w-full sm:w-auto items-center sm:items-start border-t sm:border-t-0 pt-4 sm:pt-0 mt-2 sm:mt-0">
+                  <div className="sm:text-left">
+                    <p className="text-lg font-black text-[#2b3437]">{formatCurrency(row.amountDue)}</p>
+                    <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest">
+                      Due {row.dueDate ? new Date(row.dueDate).toLocaleDateString() : 'No date'}
+                    </p>
+                  </div>
+
+                  <div className={`mt-0 sm:mt-3 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-2 ${
+                    row.status === 'paid' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'
+                  }`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${row.status === 'paid' ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
+                    {row.status || 'pending'}
+                  </div>
+                </div>
+
+                <div className="hidden lg:flex items-center gap-1">
+                  <button className="p-2.5 text-slate-400 hover:text-[#4955b3] hover:bg-slate-50 rounded-xl transition-all"><Receipt size={18} /></button>
+                  <button className="p-2.5 text-slate-400 hover:text-[#4955b3] hover:bg-slate-50 rounded-xl transition-all"><Edit3 size={18} /></button>
+                  <button className="p-2.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"><Trash2 size={18} /></button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      </main>
+
+      {/* Mobile Bottom Navigation */}
+
+
+      <MobileBottomSheet
+        open={composeOpen}
+        onClose={() => setComposeOpen(false)}
+        title="Create New Levy"
+      >
+        <form onSubmit={handleSubmit} className="p-2 space-y-4">
+          <div className="space-y-1">
+            <label className="text-[10px] font-black uppercase text-slate-400 px-1">Levy Title</label>
+            <input
+              className={estateFieldClassName}
+              value={title} onChange={e => setTitle(e.target.value)}
+              placeholder="e.g. Security Levy Q3" required
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-black uppercase text-slate-400 px-1">Amount (₦)</label>
+            <input
+              type="number" className={estateFieldClassName}
+              value={amountDue} onChange={e => setAmountDue(e.target.value)}
+              placeholder="25000" required
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-black uppercase text-slate-400 px-1">Notes</label>
+            <textarea
+              className={estateTextareaClassName}
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              rows={3}
+              placeholder="Details for residents..."
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-black uppercase text-slate-400 px-1">Due Date</label>
+            <input
+              type="date" className={estateFieldClassName}
+              value={dueDate} onChange={e => setDueDate(e.target.value)}
+            />
+          </div>
+          <button
+            disabled={busy}
+            className="w-full bg-[#4955b3] text-white py-5 rounded-[1.5rem] font-black uppercase tracking-widest mt-4 disabled:opacity-50 shadow-lg shadow-indigo-100 active:scale-95 transition-all"
+          >
+            {busy ? "Broadcasting..." : "Confirm & Send"}
           </button>
         </form>
       </MobileBottomSheet>
-      {reviewTarget ? (
-        <MobileBottomSheet open={!!reviewTarget} title="Manual Review" onClose={closeReview} width="640px" height="88dvh" zIndex={70}>
-          <div className="rounded-[2rem] bg-white p-1 dark:bg-slate-900/60">
-            <div className="mb-3 flex items-center justify-between">
-              <p className="text-sm font-bold text-slate-900 dark:text-white">Manual Review</p>
-              <button
-                type="button"
-                onClick={closeReview}
-                className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300"
-              >
-                Close
-              </button>
-            </div>
-            <div className="space-y-3 text-xs text-slate-600 dark:text-slate-300">
-              <div>
-                <p className="text-[11px] uppercase tracking-wide text-slate-400">Homeowner</p>
-                <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                  {reviewTarget.homeowner?.homeownerName || "Homeowner"}
-                </p>
-                <p className="text-[11px] text-slate-500">{reviewTarget.homeowner?.homeownerEmail || ""}</p>
-              </div>
-              {reviewTarget.homeowner?.proofUrl ? (
-                <div>
-                  <p className="text-[11px] uppercase tracking-wide text-slate-400">Proof</p>
-                  {reviewTarget.homeowner.proofUrl.endsWith(".pdf") ? (
-                    <a
-                      href={reviewTarget.homeowner.proofUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700"
-                    >
-                      <span className="grid h-6 w-6 place-items-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-600">
-                        PDF
-                      </span>
-                      View PDF proof
-                    </a>
-                  ) : (
-                    <a href={reviewTarget.homeowner.proofUrl} target="_blank" rel="noreferrer">
-                      <img
-                        src={reviewTarget.homeowner.proofUrl}
-                        alt="Payment proof"
-                        className="mt-2 max-h-48 w-full rounded-xl border border-slate-200 object-contain"
-                      />
-                    </a>
-                  )}
-                </div>
-              ) : (
-                <p className="text-[11px] text-slate-500">No proof uploaded.</p>
-              )}
-              <label className="block">
-                <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                  Payment method
-                </span>
-                <select
-                  value={reviewMethod}
-                  onChange={(event) => setReviewMethod(event.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-800/70"
-                >
-                  <option value="bank_transfer">Bank transfer</option>
-                  <option value="paystack">Paystack</option>
-                  <option value="wallet">Wallet</option>
-                </select>
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                  Reference
-                </span>
-                <input
-                  value={reviewReference}
-                  onChange={(event) => setReviewReference(event.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-800/70"
-                  placeholder="Reference"
-                />
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                  Receipt URL (optional)
-                </span>
-                <input
-                  value={reviewReceiptUrl}
-                  onChange={(event) => setReviewReceiptUrl(event.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-800/70"
-                  placeholder="https://..."
-                />
-              </label>
-              <button
-                type="button"
-                onClick={() => handleVerify(reviewTarget.alertId, { ...reviewTarget.homeowner, reference: reviewReference, paymentMethod: reviewMethod, receiptUrl: reviewReceiptUrl })}
-                disabled={verifyingKey === `${reviewTarget.alertId}:${reviewTarget.homeowner?.homeownerId}`}
-                className="w-full rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-60 dark:bg-white dark:text-slate-900"
-              >
-                {verifyingKey === `${reviewTarget.alertId}:${reviewTarget.homeowner?.homeownerId}` ? "Verifying..." : "Mark as Paid"}
-              </button>
-            </div>
-          </div>
-        </MobileBottomSheet>
-      ) : null}
-
-      {editingId ? (
-        <MobileBottomSheet open={!!editingId} title="Edit Payment Request" onClose={closeEdit} width="640px" height="82dvh" zIndex={70}>
-          <div className="rounded-[2rem] bg-white p-1 dark:bg-slate-900/60">
-            <div className="mb-3 flex items-center justify-between">
-              <p className="text-sm font-bold text-slate-900 dark:text-white">Edit Payment Request</p>
-              <button
-                type="button"
-                onClick={closeEdit}
-                className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300"
-              >
-                Close
-              </button>
-            </div>
-            <form onSubmit={handleUpdate} className="space-y-3">
-              <label className="block">
-                <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Title</span>
-                <input
-                  value={editingTitle}
-                  onChange={(event) => setEditingTitle(event.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-800/70"
-                  required
-                />
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Amount (NGN)</span>
-                <input
-                  value={editingAmountDue}
-                  onChange={(event) => setEditingAmountDue(event.target.value)}
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-800/70"
-                  required
-                />
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Due date</span>
-                <input
-                  value={editingDueDate}
-                  onChange={(event) => setEditingDueDate(event.target.value)}
-                  type="date"
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-800/70"
-                />
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Description</span>
-                <textarea
-                  value={editingDescription}
-                  onChange={(event) => setEditingDescription(event.target.value)}
-                  rows={3}
-                  className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-800/70"
-                />
-              </label>
-              <button
-                type="submit"
-                disabled={busy}
-                className="w-full rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-60 dark:bg-white dark:text-slate-900"
-              >
-                {busy ? "Saving..." : "Save Changes"}
-              </button>
-            </form>
-          </div>
-        </MobileBottomSheet>
-      ) : null}
-
-      {pendingDelete ? (
-        <MobileBottomSheet open={!!pendingDelete} title="Delete Payment Request" onClose={() => setPendingDelete(null)} width="560px" height="46dvh" zIndex={70}>
-          <div className="rounded-[2rem] bg-white p-1 dark:bg-slate-900/60">
-            <div className="mb-3 flex items-center justify-between">
-              <p className="text-sm font-bold text-slate-900 dark:text-white">Delete Payment Request</p>
-              <button
-                type="button"
-                onClick={() => setPendingDelete(null)}
-                className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300"
-              >
-                Cancel
-              </button>
-            </div>
-            <p className="text-sm text-slate-600 dark:text-slate-300">
-              This will permanently delete <span className="font-semibold">{pendingDelete.title}</span>.
-            </p>
-            <div className="mt-4 flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setPendingDelete(null)}
-                className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200"
-              >
-                Keep
-              </button>
-              <button
-                type="button"
-                onClick={confirmDelete}
-                disabled={busy}
-                className="flex-1 rounded-xl bg-rose-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-60"
-              >
-                {busy ? "Deleting..." : "Delete"}
-              </button>
-            </div>
-          </div>
-        </MobileBottomSheet>
-      ) : null}
-    </AppShell>
+    </div>
   );
-}
+};
+
+export default EstateDuesPage;

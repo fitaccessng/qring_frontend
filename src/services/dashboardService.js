@@ -13,6 +13,7 @@ const emptyState = {
   waitingRoom: [],
   session: null,
   messages: [],
+  profile: null,
   traffic: [],
   callControls: {
     canAudio: false,
@@ -36,6 +37,7 @@ export function normalizeDashboard(payload) {
     waitingRoom: Array.isArray(payload.waitingRoom) ? payload.waitingRoom : [],
     session: payload.session ?? null,
     messages: Array.isArray(payload.messages) ? payload.messages : [],
+    profile: payload.profile ?? null,
     traffic: Array.isArray(payload.traffic) ? payload.traffic : [],
     callControls: {
       ...emptyState.callControls,

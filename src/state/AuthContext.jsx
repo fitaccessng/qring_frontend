@@ -108,6 +108,18 @@ export function AuthProvider({ children }) {
     }
   }
 
+  function updateUser(nextUser) {
+    setUser((prev) => {
+      const resolved = typeof nextUser === "function" ? nextUser(prev) : nextUser;
+      if (!resolved) {
+        localStorage.removeItem("qring_user");
+        return null;
+      }
+      localStorage.setItem("qring_user", JSON.stringify(resolved));
+      return resolved;
+    });
+  }
+
   const login = async (credentials) => {
     setLoading(true);
     try {
@@ -270,6 +282,8 @@ export function AuthProvider({ children }) {
   const value = useMemo(
     () => ({
       user,
+      token: accessToken,
+      accessToken,
       loading,
       isAuthenticated: Boolean(user && accessToken),
       login,
@@ -279,7 +293,8 @@ export function AuthProvider({ children }) {
       beginGoogleSignUp,
       resumeGoogleRedirect,
       forgotPassword,
-      logout
+      logout,
+      updateUser
     }),
     [user, accessToken, loading]
   );

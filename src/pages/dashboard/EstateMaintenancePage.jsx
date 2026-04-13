@@ -1,102 +1,68 @@
-import { useEffect, useMemo, useState } from "react";
-import { Wrench } from "lucide-react";
-import AppShell from "../../layouts/AppShell";
-import { getEstateOverview, listEstateAlerts, listMaintenanceAudits, updateEstateAlert } from "../../services/estateService";
+import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  ArrowLeft,
+  Bell,
+  HardHat,
+  Verified,
+  TriangleAlert,
+  Lightbulb,
+  Plus,
+  LayoutDashboard,
+  Wallet,
+  Users,
+  Building2,
+  Settings,
+  CheckCircle2,
+  Filter,
+  X
+} from 'lucide-react';
+
+// Service & Hook Imports
+import {
+  listEstateAlerts,
+  listMaintenanceAudits,
+  updateEstateAlert,
+  createEstateAlert
+} from "../../services/estateService";
 import { showError, showSuccess } from "../../utils/flash";
 import { useSocketEvents } from "../../hooks/useSocketEvents";
 import { getDashboardSocket } from "../../services/socketClient";
-import CardSurface from "../../components/CardSurface";
-import EstateManagerPageShell, { EstateManagerSection, estateFieldClassName } from "../../components/mobile/EstateManagerPageShell";
+import useEstateOverviewState from "../../hooks/useEstateOverviewState";
 import MobileBottomSheet from "../../components/mobile/MobileBottomSheet";
+import { estateFieldClassName } from "../../components/mobile/EstateManagerPageShell";
 
-export default function EstateMaintenancePage() {
-  const [overview, setOverview] = useState(null);
-  const [estateId, setEstateId] = useState("");
+const EstateMaintenancePage = () => {
+  const navigate = useNavigate();
+  const { overview, estateId, setEstateId, loading, error, setError } = useEstateOverviewState();
+
   const [requests, setRequests] = useState([]);
   const [audits, setAudits] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [updatingId, setUpdatingId] = useState("");
-  const [activeTab, setActiveTab] = useState("requests");
-  const [auditStatusFilter, setAuditStatusFilter] = useState("all");
-  const [auditHomeownerFilter, setAuditHomeownerFilter] = useState("");
   const [controlsOpen, setControlsOpen] = useState(false);
 
-  useEffect(() => {
-    let active = true;
-    async function load() {
-      setLoading(true);
-      try {
-        const data = await getEstateOverview();
-        if (!active) return;
-        setOverview(data);
-        const firstId = data?.estates?.[0]?.id || "";
-        setEstateId((prev) => prev || firstId);
-      } catch (err) {
-        if (active) setError(err?.message || "Failed to load estate data");
-      } finally {
-        if (active) setLoading(false);
-      }
-    }
-    load();
-    return () => {
-      active = false;
-    };
-  }, []);
+  // Form State
+  const [formOpen, setFormOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formData, setFormData] = useState({ title: '', description: '', priority: 'medium' });
 
-  useEffect(() => {
+  useEffect(() => { if (error) showError(error); }, [error]);
+
+  const loadData = async () => {
     if (!estateId) return;
-    let active = true;
-    async function loadRequests() {
-      try {
-        const [rows, auditRows] = await Promise.all([
-          listEstateAlerts(estateId, "maintenance_request"),
-          listMaintenanceAudits(estateId)
-        ]);
-        if (!active) return;
-        setRequests(rows);
-        setAudits(auditRows);
-      } catch (err) {
-        if (active) setError(err?.message || "Failed to load maintenance requests");
-      }
-    }
-    loadRequests();
-    return () => {
-      active = false;
-    };
-  }, [estateId]);
-
-  useEffect(() => {
-    if (error) showError(error);
-  }, [error]);
-
-  async function updateStatus(item, status) {
-    if (!item?.id || updatingId) return;
-    setUpdatingId(item.id);
-    setError("");
     try {
-      const updated = await updateEstateAlert(item.id, {
-        title: item.title,
-        description: item.description || "",
-        maintenanceStatus: status
-      });
-      if (updated?.stale) {
-        const [rows, auditRows] = await Promise.all([
-          listEstateAlerts(estateId, "maintenance_request"),
-          listMaintenanceAudits(estateId)
-        ]);
-        setRequests(rows);
-        setAudits(auditRows);
-      } else {
-        setRequests((prev) => prev.map((row) => (row.id === item.id ? { ...row, ...updated } : row)));
-      }
-      showSuccess(`Marked as ${status}.`);
+      const [rows, auditRows] = await Promise.all([
+        listEstateAlerts(estateId, "maintenance_request"),
+        listMaintenanceAudits(estateId)
+      ]);
+      setRequests(rows);
+      setAudits(auditRows);
     } catch (err) {
-      setError(err?.message || "Failed to update status");
-    } finally {
-      setUpdatingId("");
+      setError(err?.message || "Failed to load maintenance data");
     }
-  }
+  };
+
+  useEffect(() => { loadData(); }, [estateId]);
 
   useEffect(() => {
     if (!estateId) return;
@@ -104,304 +70,258 @@ export default function EstateMaintenancePage() {
     socket.emit("dashboard.subscribe", { room: `estate:${estateId}:alerts` });
   }, [estateId]);
 
-  useSocketEvents(
-    useMemo(
-      () => ({
-        ALERT_CREATED: () => {
-          if (!estateId) return;
-          Promise.all([listEstateAlerts(estateId, "maintenance_request"), listMaintenanceAudits(estateId)])
-            .then(([rows, auditRows]) => {
-              setRequests(rows);
-              setAudits(auditRows);
-            })
-            .catch(() => {});
-        },
-        ALERT_UPDATED: () => {
-          if (!estateId) return;
-          Promise.all([listEstateAlerts(estateId, "maintenance_request"), listMaintenanceAudits(estateId)])
-            .then(([rows, auditRows]) => {
-              setRequests(rows);
-              setAudits(auditRows);
-            })
-            .catch(() => {});
-        },
-        ALERT_DELETED: () => {
-          if (!estateId) return;
-          Promise.all([listEstateAlerts(estateId, "maintenance_request"), listMaintenanceAudits(estateId)])
-            .then(([rows, auditRows]) => {
-              setRequests(rows);
-              setAudits(auditRows);
-            })
-            .catch(() => {});
-        }
-      }),
-      [estateId]
-    )
-  );
+  useSocketEvents(useMemo(() => ({
+    ALERT_CREATED: loadData,
+    ALERT_UPDATED: loadData,
+    ALERT_DELETED: loadData
+  }), [estateId]));
 
-  const estateOptions = useMemo(
-    () => (overview?.estates ?? []).map((row) => ({ value: row.id, label: row.name })),
-    [overview]
-  );
+  const handleCreateRequest = async (e) => {
+    e.preventDefault();
+    if (!formData.title) return showError("Title is required");
 
-  const auditByAlert = useMemo(() => {
-    const map = new Map();
-    audits.forEach((row) => {
-      const list = map.get(row.alertId) ?? [];
-      list.push(row);
-      map.set(row.alertId, list);
-    });
-    return map;
-  }, [audits]);
+    setIsSubmitting(true);
+    try {
+      await createEstateAlert({
+        estateId,
+        title: String(formData.title || "").trim(),
+        description: String(formData.description || "").trim(),
+        alertType: "maintenance_request"
+      });
+      showSuccess("Maintenance request created");
+      setFormOpen(false);
+      setFormData({ title: '', description: '', priority: 'medium' });
+      await loadData();
+    } catch (err) {
+      showError(err?.message || "Failed to create request");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
-  const requestById = useMemo(() => {
-    const map = new Map();
-    requests.forEach((row) => map.set(row.id, row));
-    return map;
-  }, [requests]);
+  const updateStatus = async (item, status) => {
+    if (!item?.id || updatingId) return;
+    setUpdatingId(item.id);
+    try {
+      await updateEstateAlert(item.id, {
+        title: item.title,
+        description: item.description || "",
+        maintenanceStatus: status
+      });
+      showSuccess(`Marked as ${status}`);
+      await loadData();
+    } catch (err) {
+      showError(err?.message || "Update failed");
+    } finally {
+      setUpdatingId("");
+    }
+  };
 
-  const auditHomeownerOptions = useMemo(() => {
-    const map = new Map();
-    audits.forEach((row) => {
-      const label = row.changedByName || row.changedByEmail || "Estate Admin";
-      const key = row.changedById || label;
-      if (!map.has(key)) {
-        map.set(key, label);
-      }
-    });
-    return Array.from(map.entries()).map(([value, label]) => ({ value, label }));
-  }, [audits]);
-
-  const filteredAudits = useMemo(() => {
-    return audits.filter((row) => {
-      if (auditStatusFilter !== "all" && row.toStatus !== auditStatusFilter) return false;
-      if (auditHomeownerFilter) {
-        const key = row.changedById || row.changedByName || row.changedByEmail || "";
-        if (String(key) !== String(auditHomeownerFilter)) return false;
-      }
-      return true;
-    });
-  }, [audits, auditStatusFilter, auditHomeownerFilter]);
+  // --- Dynamic Calculations ---
+  const pendingRequests = requests.filter(r => r.maintenanceStatus !== "solved");
+  const resolvedRequests = requests.filter(r => r.maintenanceStatus === "solved");
+  const pendingCount = pendingRequests.length;
+  const resolvedCount = resolvedRequests.length;
+  const totalCount = requests.length;
+  const healthScore = totalCount > 0 ? Math.round((resolvedCount / totalCount) * 100) : 100;
+  const strokeDashoffset = 125.6 - (125.6 * healthScore) / 100;
 
   return (
-    <AppShell title="Maintenance Requests">
-      <EstateManagerPageShell
-        eyebrow="Estate Operations"
-        title="Maintenance"
-        description="Handle maintenance requests and audit activity in a mobile-first operations inbox."
-        icon={<Wrench size={22} />}
-        accent="from-cyan-500 to-sky-500"
-        stats={[
-          { label: "Requests", value: requests.length, helper: "Current maintenance items" },
-          { label: "Audit Logs", value: audits.length, helper: "Change history entries" }
-        ]}
-      >
-        <EstateManagerSection title="Maintenance inbox" subtitle="Requests submitted by homeowners and the audit trail behind them.">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm font-bold text-slate-900 dark:text-white">Live request control</p>
-              <p className="mt-1 text-xs text-slate-500">Switch between requests and audit activity without losing context.</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setControlsOpen(true)}
-              className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition-all active:scale-95 dark:bg-white dark:text-slate-900"
-            >
-              Open Controls
-            </button>
-          </div>
-          <div className="mt-4 flex items-center gap-2">
-            {["requests", "audits"].map((tab) => (
-              <button
-                key={tab}
-                type="button"
-                onClick={() => setActiveTab(tab)}
-                className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-                  activeTab === tab
-                    ? "border-indigo-500 bg-indigo-600 text-white"
-                    : "border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-200"
-                }`}
-              >
-                {tab === "requests" ? "Requests" : "Audit Trail"}
-              </button>
-            ))}
-          </div>
-          {activeTab === "audits" ? (
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              <select
-                value={auditStatusFilter}
-                onChange={(event) => setAuditStatusFilter(event.target.value)}
-                className={estateFieldClassName}
-              >
-                <option value="all">All statuses</option>
-                <option value="pending">Pending only</option>
-                <option value="solved">Solved only</option>
-              </select>
-              <select
-                value={auditHomeownerFilter}
-                onChange={(event) => setAuditHomeownerFilter(event.target.value)}
-                className={estateFieldClassName}
-              >
-                <option value="">All admins</option>
-                {auditHomeownerOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : null}
-        </EstateManagerSection>
+    <div className="bg-[#f8f9fa] text-[#2b3437] min-h-screen font-sans flex flex-col selection:bg-indigo-100 pb-32">
 
-        <EstateManagerSection title={activeTab === "requests" ? "Open requests" : "Audit trail"} subtitle={activeTab === "requests" ? "Update status quickly from the same screen." : "See exactly who changed what and when."}>
-          {loading ? <p className="text-sm text-slate-500">Loading...</p> : null}
-          {activeTab === "requests" ? (
-            <>
-              {!loading && requests.length === 0 ? <p className="text-sm text-slate-500">No maintenance requests yet.</p> : null}
-              <div className="space-y-3">
-                {requests.map((item) => (
-                  <CardSurface
-                    as="article"
-                    key={item.id}
-                    className="rounded-[1.6rem] border-slate-200/80 bg-white/80 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/70"
-                    accent="from-amber-100/80 via-white/10 to-transparent"
-                    glow="bg-amber-300/40"
-                  >
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0">
-                    <h4 className="truncate text-sm font-bold">{item.title}</h4>
-                    <p className="mt-1 text-[11px] text-slate-500">
-                      {item.createdAt ? new Date(item.createdAt).toLocaleString() : ""}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                        item.maintenanceStatus === "solved"
-                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200"
-                          : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200"
-                      }`}
-                    >
-                      {item.maintenanceStatus === "solved" ? "Solved" : "Pending"}
-                    </span>
+      {/* Header */}
+      <header className="fixed top-0 w-full z-50 bg-[#f8f9fa]/80 backdrop-blur-xl flex justify-between items-center px-4 h-16 border-b border-slate-100">
+        <button
+          onClick={() => navigate(-1)}
+          className="p-2 text-[#4955b3] active:bg-indigo-50 rounded-full transition-all"
+        >
+          <ArrowLeft size={24} strokeWidth={2.5} />
+        </button>
+        <h1 className="text-[#2b3437] font-black tracking-tight text-lg">Maintenance Hub</h1>
+        <button className="relative p-2 text-[#4955b3] active:bg-indigo-50 rounded-full transition-all">
+          <Bell size={22} strokeWidth={2.5} />
+          {pendingCount > 0 && <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-rose-500 rounded-full border-2 border-[#f8f9fa]" />}
+        </button>
+      </header>
+
+      <main className="flex-1 px-5 pt-24 max-w-7xl mx-auto w-full">
+        {/* Operations Header */}
+        <section className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
+          <div>
+            <span className="text-[#4955b3] font-bold tracking-[0.15em] uppercase text-[10px] mb-1 block">Central Command</span>
+            <h2 className="text-4xl font-black tracking-tight text-[#2b3437]">Operations</h2>
+          </div>
+
+          <div className="bg-white border border-slate-100 rounded-[2rem] p-5 flex items-center gap-4 shadow-sm">
+            <div className="relative flex items-center justify-center">
+              <svg className="w-12 h-12 transform -rotate-90">
+                <circle className="text-slate-100" cx="24" cy="24" fill="transparent" r="20" stroke="currentColor" strokeWidth="4"></circle>
+                <circle className="text-[#006b61] transition-all duration-1000" cx="24" cy="24" fill="transparent" r="20" stroke="currentColor" strokeDasharray="125.6" strokeDashoffset={strokeDashoffset} strokeWidth="4" strokeLinecap="round"></circle>
+              </svg>
+              <div className="absolute text-[#006b61]"><CheckCircle2 size={18} /></div>
+            </div>
+            <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Health Score</p>
+                <p className="text-xl font-black text-[#006b61]">{healthScore}%</p>
+            </div>
+          </div>
+        </section>
+
+        {/* Bento Stats */}
+        <section className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+          <div className="bg-[#dfe0ff] rounded-[2rem] p-6 flex flex-col justify-between h-40 border border-indigo-100">
+            <div className="p-2 bg-white/50 w-fit rounded-xl text-[#4955b3]"><Settings size={20} /></div>
+            <div>
+              <h3 className="text-3xl font-black text-[#3b48a6]">{pendingCount}</h3>
+              <p className="text-[10px] font-black uppercase tracking-widest text-[#4652b0]">Open</p>
+            </div>
+          </div>
+          <div className="bg-white rounded-[2rem] p-6 flex flex-col justify-between h-40 border border-slate-100 shadow-sm">
+            <div className="p-2 bg-slate-50 w-fit rounded-xl text-slate-400"><HardHat size={20} /></div>
+            <div>
+              <h3 className="text-3xl font-black text-[#2b3437]">{audits.length}</h3>
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Audits</p>
+            </div>
+          </div>
+          <div className="bg-[#85f6e5]/30 rounded-[2rem] p-6 flex flex-col justify-between h-40 border border-[#85f6e5]/50">
+            <div className="p-2 bg-white/50 w-fit rounded-xl text-[#006b61]"><Verified size={20} /></div>
+            <div>
+              <h3 className="text-3xl font-black text-[#005c53]">{resolvedCount}</h3>
+              <p className="text-[10px] font-black uppercase tracking-widest text-[#00675d]">Resolved</p>
+            </div>
+          </div>
+          <div className="bg-rose-50 rounded-[2rem] p-6 flex flex-col justify-between h-40 border border-rose-100">
+            <div className="p-2 bg-white/50 w-fit rounded-xl text-rose-500"><TriangleAlert size={20} /></div>
+            <div>
+              <h3 className="text-3xl font-black text-rose-600">{pendingRequests.filter(r => r.priority === 'high').length}</h3>
+              <p className="text-[10px] font-black uppercase tracking-widest text-rose-500">Critical</p>
+            </div>
+          </div>
+        </section>
+
+        {/* Feed */}
+        <section className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-2xl font-black">Request Feed</h3>
+            <button onClick={() => setControlsOpen(true)} className="p-2.5 rounded-full bg-white border border-slate-100 text-[#4955b3] shadow-sm"><Filter size={18} /></button>
+          </div>
+
+          <div className="space-y-4">
+            {loading ? (
+                <div className="p-10 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest">Syncing...</div>
+            ) : requests.length === 0 ? (
+                <div className="p-10 text-center text-slate-300 font-black uppercase text-[10px] tracking-widest bg-white rounded-[2rem] border border-dashed">No Requests Found</div>
+            ) : requests.map((item) => (
+              <div key={item.id} className="group bg-white border border-slate-100 p-5 rounded-[2.5rem] shadow-sm">
+                <div className="flex items-start gap-5">
+                  <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-[#4955b3]"><Lightbulb size={20} /></div>
+                  <div className="flex-grow">
+                    <div className="flex justify-between items-start">
+                      <h5 className="font-black text-[#2b3437] line-clamp-1">{item.title}</h5>
+                      <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest whitespace-nowrap ml-2">
+                        {item.createdAt ? new Date(item.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'NOW'}
+                      </span>
+                    </div>
+                    <p className="text-slate-500 text-sm mt-1 line-clamp-2">{item.description}</p>
+                    <div className="flex items-center justify-between mt-5">
+                      <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${item.maintenanceStatus === 'solved' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
+                        {item.maintenanceStatus}
+                      </div>
+                      {item.maintenanceStatus !== 'solved' && (
+                        <button
+                            onClick={() => updateStatus(item, 'solved')}
+                            disabled={!!updatingId}
+                            className="bg-[#4955b3] text-white px-5 py-2 rounded-xl text-[10px] font-black uppercase active:scale-95 disabled:opacity-50 transition-all"
+                        >
+                            {updatingId === item.id ? '...' : 'Close Ticket'}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
-                    {item.description ? <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{item.description}</p> : null}
-                    <div className="mt-3 flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => updateStatus(item, "pending")}
-                        disabled={updatingId === item.id}
-                        className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800/60"
-                      >
-                        {updatingId === item.id ? "Updating..." : "Mark Pending"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => updateStatus(item, "solved")}
-                        disabled={updatingId === item.id}
-                        className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition active:scale-95 disabled:opacity-60"
-                      >
-                        {updatingId === item.id ? "Updating..." : "Mark Solved"}
-                      </button>
-                    </div>
-                  </CardSurface>
-                ))}
               </div>
-            </>
-          ) : (
-            <>
-              {!loading && filteredAudits.length === 0 ? <p className="text-sm text-slate-500">No audit history yet.</p> : null}
-              <div className="space-y-2">
-                {filteredAudits.map((row) => {
-                  const request = requestById.get(row.alertId);
-                  return (
-                    <CardSurface
-                      as="div"
-                      key={row.id}
-                      className="rounded-[1.2rem] border-slate-200/80 bg-white/80 px-3 py-2 text-xs text-slate-600 shadow-sm dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300"
-                      accent="from-slate-100/80 via-white/10 to-transparent"
-                      glow="bg-slate-300/30"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div>
-                          <p className="font-semibold text-slate-900 dark:text-white">
-                            {request?.title || "Maintenance Request"}
-                          </p>
-                          <p className="text-[11px] text-slate-500">
-                            {row.fromStatus} → {row.toStatus}
-                          </p>
-                        </div>
-                        <div className="text-[11px] text-slate-500">
-                          {row.changedAt ? new Date(row.changedAt).toLocaleString() : ""}
-                        </div>
-                      </div>
-                      <p className="mt-1 text-[11px] text-slate-400">
-                        {row.changedByName} {row.changedByEmail ? `(${row.changedByEmail})` : ""}
-                      </p>
-                    </CardSurface>
-                  );
-                })}
-              </div>
-            </>
-          )}
-        </EstateManagerSection>
-      </EstateManagerPageShell>
-      <MobileBottomSheet open={controlsOpen} title="Maintenance Controls" onClose={() => setControlsOpen(false)} width="720px" height="82dvh">
-        <div className="grid gap-3">
-          <label className="block">
-            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Estate</span>
-            <select value={estateId} onChange={(event) => setEstateId(event.target.value)} className={estateFieldClassName}>
-              {estateOptions.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-          </label>
-          <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">View</p>
-            <div className="flex flex-wrap items-center gap-2">
-              {["requests", "audits"].map((tab) => (
+            ))}
+          </div>
+        </section>
+      </main>
+
+      {/* TRIGGER BUTTON */}
+      <button
+        onClick={() => setFormOpen(true)}
+        className="fixed right-6 bottom-2 w-16 h-16 bg-[#4955b3] text-white rounded-[1.5rem] shadow-xl shadow-indigo-100 flex items-center justify-center z-40 active:scale-90 transition-transform"
+      >
+        <Plus size={28} strokeWidth={3} />
+      </button>
+
+      {/* CREATE FORM SHEET */}
+      <MobileBottomSheet open={formOpen} title="New Maintenance Request" onClose={() => setFormOpen(false)}>
+        <form onSubmit={handleCreateRequest} className="space-y-6 p-2">
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Issue Title</label>
+            <input
+              type="text"
+              placeholder="e.g., Street Light Repair"
+              className={estateFieldClassName}
+              value={formData.title}
+              onChange={e => setFormData({...formData, title: e.target.value})}
+            />
+          </div>
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Priority Level</label>
+            <div className="grid grid-cols-3 gap-2">
+              {['low', 'medium', 'high'].map(p => (
                 <button
-                  key={tab}
+                  key={p}
                   type="button"
-                  onClick={() => setActiveTab(tab)}
-                  className={`rounded-full border px-3 py-2 text-xs font-semibold ${activeTab === tab ? "border-indigo-500 bg-indigo-600 text-white" : "border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-200"}`}
+                  onClick={() => setFormData({...formData, priority: p})}
+                  className={`py-3 rounded-xl text-[10px] font-black uppercase border transition-all ${formData.priority === p ? 'bg-indigo-50 border-[#4955b3] text-[#4955b3]' : 'bg-white border-slate-100 text-slate-400'}`}
                 >
-                  {tab === "requests" ? "Requests" : "Audit Trail"}
+                  {p}
                 </button>
               ))}
             </div>
           </div>
-          {activeTab === "audits" ? (
-            <>
-              <label className="block">
-                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Status filter</span>
-                <select value={auditStatusFilter} onChange={(event) => setAuditStatusFilter(event.target.value)} className={estateFieldClassName}>
-                  <option value="all">All statuses</option>
-                  <option value="pending">Pending only</option>
-                  <option value="solved">Solved only</option>
-                </select>
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Admin filter</span>
-                <select value={auditHomeownerFilter} onChange={(event) => setAuditHomeownerFilter(event.target.value)} className={estateFieldClassName}>
-                  <option value="">All admins</option>
-                  {auditHomeownerOptions.map((option) => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
-              </label>
-            </>
-          ) : null}
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Description</label>
+            <textarea
+              rows="3"
+              placeholder="Describe the issue in detail..."
+              className={`${estateFieldClassName} resize-none`}
+              value={formData.description}
+              onChange={e => setFormData({...formData, description: e.target.value})}
+            />
+          </div>
           <button
-            type="button"
-            onClick={() => setControlsOpen(false)}
-            className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition-all active:scale-95 dark:bg-white dark:text-slate-900"
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full bg-[#4955b3] text-white py-5 rounded-[1.5rem] font-black uppercase tracking-widest shadow-lg active:scale-95 disabled:opacity-50 transition-all"
           >
-            Apply Controls
+            {isSubmitting ? 'Posting...' : 'Post Request'}
           </button>
+        </form>
+      </MobileBottomSheet>
+
+      {/* CONTEXT SWITCHER SHEET */}
+      <MobileBottomSheet open={controlsOpen} title="Operations Management" onClose={() => setControlsOpen(false)}>
+        <div className="grid gap-6 p-2">
+          <label className="block">
+            <span className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">Estate Context</span>
+            <select
+              value={estateId}
+              onChange={(e) => { setEstateId(e.target.value); setControlsOpen(false); }}
+              className={estateFieldClassName}
+            >
+              {(overview?.estates ?? []).map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+            </select>
+          </label>
+          <button onClick={() => setControlsOpen(false)} className="w-full bg-slate-100 text-[#2b3437] py-4 rounded-2xl font-black uppercase tracking-widest">Close</button>
         </div>
       </MobileBottomSheet>
-    </AppShell>
+
+      {/* --- BOTTOM NAV BAR --- */}
+
+    </div>
   );
-}
+};
+
+export default EstateMaintenancePage;

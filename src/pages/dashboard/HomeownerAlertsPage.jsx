@@ -33,7 +33,7 @@ export default function HomeownerAlertsPage() {
   useEffect(() => {
     load();
   }, []);
-  
+
   useEffect(() => {
     if (error) showError(error);
   }, [error]);
@@ -143,6 +143,7 @@ export default function HomeownerAlertsPage() {
           const meetingResponse = item?.myMeetingResponse || "";
           const isMeeting = item?.alertType === "meeting";
           const isPoll = item?.alertType === "poll";
+          const isPollClosed = isPoll && item?.dueDate && new Date(item.dueDate).getTime() < Date.now();
           const selectedMethod = paymentMethodByAlert[item.id] || "paystack";
           return (
             <article
@@ -196,19 +197,31 @@ export default function HomeownerAlertsPage() {
               ) : null}
               {isPoll ? (
                 <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-300">
-                  <p className="font-semibold">Vote</p>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="font-semibold">{isPollClosed ? "Poll Closed" : "Vote"}</p>
+                    {isPollClosed ? (
+                      <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-slate-700 dark:text-slate-200">
+                        Closed
+                      </span>
+                    ) : null}
+                  </div>
+                  {isPollClosed ? (
+                    <p className="mt-2 text-[11px] text-slate-500">
+                      Voting has ended for this poll.
+                    </p>
+                  ) : null}
                   <div className="mt-2 grid gap-2">
                     {(item.pollOptions || []).map((option, idx) => (
                       <button
                         key={`${item.id}-option-${idx}`}
                         type="button"
                         onClick={() => handlePollVote(item.id, idx)}
-                        disabled={votingAlertId === item.id}
+                        disabled={votingAlertId === item.id || isPollClosed}
                         className={`rounded-xl border px-3 py-2 text-left text-[11px] font-semibold transition ${
                           item.myPollVote === idx
                             ? "border-indigo-500 bg-indigo-600 text-white"
                             : "border-slate-200 bg-white text-slate-600 dark:border-slate-600 dark:bg-slate-900/50 dark:text-slate-200"
-                        }`}
+                        } ${isPollClosed ? "opacity-60 cursor-not-allowed" : ""}`}
                       >
                         {option}
                       </button>

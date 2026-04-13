@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { Building2, CheckCircle2, Home } from "lucide-react";
 import AuthCard from "../../components/AuthCard";
 import { useAuth } from "../../state/AuthContext";
 import { requestEmailVerification } from "../../services/authService";
@@ -64,16 +65,13 @@ export default function SignupPage() {
         const response = await requestEmailVerification({ email: String(form.email || "").trim().toLowerCase() });
         const status = response?.data?.emailStatus ?? response?.emailStatus ?? "unknown";
         const reason = response?.data?.emailReason ?? response?.emailReason ?? "";
-        const messageId = response?.data?.emailMessageId ?? response?.emailMessageId ?? "";
         if (String(status).toLowerCase() === "sent") {
-          setVerification({
-            sending: false,
-            status: `Verification email sent. Check your inbox and spam.${messageId ? ` Message-ID: ${messageId}` : ""}`
-          });
+          setVerification({ sending: false, status: "Email sent" });
+          navigate(`/verify-email?email=${encodeURIComponent(String(form.email || "").trim().toLowerCase())}`);
         } else {
           setVerification({
             sending: false,
-            status: `Verification email could not be sent (${status}${reason ? `: ${reason}` : ""}).${messageId ? ` Message-ID: ${messageId}` : ""}`
+            status: `Verification email could not be sent (${status}${reason ? `: ${reason}` : ""}).`
           });
         }
       } catch (err) {
@@ -126,9 +124,9 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="safe-content grid min-h-screen place-items-center bg-slate-50 p-4 dark:bg-slate-950">
+    <div className="safe-content min-h-[105dvh] overflow-x-hidden bg-slate-50 px-4 pb-[calc(2.5rem+env(safe-area-inset-bottom))] pt-6 dark:bg-slate-950 sm:grid sm:place-items-center sm:px-4 sm:py-6">
       <AuthCard title="Create Account" subtitle="Start with secure QR access">
-        <form onSubmit={onSubmit} className="space-y-4">
+        <form onSubmit={onSubmit} className="space-y-3 sm:space-y-4">
           <Input label="Full name" type="text" value={form.fullName} onChange={(value) => setForm((prev) => ({ ...prev, fullName: value }))} />
           <Input label="Email" type="email" value={form.email} onChange={(value) => setForm((prev) => ({ ...prev, email: value }))} />
           <PasswordInput
@@ -146,17 +144,24 @@ export default function SignupPage() {
             onChange={(value) => setForm((prev) => ({ ...prev, referralCode: value }))}
           />
 
-          <label className="block text-sm">
-            <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">Role</span>
-            <select
-              value={form.role}
-              onChange={(event) => setForm((prev) => ({ ...prev, role: event.target.value }))}
-              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-3 outline-none ring-brand-500 focus:ring-2 dark:border-slate-700 dark:bg-slate-900"
-            >
-              <option value="homeowner">Homeowner</option>
-              <option value="estate">Estate User</option>
-            </select>
-          </label>
+          <RolePicker
+            value={form.role}
+            onChange={(role) => setForm((prev) => ({ ...prev, role }))}
+            options={[
+              {
+                value: "homeowner",
+                label: "Homeowner",
+                description: "Manage your home, visitors, doors, and alerts.",
+                icon: Home
+              },
+              {
+                value: "estate",
+                label: "Estate User",
+                description: "Run an estate with resident access, visitor logs, and oversight tools.",
+                icon: Building2
+              }
+            ]}
+          />
 
           {error ? <p className="text-sm text-danger">{error}</p> : null}
           <button
@@ -224,16 +229,13 @@ export default function SignupPage() {
                     const response = await requestEmailVerification({ email });
                     const status = response?.data?.emailStatus ?? response?.emailStatus ?? "unknown";
                     const reason = response?.data?.emailReason ?? response?.emailReason ?? "";
-                    const messageId = response?.data?.emailMessageId ?? response?.emailMessageId ?? "";
                     if (String(status).toLowerCase() === "sent") {
-                      setVerification({
-                        sending: false,
-                        status: `Verification email sent. Check your inbox and spam.${messageId ? ` Message-ID: ${messageId}` : ""}`
-                      });
+                      setVerification({ sending: false, status: "Email sent" });
+                      navigate(`/verify-email?email=${encodeURIComponent(email)}`);
                     } else {
                       setVerification({
                         sending: false,
-                        status: `Verification email could not be sent (${status}${reason ? `: ${reason}` : ""}).${messageId ? ` Message-ID: ${messageId}` : ""}`
+                        status: `Verification email could not be sent (${status}${reason ? `: ${reason}` : ""}).`
                       });
                     }
                   } catch (err) {
@@ -266,6 +268,56 @@ export default function SignupPage() {
           </div>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function RolePicker({ value, onChange, options }) {
+  return (
+    <div className="space-y-3">
+      <div>
+        <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Choose role</p>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Pick how you want to use Qring on this device.</p>
+      </div>
+      <div className="grid gap-3">
+        {options.map((option) => {
+          const Icon = option.icon;
+          const isActive = value === option.value;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => onChange(option.value)}
+              className={`w-full rounded-[1.35rem] border px-4 py-4 text-left transition active:scale-[0.99] sm:px-5 ${
+                isActive
+                  ? "border-[#00346f] bg-[#d7e2ff]/60 shadow-[0_12px_26px_rgba(0,52,111,0.12)]"
+                  : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900"
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <div
+                  className={`grid h-12 w-12 shrink-0 place-items-center rounded-[1rem] ${
+                    isActive ? "bg-[#00346f] text-white" : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                  }`}
+                >
+                  <Icon className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-base font-bold text-slate-900 dark:text-white">{option.label}</p>
+                      <p className="mt-1 text-sm leading-5 text-slate-600 dark:text-slate-300">{option.description}</p>
+                    </div>
+                    <CheckCircle2
+                      className={`mt-0.5 h-5 w-5 shrink-0 ${isActive ? "text-[#00346f]" : "text-slate-300 dark:text-slate-600"}`}
+                    />
+                  </div>
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

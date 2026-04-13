@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Building2, CheckCircle2, Home, UserRound } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import AuthCard from "../../components/AuthCard";
 import { useAuth } from "../../state/AuthContext";
@@ -71,18 +72,30 @@ export default function GoogleRolePage() {
     <div className="grid min-h-screen place-items-center bg-slate-50 p-4 dark:bg-slate-950">
       <AuthCard title="Choose Your Role" subtitle="Select how you want to use Qring on this account">
         <form onSubmit={onContinue} className="space-y-4">
-          <label className="block text-sm">
-            <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">Role</span>
-            <select
-              value={role}
-              onChange={(event) => setRole(event.target.value)}
-              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-3 outline-none ring-brand-500 focus:ring-2 dark:border-slate-700 dark:bg-slate-900"
-            >
-              <option value="homeowner">Homeowner</option>
-              <option value="estate">Estate Manager</option>
-              <option value="resident">Resident</option>
-            </select>
-          </label>
+          <RolePicker
+            value={role}
+            onChange={setRole}
+            options={[
+              {
+                value: "homeowner",
+                label: "Homeowner",
+                description: "Control your home access, visitors, doors, and notifications.",
+                icon: Home
+              },
+              {
+                value: "estate",
+                label: "Estate Manager",
+                description: "Manage multiple homes, residents, security operations, and estate activity.",
+                icon: Building2
+              },
+              {
+                value: "resident",
+                label: "Resident",
+                description: "Join an estate-linked home account and continue with resident onboarding.",
+                icon: UserRound
+              }
+            ]}
+          />
 
           {error ? <p className="text-sm text-danger">{error}</p> : null}
 
@@ -105,6 +118,56 @@ export default function GoogleRolePage() {
           </div>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function RolePicker({ value, onChange, options }) {
+  return (
+    <div className="space-y-3">
+      <div>
+        <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Choose role</p>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Large touch-friendly options for quick selection on mobile.</p>
+      </div>
+      <div className="grid gap-3">
+        {options.map((option) => {
+          const Icon = option.icon;
+          const isActive = value === option.value;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => onChange(option.value)}
+              className={`w-full rounded-[1.35rem] border px-4 py-4 text-left transition active:scale-[0.99] sm:px-5 ${
+                isActive
+                  ? "border-[#00346f] bg-[#d7e2ff]/60 shadow-[0_12px_26px_rgba(0,52,111,0.12)]"
+                  : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900"
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <div
+                  className={`grid h-12 w-12 shrink-0 place-items-center rounded-[1rem] ${
+                    isActive ? "bg-[#00346f] text-white" : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                  }`}
+                >
+                  <Icon className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-base font-bold text-slate-900 dark:text-white">{option.label}</p>
+                      <p className="mt-1 text-sm leading-5 text-slate-600 dark:text-slate-300">{option.description}</p>
+                    </div>
+                    <CheckCircle2
+                      className={`mt-0.5 h-5 w-5 shrink-0 ${isActive ? "text-[#00346f]" : "text-slate-300 dark:text-slate-600"}`}
+                    />
+                  </div>
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

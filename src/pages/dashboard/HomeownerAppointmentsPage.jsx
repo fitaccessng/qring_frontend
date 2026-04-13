@@ -1,476 +1,305 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Share2 } from "lucide-react";
-import AppShell from "../../layouts/AppShell";
+import React, { useState, useMemo, useRef, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom"; // Added useNavigate
+import { motion, AnimatePresence } from "framer-motion";
 import {
-  createHomeownerAppointment,
-  getHomeownerAppointments,
-  getHomeownerDoors,
-  shareHomeownerAppointment
-} from "../../services/homeownerService";
-import useSubscription from "../../hooks/useSubscription";
-import { getCurrentDeviceLocation, openLocationSettings } from "../../utils/locationService";
+  Bell, Plus, User, Phone, CalendarOff, History,
+  CalendarDays, MessageSquare, LayoutGrid,
+  UserCircle, Trash2, ShieldCheck, X,
+  MapPin, DoorOpen, Clock, AlignLeft, Navigation,
+  ArrowLeft // Added ArrowLeft
+} from "lucide-react";
+import { useApiQuery, useApiMutation } from "../../hooks/useApi";
+import { endpoints } from "../../services/endpoints";
+import { useAuth } from "../../state/AuthContext";
+import { useNotifications } from "../../state/NotificationsContext";
 
-export default function HomeownerAppointmentsPage() {
-  const { subscription, hasFeature } = useSubscription();
-  const [appointments, setAppointments] = useState([]);
-  const [doorOptions, setDoorOptions] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [creating, setCreating] = useState(false);
-  const [sharingId, setSharingId] = useState("");
-  const [locating, setLocating] = useState(false);
-  const [locationBlocked, setLocationBlocked] = useState(false);
-  const [openingLocationSettings, setOpeningLocationSettings] = useState(false);
-  const autoLocateAttemptedRef = useRef(false);
+export default function AppointmentsPage() {
+  const navigate = useNavigate(); // For the back button logic
+  const { user } = useAuth();
+  const { unreadCount } = useNotifications();
+  const scrollContainerRef = useRef(null);
   const [selectedDate, setSelectedDate] = useState(() => toDateKey(new Date()));
-  const [form, setForm] = useState(() => {
-    const start = new Date(Date.now() + 20 * 60 * 1000);
-    const end = new Date(Date.now() + 80 * 60 * 1000);
-    return {
-      doorId: "",
-      visitorName: "",
-      visitorContact: "",
-      purpose: "",
-      startsAt: toLocalInputValue(start),
-      endsAt: toLocalInputValue(end),
-      geofenceLat: "",
-      geofenceLng: "",
-      geofenceRadiusMeters: "50"
-    };
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
+
+  // Error Safeguard
+  const listUrl = endpoints?.appointments?.list || "/appointments";
+  const createUrl = endpoints?.appointments?.create || "/appointments";
+
+  const { data: appointments, isLoading, refetch } = useApiQuery({
+    queryKey: ["appointments", selectedDate],
+    url: `${listUrl}?date=${selectedDate}`,
+    enabled: !!selectedDate,
   });
 
-  async function loadData() {
-    setLoading(true);
-    setError("");
-    try {
-      const [appointmentsData, doorsData] = await Promise.all([
-        getHomeownerAppointments(),
-        getHomeownerDoors()
-      ]);
-      const rows = Array.isArray(appointmentsData) ? appointmentsData : [];
-      const doors = Array.isArray(doorsData?.doors) ? doorsData.doors : [];
-      setAppointments(rows);
-      setDoorOptions(doors);
-      setForm((prev) => ({ ...prev, doorId: prev.doorId || doors?.[0]?.id || "" }));
-    } catch (requestError) {
-      setError(requestError.message ?? "Failed to load appointments.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  useEffect(() => {
-    if (autoLocateAttemptedRef.current) return;
-    autoLocateAttemptedRef.current = true;
-    handleUseCurrentLocation();
-  }, []);
-
-  const dateTiles = useMemo(() => buildMonthDateTiles(appointments), [appointments]);
-  const selectedRows = useMemo(
-    () => appointments.filter((row) => toDateKey(row?.startsAt) === selectedDate),
-    [appointments, selectedDate]
-  );
-  const shareHistory = useMemo(
-    () =>
-      appointments
-        .filter((row) => row?.shareTokenCreatedAt)
-        .sort((a, b) => new Date(b.shareTokenCreatedAt).getTime() - new Date(a.shareTokenCreatedAt).getTime())
-        .slice(0, 8),
-    [appointments]
-  );
-  const schedulingLocked = Boolean(subscription && !hasFeature("visitor_scheduling"));
-
-  async function handleCreate(event) {
-    event.preventDefault();
-    setCreating(true);
-    setError("");
-    try {
-      if (schedulingLocked) {
-        throw new Error("Visitor scheduling is not available on your current plan. Upgrade to continue.");
-      }
-      const created = await createHomeownerAppointment({
-        doorId: form.doorId,
-        visitorName: form.visitorName,
-        visitorContact: form.visitorContact,
-        purpose: form.purpose,
-        startsAt: new Date(form.startsAt).toISOString(),
-        endsAt: new Date(form.endsAt).toISOString(),
-        geofenceLat: form.geofenceLat ? Number(form.geofenceLat) : null,
-        geofenceLng: form.geofenceLng ? Number(form.geofenceLng) : null,
-        geofenceRadiusMeters: form.geofenceRadiusMeters ? Number(form.geofenceRadiusMeters) : 50
-      });
-      if (created?.id) {
-        setAppointments((prev) => [created, ...prev.filter((row) => row.id !== created.id)]);
-        if (created?.startsAt) {
-          setSelectedDate(toDateKey(created.startsAt));
-        }
-      }
-      setForm((prev) => ({
-        ...prev,
-        visitorName: "",
-        visitorContact: "",
-        purpose: ""
-      }));
-    } catch (requestError) {
-      setError(requestError.message ?? "Failed to create appointment.");
-    } finally {
-      setCreating(false);
-    }
-  }
-
-  async function handleUseCurrentLocation() {
-    setLocating(true);
-    setError("");
-    try {
-      const location = await getCurrentDeviceLocation({
-        enableHighAccuracy: false,
-        timeout: 15000,
-        maximumAge: 60000,
-        maxCachedAgeMs: 10 * 60 * 1000
-      });
-      if (!location.ok) {
-        setLocationBlocked(true);
-        if (location.reason === "permission_denied") {
-          setError("Location permission denied. Please enable location in settings.");
-        } else if (location.reason === "service_off") {
-          setError("Location service is off. Please turn it on and try again.");
-        } else {
-          setError("Unable to read current location.");
-        }
-        return;
-      }
-
-      const lat = Number(location?.coords?.latitude);
-      const lng = Number(location?.coords?.longitude);
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-        setLocationBlocked(true);
-        setError("Unable to read current location.");
-        return;
-      }
-
-      setLocationBlocked(false);
-      setForm((prev) => ({
-        ...prev,
-        geofenceLat: lat.toFixed(6),
-        geofenceLng: lng.toFixed(6)
-      }));
-    } finally {
-      setLocating(false);
-    }
-  }
-
-  async function handleOpenLocationSettings() {
-    setOpeningLocationSettings(true);
-    const opened = await openLocationSettings();
-    if (!opened) {
-      setError("Unable to open settings automatically. Enable location from device settings.");
-    }
-    setOpeningLocationSettings(false);
-  }
-
-  async function handleShare(appointmentId) {
-    setSharingId(appointmentId);
-    setError("");
-    try {
-      if (schedulingLocked) {
-        throw new Error("Appointment sharing requires a plan with visitor scheduling.");
-      }
-      const data = await shareHomeownerAppointment(appointmentId);
-      const shareUrl = String(data?.shareUrl || "").trim();
-      if (!shareUrl) throw new Error("Share link unavailable.");
-      const shareMode = await shareAppointmentLink(shareUrl);
-      if (shareMode === "clipboard") {
-        window.dispatchEvent(
-          new CustomEvent("qring:flash", {
-            detail: {
-              type: "success",
-              title: "Copied",
-              message: "Appointment link copied to clipboard."
-            }
-          })
-        );
-      }
-      await loadData();
-    } catch (requestError) {
-      setError(requestError.message ?? "Failed to share appointment.");
-    } finally {
-      setSharingId("");
-    }
-  }
-
-  return (
-    <AppShell title="Appointments">
-      <div className="mx-auto w-full max-w-4xl space-y-5 px-1 pb-14 sm:space-y-6 sm:px-2">
-        {error ? (
-          <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/30 dark:bg-rose-900/20 dark:text-rose-400">
-            {error}
-          </div>
-        ) : null}
-        {schedulingLocked ? (
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-900/30 dark:bg-amber-900/20 dark:text-amber-300">
-            Visitor scheduling is locked on your {subscription?.planName || "current"} plan. Upgrade from Billing to create and share appointments.
-          </div>
-        ) : null}
-
-          <section className="rounded-[2rem] border border-slate-200 bg-white/95 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/90 sm:p-5">
-          <h3 className="text-base font-black text-slate-900 dark:text-slate-100">Calendar</h3>
-          <div className="-mx-1 mt-3 flex snap-x gap-2 overflow-x-auto px-1 py-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:gap-3">
-            {dateTiles.map((item) => (
-              <button
-                key={item.date}
-                type="button"
-                onClick={() => setSelectedDate(item.date)}
-                className={`min-w-[4.6rem] snap-start rounded-2xl px-2.5 py-2.5 text-center transition-all sm:min-w-[5rem] sm:px-3 sm:py-3 ${
-                  item.date === selectedDate
-                    ? "bg-violet-600 text-white shadow-[0_10px_24px_rgba(124,58,237,0.35)]"
-                    : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
-                }`}
-              >
-                <p className={`text-[10px] font-semibold uppercase tracking-wide ${item.date === selectedDate ? "text-violet-100" : "text-slate-500"}`}>{item.month}</p>
-                <p className="mt-1 text-2xl font-black sm:text-3xl">{item.day}</p>
-                <p className={`mt-1 text-[11px] font-semibold ${item.date === selectedDate ? "text-violet-100" : "text-slate-500"}`}>{item.weekday}</p>
-                <p className={`mt-1 text-[10px] font-semibold ${item.date === selectedDate ? "text-violet-200" : "text-slate-400"}`}>{item.count}</p>
-              </button>
-            ))}
-          </div>
-
-          <div className="mt-4 space-y-2">
-            {loading ? <p className="text-sm text-slate-500">Loading appointments...</p> : null}
-            {!loading && selectedRows.length === 0 ? (
-              <p className="text-sm text-slate-500">No appointments for selected date.</p>
-            ) : null}
-            {selectedRows.map((appt) => (
-              <div
-                key={appt.id}
-                className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/70"
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{appt.visitorName}</p>
-                  <p className="text-xs text-slate-500">{new Date(appt.startsAt).toLocaleString()} - {appt.statusLabel || appt.status}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleShare(appt.id)}
-                  disabled={sharingId === appt.id || schedulingLocked}
-                  className="inline-flex items-center gap-1 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
-                >
-                  <Share2 className="h-3.5 w-3.5" />
-                  {sharingId === appt.id ? "Sharing..." : "Share"}
-                </button>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="rounded-[2rem] border border-slate-200 bg-white/95 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/90 sm:p-5">
-          <h3 className="text-base font-black text-slate-900 dark:text-slate-100">Create Appointment</h3>
-          <p className="mt-1 text-xs text-slate-500">Generate scheduled access and share a secure link with visitor.</p>
-          <form onSubmit={handleCreate} className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <label className="space-y-1">
-              <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Visitor Name</span>
-              <input
-                value={form.visitorName}
-                onChange={(event) => setForm((prev) => ({ ...prev, visitorName: event.target.value }))}
-                placeholder="Visitor name"
-                required
-                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
-              />
-            </label>
-            <label className="space-y-1">
-              <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Visitor Contact</span>
-              <input
-                value={form.visitorContact}
-                onChange={(event) => setForm((prev) => ({ ...prev, visitorContact: event.target.value }))}
-                placeholder="Phone or email"
-                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
-              />
-            </label>
-            <label className="space-y-1">
-              <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Door</span>
-              <select
-                value={form.doorId}
-                onChange={(event) => setForm((prev) => ({ ...prev, doorId: event.target.value }))}
-                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
-                required
-              >
-                {doorOptions.map((door) => (
-                  <option key={door.id} value={door.id}>
-                    {door.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="space-y-1">
-              <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Start Time</span>
-              <input
-                type="datetime-local"
-                value={form.startsAt}
-                onChange={(event) => setForm((prev) => ({ ...prev, startsAt: event.target.value }))}
-                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
-                required
-              />
-            </label>
-            <label className="space-y-1">
-              <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">End Time</span>
-              <input
-                type="datetime-local"
-                value={form.endsAt}
-                onChange={(event) => setForm((prev) => ({ ...prev, endsAt: event.target.value }))}
-                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
-                required
-              />
-            </label>
-            <label className="space-y-1">
-              <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Latitude (optional)</span>
-              <input
-                value={form.geofenceLat}
-                onChange={(event) => setForm((prev) => ({ ...prev, geofenceLat: event.target.value }))}
-                placeholder="e.g. 6.524379"
-                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
-              />
-            </label>
-            <label className="space-y-1">
-              <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Longitude (optional)</span>
-              <input
-                value={form.geofenceLng}
-                onChange={(event) => setForm((prev) => ({ ...prev, geofenceLng: event.target.value }))}
-                placeholder="e.g. 3.379206"
-                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
-              />
-            </label>
-            <div className="sm:col-span-2">
-              <button
-                type="button"
-                onClick={handleUseCurrentLocation}
-                disabled={locating}
-                className="rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 transition-all active:scale-95 disabled:opacity-50 dark:border-indigo-800/40 dark:bg-indigo-900/20 dark:text-indigo-300"
-              >
-                {locating ? "Capturing location..." : "Use current location"}
-              </button>
-              {locationBlocked ? (
-                <button
-                  type="button"
-                  onClick={handleOpenLocationSettings}
-                  disabled={openingLocationSettings}
-                  className="ml-2 rounded-xl border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 transition-all active:scale-95 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200"
-                >
-                  {openingLocationSettings ? "Opening Settings..." : "Turn On Location"}
-                </button>
-              ) : null}
-            </div>
-            <label className="space-y-1 sm:col-span-2">
-              <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Purpose</span>
-              <textarea
-                value={form.purpose}
-                onChange={(event) => setForm((prev) => ({ ...prev, purpose: event.target.value }))}
-                placeholder="Reason for appointment"
-                rows={2}
-                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
-              />
-            </label>
-            <button
-              type="submit"
-              disabled={creating || schedulingLocked}
-              className="sm:col-span-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
-            >
-              {creating ? "Creating..." : "Create Appointment"}
-            </button>
-          </form>
-        </section>
-
-      
-
-        <section className="rounded-[2rem] border border-slate-200 bg-white/95 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/90 sm:p-5">
-          <h3 className="text-base font-black text-slate-900 dark:text-slate-100">Share History</h3>
-          <div className="mt-3 space-y-2">
-            {shareHistory.length === 0 ? (
-              <p className="text-sm text-slate-500">No shares yet.</p>
-            ) : (
-              shareHistory.map((row) => (
-                <div
-                  key={`share-${row.id}`}
-                  className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800/70"
-                >
-                  <p className="font-semibold text-slate-900 dark:text-slate-100">{row.visitorName}</p>
-                  <p className="text-xs text-slate-500">
-                    Shared: {new Date(row.shareTokenCreatedAt).toLocaleString()} | Status: {row.statusLabel || row.status}
-                  </p>
-                </div>
-              ))
-            )}
-          </div>
-        </section>
-      </div>
-    </AppShell>
-  );
-}
-
-function toDateKey(value) {
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
-function buildMonthDateTiles(rows) {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const counts = rows.reduce((acc, row) => {
-    const key = toDateKey(row?.startsAt);
-    if (!key) return acc;
-    acc[key] = (acc[key] || 0) + 1;
-    return acc;
-  }, {});
-
-  return Array.from({ length: daysInMonth }).map((_, idx) => {
-    const date = new Date(year, month, idx + 1);
-    const key = toDateKey(date);
-    return {
-      date: key,
-      day: date.getDate(),
-      month: date.toLocaleString(undefined, { month: "short" }),
-      weekday: date.toLocaleString(undefined, { weekday: "short" }),
-      count: counts[key] ?? 0
-    };
+  const createMutation = useApiMutation({
+    url: createUrl,
+    method: "POST",
+    onSuccess: () => {
+      refetch();
+      setIsModalOpen(false);
+    },
   });
-}
 
-function toLocalInputValue(date) {
-  const dt = date instanceof Date ? date : new Date(date);
-  if (Number.isNaN(dt.getTime())) return "";
-  const local = new Date(dt.getTime() - dt.getTimezoneOffset() * 60000);
-  return local.toISOString().slice(0, 16);
-}
+  const dateTiles = useMemo(() => buildDateTiles(), []);
 
-async function shareAppointmentLink(shareUrl) {
-  const payload = {
-    title: "Qring Secure Appointment Invitation",
-    text: "You are invited for a scheduled visit. Open this secure link to confirm your appointment and receive QR access.",
-    url: shareUrl
+  const handleGetLocation = () => {
+    setIsLocating(true);
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const latInput = document.getElementsByName('latitude')[0];
+          const lngInput = document.getElementsByName('longitude')[0];
+          if (latInput) latInput.value = position.coords.latitude.toFixed(6);
+          if (lngInput) lngInput.value = position.coords.longitude.toFixed(6);
+          setIsLocating(false);
+        },
+        () => {
+          alert("Location access denied.");
+          setIsLocating(false);
+        }
+      );
+    }
   };
 
-  const nativeShare = globalThis?.Capacitor?.Plugins?.Share;
-  if (nativeShare?.share) {
-    await nativeShare.share({
-      ...payload,
-      dialogTitle: "Share appointment"
-    });
-    return "native";
-  }
+  const handleCreateAppointment = async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const payload = Object.fromEntries(formData.entries());
+    payload.selectedDate = selectedDate;
+    createMutation.mutate(payload);
+  };
 
-  if (navigator.share) {
-    await navigator.share(payload);
-    return "web";
-  }
+  return (
+    <div className="bg-[#f8f9fa] min-h-screen font-sans pb-32 overflow-x-hidden">
+      {/* Updated Header with Back Arrow */}
+      <header className="fixed top-0 w-full z-[100] bg-white/90 backdrop-blur-md border-b border-slate-100 px-6 py-4">
+        <div className="max-w-5xl mx-auto w-full flex justify-between items-center">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => navigate(-1)}
+              className="p-2 -ml-2 hover:bg-slate-50 rounded-full transition-colors text-slate-600"
+            >
+              <ArrowLeft size={22} />
+            </button>
+            <div>
+              <h1 className="font-bold text-lg text-slate-900 leading-none">Appointments</h1>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter mt-1">Security Access</p>
+            </div>
+          </div>
 
-  await navigator.clipboard.writeText(shareUrl);
-  return "clipboard";
+          <Link to="/dashboard/notifications" className="relative p-2.5 bg-slate-50 text-slate-600 rounded-full hover:bg-indigo-50 transition-all">
+            <Bell size={18} />
+            {unreadCount > 0 && (
+              <span className="absolute top-2 right-2.5 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white" />
+            )}
+          </Link>
+        </div>
+      </header>
+
+      <main className="pt-24 px-6 max-w-4xl mx-auto space-y-8">
+        <section>
+          <div className="flex justify-between items-end mb-4">
+            <h2 className="font-extrabold text-2xl text-slate-900 tracking-tight">Select Date</h2>
+            <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1">{formatDateHeader(selectedDate)}</span>
+          </div>
+          <div ref={scrollContainerRef} className="flex gap-3 overflow-x-auto pb-4 no-scrollbar snap-x">
+            {dateTiles.map((item) => {
+              const isActive = selectedDate === item.date;
+              return (
+                <button
+                  key={item.date}
+                  onClick={() => setSelectedDate(item.date)}
+                  className={`flex-shrink-0 w-16 h-24 flex flex-col items-center justify-center rounded-3xl transition-all snap-start ${
+                    isActive ? "bg-indigo-600 text-white shadow-xl shadow-indigo-200 scale-105" : "bg-white border border-slate-100 text-slate-400"
+                  }`}
+                >
+                  <span className="text-[9px] font-black uppercase mb-1">{item.weekday}</span>
+                  <span className="text-xl font-black">{item.day}</span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h3 className="font-bold text-lg text-slate-800">Scheduled Visitors</h3>
+            <span className="text-[10px] font-bold text-slate-400 uppercase bg-slate-100 px-3 py-1 rounded-full">{appointments?.length || 0} Expected</span>
+          </div>
+          {isLoading ? (
+            <div className="animate-pulse space-y-4">
+              {[1, 2].map(i => <div key={i} className="h-20 bg-white rounded-[2rem] border border-slate-100" />)}
+            </div>
+          ) : appointments?.length > 0 ? (
+            <div className="space-y-3">
+              {appointments.map((appt, idx) => (
+                <div key={idx} className="bg-white p-5 rounded-[2rem] border border-slate-100 flex items-center justify-between group shadow-sm">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center"><User size={22} /></div>
+                    <div>
+                      <p className="font-bold text-sm text-slate-900">{appt.name || appt.visitorName}</p>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{appt.phone || appt.visitorPhone}</p>
+                    </div>
+                  </div>
+                  <button className="p-2 text-slate-300 hover:text-rose-500 transition-colors"><Trash2 size={18} /></button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-16 bg-white rounded-[3rem] border-2 border-dashed border-slate-100 text-center px-6">
+              <CalendarOff size={40} className="text-slate-200 mb-4" />
+              <p className="text-xs font-black text-slate-400 uppercase tracking-widest">No scheduled visits</p>
+            </div>
+          )}
+        </section>
+      </main>
+
+      <button
+        onClick={() => setIsModalOpen(true)}
+        className="fixed bottom-28 right-6 w-16 h-16 bg-indigo-600 text-white rounded-full shadow-2xl shadow-indigo-300 flex items-center justify-center hover:bg-indigo-700 active:scale-90 transition-all z-[90] border-4 border-white"
+      >
+        <Plus size={28} />
+      </button>
+
+      {/* MODAL SECTION */}
+      <AnimatePresence>
+        {isModalOpen && (
+          <div className="fixed inset-0 z-[1000] flex items-end sm:items-center justify-center">
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setIsModalOpen(false)}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+            />
+
+            <motion.div
+              initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+              className="relative bg-white w-full max-w-lg rounded-t-[2.5rem] sm:rounded-[2.5rem] flex flex-col h-[85vh] sm:h-auto sm:max-h-[90vh] shadow-2xl overflow-hidden"
+            >
+              {/* Modal Header */}
+              <div className="p-8 pb-4 bg-white shrink-0">
+                <div className="flex justify-between items-start mb-2">
+                  <h3 className="font-black text-2xl text-slate-900 tracking-tight">Create Appointment</h3>
+                  <button onClick={() => setIsModalOpen(false)} className="p-2 bg-slate-50 rounded-full text-slate-400"><X size={20} /></button>
+                </div>
+                <p className="text-slate-500 text-xs font-medium leading-relaxed">Schedule access and share link with visitor.</p>
+              </div>
+
+              {/* Scrollable Form Content */}
+              <form onSubmit={handleCreateAppointment} className="flex-1 flex flex-col overflow-hidden">
+                <div className="flex-1 overflow-y-auto px-8 py-4 space-y-6 no-scrollbar">
+                  <InputField label="Visitor Name" name="visitorName" placeholder="Full Name" icon={<User size={18}/>} required />
+                  <InputField label="Visitor Contact" name="visitorPhone" placeholder="+234..." icon={<Phone size={18}/>} required />
+
+                  <div className="h-px bg-slate-100 w-full" />
+
+                  <InputField label="Door / Point of Entry" name="door" placeholder="Main Gate, Front Door..." icon={<DoorOpen size={18}/>} required />
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <InputField label="Start Time" name="startTime" type="datetime-local" icon={<Clock size={18}/>} required />
+                    <InputField label="End Time" name="endTime" type="datetime-local" icon={<Clock size={18}/>} required />
+                  </div>
+
+                  <div className="h-px bg-slate-100 w-full" />
+
+                  {/* Geofencing Section */}
+                  <div className="space-y-4 bg-slate-50 p-5 rounded-[2rem] border border-slate-100">
+                    <div className="flex justify-between items-center px-1">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Location Security</label>
+                      <button type="button" onClick={handleGetLocation} className="flex items-center gap-1.5 text-[10px] font-bold text-indigo-600 uppercase">
+                        <Navigation size={12} className={isLocating ? "animate-pulse" : ""} />
+                        {isLocating ? "Locating..." : "Turn On Location"}
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <InputField label="Latitude" name="latitude" placeholder="Optional" icon={<MapPin size={16}/>} />
+                      <InputField label="Longitude" name="longitude" placeholder="Optional" icon={<MapPin size={16}/>} />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Purpose</label>
+                    <div className="relative">
+                      <textarea name="purpose" placeholder="Reason for visit..." rows="3" className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-bold text-slate-900 focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 transition-all outline-none resize-none" />
+                      <div className="absolute right-5 top-4 text-slate-300"><AlignLeft size={18} /></div>
+                    </div>
+                  </div>
+                  <div className="h-6" />
+                </div>
+
+                {/* Fixed Footer Action */}
+                <div className="p-8 pt-4 bg-white border-t border-slate-100 shrink-0">
+                  <button
+                    type="submit"
+                    disabled={createMutation.isLoading}
+                    className="w-full bg-indigo-600 text-white font-black text-xs uppercase tracking-widest py-5 rounded-2xl shadow-xl shadow-indigo-100 flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-50"
+                  >
+                    {createMutation.isLoading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><ShieldCheck size={18} /> Invite Guest</>}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Bottom Nav */}
+      <nav className="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-8 pt-4 bg-white border-t border-slate-100 z-[999] shadow-[0_-10px_40px_rgba(0,0,0,0.08)]">
+        <NavItem to="/dashboard/homeowner/overview" icon={<LayoutGrid size={22} />} label="Home" />
+        <NavItem to="/dashboard/homeowner/visits" icon={<History size={22} />} label="Activity" />
+        <NavItem to="/dashboard/homeowner/appointments" icon={<CalendarDays size={22} />} label="Schedule" active />
+        <NavItem to="/dashboard/homeowner/messages" icon={<MessageSquare size={22} />} label="Inbox" />
+        <NavItem to="/dashboard/homeowner/settings" icon={<User size={22} />} label="Profile" />
+      </nav>
+    </div>
+  );
+}
+
+// Sub-components
+function InputField({ label, icon, ...props }) {
+  return (
+    <div className="space-y-2">
+      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">{label}</label>
+      <div className="relative group">
+        <input
+          {...props}
+          className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-bold text-slate-900 focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 transition-all outline-none placeholder:text-slate-300"
+        />
+        <div className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-600 transition-colors pointer-events-none">
+          {icon}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function NavItem({ to, icon, label, active = false }) {
+  return (
+    <Link to={to} className={`flex flex-col items-center justify-center min-w-[64px] transition-all active:scale-90 ${active ? 'text-indigo-600' : 'text-slate-400'}`}>
+      <div className={`${active ? 'bg-indigo-50 p-2 rounded-xl' : ''}`}>{icon}</div>
+      <span className="text-[9px] font-black uppercase mt-1 tracking-tight">{label}</span>
+    </Link>
+  );
+}
+
+// Utils
+function toDateKey(val) {
+  const d = new Date(val);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function formatDateHeader(key) {
+  const d = new Date(`${key}T00:00:00`);
+  return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+}
+
+function buildDateTiles() {
+  const days = [];
+  const now = new Date();
+  for (let i = -2; i <= 14; i++) {
+    const d = new Date();
+    d.setDate(now.getDate() + i);
+    days.push({ date: toDateKey(d), day: d.getDate(), weekday: d.toLocaleString('en-US', { weekday: 'short' }) });
+  }
+  return days;
 }

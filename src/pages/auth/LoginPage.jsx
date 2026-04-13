@@ -25,11 +25,16 @@ function resolveTargetPath(data, fromPath) {
   return fromPath ?? fallback;
 }
 
-function resolveLoginErrorMessage(submitError) {
+function resolveLoginErrorMessage(submitError, attemptedLogin = "") {
   const status = Number(submitError?.status ?? 0);
   const message = String(submitError?.message || "");
+  const normalizedLogin = String(attemptedLogin || "").trim().toLowerCase();
+  const looksLikeEmailLogin = normalizedLogin.includes("@");
   if (status === 401 || message.toLowerCase().includes("invalid credential")) {
-    return "Invalid email or password.";
+    if (looksLikeEmailLogin) {
+      return "We could not sign you in with that email and password. If this is an invited estate resident account and you already used the latest invite details, ask the estate manager to resend the invite so your access details can be refreshed.";
+    }
+    return "We could not sign you in. If you were invited by an estate manager and already used the latest invite details, ask them to resend your invite and try again.";
   }
   return message || "Login failed";
 }
@@ -98,7 +103,7 @@ export default function LoginPage() {
         setVerificationState((prev) => ({ ...prev, needed: true }));
         return;
       }
-      setError(resolveLoginErrorMessage(submitError));
+      setError(resolveLoginErrorMessage(submitError, form.email));
     }
   };
 
@@ -158,18 +163,14 @@ export default function LoginPage() {
                     const response = await requestEmailVerification({ email });
                     const status = response?.data?.emailStatus ?? response?.emailStatus ?? "unknown";
                     const reason = response?.data?.emailReason ?? response?.emailReason ?? "";
-                    const messageId = response?.data?.emailMessageId ?? response?.emailMessageId ?? "";
                     if (String(status).toLowerCase() === "sent") {
-                      setVerificationState({
-                        needed: true,
-                        sending: false,
-                        status: `Verification email sent. Check your inbox and spam.${messageId ? ` Message-ID: ${messageId}` : ""}`
-                      });
+                      setVerificationState({ needed: true, sending: false, status: "Email sent" });
+                      navigate(`/verify-email?email=${encodeURIComponent(email)}`);
                     } else {
                       setVerificationState({
                         needed: true,
                         sending: false,
-                        status: `Verification email could not be sent (${status}${reason ? `: ${reason}` : ""}).${messageId ? ` Message-ID: ${messageId}` : ""}`
+                        status: `Verification email could not be sent (${status}${reason ? `: ${reason}` : ""}).`
                       });
                     }
                   } catch (err) {

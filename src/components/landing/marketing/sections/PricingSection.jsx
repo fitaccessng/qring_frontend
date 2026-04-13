@@ -9,10 +9,10 @@ const estatePlans = [
     monthlyPrice: 0,
     yearlyPrice: 0,
     monthlyBilling: "/month",
-    yearlyBilling: "/year",
-    intro: "Up to 3 houses",
-    subsidy: "Trial only",
-    note: "30 days of full system access at limited scale.",
+    yearlyBilling: "/month",
+    intro: "Up to 3 houses (trial only, 30 days)",
+    subsidy: "Trial only - 30 days",
+    note: "Full system access at limited scale.",
     cta: "Start Free Trial",
     to: "/signup",
     features: ["Up to 3 houses", "Full system access (limited scale)", "Trial only - 30 days"],
@@ -20,27 +20,27 @@ const estatePlans = [
   {
     id: "estate-basic",
     name: "Estate Basic",
-    monthlyPrice: 300,
-    yearlyPrice: 3600,
-    monthlyBilling: "/house/month",
-    yearlyBilling: "/house/year",
-    intro: "Core tools for daily estate operations",
-    subsidy: "First 2 houses free",
-    note: "Typical 10-house estate: ~₦2,400/month",
+    monthlyPrice: 6000,
+    yearlyPrice: 72000,
+    monthlyBilling: "/month",
+    yearlyBilling: "/year",
+    intro: "Up to 10 houses",
+    subsidy: "Standard plan",
+    note: "Realtime alerts, visitor logs, resident management, and mobile dashboard.",
     cta: "Start Basic",
     to: "/signup",
-    features: ["Visitor logs", "Resident management", "Mobile dashboard", "Real-time alerts"],
+    features: ["Up to 10 houses", "Realtime alerts", "Visitor logs", "Resident management", "Mobile dashboard"],
   },
   {
     id: "estate-plus",
     name: "Estate Plus",
-    monthlyPrice: 300,
-    yearlyPrice: 3600,
-    monthlyBilling: "/house/month",
-    yearlyBilling: "/house/year",
-    intro: "Adds scheduling and verified access flow",
-    subsidy: "First 2 houses free",
-    note: "Typical 15-house estate: ~₦3,900/month",
+    monthlyPrice: 9000,
+    yearlyPrice: 108000,
+    monthlyBilling: "/month",
+    yearlyBilling: "/year",
+    intro: "Up to 15 houses",
+    subsidy: "Growing estates",
+    note: "Everything in Basic plus scheduling, access windows, and chat + call verification.",
     cta: "Choose Plus",
     to: "/signup",
     features: ["Everything in Basic", "Visitor scheduling", "Access time windows", "Chat & call verification"],
@@ -48,13 +48,13 @@ const estatePlans = [
   {
     id: "estate-growth",
     name: "Estate Growth",
-    monthlyPrice: 300,
-    yearlyPrice: 3600,
-    monthlyBilling: "/house/month",
-    yearlyBilling: "/house/year",
-    intro: "Built for growing estates that need more oversight",
-    subsidy: "First 2 houses free",
-    note: "Typical 30-house estate: ~₦8,400/month",
+    monthlyPrice: 18000,
+    yearlyPrice: 216000,
+    monthlyBilling: "/month",
+    yearlyBilling: "/year",
+    intro: "Up to 30 houses",
+    subsidy: "Popular",
+    note: "Everything in Plus with multi-admin roles, analytics dashboard, and activity tracking.",
     cta: "Choose Growth",
     to: "/signup",
     popular: true,
@@ -63,43 +63,69 @@ const estatePlans = [
   {
     id: "estate-pro",
     name: "Estate Pro",
-    monthlyPrice: 300,
-    yearlyPrice: 3600,
-    monthlyBilling: "/house/month",
-    yearlyBilling: "/house/year",
-    intro: "More control for larger and security-focused estates",
-    subsidy: "First 2 houses free",
-    note: "Typical 50-house estate: ~₦14,400/month",
-    cta: "Choose Pro",
+    monthlyPrice: 30000,
+    yearlyPrice: 360000,
+    monthlyBilling: "/month",
+    yearlyBilling: "/year",
+    intro: "Up to 50 houses",
+    subsidy: "Advanced control",
+    note: "Everything in Growth with advanced analytics, audit logs, role permissions, and priority support.",
+    cta: "Start Pro",
     to: "/signup",
     features: ["Everything in Growth", "Advanced analytics", "Security audit logs", "Role permissions", "Priority support"],
+  },
+  {
+    id: "enterprise-estate",
+    name: "Enterprise Estate",
+    monthlyPrice: 0,
+    yearlyPrice: 0,
+    monthlyBilling: "",
+    yearlyBilling: "",
+    intro: "Custom plan for large estates",
+    subsidy: "Custom pricing",
+    note: "Unlimited houses, SLA + API access, multi-location control, and dedicated support.",
+    cta: "Contact Sales",
+    to: "/contact",
+    features: ["Unlimited houses", "SLA + API access", "Multi-location control", "Dedicated support"],
   },
 ];
 
 const homeownerPlans = [
   {
+    id: "free",
+    name: "Free",
+    monthlyPrice: 0,
+    yearlyPrice: 0,
+    monthlyBilling: "",
+    yearlyBilling: "",
+    note: "1 door with basic notifications and limited logs.",
+    cta: "Get Started Free",
+    to: "/signup",
+    features: ["1 door", "Basic notifications", "Limited logs"],
+  },
+  {
     id: "home-pro",
     name: "Home Pro",
-    monthlyPrice: 300,
-    yearlyPrice: 3600,
+    monthlyPrice: 2500,
+    yearlyPrice: 30000,
     monthlyBilling: "/month",
     yearlyBilling: "/year",
-    note: "Included for residents in QRing-enabled estates",
+    note: "Smart homeowner controls.",
     cta: "Choose Home Pro",
     to: "/signup",
-    features: ["Visitor history", "Visitor scheduling", "Chat & call verification", "Real-time notifications"],
+    features: ["Chat + call verification", "Visitor history", "Visitor scheduling", "Advanced notifications"],
   },
   {
     id: "home-premium",
     name: "Home Premium",
-    monthlyPrice: 1000,
-    yearlyPrice: 12000,
+    monthlyPrice: 4500,
+    yearlyPrice: 54000,
     monthlyBilling: "/month",
     yearlyBilling: "/year",
-    note: "For households that want more control across entry points",
+    note: "Advanced access and privacy.",
     cta: "Choose Home Premium",
     to: "/signup",
-    features: ["Everything in Home Pro", "Multiple door access", "Access time windows", "Advanced privacy controls", "Priority support"],
+    features: ["Multiple doors", "Access time windows", "Priority support", "Advanced privacy controls"],
   },
 ];
 
@@ -126,6 +152,7 @@ function PlanFeatureList({ items, subtle = false }) {
 }
 
 function formatPrice(amount) {
+  if (amount === 0) return "Free";
   return `₦${amount.toLocaleString()}`;
 }
 
@@ -159,9 +186,7 @@ function EstatePlanRow({ plan, billingCycle }) {
             {plan.subsidy}
           </span>
         </div>
-        <p className="mt-3 text-sm font-medium text-slate-500 dark:text-slate-400">
-          {billingCycle === "yearly" ? plan.note.replace("/month", "/month equivalent") : plan.note}
-        </p>
+        <p className="mt-3 text-sm font-medium text-slate-500 dark:text-slate-400">{plan.note}</p>
       </div>
 
       <PlanFeatureList items={plan.features} />
@@ -169,9 +194,9 @@ function EstatePlanRow({ plan, billingCycle }) {
       <div className="border-t border-slate-200/70 pt-4 lg:border-t-0 lg:border-l lg:border-slate-200/70 lg:pl-8 dark:border-slate-800">
         <p className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-500 dark:text-slate-400">Why it works</p>
         <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
-          Affordable, predictable pricing for estates that want secure visitor access without heavy setup costs.
+          Clear fixed pricing for estates that want predictable visitor access and resident control.
         </p>
-        <p className="mt-4 text-sm font-semibold text-blue-700 dark:text-blue-300">Less than the cost of airtime per household</p>
+        <p className="mt-4 text-sm font-semibold text-blue-700 dark:text-blue-300">Built to scale from trial to enterprise</p>
       </div>
 
       <div className="lg:min-w-[180px]">
@@ -227,8 +252,6 @@ function HomeownerPlanBlock({ plan, billingCycle }) {
 
 export function PricingShowcase({ compact = false }) {
   const [billingCycle, setBillingCycle] = useState("monthly");
-  const anchorPrice = billingCycle === "yearly" ? "₦3,600" : "₦300";
-  const anchorBilling = billingCycle === "yearly" ? "/ house / year" : "/ house / month";
 
   return (
     <section id="pricing" className={compact ? "py-16 sm:py-20" : "pb-16 pt-8 sm:pb-20 sm:pt-10"}>
@@ -239,7 +262,7 @@ export function PricingShowcase({ compact = false }) {
             Clear pricing for estates and homeowners
           </h2>
           <p className="mt-4 text-base leading-7 text-slate-600 dark:text-slate-300">
-            Start small, scale by household, and keep costs predictable as your community grows.
+            Fixed plan pricing for estates and homeowners with clear limits, features, and upgrade paths.
           </p>
         </div>
 
@@ -272,30 +295,13 @@ export function PricingShowcase({ compact = false }) {
           </div>
         </div>
 
-        <div className="mt-6 rounded-2xl border border-blue-100 bg-[linear-gradient(180deg,rgba(239,246,255,0.9),rgba(255,255,255,1))] px-5 py-5 sm:px-7 dark:border-blue-900/40 dark:bg-[linear-gradient(180deg,rgba(2,132,199,0.14),rgba(2,6,23,0.24))]">
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:items-center">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-blue-700 dark:text-blue-300">Estate pricing anchor</p>
-              <div className="mt-3 flex flex-wrap items-end gap-2 text-slate-950 dark:text-white">
-                <span className="text-5xl font-black tracking-tight sm:text-6xl">{anchorPrice}</span>
-                <span className="pb-2 text-base font-semibold text-slate-500 dark:text-slate-400">{anchorBilling}</span>
-              </div>
-            </div>
-            <div className="space-y-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
-              <p className="font-semibold text-slate-900 dark:text-white">First 2 houses free on every estate plan.</p>
-              <p>That means many estates get started at a very low monthly cost while keeping the same trusted QRing workflow.</p>
-              <p className="font-semibold text-blue-700 dark:text-blue-300">Less than the cost of airtime per household.</p>
-            </div>
-          </div>
-        </div>
-
         <div className="mt-10">
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500 dark:text-slate-400">Section 1</p>
               <h3 className="mt-2 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl dark:text-white">Estate Plans</h3>
             </div>
-            <p className="hidden text-sm font-medium text-slate-500 lg:block dark:text-slate-400">Simple monthly billing. Scale only when the estate grows.</p>
+            <p className="hidden text-sm font-medium text-slate-500 lg:block dark:text-slate-400">Fixed plan pricing for every estate size.</p>
           </div>
 
           <div className="mt-6 rounded-2xl border border-slate-200 bg-white px-5 sm:px-7 dark:border-slate-800 dark:bg-slate-950">
@@ -303,8 +309,6 @@ export function PricingShowcase({ compact = false }) {
               <EstatePlanRow key={plan.id} plan={plan} billingCycle={billingCycle} />
             ))}
           </div>
-
-          <p className="mt-4 text-sm font-medium text-slate-500 dark:text-slate-400">Minimum monthly billing: ₦2,000 per estate</p>
         </div>
 
         <div className="mt-14 rounded-2xl border border-slate-200/90 bg-slate-50/70 px-5 py-6 sm:px-7 sm:py-8 dark:border-slate-800 dark:bg-slate-900/40">
@@ -312,7 +316,7 @@ export function PricingShowcase({ compact = false }) {
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500 dark:text-slate-400">Section 2</p>
             <h3 className="mt-2 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl dark:text-white">Homeowner Plans</h3>
             <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
-              Personal plans for households that want extra control, with simple monthly pricing and the same trusted visitor flow.
+              Homeowner plans with simple monthly or yearly billing and clear access/privacy upgrades.
             </p>
           </div>
 

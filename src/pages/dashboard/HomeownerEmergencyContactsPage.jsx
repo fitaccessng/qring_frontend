@@ -1,179 +1,261 @@
-import { useEffect, useState } from "react";
-import { ChevronLeft, Phone, ShieldAlert } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import AppShell from "../../layouts/AppShell";
+import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import {
+  Bell,
+  ChevronLeft,
+  HeartHandshake,
+  History,
+  HomeIcon,
+  Info,
+  KeyRound,
+  LayoutGrid,
+  Shield,
+  ShieldAlert,
+  Trash2,
+  User as UserIcon,
+  UserPlus
+} from "lucide-react";
+import { useNotifications } from "../../state/NotificationsContext";
 import { getHomeownerSettings, updateHomeownerSettings } from "../../services/homeownerSettingsService";
 import { showError, showSuccess } from "../../utils/flash";
+import { formatEmergencyContact, parseEmergencyContact } from "../../utils/emergencyContacts";
 
-export default function HomeownerEmergencyContactsPage() {
+const EMPTY_FORM = {
+  name: "",
+  phone: "",
+  relationship: ""
+};
+
+export default function EmergencyContactsPage() {
   const navigate = useNavigate();
+  const { unreadCount } = useNotifications();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [settings, setSettings] = useState({
-    pushAlerts: true,
-    soundAlerts: true,
-    autoRejectUnknownVisitors: false,
-    autoApproveTrustedVisitors: false,
-    autoApproveKnownContacts: false,
-    knownContacts: [],
-    allowDeliveryDropAtGate: true,
-    smsFallbackEnabled: true
-  });
-  const [contactsInput, setContactsInput] = useState("");
+  const [settings, setSettings] = useState(null);
+  const [contacts, setContacts] = useState([]);
+  const [form, setForm] = useState(EMPTY_FORM);
 
   useEffect(() => {
     let active = true;
-    async function load() {
+
+    async function loadContacts() {
       setLoading(true);
       try {
         const data = await getHomeownerSettings();
         if (!active) return;
-        const next = {
-          pushAlerts: Boolean(data?.pushAlerts),
-          soundAlerts: Boolean(data?.soundAlerts),
-          autoRejectUnknownVisitors: Boolean(data?.autoRejectUnknownVisitors),
-          autoApproveTrustedVisitors: Boolean(data?.autoApproveTrustedVisitors),
-          autoApproveKnownContacts: Boolean(data?.autoApproveKnownContacts),
-          knownContacts: Array.isArray(data?.knownContacts) ? data.knownContacts : [],
-          allowDeliveryDropAtGate: Boolean(data?.allowDeliveryDropAtGate),
-          smsFallbackEnabled: Boolean(data?.smsFallbackEnabled)
-        };
-        setSettings(next);
-        setContactsInput(next.knownContacts.join("\n"));
-      } catch (requestError) {
+        const knownContacts = Array.isArray(data?.knownContacts) ? data.knownContacts : [];
+        setSettings(data || null);
+        setContacts(knownContacts.map((item, index) => parseEmergencyContact(item, index)));
+      } catch (error) {
         if (!active) return;
-        setError(requestError?.message || "Failed to load emergency contacts.");
+        showError(error?.message || "Failed to load emergency contacts.");
       } finally {
         if (active) setLoading(false);
       }
     }
-    load();
+
+    loadContacts();
     return () => {
       active = false;
     };
   }, []);
 
-  useEffect(() => {
-    if (error) showError(error);
-  }, [error]);
+  const isPanicActive = false;
+  const canAdd = form.name.trim() && form.phone.trim();
+  const autoEscalationLabel = useMemo(() => {
+    if (!contacts.length) return "Add at least one contact so alerts have someone to reach.";
+    return `QRing will notify ${contacts.length} configured contact${contacts.length === 1 ? "" : "s"} during escalation.`;
+  }, [contacts.length]);
 
-  async function handleSave() {
+  async function persistContacts(nextContacts, successMessage) {
+    if (!settings) return;
     setSaving(true);
-    setError("");
     try {
       const payload = {
-        ...settings,
-        knownContacts: contactsInput
-          .split("\n")
-          .map((item) => item.trim())
-          .filter(Boolean)
+        pushAlerts: Boolean(settings.pushAlerts),
+        soundAlerts: Boolean(settings.soundAlerts),
+        autoRejectUnknownVisitors: Boolean(settings.autoRejectUnknownVisitors),
+        autoApproveTrustedVisitors: Boolean(settings.autoApproveTrustedVisitors),
+        autoApproveKnownContacts: Boolean(settings.autoApproveKnownContacts),
+        knownContacts: nextContacts.map((item) => formatEmergencyContact(item)),
+        allowDeliveryDropAtGate: Boolean(settings.allowDeliveryDropAtGate),
+        smsFallbackEnabled: Boolean(settings.smsFallbackEnabled)
       };
       const updated = await updateHomeownerSettings(payload);
-      const nextContacts = Array.isArray(updated?.knownContacts) ? updated.knownContacts : payload.knownContacts;
-      setSettings((prev) => ({
-        ...prev,
-        ...updated,
-        knownContacts: nextContacts
-      }));
-      setContactsInput(nextContacts.join("\n"));
-      showSuccess("Emergency contacts saved.");
-      navigate("/dashboard/homeowner/safety");
-    } catch (requestError) {
-      setError(requestError?.message || "Failed to save emergency contacts.");
+      setSettings((prev) => ({ ...(prev || {}), ...(updated || {}), knownContacts: payload.knownContacts }));
+      setContacts(nextContacts);
+      showSuccess(successMessage);
+    } catch (error) {
+      showError(error?.message || "Failed to save emergency contacts.");
     } finally {
       setSaving(false);
     }
   }
 
+  async function handleAddContact() {
+    if (!canAdd || saving) return;
+    const nextContact = {
+      id: `contact_${Date.now()}`,
+      name: form.name.trim(),
+      phone: form.phone.trim(),
+      relationship: form.relationship.trim() || "Emergency Contact"
+    };
+    await persistContacts([...contacts, nextContact], "Emergency contact added.");
+    setForm(EMPTY_FORM);
+  }
+
+  async function handleRemoveContact(contactId) {
+    if (saving) return;
+    const nextContacts = contacts.filter((contact) => contact.id !== contactId);
+    await persistContacts(nextContacts, "Emergency contact removed.");
+  }
+
+  function iconForRelationship(value) {
+    const normalized = String(value || "").toLowerCase();
+    if (normalized.includes("family")) return <HeartHandshake className="text-indigo-600" size={28} />;
+    if (normalized.includes("neighbor")) return <HomeIcon className="text-emerald-600" size={28} />;
+    return <ShieldAlert className="text-rose-600" size={28} />;
+  }
+
+  function colorForRelationship(value) {
+    const normalized = String(value || "").toLowerCase();
+    if (normalized.includes("family")) return "bg-indigo-50";
+    if (normalized.includes("neighbor")) return "bg-emerald-50";
+    return "bg-rose-50";
+  }
+
   return (
-    <AppShell title="Emergency Contacts">
-      <div className="mx-auto max-w-md space-y-4 px-1 pb-24">
-        <section className="overflow-hidden rounded-[2rem] bg-[linear-gradient(180deg,#fff7ed_0%,#fff1f2_44%,#ffffff_100%)] px-5 pb-5 pt-4 shadow-[0_18px_40px_rgba(15,23,42,0.08)] ring-1 ring-slate-200">
-          <button
-            type="button"
-            onClick={() => navigate("/dashboard/homeowner/safety")}
-            className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200"
-          >
-            <ChevronLeft size={16} />
-            Back
-          </button>
-          <div className="mt-4 flex items-start gap-3">
-            <div className="grid h-10 w-20 place-items-center px-1 py-2  rounded-[2rem] bg-rose-600 text-white shadow-lg">
-              <Phone size={20} />
-            </div>
+    <div className="min-h-screen bg-[#f8f9fa] font-sans text-slate-900 antialiased flex flex-col">
+      <header className="fixed top-0 w-full z-[100] bg-white/80 backdrop-blur-md border-b border-slate-100 px-6 py-4">
+        <div className="max-w-4xl mx-auto flex justify-between items-center">
+          <div className="flex items-center gap-4">
+            <button onClick={() => navigate(-1)} className="p-2.5 bg-slate-50 text-slate-600 rounded-full hover:bg-slate-100 transition-colors">
+              <ChevronLeft size={20} />
+            </button>
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-rose-600">Emergency Contacts</p>
-              <h1 className="mt-2 text-2xl font-black tracking-tight text-slate-950">
-                Add the people QRing should escalate to.
-              </h1>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-                For independent homeowners, panic alerts route to these personal emergency contacts first. For estate homeowners, these become part of later escalation.
+              <h1 className="font-bold text-lg text-slate-900 leading-none">Safety Center</h1>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+                {isPanicActive ? "🔴 Emergency Active" : "🟢 System Armed"}
               </p>
             </div>
           </div>
+          <Link to="/dashboard/notifications" className="relative p-2.5 bg-slate-50 text-slate-600 rounded-full">
+            <Bell size={18} />
+            {unreadCount > 0 ? <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-white" /> : null}
+          </Link>
+        </div>
+      </header>
+
+      <main className="flex-grow pt-28 pb-32 px-6 max-w-2xl mx-auto w-full">
+        <section className="mb-10">
+          <h2 className="text-3xl font-black text-slate-900 tracking-tight mb-3">Emergency Contacts</h2>
+          <p className="text-slate-500 text-lg leading-relaxed">Manage the real contact list QRing will use during safety escalation.</p>
         </section>
 
-        <section className="rounded-[2rem] bg-white px-4 py-4 shadow-[0_12px_30px_rgba(15,23,42,0.08)] ring-1 ring-slate-200">
-          {loading ? <p className="text-sm text-slate-500">Loading contacts...</p> : null}
-          {!loading ? (
-            <div className="space-y-4">
-              <div className="rounded-[1.35rem] bg-slate-50 px-4 py-4 ring-1 ring-slate-200">
-                <div className="flex items-center gap-2">
-                  <ShieldAlert size={16} className="text-rose-600" />
-                  <p className="text-sm font-semibold text-slate-900">Personal Emergency Contacts</p>
-                </div>
-                <p className="mt-2 text-xs leading-5 text-slate-500">
-                  Add one contact per line. Include names and numbers so responders can identify the person quickly.
-                </p>
-                <textarea
-                  value={contactsInput}
-                  onChange={(event) => setContactsInput(event.target.value)}
-                  rows={8}
-                  className="mt-3 w-full rounded-[1.15rem] border border-slate-200 bg-white px-4 py-3 text-sm outline-none"
-                  placeholder={"Mum - 0803 000 0000\nBrother - 0805 111 1111\nFamily Doctor - 0703 222 2222"}
-                />
-              </div>
+        <section className="bg-white rounded-[2rem] p-6 border border-slate-100 shadow-sm mb-10">
+          <div className="flex items-center gap-3 mb-4">
+            <UserPlus size={20} className="text-indigo-600" />
+            <h3 className="font-bold text-slate-900">Add New Contact</h3>
+          </div>
+          <div className="grid gap-3 md:grid-cols-3">
+            <input
+              value={form.name}
+              onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
+              placeholder="Full name"
+              className="rounded-2xl bg-slate-50 border border-slate-100 px-4 py-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500/20"
+            />
+            <input
+              value={form.phone}
+              onChange={(event) => setForm((prev) => ({ ...prev, phone: event.target.value }))}
+              placeholder="Phone number"
+              className="rounded-2xl bg-slate-50 border border-slate-100 px-4 py-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500/20"
+            />
+            <input
+              value={form.relationship}
+              onChange={(event) => setForm((prev) => ({ ...prev, relationship: event.target.value }))}
+              placeholder="Relationship"
+              className="rounded-2xl bg-slate-50 border border-slate-100 px-4 py-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500/20"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={handleAddContact}
+            disabled={!canAdd || saving}
+            className="mt-4 w-full md:w-auto flex items-center justify-center gap-3 px-8 py-4 bg-indigo-600 text-white rounded-2xl font-bold active:scale-[0.98] transition-all shadow-lg shadow-indigo-200 disabled:opacity-60"
+          >
+            <UserPlus size={20} />
+            <span>{saving ? "Saving..." : "Add New Contact"}</span>
+          </button>
+        </section>
 
-              <div className="flex items-center justify-between rounded-[1.35rem] bg-slate-50 px-4 py-4 ring-1 ring-slate-200">
-                <div>
-                  <p className="text-sm font-semibold text-slate-900">Enable SMS fallback</p>
-                  <p className="mt-1 text-xs text-slate-500">Use SMS as a backup when internet delivery is weak.</p>
-                </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={settings.smsFallbackEnabled}
-                  onClick={() =>
-                    setSettings((prev) => ({
-                      ...prev,
-                      smsFallbackEnabled: !prev.smsFallbackEnabled
-                    }))
-                  }
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${
-                    settings.smsFallbackEnabled ? "bg-emerald-600" : "bg-slate-300"
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-5 w-5 rounded-full bg-white shadow transition ${
-                      settings.smsFallbackEnabled ? "translate-x-5" : "translate-x-1"
-                    }`}
-                  />
-                </button>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={saving}
-                className="w-full rounded-full bg-slate-950 px-5 py-3.5 text-sm font-semibold text-white"
-              >
-                {saving ? "Saving..." : "Save Emergency Contacts"}
-              </button>
+        <div className="space-y-4">
+          {loading ? (
+            <div className="bg-white rounded-[2rem] p-8 border border-slate-100 shadow-sm text-center text-slate-500 font-bold">Loading contacts...</div>
+          ) : contacts.length === 0 ? (
+            <div className="bg-white rounded-[2rem] p-8 border border-slate-100 shadow-sm text-center text-slate-500 font-bold">
+              No emergency contacts saved yet.
             </div>
-          ) : null}
-        </section>
+          ) : (
+            contacts.map((contact) => (
+              <div key={contact.id} className="group bg-white rounded-[2rem] p-6 border border-slate-100 shadow-sm hover:shadow-md transition-all duration-300">
+                <div className="flex items-center gap-5">
+                  <div className={`w-16 h-16 rounded-2xl ${colorForRelationship(contact.relationship)} flex items-center justify-center`}>
+                    {iconForRelationship(contact.relationship)}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between mb-1 gap-3">
+                      <span className="text-[10px] font-black uppercase tracking-[0.15em] text-indigo-500">
+                        {contact.relationship || "Emergency Contact"}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveContact(contact.id)}
+                        disabled={saving}
+                        className="text-slate-300 hover:text-rose-500 transition-colors disabled:opacity-60"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                    <h3 className="text-xl font-bold text-slate-900">{contact.name}</h3>
+                    <p className="text-slate-500 font-medium">{contact.phone || "No phone saved"}</p>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="mt-12 bg-white rounded-[2rem] p-8 border border-slate-100 flex flex-col md:flex-row gap-6 items-center">
+          <div className="flex-shrink-0 w-12 h-12 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center">
+            <Info size={24} />
+          </div>
+          <div className="text-center md:text-left">
+            <h4 className="font-bold text-slate-900 mb-1">Automatic Escalation</h4>
+            <p className="text-slate-500 text-sm leading-relaxed">{autoEscalationLabel}</p>
+          </div>
+        </div>
+      </main>
+
+      <nav className="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-8 pt-4 bg-white border-t border-slate-100 z-[9999] shadow-[0_-10px_40px_rgba(0,0,0,0.08)]">
+        <NavItem to="/dashboard/homeowner/overview" icon={<LayoutGrid size={22} />} label="Home" />
+        <NavItem to="/dashboard/homeowner/visits" icon={<History size={22} />} label="Activity" />
+        <NavItem to="/dashboard/homeowner/safety" icon={<Shield size={22} />} label="Safety" active />
+        <NavItem to="/dashboard/homeowner/doors" icon={<KeyRound size={22} />} label="Access" />
+        <NavItem to="/dashboard/homeowner/settings" icon={<UserIcon size={22} />} label="Profile" />
+      </nav>
+
+      <div className="fixed top-0 right-0 -z-10 w-1/2 h-full opacity-40 pointer-events-none overflow-hidden">
+        <div className="absolute top-0 right-0 w-full h-1/2 bg-gradient-to-bl from-indigo-100/50 via-transparent to-transparent blur-3xl" />
       </div>
-    </AppShell>
+    </div>
+  );
+}
+
+function NavItem({ to, icon, label, active = false }) {
+  return (
+    <Link to={to} className={`flex flex-col items-center gap-1 transition-all ${active ? "text-indigo-600" : "text-slate-400 hover:text-slate-500"}`}>
+      <div className={`${active ? "bg-indigo-50 p-2 rounded-xl" : "p-2"}`}>{icon}</div>
+      <span className="text-[9px] font-black uppercase mt-0.5 tracking-tight">{label}</span>
+    </Link>
   );
 }

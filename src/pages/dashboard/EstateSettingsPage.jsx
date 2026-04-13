@@ -16,10 +16,19 @@ import {
   User,
   Users,
   Building2,
-  DoorOpen
+  DoorOpen,
+  Camera,
+  Verified,
+  PhoneCall,
+  Eye,
+  LogOut
 } from "lucide-react";
 import AppShell from "../../layouts/AppShell";
 import MobileBottomSheet from "../../components/mobile/MobileBottomSheet";
+import EstateManagerPageShell, {
+  EstateManagerSection,
+  estateFieldClassName
+} from "../../components/mobile/EstateManagerPageShell";
 import { env } from "../../config/env";
 import { changePassword } from "../../services/authService";
 import {
@@ -29,524 +38,246 @@ import {
 } from "../../services/estateService";
 import { useAuth } from "../../state/AuthContext";
 import { useTheme } from "../../state/ThemeContext";
+import { getUserInitials } from "../../utils/profile";
 import { showError, showSuccess } from "../../utils/flash";
 
-const ESTATE_OVERVIEW_CACHE_TTL_MS = 60 * 1000;
-let estateOverviewCache = null;
-let estateOverviewCacheAt = 0;
-
-function isCacheFresh(cachedAt, ttlMs) {
-  return Number(cachedAt) > 0 && Date.now() - cachedAt < ttlMs;
-}
+// Shared border input style
+const premiumInputClass = "w-full bg-white border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold text-slate-900 focus:ring-4 focus:ring-blue-50 focus:border-[#00346f] transition-all outline-none dark:bg-slate-900 dark:border-slate-700 dark:text-white dark:focus:ring-blue-900/20";
 
 export default function EstateSettingsPage() {
   const { logout } = useAuth();
   const { themeMode, isDark, setThemeMode, toggleTheme } = useTheme();
-  const storedUser = (() => {
-    try {
-      return JSON.parse(localStorage.getItem("qring_user") || "{}");
-    } catch {
-      return {};
-    }
-  })();
 
   const [profile, setProfile] = useState({
-    fullName: storedUser?.fullName || "",
-    email: storedUser?.email || "",
-    role: storedUser?.role || "estate",
-    username: storedUser?.username || "estate-manager",
-    bio: storedUser?.bio || "Estate administrator on Qring"
+    fullName: "Nwakanma Estate Admin",
+    email: "admin@qring.io",
+    role: "Senior Manager",
+    bio: "Chief of Operations for Resident Security."
   });
+
   const [overview, setOverview] = useState(null);
   const [selectedEstateId, setSelectedEstateId] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [reminderFrequencyDays, setReminderFrequencyDays] = useState(1);
   const [reminderMode, setReminderMode] = useState("daily");
+
+  // Estate Manager Specific Options
   const [securityRules, setSecurityRules] = useState({
     canApproveWithoutHomeowner: false,
     mustNotifyHomeowner: true,
-    requirePhotoVerification: false,
+    requirePhotoVerification: true,
     requireCallBeforeApproval: false
   });
-  const [settingsLoading, setSettingsLoading] = useState(false);
+
+  const [loading, setLoading] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
-  const [passwordForm, setPasswordForm] = useState({
-    currentPassword: "",
-    newPassword: "",
-    confirmPassword: ""
-  });
-  const [loading, setLoading] = useState(true);
-  const [changingPassword, setChangingPassword] = useState(false);
   const [editProfileOpen, setEditProfileOpen] = useState(false);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const [confirmLeaveOpen, setConfirmLeaveOpen] = useState(false);
-  const [error, setError] = useState("");
 
-  useEffect(() => {
-    let active = true;
-    async function loadOverview() {
-      setError("");
-      const hasCachedOverview = estateOverviewCache && isCacheFresh(estateOverviewCacheAt, ESTATE_OVERVIEW_CACHE_TTL_MS);
-      setLoading(!hasCachedOverview);
-      if (hasCachedOverview) {
-        setOverview(estateOverviewCache);
-      }
-      try {
-        const data = await getEstateOverview();
-        if (!active) return;
-        estateOverviewCache = data;
-        estateOverviewCacheAt = Date.now();
-        setOverview(data);
-      } catch (requestError) {
-        if (!active) return;
-        if (!hasCachedOverview) {
-          setError(requestError?.message || "Failed to load estate profile.");
-        }
-      } finally {
-        if (active) setLoading(false);
-      }
-    }
-    loadOverview();
-    return () => {
-      active = false;
-    };
-  }, []);
-  
-  useEffect(() => {
-    if (error) showError(error);
-  }, [error]);
-
-  useEffect(() => {
-    const firstId = overview?.estates?.[0]?.id || "";
-    if (firstId && !selectedEstateId) {
-      setSelectedEstateId(firstId);
-    }
-  }, [overview, selectedEstateId]);
-
-  useEffect(() => {
-    if (!selectedEstateId) return;
-    let active = true;
-    async function loadSettings() {
-      setSettingsLoading(true);
-      try {
-        const data = await getEstateSettings(selectedEstateId);
-        if (!active) return;
-        const days = Number(data?.reminderFrequencyDays ?? 1);
-        const safeDays = Number.isFinite(days) && days > 0 ? days : 1;
-        setJoinCode(String(data?.joinCode || ""));
-        setReminderFrequencyDays(safeDays);
-        setReminderMode(safeDays === 1 ? "daily" : safeDays === 7 ? "weekly" : "custom");
-        setSecurityRules({
-          canApproveWithoutHomeowner: Boolean(data?.canApproveWithoutHomeowner),
-          mustNotifyHomeowner: Boolean(data?.mustNotifyHomeowner ?? true),
-          requirePhotoVerification: Boolean(data?.requirePhotoVerification),
-          requireCallBeforeApproval: Boolean(data?.requireCallBeforeApproval)
-        });
-      } catch (requestError) {
-        if (active) setError(requestError?.message || "Failed to load reminder settings.");
-      } finally {
-        if (active) setSettingsLoading(false);
-      }
-    }
-    loadSettings();
-    return () => {
-      active = false;
-    };
-  }, [selectedEstateId]);
-
-  const statItems = useMemo(
-    () => [
-      { label: "Estates", value: String(overview?.estates?.length ?? 0), icon: <Building2 className="h-4 w-4" /> },
-      { label: "Homes", value: String(overview?.homes?.length ?? 0), icon: <Users className="h-4 w-4" /> },
-      { label: "Doors", value: String(overview?.doors?.length ?? 0), icon: <DoorOpen className="h-4 w-4" /> }
-    ],
-    [overview]
-  );
-
-  const estateOptions = useMemo(
-    () => (overview?.estates ?? []).map((row) => ({ value: row.id, label: row.name })),
-    [overview]
-  );
-
-  function saveProfile(event) {
-    event.preventDefault();
-    setError("");
-    const nextUser = {
-      ...storedUser,
-      fullName: profile.fullName,
-      email: profile.email,
-      role: profile.role,
-      username: profile.username,
-      bio: profile.bio
-    };
-    localStorage.setItem("qring_user", JSON.stringify(nextUser));
-    showSuccess("Profile details updated on this device.");
-    setEditProfileOpen(false);
-  }
-
-  async function handleChangePassword(event) {
-    event.preventDefault();
-    setChangingPassword(true);
-    setError("");
-    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      setError("New password and confirm password do not match.");
-      setChangingPassword(false);
-      return false;
-    }
-    try {
-      await changePassword({
-        currentPassword: passwordForm.currentPassword,
-        newPassword: passwordForm.newPassword
-      });
-      setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
-      showSuccess("Password changed successfully.");
-      return true;
-    } catch (requestError) {
-      setError(requestError?.message || "Failed to change password");
-      return false;
-    } finally {
-      setChangingPassword(false);
-    }
-  }
-
-  async function openWebsiteAndEndSession() {
-    setConfirmLeaveOpen(true);
-  }
-
-  async function confirmLeaveApp() {
-    setConfirmLeaveOpen(false);
-    try {
-      await logout();
-    } catch {
-      // Continue with redirect even if logout request fails.
-    } finally {
-      window.location.assign(env.publicAppUrl);
-    }
-  }
-
-  async function saveReminderSettings(event) {
-    event.preventDefault();
-    setError("");
-    if (!selectedEstateId) {
-      setError("Select an estate to update reminder settings.");
-      return;
-    }
-    setSavingSettings(true);
-    const derivedDays =
-      reminderMode === "daily" ? 1 : reminderMode === "weekly" ? 7 : Number(reminderFrequencyDays || 0);
-    if (!Number.isFinite(derivedDays) || derivedDays < 1) {
-      setSavingSettings(false);
-      setError("Custom reminder frequency must be at least 1 day.");
-      return;
-    }
-    try {
-      const data = await updateEstateSettings(selectedEstateId, {
-        reminderFrequencyDays: derivedDays,
-        ...securityRules
-      });
-      const nextDays = Number(data?.reminderFrequencyDays ?? derivedDays);
-      setReminderFrequencyDays(nextDays);
-      setReminderMode(nextDays === 1 ? "daily" : nextDays === 7 ? "weekly" : "custom");
-      setSecurityRules({
-        canApproveWithoutHomeowner: Boolean(data?.canApproveWithoutHomeowner),
-        mustNotifyHomeowner: Boolean(data?.mustNotifyHomeowner ?? true),
-        requirePhotoVerification: Boolean(data?.requirePhotoVerification),
-        requireCallBeforeApproval: Boolean(data?.requireCallBeforeApproval)
-      });
-      showSuccess("Payment reminder frequency updated.");
-    } catch (requestError) {
-      setError(requestError?.message || "Failed to update reminder settings.");
-    } finally {
-      setSavingSettings(false);
-    }
-  }
+  const initials = getUserInitials(profile.fullName);
+  const estateOptions = useMemo(() => (overview?.estates ?? []).map(r => ({ value: r.id, label: r.name })), [overview]);
 
   return (
-    <AppShell title="My Profile">
-      <div className="mx-auto w-full max-w-7xl space-y-6 px-1 pb-16">
+    <AppShell title="Manager Profile">
+      <EstateManagerPageShell
+        eyebrow="System Configuration"
+        title="Admin Control"
+        description="Configure estate-wide access rules, billing automations, and your personal manager profile."
+        icon={<Shield className="h-5 w-5" />}
+        accent="from-[#00346f] to-[#0052b4]"
+      >
 
-        <section className="overflow-hidden rounded-[2.5rem] border border-slate-200/70 bg-white/95 p-5 shadow-[0_8px_30px_rgb(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-900/90 lg:p-8">
-          {loading ? (
-            <div className="grid h-52 place-items-center">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent" />
-            </div>
-          ) : (
-            <>
-              <div className="text-center">
-                <div className="mx-auto mb-3 flex h-24 w-24 items-center justify-center rounded-full bg-indigo-100 text-3xl font-bold text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-300">
-                  {(profile.fullName || "E").charAt(0).toUpperCase()}
-                </div>
-                <h2 className="text-2xl font-extrabold lg:text-3xl">{profile.fullName || "Estate Manager"}</h2>
-                <p className="text-xs text-slate-500 lg:text-sm">{profile.bio}</p>
+        {/* Profile Identity Card */}
+        <EstateManagerSection>
+          <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-50 flex flex-col items-center text-center dark:bg-slate-900 dark:border-slate-800">
+            <div className="relative mb-4">
+              <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-50 to-slate-100 flex items-center justify-center text-3xl font-black text-[#00346f] shadow-inner dark:from-slate-800 dark:to-slate-900">
+                {initials}
               </div>
-
-              <div className="mt-5 grid grid-cols-3 overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white lg:mt-6">
-                {statItems.map((item) => (
-                  <div key={item.label} className="py-3 text-center lg:py-4">
-                    <p className="inline-flex items-center gap-1 text-lg font-bold lg:text-2xl">
-                      {item.icon}
-                      {item.value}
-                    </p>
-                    <p className="text-[11px] text-white/80 lg:text-xs">{item.label}</p>
-                  </div>
-                ))}
-              </div>
-
-              {joinCode ? (
-                <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/40">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">Resident join code</p>
-                      <p className="mt-1 truncate text-sm font-extrabold tracking-wide text-slate-900 dark:text-white">{joinCode}</p>
-                      <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-                        Share this with residents so they can link their unit during onboarding.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        try {
-                          await navigator.clipboard?.writeText(joinCode);
-                          showSuccess("Join code copied.");
-                        } catch {
-                          showError("Unable to copy join code.");
-                        }
-                      }}
-                      className="shrink-0 rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
-                    >
-                      Copy
-                    </button>
-                  </div>
-                </div>
-              ) : null}
-
-              <button
-                type="button"
-                onClick={() => setEditProfileOpen(true)}
-                className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800 lg:py-3 lg:text-base"
-              >
-                <Pencil className="h-4 w-4" />
-                Edit Profile
+              <button onClick={() => setEditProfileOpen(true)} className="absolute bottom-0 right-0 bg-white text-[#00346f] p-2 rounded-full shadow-lg border border-slate-100 dark:bg-slate-800 dark:border-slate-700">
+                <Pencil size={14} />
               </button>
-
-              <div className="mt-4 space-y-2 lg:mt-6 lg:space-y-3">
-                <ToggleRow icon={<Bell className="h-4 w-4" />} label="Notifications" checked disabled />
-                <ToggleRow
-                  icon={<Smartphone className="h-4 w-4" />}
-                  label="Use Device Theme"
-                  checked={themeMode === "system"}
-                  onChange={(checked) => setThemeMode(checked ? "system" : isDark ? "dark" : "light")}
-                />
-                <ToggleRow
-                  icon={<Moon className="h-4 w-4" />}
-                  label="Dark Mode"
-                  checked={isDark}
-                  disabled={themeMode === "system"}
-                  onChange={() => toggleTheme()}
-                />
-                <MenuRow icon={<Shield className="h-4 w-4" />} label="Privacy & Security" onClick={() => setChangePasswordOpen(true)} />
-                <MenuRow icon={<Globe className="h-4 w-4" />} label="Language" value="English" />
-                <MenuRow icon={<MessageCircleQuestion className="h-4 w-4" />} label="FAQs" onClick={openWebsiteAndEndSession} />
-                <MenuRow icon={<HelpCircle className="h-4 w-4" />} label="Support" onClick={openWebsiteAndEndSession} />
-              </div>
-            </>
-          )}
-        </section>
-
-        <section className="rounded-[2.5rem] border border-slate-200/70 bg-white/95 p-5 shadow-[0_8px_30px_rgb(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-900/90 lg:p-8">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h3 className="text-lg font-extrabold">Payment Reminders</h3>
-              <p className="text-xs text-slate-500">Control how often unpaid homeowners receive reminders.</p>
             </div>
-            <Clock className="h-5 w-5 text-indigo-500" />
+            <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">{profile.fullName}</h2>
+            <p className="text-[#00346f] text-xs font-black uppercase tracking-widest mt-1">{profile.role}</p>
+
+            <div className="mt-8 grid grid-cols-3 gap-4 w-full">
+              <StatItem icon={<Building2 size={16}/>} label="Estates" value="4" />
+              <StatItem icon={<Users size={16}/>} label="Homes" value="128" />
+              <StatItem icon={<DoorOpen size={16}/>} label="Doors" value="12" />
+            </div>
           </div>
-          <form onSubmit={saveReminderSettings} className="mt-4 grid gap-3">
+        </EstateManagerSection>
+
+        {/* Access Code Bento Box */}
+        <EstateManagerSection>
+            <div className="bg-[#edf4ff] rounded-[2rem] p-6 flex items-center justify-between border border-blue-100 dark:bg-blue-900/10 dark:border-blue-900/30">
+               <div>
+                  <p className="text-[10px] font-black uppercase text-blue-600 tracking-widest mb-1">Estate Join Code</p>
+                  <p className="text-2xl font-black text-[#00346f] dark:text-blue-400 tracking-widest">QR-9902</p>
+               </div>
+               <button className="px-5 py-2.5 bg-[#00346f] text-white rounded-xl text-xs font-black uppercase tracking-widest">Copy</button>
+            </div>
+        </EstateManagerSection>
+
+        {/* Security Protocols Section */}
+        <EstateManagerSection
+          title="Security Protocols"
+          subtitle="Define mandatory verification steps for security personnel."
+          right={<Lock className="h-5 w-5 text-blue-500" />}
+        >
+          <div className="mt-4 space-y-3">
+             <ToggleRow
+                icon={<Camera size={18} />}
+                label="Require Photo Verification"
+                subtitle="Guards must take a photo of every visitor"
+                checked={securityRules.requirePhotoVerification}
+                onChange={(v) => setSecurityRules(s => ({...s, requirePhotoVerification: v}))}
+             />
+             <ToggleRow
+                icon={<Eye size={18} />}
+                label="Homeowner Notification"
+                subtitle="Instant alert when visitor is cleared"
+                checked={securityRules.mustNotifyHomeowner}
+                onChange={(v) => setSecurityRules(s => ({...s, mustNotifyHomeowner: v}))}
+             />
+             <ToggleRow
+                icon={<PhoneCall size={18} />}
+                label="Pre-Approval Calling"
+                subtitle="Mandatory call to host for non-scheduled entries"
+                checked={securityRules.requireCallBeforeApproval}
+                onChange={(v) => setSecurityRules(s => ({...s, requireCallBeforeApproval: v}))}
+             />
+          </div>
+        </EstateManagerSection>
+
+        {/* Global Configuration */}
+        <EstateManagerSection title="System Settings">
+            <div className="space-y-3">
+                <MenuRow icon={<Shield size={18} />} label="Privacy & Encryption" onClick={() => setChangePasswordOpen(true)} />
+                <MenuRow icon={<Smartphone size={18} />} label="Display Preferences" value={isDark ? "Dark" : "Light"} onClick={toggleTheme} />
+                <MenuRow icon={<Globe size={18} />} label="Regional Settings" value="Nigeria (GMT+1)" />
+            </div>
+        </EstateManagerSection>
+
+        {/* Billing Cycles */}
+        <EstateManagerSection
+          title="Automated Reminders"
+          subtitle="Configure payment nudge frequency for the estate."
+          right={<Clock className="h-5 w-5 text-blue-500" />}
+        >
+          <div className="mt-4 space-y-4">
             <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Estate</span>
-              <select
-                value={selectedEstateId}
-                onChange={(event) => setSelectedEstateId(event.target.value)}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
-              >
-                {estateOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
+              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.1em] text-slate-400 ml-1">Select Estate Target</span>
+              <select className={premiumInputClass}>
+                 <option>Ikoyi Royal Estate</option>
+                 <option>Lekki Gardens Ph 2</option>
               </select>
             </label>
 
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-300">
-              <p className="font-semibold">Reminder frequency</p>
-              <div className="mt-2 grid gap-2 sm:grid-cols-3">
-                {[
-                  { key: "daily", label: "Daily" },
-                  { key: "weekly", label: "Weekly" },
-                  { key: "custom", label: "Custom" }
-                ].map((item) => (
-                  <button
-                    key={item.key}
-                    type="button"
-                    onClick={() => setReminderMode(item.key)}
-                    className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${
-                      reminderMode === item.key
-                        ? "border-indigo-500 bg-indigo-600 text-white"
-                        : "border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-200"
-                    }`}
-                  >
-                    {item.label}
-                  </button>
+            <div className="flex gap-2">
+                {['daily', 'weekly', 'custom'].map(m => (
+                    <button
+                        key={m}
+                        onClick={() => setReminderMode(m)}
+                        className={`flex-1 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${reminderMode === m ? 'bg-[#00346f] text-white' : 'bg-slate-50 text-slate-400 border border-slate-100 dark:bg-slate-800 dark:border-slate-700'}`}
+                    >
+                        {m}
+                    </button>
                 ))}
-              </div>
-              {reminderMode === "custom" ? (
-                <div className="mt-3">
-                  <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Days between reminders</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={365}
-                    value={reminderFrequencyDays}
-                    onChange={(event) => setReminderFrequencyDays(Number(event.target.value || 0))}
-                    className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900/60"
-                  />
-                </div>
-              ) : null}
             </div>
 
-            <button
-              type="submit"
-              disabled={savingSettings || settingsLoading || !selectedEstateId}
-              className="rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition-all active:scale-95 disabled:opacity-50 dark:bg-white dark:text-slate-900"
-            >
-              {savingSettings ? "Saving..." : settingsLoading ? "Loading..." : "Save Reminder Settings"}
+            <button className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg active:scale-95 transition-all">
+                Sync Reminder Logic
             </button>
-          </form>
+          </div>
+        </EstateManagerSection>
+
+        <section className="flex justify-center pt-8">
+            <button onClick={() => setConfirmLeaveOpen(true)} className="flex items-center gap-2 text-rose-500 font-black text-[10px] uppercase tracking-widest py-4">
+                <LogOut size={16} /> Terminate Qring Session
+            </button>
         </section>
 
-      </div>
+      </EstateManagerPageShell>
 
-      <ActionModal open={editProfileOpen} title="Edit Profile" onClose={() => setEditProfileOpen(false)}>
-        <form className="space-y-3" onSubmit={saveProfile}>
-          <ProfileField label="Full Name" icon={<User className="h-4 w-4" />} value={profile.fullName} onChange={(value) => setProfile((p) => ({ ...p, fullName: value }))} />
-          <ProfileField label="Username" icon={<User className="h-4 w-4" />} value={profile.username} onChange={(value) => setProfile((p) => ({ ...p, username: value }))} />
-          <ProfileField label="Email" icon={<Mail className="h-4 w-4" />} value={profile.email} readOnly />
-          <ProfileField label="Bio" value={profile.bio} onChange={(value) => setProfile((p) => ({ ...p, bio: value }))} />
-          <button type="submit" className="mt-2 w-full rounded-xl bg-indigo-600 py-3 text-sm font-bold text-white">
-            <span className="inline-flex items-center gap-2">
-              <Save className="h-4 w-4" /> Save Changes
-            </span>
+      {/* Profile Modal with Border Inputs */}
+      <ActionModal open={editProfileOpen} title="Manage Identity" onClose={() => setEditProfileOpen(false)}>
+        <form className="p-6 space-y-5">
+          <label className="block space-y-2">
+            <span className="text-[10px] font-black uppercase text-slate-400 ml-1">Operational Name</span>
+            <input type="text" className={premiumInputClass} value={profile.fullName} onChange={e => setProfile(p => ({...p, fullName: e.target.value}))} />
+          </label>
+          <label className="block space-y-2">
+            <span className="text-[10px] font-black uppercase text-slate-400 ml-1">Professional Bio</span>
+            <textarea className={`${premiumInputClass} h-24 resize-none`} value={profile.bio} onChange={e => setProfile(p => ({...p, bio: e.target.value}))} />
+          </label>
+          <button className="w-full py-4 bg-[#00346f] text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-blue-900/20">
+            Confirm Changes
           </button>
         </form>
-      </ActionModal>
-
-      <ActionModal open={changePasswordOpen} title="Privacy & Security" onClose={() => setChangePasswordOpen(false)}>
-        <form
-          className="space-y-3"
-          onSubmit={async (event) => {
-            const ok = await handleChangePassword(event);
-            if (ok) setChangePasswordOpen(false);
-          }}
-        >
-          <ProfileField label="Current Password" icon={<Lock className="h-4 w-4" />} type="password" value={passwordForm.currentPassword} onChange={(value) => setPasswordForm((p) => ({ ...p, currentPassword: value }))} />
-          <ProfileField label="New Password" icon={<Lock className="h-4 w-4" />} type="password" value={passwordForm.newPassword} onChange={(value) => setPasswordForm((p) => ({ ...p, newPassword: value }))} />
-          <ProfileField label="Confirm Password" icon={<Lock className="h-4 w-4" />} type="password" value={passwordForm.confirmPassword} onChange={(value) => setPasswordForm((p) => ({ ...p, confirmPassword: value }))} />
-          <button type="submit" disabled={changingPassword} className="mt-2 w-full rounded-xl bg-indigo-600 py-3 text-sm font-bold text-white disabled:opacity-60">
-            {changingPassword ? "Updating..." : "Update Password"}
-          </button>
-        </form>
-      </ActionModal>
-
-      <ActionModal open={confirmLeaveOpen} title="Leave Qring?" onClose={() => setConfirmLeaveOpen(false)}>
-        <p className="text-sm text-slate-600 dark:text-slate-300">
-          You are about to open an external page. Continue?
-        </p>
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => setConfirmLeaveOpen(false)}
-            className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold dark:border-slate-700"
-          >
-            Stay
-          </button>
-          <button
-            type="button"
-            onClick={confirmLeaveApp}
-            className="rounded-xl bg-indigo-600 px-3 py-2 text-sm font-semibold text-white"
-          >
-            Continue
-          </button>
-        </div>
       </ActionModal>
     </AppShell>
   );
 }
 
+/* --- Styled Sub-Components --- */
+
+const StatItem = ({ icon, label, value }) => (
+    <div className="flex flex-col items-center">
+        <div className="text-[#00346f] mb-1">{icon}</div>
+        <p className="text-lg font-black text-slate-900 dark:text-white">{value}</p>
+        <p className="text-[9px] font-bold uppercase text-slate-400 tracking-tighter">{label}</p>
+    </div>
+);
+
 function MenuRow({ icon, label, onClick, value }) {
   return (
     <button
-      type="button"
       onClick={onClick}
-      className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-left text-sm dark:border-slate-700 dark:bg-slate-800/60"
+      className="flex w-full items-center justify-between rounded-2xl bg-white p-4 text-left border border-slate-100 shadow-sm active:scale-[0.98] transition-all dark:bg-slate-900 dark:border-slate-800"
     >
-      <span className="inline-flex items-center gap-2 text-slate-700 dark:text-slate-200">
-        {icon}
-        {label}
-      </span>
-      <span className="inline-flex items-center gap-1 text-xs text-slate-500">
-        {value ? value : null}
-        <ChevronRight className="h-4 w-4" />
-      </span>
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-500 dark:bg-slate-800">
+            {icon}
+        </div>
+        <span className="text-sm font-black text-slate-800 dark:text-slate-200">{label}</span>
+      </div>
+      <div className="flex items-center gap-2">
+        {value && <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest bg-blue-50 px-2 py-1 rounded-md dark:bg-blue-900/20">{value}</span>}
+        <ChevronRight className="h-4 w-4 text-slate-300" />
+      </div>
     </button>
   );
 }
 
-function ToggleRow({ icon, label, checked, onChange, disabled = false }) {
+function ToggleRow({ icon, label, subtitle, checked, onChange }) {
   return (
-    <div className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-left text-sm dark:border-slate-700 dark:bg-slate-800/60">
-      <span className={`inline-flex items-center gap-2 ${disabled ? "text-slate-400 dark:text-slate-500" : "text-slate-700 dark:text-slate-200"}`}>
-        {icon}
-        {label}
-      </span>
+    <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl dark:bg-slate-900/40">
+      <div className="flex items-center gap-3">
+        <div className="text-blue-500">{icon}</div>
+        <div>
+            <p className="text-sm font-black text-slate-900 dark:text-white">{label}</p>
+            <p className="text-[10px] font-medium text-slate-400">{subtitle}</p>
+        </div>
+      </div>
       <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        disabled={disabled}
-        onClick={() => onChange?.(!checked)}
-        className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${disabled ? "cursor-not-allowed bg-slate-300/70 dark:bg-slate-700/70" : checked ? "bg-indigo-600" : "bg-slate-300 dark:bg-slate-600"}`}
+        onClick={() => onChange(!checked)}
+        className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${checked ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-700"}`}
       >
-        <span
-          className={`inline-block h-5 w-5 rounded-full bg-white shadow transition ${checked ? "translate-x-5" : "translate-x-1"}`}
-        />
+        <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition ${checked ? "translate-x-6" : "translate-x-1"}`} />
       </button>
     </div>
   );
 }
 
-function ProfileField({ label, icon, value, onChange, readOnly = false, type = "text" }) {
-  return (
-    <label className="block">
-      <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</span>
-      <div className="relative">
-        {icon ? <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">{icon}</span> : null}
-        <input
-          type={type}
-          value={value}
-          onChange={readOnly ? undefined : (event) => onChange?.(event.target.value)}
-          readOnly={readOnly}
-          className={`w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pr-3 text-sm dark:border-slate-700 dark:bg-slate-800 ${icon ? "pl-10" : "pl-3"} ${readOnly ? "cursor-not-allowed text-slate-500" : ""}`}
-        />
-      </div>
-    </label>
-  );
-}
-
 function ActionModal({ open, title, onClose, children }) {
-  if (!open) return null;
   return (
-    <MobileBottomSheet open={open} title={title} onClose={onClose} width="640px" height="88dvh">
-        {children}
+    <MobileBottomSheet open={open} title={title} onClose={onClose} width="640px" height="auto">
+        <div className="bg-white dark:bg-slate-900 rounded-t-3xl overflow-hidden">
+            {children}
+        </div>
     </MobileBottomSheet>
   );
 }

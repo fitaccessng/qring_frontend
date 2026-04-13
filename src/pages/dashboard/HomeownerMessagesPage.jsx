@@ -1,23 +1,31 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { io } from "socket.io-client";
-import { ChevronLeft, MoreVertical, Search, SendHorizontal, SlidersHorizontal, Trash2 } from "lucide-react";
-import AppShell from "../../layouts/AppShell";
+import {
+  Bell, ChevronLeft, LayoutGrid, History, CalendarDays,
+  MessageSquare, User, Search, SendHorizontal, Trash2
+} from "lucide-react";
+import VoiceNoteRecorder from "../../components/VoiceNoteRecorder";
 import { env } from "../../config/env";
 import { realtimeTransportOptions } from "../../services/socketConfig";
-import { playMessageNotificationSound } from "../../utils/notificationSound";
-import VoiceNoteRecorder from "../../components/VoiceNoteRecorder";
 import { resolveVoiceNoteUrl, uploadHomeownerVoiceNote } from "../../services/voiceNoteService";
+import { playMessageNotificationSound } from "../../utils/notificationSound";
 import {
   deleteHomeownerSessionMessage,
   getHomeownerMessages,
   getHomeownerSessionMessages,
   sendHomeownerSessionMessage
 } from "../../services/homeownerService";
+import { useAuth } from "../../state/AuthContext";
+import { useNotifications } from "../../state/NotificationsContext";
 
 export default function HomeownerMessagesPage() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { unreadCount: globalUnreadCount } = useNotifications();
   const [searchParams, setSearchParams] = useSearchParams();
   const preferredSessionId = (searchParams.get("sessionId") || "").trim();
+
   const [threads, setThreads] = useState([]);
   const [selectedId, setSelectedId] = useState("");
   const [messagesByThread, setMessagesByThread] = useState({});
@@ -27,47 +35,19 @@ export default function HomeownerMessagesPage() {
   const [sending, setSending] = useState(false);
   const [deletingMessageId, setDeletingMessageId] = useState("");
   const [query, setQuery] = useState("");
-  const [threadFilter, setThreadFilter] = useState("all");
   const [error, setError] = useState("");
+
   const messagesRef = useRef(null);
   const selectedIdRef = useRef("");
+  const threadsRef = useRef([]);
   const socketRef = useRef(null);
+  const joinedSessionIdsRef = useRef(new Set());
   const token = localStorage.getItem("qring_access_token");
 
-  useEffect(() => {
-    selectedIdRef.current = selectedId;
-  }, [selectedId]);
+  useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
+  useEffect(() => { threadsRef.current = threads; }, [threads]);
 
-  function isLikelyDuplicateMessage(current, next) {
-    if (!current || !next) return false;
-    if (current.id && next.id && current.id === next.id) return true;
-    if ((current.text || "").trim() !== (next.text || "").trim()) return false;
-    if ((current.senderType || "") !== (next.senderType || "")) return false;
-    const currentTs = new Date(current.at).getTime();
-    const nextTs = new Date(next.at).getTime();
-    if (Number.isNaN(currentTs) || Number.isNaN(nextTs)) return false;
-    return Math.abs(currentTs - nextTs) < 10000;
-  }
-
-  function upsertThreadPreview(message) {
-    if (!message?.sessionId) return;
-    setThreads((prev) =>
-      prev.map((thread) =>
-        thread.id === message.sessionId
-          ? {
-              ...thread,
-              last: previewMessageText(message.text),
-              time: message.at,
-              unread:
-                selectedIdRef.current === message.sessionId || message.senderType === "homeowner"
-                  ? 0
-                  : (thread.unread || 0) + 1
-            }
-          : thread
-      )
-    );
-  }
-
+  // --- Initial Data Load ---
   useEffect(() => {
     let active = true;
     async function load() {
@@ -80,15 +60,10 @@ export default function HomeownerMessagesPage() {
           ...thread,
           last: previewMessageText(thread?.last || "")
         }));
-        setThreads(normalized);
-        const sortedThreads = sortThreadsForInbox(normalized);
-        const isDesktop = typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches;
-        const preferredExists = preferredSessionId && sortedThreads.some((item) => item.id === preferredSessionId);
-        setSelectedId((prev) => {
-          if (prev) return prev;
-          if (preferredExists) return preferredSessionId;
-          return isDesktop ? sortedThreads[0]?.id || "" : "";
-        });
+        const sorted = sortThreadsForInbox(normalized);
+        setThreads(sorted);
+        const preferredExists = preferredSessionId && sorted.some((item) => item.id === preferredSessionId);
+        setSelectedId((prev) => prev || (preferredExists ? preferredSessionId : sorted[0]?.id || ""));
       } catch (requestError) {
         if (!active) return;
         setError(requestError.message ?? "Failed to load messages");
@@ -97,147 +72,21 @@ export default function HomeownerMessagesPage() {
       }
     }
     load();
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, [preferredSessionId]);
 
+  // --- Socket Logic & Message Handlers ---
   useEffect(() => {
-    if (!preferredSessionId) return;
-    const exists = threads.some((thread) => thread.id === preferredSessionId);
-    if (!exists) return;
-    setSelectedId(preferredSessionId);
-    setSearchParams((current) => {
-      const next = new URLSearchParams(current);
-      next.delete("sessionId");
-      return next;
-    }, { replace: true });
-  }, [preferredSessionId, setSearchParams, threads]);
-
-  useEffect(() => {
-    if (!selectedId) return;
-    let active = true;
-    const run = async () => {
-      setConversationLoading(true);
-      try {
-        const rows = await getHomeownerSessionMessages(selectedId);
-        if (!active) return;
-        setMessagesByThread((prev) => ({ ...prev, [selectedId]: rows }));
-        const freshThreads = await getHomeownerMessages();
-        if (!active) return;
-        setThreads(
-          freshThreads.map((item) => ({
-            ...item,
-            last: previewMessageText(item?.last || ""),
-            unread: item.id === selectedId ? 0 : item.unread
-          }))
-        );
-      } catch (requestError) {
-        if (!active) return;
-        setError(requestError.message ?? "Failed to load conversation");
-      } finally {
-        if (active) setConversationLoading(false);
-      }
-    };
-    run();
-    return () => {
-      active = false;
-    };
-  }, [selectedId]);
-
-  useEffect(() => {
-    let active = true;
-    const syncThreads = async () => {
-      try {
-        const latestThreads = await getHomeownerMessages();
-        if (!active) return;
-        setThreads((prev) => {
-          const selected = selectedIdRef.current;
-          return latestThreads.map((item) => ({
-            ...item,
-            last: previewMessageText(item?.last || ""),
-            unread: item.id === selected ? 0 : item.unread
-          }));
-        });
-      } catch {
-        // Keep realtime UX resilient to intermittent network errors.
-      }
-    };
-
-    const timer = setInterval(() => {
-      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
-      syncThreads();
-    }, 2500);
-
-    return () => {
-      active = false;
-      clearInterval(timer);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!selectedId) return;
-    let active = true;
-    const syncConversation = async () => {
-      try {
-        const [rows, latestThreads] = await Promise.all([
-          getHomeownerSessionMessages(selectedId),
-          getHomeownerMessages()
-        ]);
-        if (!active) return;
-        setMessagesByThread((prev) => ({ ...prev, [selectedId]: rows }));
-        setThreads(
-          latestThreads.map((item) => ({
-            ...item,
-            last: previewMessageText(item?.last || ""),
-            unread: item.id === selectedId ? 0 : item.unread
-          }))
-        );
-      } catch {
-        // Keep live view resilient when network/sockets are unstable.
-      }
-    };
-
-    const timer = setInterval(() => {
-      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
-      syncConversation();
-    }, 2500);
-
-    return () => {
-      active = false;
-      clearInterval(timer);
-    };
-  }, [selectedId]);
-
-  useEffect(() => {
-    if (!token) return () => {};
+    if (!token) return;
     const socket = io(`${env.socketUrl}${env.signalingNamespace ?? "/realtime/signaling"}`, {
       path: env.socketPath,
       ...realtimeTransportOptions,
-      reconnection: true,
-      reconnectionAttempts: 10,
-      reconnectionDelay: 400,
-      reconnectionDelayMax: 2000,
-      timeout: 7000,
       auth: (cb) => {
         const latestToken = localStorage.getItem("qring_access_token");
         cb(latestToken ? { token: latestToken } : {});
-      },
-      withCredentials: true
+      }
     });
     socketRef.current = socket;
-
-    socket.on("connect", () => {
-      const knownSessionIds = new Set(
-        threads.map((thread) => String(thread?.id || "").trim()).filter(Boolean)
-      );
-      if (selectedIdRef.current) {
-        knownSessionIds.add(String(selectedIdRef.current));
-      }
-      knownSessionIds.forEach((sessionId) => {
-        socket.emit("session.join", { sessionId, displayName: "Homeowner" });
-      });
-    });
 
     socket.on("chat.message", (payload) => {
       const incomingSessionId = payload?.sessionId;
@@ -256,398 +105,242 @@ export default function HomeownerMessagesPage() {
         return { ...prev, [incomingSessionId]: [...current, normalized] };
       });
       if (normalized.senderType !== "homeowner") playMessageNotificationSound();
-      upsertThreadPreview(normalized);
+      upsertThreadPreview(normalized, setThreads, selectedIdRef.current);
     });
 
-    return () => {
-      socketRef.current = null;
-      socket.disconnect();
-    };
+    return () => socket.disconnect();
   }, [token]);
 
   useEffect(() => {
-    if (!socketRef.current || !socketRef.current.connected) return;
-    const knownSessionIds = new Set(
-      threads.map((thread) => String(thread?.id || "").trim()).filter(Boolean)
-    );
-    if (selectedIdRef.current) {
-      knownSessionIds.add(String(selectedIdRef.current));
+    if (!selectedId) return;
+    async function loadConv() {
+        setConversationLoading(true);
+        try {
+            const rows = await getHomeownerSessionMessages(selectedId);
+            setMessagesByThread(prev => ({ ...prev, [selectedId]: rows }));
+            setThreads(prev => prev.map(t => t.id === selectedId ? { ...t, unread: 0 } : t));
+        } catch (err) { setError(err.message); }
+        finally { setConversationLoading(false); }
     }
-    knownSessionIds.forEach((sessionId) => {
-      socketRef.current?.emit("session.join", { sessionId, displayName: "Homeowner" });
-    });
-  }, [threads, selectedId]);
-
-  useEffect(() => {
-    if (!messagesRef.current) return;
-    messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
-  }, [selectedId, messagesByThread]);
+    loadConv();
+  }, [selectedId]);
 
   const filteredThreads = useMemo(() => {
-    let list = sortThreadsForInbox(threads);
-    if (threadFilter === "archived") {
-      list = list.filter((thread) => Number(thread.unread || 0) === 0);
-    } else if (threadFilter === "unread") {
-      list = list.filter((thread) => Number(thread.unread || 0) > 0);
-    }
-
     const term = query.trim().toLowerCase();
-    if (!term) return list;
-    return list.filter((thread) =>
-      [thread.name, thread.last, thread.door, formatClockTime(thread.time)].join(" ").toLowerCase().includes(term)
-    );
-  }, [threads, query, threadFilter]);
+    const sorted = sortThreadsForInbox(threads);
+    if (!term) return sorted;
+    return sorted.filter((t) => [t.name, t.last].join(" ").toLowerCase().includes(term));
+  }, [threads, query]);
 
-  const filterLabel = useMemo(() => {
-    if (threadFilter === "all") return "All messages";
-    if (threadFilter === "unread") return "Unread messages";
-    return "Archived messages";
-  }, [threadFilter]);
+  const heroThread = useMemo(() => threads.find(t => t.id === selectedId) || filteredThreads[0], [threads, selectedId, filteredThreads]);
+  const selectedMessages = useMemo(() => messagesByThread[selectedId] || [], [messagesByThread, selectedId]);
 
-  function cycleFilter() {
-    setThreadFilter((prev) => {
-      if (prev === "all") return "archived";
-      if (prev === "archived") return "unread";
-      return "all";
-    });
-  }
-
-  const selectedThread = useMemo(
-    () => threads.find((thread) => thread.id === selectedId) ?? null,
-    [threads, selectedId]
-  );
-  const selectedMessages = useMemo(() => messagesByThread[selectedId] ?? [], [messagesByThread, selectedId]);
-
-  async function handleSend(event) {
-    event.preventDefault();
+  async function handleSend(e) {
+    if (e) e.preventDefault();
     const text = draft.trim();
     if (!selectedId || !text) return;
     setSending(true);
     try {
       const saved = await sendHomeownerSessionMessage(selectedId, text);
-      const outbound = {
-        id: saved?.id ?? `local-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        sessionId: selectedId,
-        text,
-        senderType: "homeowner",
-        displayName: saved?.displayName || "Homeowner",
-        at: saved?.at || new Date().toISOString()
-      };
-      setMessagesByThread((prev) => {
-        const current = prev[selectedId] ?? [];
-        if (current.some((item) => isLikelyDuplicateMessage(item, outbound))) return prev;
-        return { ...prev, [selectedId]: [...current, outbound] };
-      });
-      upsertThreadPreview(outbound);
-      socketRef.current?.emit("chat.message", outbound);
+      const outbound = { id: saved?.id || Date.now(), sessionId: selectedId, text, senderType: "homeowner", at: new Date().toISOString() };
+      setMessagesByThread(prev => ({ ...prev, [selectedId]: [...(prev[selectedId] || []), outbound] }));
       setDraft("");
-    } catch (requestError) {
-      setError(requestError.message ?? "Failed to send message");
-    } finally {
-      setSending(false);
-    }
+    } catch (err) { setError(err.message); }
+    finally { setSending(false); }
   }
 
   async function handleSendVoiceNote(file) {
-    if (!selectedId || !file) return "Select a session first.";
+    if (!selectedId) return;
     setSending(true);
-    setError("");
     try {
       const upload = await uploadHomeownerVoiceNote(selectedId, file);
       const url = resolveVoiceNoteUrl(upload?.url);
-      if (!url) return "Voice note uploaded but no URL was returned.";
       const text = `voice_note_url:${url}`;
-      const saved = await sendHomeownerSessionMessage(selectedId, text);
-      const outbound = {
-        id: saved?.id ?? `local-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        sessionId: selectedId,
-        text,
-        senderType: "homeowner",
-        displayName: saved?.displayName || "Homeowner",
-        at: saved?.at || new Date().toISOString()
-      };
-      setMessagesByThread((prev) => {
-        const current = prev[selectedId] ?? [];
-        if (current.some((item) => isLikelyDuplicateMessage(item, outbound))) return prev;
-        return { ...prev, [selectedId]: [...current, outbound] };
-      });
-      upsertThreadPreview(outbound);
-      socketRef.current?.emit("chat.message", outbound);
-      return true;
-    } catch (requestError) {
-      const message = requestError.message ?? "Failed to send voice note";
-      setError(message);
-      return message;
-    } finally {
-      setSending(false);
-    }
-  }
-
-  async function handleDeleteMessage(messageId) {
-    if (!selectedId || !messageId || deletingMessageId) return;
-    setError("");
-    setDeletingMessageId(messageId);
-    try {
-      const nextMessages = selectedMessages.filter((row) => row.id !== messageId);
-      await deleteHomeownerSessionMessage(selectedId, messageId);
-      setMessagesByThread((prev) => ({ ...prev, [selectedId]: nextMessages }));
-      setThreads((prev) =>
-        prev.map((thread) => {
-          if (thread.id !== selectedId) return thread;
-          const latest = nextMessages[nextMessages.length - 1];
-          return { ...thread, last: previewMessageText(latest?.text ?? ""), time: latest?.at ?? thread.time };
-        })
-      );
-    } catch (requestError) {
-      setError(requestError.message ?? "Failed to delete message");
-    } finally {
-      setDeletingMessageId("");
-    }
+      await sendHomeownerSessionMessage(selectedId, text);
+      setMessagesByThread(prev => ({ ...prev, [selectedId]: [...(prev[selectedId] || []), { text, senderType: "homeowner", at: new Date() }] }));
+    } catch (err) { setError(err.message); }
+    finally { setSending(false); }
   }
 
   return (
-    <AppShell title="Messages">
-      {error ? (
-        <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/30 dark:bg-rose-900/20 dark:text-rose-400">
-          {error}
-        </div>
-      ) : null}
-
-      <section className="grid gap-4 lg:grid-cols-[360px_minmax(0,1fr)]">
-        <article
-          className={`${selectedId ? "hidden lg:flex" : "flex"} min-h-[74vh] flex-col overflow-hidden rounded-[2rem] border border-slate-200 bg-slate-50/80 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60`}
-        >
-          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="text-2xl font-extrabold">Messages</h2>
-            <button
-              type="button"
-              onClick={cycleFilter}
-              className="rounded-full p-2 text-slate-500 hover:bg-slate-200/70 dark:hover:bg-slate-800"
-              title="Cycle filter: All, Archived, Unread"
-              aria-label="Cycle thread filter"
-            >
-              <SlidersHorizontal className="h-4 w-4" />
+    <div className="bg-[#f8f9fa] min-h-screen font-sans pb-32 overflow-x-hidden">
+      {/* Top Header */}
+      <header className="fixed top-0 w-full z-[100] bg-white/80 backdrop-blur-md border-b border-slate-100 px-6 py-4">
+        <div className="max-w-4xl mx-auto flex justify-between items-center">
+          <div className="flex items-center gap-4">
+            <button onClick={() => navigate(-1)} className="p-2.5 bg-slate-50 text-slate-600 rounded-full hover:bg-indigo-50 hover:text-indigo-600 transition-all">
+              <ChevronLeft size={20} />
             </button>
+            <div>
+              <h1 className="font-bold text-lg text-slate-900 leading-none">Inbox</h1>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter mt-1">Secure Communications</p>
+            </div>
           </div>
+          <div className="flex gap-2">
+            <Link to="/dashboard/notifications" className="relative p-2.5 bg-slate-50 text-slate-600 rounded-full hover:bg-indigo-50 hover:text-indigo-600 transition-all">
+              <Bell size={18} />
+              {globalUnreadCount > 0 && (
+                  <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white" />
+              )}
+            </Link>
+          </div>
+        </div>
+      </header>
 
-          <div className="relative mb-4">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+      <main className="pt-24 px-6 max-w-4xl mx-auto space-y-6">
+        {error && (
+          <div className="bg-rose-50 text-rose-600 p-4 rounded-2xl text-xs font-bold border border-rose-100 uppercase tracking-tight">
+            {error}
+          </div>
+        )}
+
+        {/* Search & Active Threads */}
+        <section className="space-y-4">
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
             <input
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search messages..."
-              className="h-11 w-full rounded-2xl border border-slate-200 bg-white py-2.5 pl-10 pr-3 text-sm dark:border-slate-700 dark:bg-slate-900"
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search conversations..."
+              className="w-full bg-white border border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-sm font-medium shadow-sm focus:ring-2 focus:ring-indigo-600/10 outline-none"
             />
           </div>
 
-          <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between px-1">
-            <p className="text-sm font-bold">{filterLabel} ({filteredThreads.length})</p>
-            <button
-              type="button"
-              onClick={() => setThreadFilter("all")}
-              className="text-xs font-semibold text-slate-500 hover:text-slate-700"
-            >
-              View all messages
-            </button>
-          </div>
-
-          <div className="flex-1 space-y-1 overflow-y-auto pr-1">
-            {loading ? <p className="px-2 py-4 text-sm text-slate-500">Loading messages...</p> : null}
-            {!loading && filteredThreads.length === 0 ? (
-              <p className="px-2 py-4 text-sm text-slate-500">No threads found.</p>
-            ) : null}
+          <div className="flex gap-3 overflow-x-auto no-scrollbar py-2">
             {filteredThreads.map((thread) => {
-              const initial = (thread.name || "V").charAt(0).toUpperCase();
+              const isActive = selectedId === thread.id;
               return (
                 <button
                   key={thread.id}
-                  type="button"
                   onClick={() => setSelectedId(thread.id)}
-                  className={`flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition ${
-                    selectedId === thread.id ? "bg-white shadow-sm dark:bg-slate-800" : "hover:bg-white/70 dark:hover:bg-slate-800/60"
+                  className={`flex-shrink-0 flex items-center gap-3 p-3 rounded-2xl transition-all border ${
+                    isActive ? "bg-indigo-600 border-indigo-600 text-white shadow-lg" : "bg-white border-slate-100 text-slate-600"
                   }`}
                 >
-                  <div className="relative h-11 w-11 shrink-0 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">
-                    <span className="grid h-full w-full place-items-center text-sm font-bold">{initial}</span>
-                    {thread.unread > 0 ? <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-800" /> : null}
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black ${isActive ? 'bg-white/20' : 'bg-slate-100'}`}>
+                    {(thread.name || "V")[0]}
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="truncate text-sm font-bold">{thread.name}</p>
-                      <p className="text-xs text-slate-500">{formatClockTime(thread.time)}</p>
-                    </div>
-                    <p className="truncate text-sm text-slate-500">{thread.last || "No messages yet"}</p>
+                  <div className="pr-2">
+                    <p className="text-[11px] font-black uppercase tracking-tight leading-none">{thread.name || "Visitor"}</p>
+                    <p className={`text-[9px] mt-1 font-bold opacity-60`}>{formatClockTime(thread.time)}</p>
                   </div>
-                  {thread.unread > 0 ? (
-                    <span className="grid h-5 w-5 place-items-center rounded-full bg-indigo-600 text-[10px] font-bold text-white">
-                      {thread.unread}
-                    </span>
-                  ) : null}
                 </button>
               );
             })}
           </div>
-        </article>
+        </section>
 
-        <article
-          className={`${selectedId ? "flex" : "hidden lg:flex"} min-h-[74vh] flex-col overflow-hidden rounded-[2rem] border border-slate-200 bg-slate-100/70 shadow-sm dark:border-slate-800 dark:bg-slate-900/60`}
-        >
-          {selectedThread ? (
-            <>
-              <header className="flex items-center justify-between border-b border-slate-200 bg-white/80 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/70">
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedId("")}
-                    className="rounded-full p-1.5 text-slate-500 hover:bg-slate-200/70 lg:hidden"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </button>
-                  <div className="h-9 w-9 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">
-                    <span className="grid h-full w-full place-items-center text-xs font-bold">
-                      {(selectedThread.name || "V").charAt(0).toUpperCase()}
-                    </span>
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold">{selectedThread.name}</p>
-                    <p className="text-xs text-slate-500">{selectedThread.door || "Door chat"}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  {selectedId ? (
-                    <>
-                      <Link
-                        to={`/session/${selectedId}/audio`}
-                        className="rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
-                      >
-                        Audio
-                      </Link>
-                      <Link
-                        to={`/session/${selectedId}/video`}
-                        className="rounded-full bg-indigo-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-indigo-500"
-                      >
-                        Video
-                      </Link>
-                    </>
-                  ) : null}
-                  <button type="button" className="rounded-full p-1.5 text-slate-500 hover:bg-slate-200/70 dark:hover:bg-slate-800">
-                    <MoreVertical className="h-4 w-4" />
-                  </button>
-                </div>
-              </header>
-
-              <div ref={messagesRef} className="flex-1 space-y-3 overflow-y-auto p-4">
-                {conversationLoading ? <p className="text-sm text-slate-500">Loading conversation...</p> : null}
-                {!conversationLoading && selectedMessages.length === 0 ? (
-                  <p className="text-sm text-slate-500">No messages in this session yet.</p>
-                ) : null}
-                {selectedMessages.map((message) => {
-                  const mine = message.senderType === "homeowner";
-                  return (
-                    <div key={message.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
-                      <div
-                        className={`max-w-[84%] rounded-2xl px-4 py-2.5 text-sm ${
-                          mine
-                            ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
-                            : "bg-white text-slate-800 dark:bg-slate-800 dark:text-slate-100"
-                        }`}
-                      >
-                        {renderMessageBody(message.text)}
-                        <div className={`mt-1 flex items-center gap-2 text-[11px] ${mine ? "text-slate-300 dark:text-slate-500" : "text-slate-400"}`}>
-                          <span>{formatClockTime(message.at)}</span>
-                          {mine ? (
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteMessage(message.id)}
-                              disabled={deletingMessageId === message.id}
-                              className="rounded p-0.5 hover:bg-black/10 disabled:opacity-60 dark:hover:bg-white/20"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          ) : null}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <form onSubmit={handleSend} className="mb-20 border-t border-slate-200 bg-white/90 p-3 dark:border-slate-800 dark:bg-slate-900/80 lg:mb-0">
-                <div className="flex items-center gap-2">
-                  <input
-                    value={draft}
-                    onChange={(event) => setDraft(event.target.value)}
-                    placeholder="Type your message..."
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-900"
-                  />
-                  <VoiceNoteRecorder
-                    onSend={(dataUrl) => handleSendVoiceNote(dataUrl)}
-                    disabled={!selectedId || sending}
-                  />
-                  <button
-                    type="submit"
-                    disabled={sending || !draft.trim()}
-                    className="grid h-10 w-10 place-items-center rounded-xl bg-indigo-600 text-white disabled:opacity-60"
-                  >
-                    <SendHorizontal className="h-4 w-4" />
-                  </button>
-                </div>
-              </form>
-            </>
-          ) : (
-            <div className="grid flex-1 place-items-center p-8 text-center text-slate-500">
-              <p>Select a conversation to start messaging.</p>
+        {/* Chat Window */}
+        <section className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden flex flex-col h-[60vh]">
+          {/* Live Feed / Header */}
+          <div className="p-5 border-b border-slate-50 bg-slate-50/50 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+              <h2 className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                Live: {heroThread?.gateLabel || "Main Entry"}
+              </h2>
             </div>
-          )}
-        </article>
-      </section>
-    </AppShell>
+            {heroThread?.photoUrl && (
+                <div className="w-10 h-10 rounded-lg overflow-hidden border-2 border-white shadow-sm">
+                    <img src={heroThread.photoUrl} className="w-full h-full object-cover" />
+                </div>
+            )}
+          </div>
+
+          {/* Messages Area */}
+          <div ref={messagesRef} className="flex-1 overflow-y-auto p-6 space-y-4 no-scrollbar bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-fixed">
+            {conversationLoading ? (
+               <div className="flex justify-center py-10"><div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" /></div>
+            ) : selectedMessages.map((msg, i) => (
+              <div key={i} className={`flex ${msg.senderType === 'homeowner' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[80%] p-4 rounded-[1.5rem] text-sm font-medium ${
+                  msg.senderType === 'homeowner'
+                  ? 'bg-indigo-600 text-white rounded-tr-none'
+                  : 'bg-slate-100 text-slate-700 rounded-tl-none border border-slate-200/50'
+                }`}>
+                  {renderMessageBody(msg.text)}
+                  <p className={`text-[8px] mt-2 font-bold opacity-50 uppercase ${msg.senderType === 'homeowner' ? 'text-indigo-100' : 'text-slate-400'}`}>
+                    {formatClockTime(msg.at)}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Input Area */}
+          <div className="p-6 bg-white border-t border-slate-50">
+            <div className="flex gap-2 mb-4">
+                 <button onClick={() => handleSend({ preventDefault: () => {}, target: { value: "Please wait, checking." } })} className="flex-1 py-2 bg-slate-50 rounded-xl text-[9px] font-black uppercase text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 transition-all">Wait</button>
+                 <button onClick={() => handleSend({ preventDefault: () => {}, target: { value: "Access Granted." } })} className="flex-1 py-2 bg-emerald-50 rounded-xl text-[9px] font-black uppercase text-emerald-600">Grant</button>
+            </div>
+            <form onSubmit={handleSend} className="relative">
+              <input
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                placeholder="Type secure reply..."
+                className="w-full bg-slate-50 border-none rounded-2xl py-4 pl-5 pr-24 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-600/10"
+              />
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                <VoiceNoteRecorder onSend={handleSendVoiceNote} />
+                <button type="submit" disabled={!draft.trim() || sending} className="p-3 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-100 disabled:opacity-50">
+                  <SendHorizontal size={18} />
+                </button>
+              </div>
+            </form>
+          </div>
+        </section>
+      </main>
+
+      {/* Bottom Navigation */}
+      <nav className="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-8 pt-4 bg-white border-t border-slate-100 z-[9999] shadow-[0_-10px_40px_rgba(0,0,0,0.08)]">
+        <NavItem to="/dashboard/homeowner/overview" icon={<LayoutGrid size={22} />} label="Home" />
+        <NavItem to="/dashboard/homeowner/visits" icon={<History size={22} />} label="Activity" />
+        <NavItem to="/dashboard/homeowner/appointments" icon={<CalendarDays size={22} />} label="Schedule" />
+        <NavItem to="/dashboard/homeowner/messages" icon={<MessageSquare size={22} />} label="Inbox" active />
+        <NavItem to="/dashboard/homeowner/settings" icon={<User size={22} />} label="Profile" />
+      </nav>
+    </div>
   );
 }
 
-function formatClockTime(value) {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+function NavItem({ to, icon, label, active = false }) {
+  return (
+    <Link to={to} className={`flex flex-col items-center justify-center min-w-[64px] transition-all active:scale-90 ${active ? 'text-indigo-600' : 'text-slate-400'}`}>
+      <div className={`${active ? 'bg-indigo-50 p-2 rounded-xl' : ''}`}>
+        {icon}
+      </div>
+      <span className="text-[9px] font-black uppercase mt-1 tracking-tight">{label}</span>
+    </Link>
+  );
 }
 
-function getSessionPriority(status) {
-  const normalized = String(status || "").toLowerCase();
-  if (normalized === "active") return 0;
-  if (normalized === "approved") return 1;
-  if (normalized === "pending") return 2;
-  return 3;
-}
-
-function sortThreadsForInbox(rows) {
-  return [...(rows || [])].sort((a, b) => {
-    const priorityDelta = getSessionPriority(a?.sessionStatus) - getSessionPriority(b?.sessionStatus);
-    if (priorityDelta !== 0) return priorityDelta;
-    const aTime = new Date(a?.time || 0).getTime();
-    const bTime = new Date(b?.time || 0).getTime();
-    return bTime - aTime;
-  });
+// --- Helpers ---
+function formatClockTime(v) {
+  if (!v) return "";
+  return new Date(v).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 function renderMessageBody(text) {
-  if (typeof text !== "string") return <p>{String(text || "")}</p>;
-  if (text.startsWith("voice_note_url:")) {
-    const src = text.replace("voice_note_url:", "");
-    return <audio controls className="mt-2 w-full" src={src} />;
-  }
-  if (text.startsWith("voice_note:")) {
-    const src = text.replace("voice_note:", "");
-    return (
-      <audio controls className="mt-2 w-full" src={src} />
-    );
+  if (text?.startsWith("voice_note")) {
+    const src = text.split(":")[1];
+    return <audio src={src} controls className="h-8 w-40" />;
   }
   return <p>{text}</p>;
 }
 
 function previewMessageText(text) {
-  if (typeof text !== "string") return "";
-  if (text.startsWith("voice_note_url:")) return "Voice note";
-  if (text.startsWith("voice_note:")) return "Voice note";
+  if (text?.startsWith("voice_note")) return "Voice note";
   return text;
+}
+
+function isLikelyDuplicateMessage(a, b) {
+  return a.text === b.text && Math.abs(new Date(a.at) - new Date(b.at)) < 2000;
+}
+
+function upsertThreadPreview(msg, setThreads, selectedId) {
+    setThreads(prev => prev.map(t => t.id === msg.sessionId ? { ...t, last: previewMessageText(msg.text), time: msg.at } : t));
+}
+
+function sortThreadsForInbox(threads) {
+  return [...threads].sort((a, b) => new Date(b.time) - new Date(a.time));
 }

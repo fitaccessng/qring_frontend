@@ -1,59 +1,60 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import AppShell from "../../layouts/AppShell";
-import { env } from "../../config/env";
+import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
-  addEstateDoor,
-  createEstateSharedQr,
-  getEstateOverview,
-  updateEstateDoorAdminProfile
-} from "../../services/estateService";
+  ArrowLeft,
+  Bell,
+  DoorOpen,
+  QrCode,
+  Plus,
+  ChevronRight,
+  GitBranch,
+  ShieldCheck,
+  Settings,
+  ChevronDown,
+  Check,
+  X
+} from 'lucide-react';
+
+// Service & Utility Imports
+import { addEstateDoor } from "../../services/estateService";
 import { showError, showSuccess } from "../../utils/flash";
+import useEstateOverviewState from "../../hooks/useEstateOverviewState";
 
-function qrImageUrl(value, size = 140) {
-  return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(value)}`;
-}
+const EstateDoorsPage = () => {
+  const navigate = useNavigate();
+  const { overview, estateId, error, refresh } = useEstateOverviewState();
 
-export default function EstateDoorsPage() {
-  const [overview, setOverview] = useState(null);
-  const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [createdQr, setCreatedQr] = useState(null);
-  const [sharedQr, setSharedQr] = useState(null);
-  const [editingDoorId, setEditingDoorId] = useState("");
-  const [editingBusy, setEditingBusy] = useState(false);
-  const [adminForm, setAdminForm] = useState({
-    doorName: "",
-    homeownerName: "",
-    homeownerEmail: "",
-    newPassword: ""
-  });
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [form, setForm] = useState({
-    estateId: "",
+    estateId: estateId || "",
     homeownerId: "",
     name: ""
   });
+  const planRestrictions = overview?.planRestrictions ?? {};
 
-  async function load() {
-    const data = await getEstateOverview();
-    setOverview(data);
-    if (!form.estateId && data?.estates?.length) {
-      setForm((prev) => ({ ...prev, estateId: data.estates[0].id }));
+  // Prevent body scroll when sheet is open
+  useEffect(() => {
+    if (isSheetOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
     }
-  }
+  }, [isSheetOpen]);
 
   useEffect(() => {
-    load().catch((requestError) => setError(requestError.message ?? "Failed to load door data"));
-  }, []);
+    if (estateId && !form.estateId) {
+      setForm((prev) => ({ ...prev, estateId }));
+    }
+  }, [estateId, form.estateId]);
 
-  useEffect(() => {
-    if (error) showError(error);
-  }, [error]);
+  useEffect(() => { if (error) showError(error); }, [error]);
 
   const homesByEstate = useMemo(
     () => (overview?.homes ?? []).filter((home) => !form.estateId || home.estateId === form.estateId),
     [overview, form.estateId]
   );
+
   const homeownerOptions = useMemo(() => {
     const byHomeowner = new Map();
     homesByEstate.forEach((home) => {
@@ -62,45 +63,38 @@ export default function EstateDoorsPage() {
         byHomeowner.set(home.homeownerId, {
           homeownerId: home.homeownerId,
           homeownerName: home.homeownerName || "Homeowner",
-          homeownerEmail: home.homeownerEmail || "",
-          homeId: home.id,
           homeName: home.name || "Home",
+          homeId: home.id,
         });
       }
     });
     return Array.from(byHomeowner.values());
   }, [homesByEstate]);
-  const hasHomeownersInEstate = homeownerOptions.length > 0;
-
-  useEffect(() => {
-    if (homeownerOptions.length === 0) return;
-    const hasSelected = homeownerOptions.some((row) => row.homeownerId === form.homeownerId);
-    if (hasSelected) return;
-    setForm((prev) => ({ ...prev, homeownerId: homeownerOptions[0].homeownerId }));
-  }, [form.homeownerId, homeownerOptions]);
 
   const doors = useMemo(() => overview?.doors ?? [], [overview]);
-  const selectedEstate = useMemo(
-    () => (overview?.estates ?? []).find((item) => item.id === form.estateId) ?? null,
-    [overview, form.estateId]
-  );
-  const selectedEstateHomeIds = useMemo(() => new Set(homesByEstate.map((home) => home.id)), [homesByEstate]);
-  const selectedEstateDoors = useMemo(
-    () => doors.filter((door) => !form.estateId || selectedEstateHomeIds.has(door.homeId)),
-    [doors, form.estateId, selectedEstateHomeIds]
+  const maxDoors = Number(planRestrictions.maxDoors ?? 0);
+  const usedDoors = Number(planRestrictions.usedDoors ?? doors.length ?? 0);
+  const canAddDoor = !maxDoors || usedDoors < maxDoors;
+
+  const selectedResident = useMemo(() =>
+    homeownerOptions.find(opt => opt.homeownerId === form.homeownerId),
+    [homeownerOptions, form.homeownerId]
   );
 
   async function onSubmit(event) {
     event.preventDefault();
+    if (!canAddDoor) {
+      showError("Door limit reached for your current estate plan.");
+      return;
+    }
+    if (!form.homeownerId || !form.name) {
+        showError("Please select a resident and name the door.");
+        return;
+    }
     setBusy(true);
-    setError("");
-    setCreatedQr(null);
     try {
       const selectedHomeowner = homeownerOptions.find((row) => row.homeownerId === form.homeownerId);
-      if (!selectedHomeowner?.homeId) {
-        throw new Error("Select a homeowner linked to a home before creating a door.");
-      }
-      const data = await addEstateDoor({
+      await addEstateDoor({
         estateId: form.estateId,
         homeId: selectedHomeowner.homeId,
         name: form.name,
@@ -108,473 +102,224 @@ export default function EstateDoorsPage() {
         mode: "direct",
         plan: "single"
       });
-      if (data?.qr?.qrId) {
-        setCreatedQr({
-          qrId: data.qr.qrId,
-          scanUrl: toScanUrl(data.qr.qrId),
-          doorName: data?.door?.name ?? form.name
-        });
-      }
-      if (data?.door?.id) {
-        setOverview((prev) => {
-          if (!prev) return prev;
-          const home = (prev.homes ?? []).find((row) => String(row.id) === String(selectedHomeowner.homeId));
-          const nextDoor = {
-            id: data.door.id,
-            name: data.door.name ?? form.name,
-            homeId: selectedHomeowner.homeId,
-            homeName: home?.name || "",
-            homeownerId: home?.homeownerId || "",
-            homeownerName: home?.homeownerName || "",
-            homeownerEmail: home?.homeownerEmail || "",
-            loginLink: `${getPublicBaseUrl()}/login`,
-            state: data?.door?.state || "Online",
-            qr: data?.qr?.qrId ? [data.qr.qrId] : []
-          };
-          return {
-            ...prev,
-            doors: [nextDoor, ...(prev.doors ?? []).filter((row) => row.id !== nextDoor.id)]
-          };
-        });
-      }
       showSuccess("Door created successfully.");
-      setForm((prev) => ({
-        ...prev,
-        name: ""
-      }));
-      load().catch(() => {});
+      setForm((prev) => ({ ...prev, name: "", homeownerId: "" }));
+      await refresh();
     } catch (requestError) {
-      setError(requestError.message ?? "Failed to create door");
+      showError(requestError.message ?? "Failed to create door");
     } finally {
       setBusy(false);
     }
   }
 
-  async function generateSharedQr() {
-    if (!form.estateId) return;
-    setError("");
-    try {
-      const data = await createEstateSharedQr(form.estateId);
-      setSharedQr({
-        ...data,
-        fullScanUrl: toPublicUrl(data.scanUrl)
-      });
-      showSuccess("Estate shared QR generated. Visitors can pick a door after scanning.");
-      await load();
-    } catch (requestError) {
-      setError(requestError.message ?? "Failed to generate estate shared QR");
-    }
-  }
+  const inputBaseClass = "w-full bg-[#f1f3f5] border-2 border-transparent focus:border-[#4955b3] focus:bg-white rounded-2xl px-4 py-4 text-[16px] font-bold text-[#2b3437] transition-all outline-none placeholder:text-slate-400 min-h-[58px]";
 
-  async function saveAdminProfile(event) {
-    event.preventDefault();
-    if (!editingDoorId) return;
-    setEditingBusy(true);
-    setError("");
-    try {
-      const payload = {
-        doorName: adminForm.doorName || undefined,
-        homeownerName: adminForm.homeownerName || undefined,
-        homeownerEmail: adminForm.homeownerEmail || undefined,
-        newPassword: adminForm.newPassword || undefined
-      };
-      await updateEstateDoorAdminProfile(editingDoorId, payload);
-      showSuccess("Door admin profile updated successfully.");
-      setEditingDoorId("");
-      setAdminForm({ doorName: "", homeownerName: "", homeownerEmail: "", newPassword: "" });
-      await load();
-    } catch (requestError) {
-      setError(requestError.message ?? "Failed to update door admin profile");
-    } finally {
-      setEditingBusy(false);
-    }
-  }
+  return (
+    <div className="bg-[#f8f9fa] text-[#2b3437] min-h-screen font-sans pb-32 overflow-x-hidden">
 
-  function startEditDoor(door) {
-    setEditingDoorId(door.id);
-    setAdminForm({
-      doorName: door.name ?? "",
-      homeownerName: door.homeownerName ?? "",
-      homeownerEmail: door.homeownerEmail ?? "",
-      newPassword: ""
-    });
-  }
+      {/* Top Nav */}
+      <header className="fixed top-0 w-full z-50 bg-white/90 backdrop-blur-xl flex items-center justify-between px-4 h-16 border-b border-slate-100">
+        <button onClick={() => navigate(-1)} className="p-2 text-[#4955b3] active:bg-indigo-50 rounded-xl">
+          <ArrowLeft size={24} />
+        </button>
+        <h1 className="text-sm font-black tracking-widest uppercase">Estate Doors</h1>
+        <div className="relative">
+          <button className="p-2 text-[#4955b3] active:bg-indigo-50 rounded-xl">
+            <Bell size={22} />
+          </button>
+          <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-rose-500 rounded-full border-2 border-white" />
+        </div>
+      </header>
 
-  function printDoorQr(door, qrId) {
-    const scanUrl = toScanUrl(qrId);
-    const html = `
-      <html>
-        <head>
-          <title>Print Door QR</title>
-          <style>
-            body{font-family:Arial,sans-serif;padding:24px}
-            .card{width:340px;border:1px solid #cbd5e1;border-radius:16px;padding:16px}
-            .title{font-size:14px;font-weight:700;text-align:center;margin-bottom:8px}
-            .meta{font-size:12px;color:#475569;text-align:center;margin-bottom:8px}
-            .qr{display:block;width:280px;height:280px;margin:0 auto;background:#fff;padding:8px;border-radius:10px}
-            .url{font-size:10px;color:#64748b;text-align:center;margin-top:8px;word-break:break-all}
-          </style>
-        </head>
-        <body>
-          <div class="card">
-            <div class="title">${door.name}</div>
-            <div class="meta">${door.homeName || ""}</div>
-            <img class="qr" src="${qrImageUrl(scanUrl, 280)}" alt="QR" />
-            <div class="url">${scanUrl}</div>
+      <main className="pt-20 px-4 max-w-md mx-auto">
+        <section className="mb-6">
+          <span className="text-[#4955b3] font-black tracking-widest uppercase text-[10px] mb-1 block">Access Management</span>
+          <h2 className="text-3xl font-black text-[#2b3437] leading-tight">Digital Perimeter</h2>
+          <p className="text-slate-500 font-medium text-base mt-1">Setup door access for your residents.</p>
+        </section>
+
+        <section className="mb-6 rounded-[2rem] border border-slate-100 bg-white p-5 shadow-sm">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Structure Sync</p>
+              <h3 className="mt-2 text-lg font-black text-[#2b3437]">Doors now follow your mapped homes</h3>
+              <p className="mt-1 text-sm text-slate-500">
+                Choose a resident-linked home first, then add the access point. Review the full relationship on the mappings page instead of managing a separate duplicate structure.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate("/dashboard/estate/mappings")}
+              className="rounded-2xl bg-slate-900 px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-white"
+            >
+              Mappings
+            </button>
           </div>
-          <script>window.onload = () => window.print();</script>
-        </body>
-      </html>
-    `;
-    const printWindow = window.open("", "_blank", "width=720,height=860");
-    if (!printWindow) return;
-    printWindow.document.open();
-    printWindow.document.write(html);
-    printWindow.document.close();
-  }
+        </section>
 
-  async function copyLoginDetails(door) {
-    const loginLink = `${door.loginLink}?email=${encodeURIComponent(door.homeownerEmail || "")}`;
-    const payload = `Homeowner: ${door.homeownerName || "N/A"}\nEmail: ${door.homeownerEmail || "N/A"}\nLogin: ${loginLink}`;
-    try {
-      await navigator.clipboard.writeText(payload);
-      showSuccess(`Login details copied for ${door.name}.`);
-      setError("");
-    } catch {
-      setError("Unable to copy login details. Please copy manually.");
-    }
-  }
+        {/* Quick Stats */}
+        <div className="grid grid-cols-2 gap-3 mb-6">
+          <div className="bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm">
+            <DoorOpen className="text-[#4955b3] mb-2" size={24} />
+            <h3 className="text-2xl font-black text-[#2b3437]">{usedDoors}{maxDoors ? ` / ${maxDoors}` : ""}</h3>
+            <p className="text-slate-400 font-black text-[9px] uppercase tracking-widest">Active Doors</p>
+          </div>
+          <div className="bg-[#4955b3] p-5 rounded-[2rem] text-white shadow-lg shadow-indigo-100">
+            <QrCode className="text-white/60 mb-2" size={24} />
+            <h3 className="text-2xl font-black leading-none uppercase">Ready</h3>
+            <p className="text-white/40 font-black text-[9px] uppercase tracking-widest">QR System</p>
+          </div>
+        </div>
 
-  function printSharedEstateQr() {
-    if (!sharedQr) return;
-    const estateName =
-      (overview?.estates ?? []).find((item) => item.id === form.estateId)?.name ?? "Estate Entry";
-    const qrSrc = qrImageUrl(sharedQr.fullScanUrl, 300);
+        {/* Input Card */}
+        <section className="bg-white rounded-[2.2rem] border border-slate-100 p-6 shadow-sm mb-8">
+            <h3 className="text-lg font-black text-[#2b3437] mb-5">Create Entry Point</h3>
 
-    const html = `
-      <html>
-        <head>
-          <title>Print Shared Estate QR</title>
-          <style>
-            body{font-family:Inter,Arial,sans-serif;padding:24px;background:#fff;color:#0f172a}
-            .card{width:380px;border:1px solid #cbd5e1;border-radius:18px;padding:18px}
-            .brand{display:flex;align-items:center;gap:10px;margin-bottom:8px}
-            .logo{width:30px;height:30px;border-radius:9px;background:#0f172a;color:#fff;display:grid;place-items:center;font-weight:800}
-            .name{font-size:18px;font-weight:800}
-            .subtitle{font-size:12px;color:#475569;margin-bottom:10px}
-            .title{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#334155;text-align:center;margin:8px 0}
-            .qr{display:block;width:320px;height:320px;margin:0 auto;background:#fff;padding:10px;border-radius:12px;border:1px solid #e2e8f0}
-            .steps{margin-top:10px;font-size:11px;color:#475569;line-height:1.5}
-            .url{font-size:10px;color:#64748b;text-align:center;margin-top:8px;word-break:break-all}
-          </style>
-        </head>
-        <body>
-          <div class="card">
-            <div class="brand">
-              <div class="logo">Q</div>
-              <div>
-                <div class="name">Qring</div>
-                <div class="subtitle">${estateName}</div>
+            <form onSubmit={onSubmit} className="space-y-4">
+                <div className="relative">
+                    <label className="text-[10px] font-black uppercase text-[#4955b3] ml-2 mb-1.5 block tracking-widest">Resident / Home</label>
+                    <button
+                      type="button"
+                      onClick={() => setIsSheetOpen(true)}
+                      className="w-full bg-[#f1f3f5] rounded-2xl px-4 py-4 text-left flex justify-between items-center min-h-[58px] active:scale-[0.98] transition-all"
+                    >
+                      <span className={`text-[16px] font-bold truncate ${selectedResident ? 'text-[#2b3437]' : 'text-slate-400'}`}>
+                        {selectedResident ? `${selectedResident.homeownerName} — ${selectedResident.homeName}` : "Choose resident..."}
+                      </span>
+                      <ChevronDown size={18} className="text-slate-400" />
+                    </button>
+                </div>
+
+                <div>
+                    <label className="text-[10px] font-black uppercase text-[#4955b3] ml-2 mb-1.5 block tracking-widest">Door Name</label>
+                    <input
+                        type="text"
+                        placeholder="e.g. Lobby Entrance"
+                        className={inputBaseClass}
+                        value={form.name}
+                        onChange={(e) => setForm({...form, name: e.target.value})}
+                    />
+                </div>
+
+                <button
+                    disabled={busy || !canAddDoor}
+                    className="w-full bg-[#4955b3] hover:bg-[#3c49a7] text-white py-5 rounded-2xl flex items-center justify-center gap-3 font-black text-base transition-all active:scale-[0.98] shadow-lg shadow-indigo-50 mt-2"
+                >
+                    {busy ? "Creating..." : <><Plus size={20} strokeWidth={3} /> Add Door</>}
+                </button>
+                {!canAddDoor ? (
+                  <p className="text-center text-sm font-semibold text-amber-700">
+                    Upgrade your plan to add more doors.
+                  </p>
+                ) : null}
+            </form>
+        </section>
+
+        {/* Active List */}
+        <div className="space-y-3">
+            <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-2 mb-2">Recent Setup</h4>
+            {doors.length > 0 ? doors.slice(0, 5).map(door => (
+                <div key={door.id} className="bg-white p-4 rounded-2xl border border-slate-50 flex items-center justify-between shadow-sm active:bg-slate-50">
+                    <div className="flex items-center gap-4 overflow-hidden">
+                        <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-indigo-50 flex items-center justify-center text-[#4955b3]">
+                            <DoorOpen size={20} />
+                        </div>
+                        <div className="overflow-hidden">
+                            <p className="text-sm font-black text-[#2b3437] truncate">{door.name}</p>
+                            <p className="text-[10px] font-black text-slate-400 uppercase truncate tracking-tight">{door.homeName}</p>
+                        </div>
+                    </div>
+                    <ChevronRight size={18} className="text-slate-300 flex-shrink-0 ml-2" />
+                </div>
+            )) : (
+              <p className="text-center py-8 text-slate-400 font-bold text-xs italic">No doors configured yet.</p>
+            )}
+        </div>
+      </main>
+
+      {/* RESPONSIVE BOTTOM SHEET */}
+      {isSheetOpen && (
+        <div className="fixed inset-0 z-[100] flex flex-col justify-end">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+            onClick={() => setIsSheetOpen(false)}
+          />
+
+          {/* Sheet Body */}
+          <div className="relative bg-white rounded-t-[2.5rem] w-full max-h-[80vh] flex flex-col shadow-2xl animate-in slide-in-from-bottom duration-300">
+
+            {/* Fixed Header Area */}
+            <div className="flex-shrink-0 pt-4 px-6 pb-2">
+              <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6" />
+              <div className="flex justify-between items-center mb-4">
+                <div>
+                  <h3 className="text-xl font-black text-[#2b3437]">Select Resident</h3>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Available Homes</p>
+                </div>
+                <button
+                  onClick={() => setIsSheetOpen(false)}
+                  className="p-3 bg-slate-50 text-slate-400 rounded-2xl active:scale-90 transition-all"
+                >
+                  <X size={20} />
+                </button>
               </div>
             </div>
-            <div class="title">Shared Estate Access QR</div>
-            <img class="qr" src="${qrSrc}" alt="Shared Estate QR" />
-            <div class="steps">
-              1. Visitor scans this QR<br/>
-              2. Selects door from list<br/>
-              3. Sends request to specific homeowner
-            </div>
-            <div class="url">${sharedQr.fullScanUrl}</div>
-          </div>
-          <script>window.onload = () => window.print();</script>
-        </body>
-      </html>
-    `;
 
-    const printWindow = window.open("", "_blank", "width=760,height=900");
-    if (!printWindow) return;
-    printWindow.document.open();
-    printWindow.document.write(html);
-    printWindow.document.close();
-  }
-
-  return (
-    <AppShell title="Estate Doors">
-      <div className="mx-auto max-w-7xl space-y-6">
-
-        <section className="relative overflow-hidden rounded-[2.5rem] bg-slate-900 p-8 text-white dark:bg-indigo-600">
-          <div className="relative z-10">
-            <h2 style={{color: "white"}} className="text-2xl font-bold tracking-tight">Estate Doors</h2>
-            <p className="mt-2 text-sm text-slate-200 dark:text-indigo-100">Create doors for existing homeowners. Each door gets a QR code automatically.</p>
-          </div>
-          <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/5 blur-3xl" />
-        </section>
-
-      <section className="rounded-[2rem] border border-slate-200/70 bg-white/95 p-5 shadow-[0_8px_30px_rgb(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-900/90 sm:p-6">
-        <div>
-          <h2 className="font-heading text-lg font-bold sm:text-xl text-slate-900 dark:text-white">Create Door</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Flow: create homeowner, assign homeowner to a home, then create a door for that home.
-          </p>
-        </div>
-        {!hasHomeownersInEstate ? (
-          <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/30 dark:bg-amber-900/20 dark:text-amber-200">
-            No homeowner record is available for this estate yet. Create homeowner in{" "}
-            <Link to="/dashboard/estate/invites" className="font-semibold underline">
-              Create / Invite Homeowners
-            </Link>
-            {" "}and then add or confirm a home in{" "}
-            <Link to="/dashboard/estate/homes" className="font-semibold underline">
-              Multi-Home
-            </Link>
-            .
-          </div>
-        ) : null}
-
-        <form onSubmit={onSubmit} className="mt-4 grid gap-3 md:grid-cols-2">
-          <Select
-            label="Estate"
-            value={form.estateId}
-            onChange={(value) => setForm((prev) => ({ ...prev, estateId: value }))}
-            options={(overview?.estates ?? []).map((item) => ({ value: item.id, label: item.name }))}
-          />
-          <Select
-            label="Homeowner"
-            value={form.homeownerId}
-            onChange={(value) => setForm((prev) => ({ ...prev, homeownerId: value }))}
-            options={homeownerOptions.map((item) => ({
-              value: item.homeownerId,
-              label: `${item.homeownerName} (${item.homeName})`
-            }))}
-          />
-
-          <label className="block">
-            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Door Name</span>
-            <input
-              value={form.name}
-              onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
-              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
-              required
-            />
-          </label>
-
-          <button
-            type="submit"
-            disabled={busy || !hasHomeownersInEstate}
-            className="rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition-all active:scale-95 disabled:opacity-50 dark:bg-white dark:text-slate-900"
-          >
-            {busy ? "Saving..." : "Create Door"}
-          </button>
-        </form>
-      </section>
-
-      {createdQr ? (
-        <section className="rounded-[2rem] border border-slate-200/70 bg-white/95 p-5 shadow-[0_8px_30px_rgb(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-900/90">
-          <h3 className="font-heading text-base font-bold">Generated QR</h3>
-          <p className="text-xs text-slate-500">{createdQr.doorName}</p>
-          <div className="mt-3 inline-flex flex-col items-center rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800">
-            <img src={qrImageUrl(createdQr.scanUrl, 180)} alt={createdQr.qrId} className="h-44 w-44 rounded bg-white p-2" />
-            <p className="mt-2 text-xs font-semibold">{createdQr.qrId}</p>
-          </div>
-        </section>
-      ) : null}
-
-      <section className="rounded-[2rem] border border-slate-200/70 bg-white/95 p-5 shadow-[0_8px_30px_rgb(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-900/90">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h3 className="font-heading text-base font-bold">Estate Shared Entry QR</h3>
-            <p className="text-xs text-slate-500">One QR for the estate. Visitors scan, pick a configured door, then request access.</p>
-          </div>
-          <button
-            type="button"
-            onClick={generateSharedQr}
-            disabled={!selectedEstateDoors.length}
-            className="rounded-2xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition-all active:scale-95 dark:bg-white dark:text-slate-900"
-          >
-            Generate Shared QR
-          </button>
-        </div>
-        {!selectedEstateDoors.length ? (
-          <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/30 dark:bg-amber-900/20 dark:text-amber-200">
-            {selectedEstate?.name || "This estate"} does not have any doors yet. Estate QR works after you create at least one homeowner-linked home and one door.
-          </div>
-        ) : null}
-        {sharedQr ? (
-          <div className="mt-3 inline-flex flex-col items-center rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800">
-            <img src={qrImageUrl(sharedQr.fullScanUrl, 180)} alt={sharedQr.qrId} className="h-44 w-44 rounded bg-white p-2" />
-            <p className="mt-2 text-xs font-semibold">{sharedQr.qrId}</p>
-            <p className="text-[11px] text-slate-500">{sharedQr.fullScanUrl}</p>
-            <button
-              type="button"
-              onClick={printSharedEstateQr}
-              className="mt-3 rounded-2xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition-all active:scale-95 dark:bg-white dark:text-slate-900"
-            >
-              Print Shared Estate QR
-            </button>
-          </div>
-        ) : null}
-      </section>
-
-      <section>
-        <h3 className="mb-3 font-heading text-lg font-bold">Doors Created</h3>
-        <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
-          {doors.map((door) => {
-            const firstQr = door.qr?.[0];
-            const loginLink = `${door.loginLink}?email=${encodeURIComponent(door.homeownerEmail || "")}`;
-            return (
-              <article key={door.id} className="rounded-[2rem] border border-slate-200/70 bg-white/95 p-5 shadow-[0_8px_30px_rgb(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-900/90">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="font-heading text-lg font-bold">{door.name}</p>
-                    <p className="text-xs text-slate-500">{door.homeName} | {door.state}</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => startEditDoor(door)}
-                    className="rounded-2xl border border-slate-300 px-2.5 py-1.5 text-xs font-semibold transition-all active:scale-95 dark:border-slate-700"
-                  >
-                    Admin Profile
-                  </button>
-                </div>
-                <p className="mt-2 text-xs text-slate-500">Homeowner: {door.homeownerName || "N/A"}</p>
-                <p className="text-xs text-slate-500">Email: {door.homeownerEmail || "N/A"}</p>
-                <a href={loginLink} target="_blank" rel="noreferrer" className="mt-2 inline-block text-xs font-semibold text-brand-600 dark:text-brand-300">
-                  Estate Homeowner Login Link
-                </a>
-                <div className="mt-2">
-                  <button
-                    type="button"
-                    onClick={() => copyLoginDetails(door)}
-                    className="rounded-2xl border border-slate-300 px-2.5 py-1.5 text-xs font-semibold transition-all active:scale-95 dark:border-slate-700"
-                  >
-                    Copy Login Details
-                  </button>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {door.qr?.length ? door.qr.map((qrId) => (
+            {/* Scrollable Content Area */}
+            <div className="flex-1 overflow-y-auto px-6 pb-12 custom-scrollbar">
+              <div className="space-y-3">
+                {homeownerOptions.length > 0 ? homeownerOptions.map((opt) => {
+                  const isSelected = opt.homeownerId === form.homeownerId;
+                  return (
                     <button
-                      key={`${door.id}-${qrId}`}
+                      key={opt.homeownerId}
                       type="button"
-                      onClick={() => printDoorQr(door, qrId)}
-                      className="rounded-2xl border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-semibold transition-all active:scale-95 dark:border-slate-700 dark:bg-slate-800"
+                      onClick={() => {
+                        setForm({ ...form, homeownerId: opt.homeownerId });
+                        setIsSheetOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between p-5 rounded-3xl transition-all active:scale-[0.98] ${
+                        isSelected
+                          ? 'bg-indigo-50 border-2 border-[#4955b3]'
+                          : 'bg-[#f8f9fa] border-2 border-transparent hover:bg-slate-100'
+                      }`}
                     >
-                      Print {qrId}
+                      <div className="text-left overflow-hidden mr-4">
+                        <p className={`font-black text-[17px] truncate ${isSelected ? 'text-[#4955b3]' : 'text-[#2b3437]'}`}>
+                          {opt.homeownerName}
+                        </p>
+                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-tight">
+                          {opt.homeName}
+                        </p>
+                      </div>
+                      <div className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center ${isSelected ? 'bg-[#4955b3] text-white' : 'bg-slate-200'}`}>
+                        {isSelected ? <Check size={14} strokeWidth={4} /> : null}
+                      </div>
                     </button>
-                  )) : (
-                    <span className="text-xs text-slate-500">No QR yet</span>
-                  )}
-                  {firstQr ? (
-                    <img
-                      src={qrImageUrl(toScanUrl(firstQr), 64)}
-                      alt={firstQr}
-                      className="h-12 w-12 rounded border border-slate-200 bg-white p-1 dark:border-slate-700"
-                    />
-                  ) : null}
-                </div>
-              </article>
-            );
-          })}
-          {doors.length === 0 ? <p className="text-sm text-slate-500">No doors created yet.</p> : null}
-        </div>
-      </section>
-
-      {editingDoorId ? (
-        <section className="rounded-[2rem] border border-slate-200/70 bg-white/95 p-5 shadow-[0_8px_30px_rgb(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-900/90 sm:p-6">
-          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <h3 className="font-heading text-lg font-bold">Door Admin Profile</h3>
-            <button
-              type="button"
-              onClick={() => setEditingDoorId("")}
-              className="rounded-2xl border border-slate-300 px-2.5 py-1.5 text-xs font-semibold transition-all active:scale-95 dark:border-slate-700"
-            >
-              Close
-            </button>
+                  );
+                }) : (
+                    <div className="py-20 text-center">
+                        <p className="text-slate-400 font-bold">No residents found</p>
+                    </div>
+                )}
+              </div>
+            </div>
           </div>
-          <form onSubmit={saveAdminProfile} className="grid gap-3 md:grid-cols-2">
-            <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Door Name</span>
-              <input
-                value={adminForm.doorName}
-                onChange={(event) => setAdminForm((prev) => ({ ...prev, doorName: event.target.value }))}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
-              />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Homeowner Name</span>
-              <input
-                value={adminForm.homeownerName}
-                onChange={(event) => setAdminForm((prev) => ({ ...prev, homeownerName: event.target.value }))}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
-              />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Homeowner Email</span>
-              <input
-                type="email"
-                value={adminForm.homeownerEmail}
-                onChange={(event) => setAdminForm((prev) => ({ ...prev, homeownerEmail: event.target.value }))}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
-              />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Change Password</span>
-              <input
-                type="password"
-                value={adminForm.newPassword}
-                onChange={(event) => setAdminForm((prev) => ({ ...prev, newPassword: event.target.value }))}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
-                placeholder="Leave empty to keep current password"
-              />
-            </label>
-            <button
-              type="submit"
-              disabled={editingBusy}
-              className="rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition-all active:scale-95 disabled:opacity-50 dark:bg-white dark:text-slate-900"
-            >
-              {editingBusy ? "Updating..." : "Update Admin Profile"}
-            </button>
-          </form>
-        </section>
-      ) : null}
-      </div>
-    </AppShell>
+        </div>
+      )}
+
+      {/* Bottom Navigation */}
+
+    </div>
   );
-}
+};
 
-function getPublicBaseUrl() {
-  return (env.publicAppUrl || window.location.origin || "").replace(/\/+$/, "");
-}
+const NavItem = ({ icon, label, active = false, onClick }) => (
+  <button onClick={onClick} className={`flex flex-col items-center gap-1.5 px-4 py-2 rounded-xl transition-all active:scale-90 ${active ? 'bg-indigo-50 text-[#4955b3]' : 'text-slate-300'}`}>
+    {icon}
+    <span className="text-[8px] font-black uppercase tracking-tight">{label}</span>
+  </button>
+);
 
-function toScanUrl(qrId) {
-  return `${getPublicBaseUrl()}/scan/${qrId}`;
-}
-
-function toPublicUrl(path) {
-  if (!path) return getPublicBaseUrl();
-  if (/^https?:\/\//i.test(path)) return path;
-  return `${getPublicBaseUrl()}${path.startsWith("/") ? path : `/${path}`}`;
-}
-
-function Select({ label, value, onChange, options }) {
-  return (
-    <label className="block">
-      <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</span>
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
-        required
-      >
-        {options.length === 0 ? <option value="">No options available</option> : null}
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-
-
+export default EstateDoorsPage;

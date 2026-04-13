@@ -1,10 +1,10 @@
 import AppShell from "../../layouts/AppShell";
-import SafetyOperationsConsole from "../../components/safety/SafetyOperationsConsole";
+import EstateDashboard from "../../components/panic/EstateDashboard";
 
 export default function SecurityEmergencyPage() {
   return (
     <AppShell title="Emergency Console">
-      <SafetyOperationsConsole roleLabel="Guard Response Console" />
+      <EstateDashboard roleLabel="Guard Response Console" />
     </AppShell>
   );
 }

@@ -1,445 +1,290 @@
-import { useEffect, useMemo, useState } from "react";
-import { Vote } from "lucide-react";
-import AppShell from "../../layouts/AppShell";
-import { createEstateAlert, deleteEstateAlert, getEstateOverview, listEstateAlerts, updateEstateAlert } from "../../services/estateService";
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  ArrowLeft,
+  Bell,
+  PlusCircle,
+  Trash2,
+  BarChart2,
+  Users,
+  Lock,
+  Eye,
+  CheckCircle2
+} from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+
+// Services & Hooks
+import { createEstateAlert, deleteEstateAlert, listEstateAlerts, updateEstateAlert } from "../../services/estateService";
 import { showError, showSuccess } from "../../utils/flash";
 import { useSocketEvents } from "../../hooks/useSocketEvents";
-import { getDashboardSocket } from "../../services/socketClient";
-import CardSurface from "../../components/CardSurface";
+import useEstateOverviewState from "../../hooks/useEstateOverviewState";
 import MobileBottomSheet from "../../components/mobile/MobileBottomSheet";
-import EstateManagerPageShell, { EstateManagerSection, estateFieldClassName } from "../../components/mobile/EstateManagerPageShell";
 
-export default function EstatePollsPage() {
-  const [overview, setOverview] = useState(null);
-  const [estateId, setEstateId] = useState("");
+const EstatePollsPage = () => {
+  const navigate = useNavigate();
+  const { estateId, loading, error, setError } = useEstateOverviewState();
+
+  const [polls, setPolls] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [activeTab, setActiveTab] = useState("active");
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [selectedPoll, setSelectedPoll] = useState(null); // For viewing detailed results
+  const [pollToClose, setPollToClose] = useState(null);
+
   const [question, setQuestion] = useState("");
   const [options, setOptions] = useState(["", ""]);
-  const [polls, setPolls] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [editingId, setEditingId] = useState("");
-  const [editingQuestion, setEditingQuestion] = useState("");
-  const [editingOptions, setEditingOptions] = useState(["", ""]);
-  const [pendingDelete, setPendingDelete] = useState(null);
-  const [composeOpen, setComposeOpen] = useState(false);
 
-  useEffect(() => {
-    let active = true;
-    async function load() {
-      setLoading(true);
-      try {
-        const data = await getEstateOverview();
-        if (!active) return;
-        setOverview(data);
-        const firstId = data?.estates?.[0]?.id || "";
-        setEstateId((prev) => prev || firstId);
-      } catch (err) {
-        if (active) setError(err?.message || "Failed to load estate data");
-      } finally {
-        if (active) setLoading(false);
-      }
-    }
-    load();
-    return () => {
-      active = false;
-    };
-  }, []);
-  
-  useEffect(() => {
-    if (error) showError(error);
-  }, [error]);
-
-  useEffect(() => {
+  const loadPolls = async () => {
     if (!estateId) return;
-    let active = true;
-    async function loadPolls() {
-      try {
-        const rows = await listEstateAlerts(estateId, "poll");
-        if (active) setPolls(rows);
-      } catch (err) {
-        if (active) setError(err?.message || "Failed to load polls");
-      }
+    try {
+      const rows = await listEstateAlerts(estateId, "poll");
+      setPolls(rows);
+    } catch (err) {
+      setError(err?.message || "Failed to load polls");
     }
-    loadPolls();
-    return () => {
-      active = false;
-    };
-  }, [estateId]);
+  };
 
-  useEffect(() => {
-    if (!estateId) return;
-    const socket = getDashboardSocket();
-    socket.emit("dashboard.subscribe", { room: `estate:${estateId}:alerts` });
-  }, [estateId]);
+  useEffect(() => { loadPolls(); }, [estateId]);
 
-  useSocketEvents(
-    useMemo(
-      () => ({
-        ALERT_CREATED: () => {
-          if (!estateId) return;
-          listEstateAlerts(estateId, "poll").then(setPolls).catch(() => {});
-        },
-        ALERT_UPDATED: () => {
-          if (!estateId) return;
-          listEstateAlerts(estateId, "poll").then(setPolls).catch(() => {});
-        },
-        ALERT_DELETED: () => {
-          if (!estateId) return;
-          listEstateAlerts(estateId, "poll").then(setPolls).catch(() => {});
-        }
-      }),
-      [estateId]
-    )
-  );
+  useSocketEvents(useMemo(() => ({
+    ALERT_CREATED: loadPolls,
+    ALERT_UPDATED: loadPolls,
+    ALERT_DELETED: loadPolls
+  }), [estateId]));
 
-  function updateOption(index, value) {
-    setOptions((prev) => prev.map((opt, idx) => (idx === index ? value : opt)));
+  const categorized = useMemo(() => {
+    const now = Date.now();
+    const active = polls.filter(p => !p.dueDate || new Date(p.dueDate).getTime() >= now);
+    const closed = polls.filter(p => p.dueDate && new Date(p.dueDate).getTime() < now);
+    const visible = activeTab === "active" ? active : closed;
+    return { active, closed, visible };
+  }, [polls, activeTab]);
+
+  // -- Handlers --
+
+  async function handleClosePoll(poll) {
+    const pollId = poll?.id;
+    if (!pollId) return;
+    setBusy(true);
+    try {
+      // Setting due date to 1 minute ago to force immediate closure
+      const pastDate = new Date(Date.now() - 60000).toISOString();
+      const cleanOptions = Array.isArray(poll?.pollOptions)
+        ? poll.pollOptions.map((option) => String(option || "").trim()).filter(Boolean)
+        : [];
+      await updateEstateAlert(pollId, {
+        title: String(poll?.title || "").trim(),
+        description: String(poll?.description || "").trim(),
+        dueDate: pastDate,
+        pollOptions: cleanOptions,
+        targetHomeownerIds: Array.isArray(poll?.targetHomeownerIds) ? poll.targetHomeownerIds : []
+      });
+      setPolls((prev) =>
+        prev.map((row) => (row.id === pollId ? { ...row, dueDate: pastDate } : row))
+      );
+      setPollToClose(null);
+      setActiveTab("closed");
+      showSuccess("Poll closed successfully.");
+      await loadPolls();
+    } catch (err) {
+      showError(err?.message || "Failed to close poll");
+    } finally {
+      setBusy(false);
+    }
   }
 
-  function addOption() {
-    setOptions((prev) => [...prev, ""]);
-  }
-
-  function removeOption(index) {
-    setOptions((prev) => prev.filter((_, idx) => idx !== index));
+  async function handleDelete(id) {
+    if (!window.confirm("Delete this poll permanently?")) return;
+    try {
+      await deleteEstateAlert(id);
+      showSuccess("Poll deleted");
+      loadPolls();
+    } catch (err) { showError(err?.message); }
   }
 
   async function handleSubmit(event) {
     event.preventDefault();
-    if (!estateId || !question.trim()) return false;
     const cleanOptions = options.map((opt) => opt.trim()).filter(Boolean);
-    if (cleanOptions.length < 2) {
-      setError("Provide at least two options.");
-      return false;
-    }
+    if (cleanOptions.length < 2) { showError("Provide at least two options."); return; }
     setBusy(true);
-    setError("");
     try {
-      await createEstateAlert({
-        estateId,
-        title: question.trim(),
-        description: "",
-        alertType: "poll",
-        pollOptions: cleanOptions
-      });
-      showSuccess("Poll created.");
-      setQuestion("");
-      setOptions(["", ""]);
-      const rows = await listEstateAlerts(estateId, "poll");
-      setPolls(rows);
-      return true;
-    } catch (err) {
-      setError(err?.message || "Failed to create poll");
-      return false;
-    } finally {
-      setBusy(false);
-    }
+      await createEstateAlert({ estateId, title: question.trim(), alertType: "poll", pollOptions: cleanOptions });
+      showSuccess("Poll published.");
+      setQuestion(""); setOptions(["", ""]); setComposeOpen(false);
+      loadPolls();
+    } catch (err) { showError(err?.message); } finally { setBusy(false); }
   }
-
-  function startEdit(poll) {
-    setEditingId(poll?.id || "");
-    setEditingQuestion(poll?.title || "");
-    const nextOptions = (poll?.pollOptions ?? []).map((opt) => String(opt ?? ""));
-    setEditingOptions(nextOptions.length >= 2 ? nextOptions : ["", ""]);
-  }
-
-  function closeEdit() {
-    setEditingId("");
-    setEditingQuestion("");
-    setEditingOptions(["", ""]);
-  }
-
-  function updateEditingOption(index, value) {
-    setEditingOptions((prev) => prev.map((opt, idx) => (idx === index ? value : opt)));
-  }
-
-  function addEditingOption() {
-    setEditingOptions((prev) => [...prev, ""]);
-  }
-
-  function removeEditingOption(index) {
-    setEditingOptions((prev) => prev.filter((_, idx) => idx !== index));
-  }
-
-  async function handleUpdate(event) {
-    event.preventDefault();
-    if (!editingId || !editingQuestion.trim()) return;
-    const cleanOptions = editingOptions.map((opt) => opt.trim()).filter(Boolean);
-    if (cleanOptions.length < 2) {
-      setError("Provide at least two options.");
-      return;
-    }
-    setBusy(true);
-    setError("");
-    try {
-      const updated = await updateEstateAlert(editingId, {
-        title: editingQuestion.trim(),
-        description: "",
-        pollOptions: cleanOptions
-      });
-      if (updated?.stale) {
-        const rows = await listEstateAlerts(estateId, "poll");
-        setPolls(rows);
-      } else {
-        setPolls((prev) => prev.map((row) => (row.id === editingId ? { ...row, ...updated } : row)));
-      }
-      showSuccess("Poll updated.");
-      closeEdit();
-    } catch (err) {
-      setError(err?.message || "Failed to update poll");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  function handleDelete(alertId) {
-    const item = polls.find((row) => row.id === alertId);
-    setPendingDelete({ id: alertId, title: item?.title || "this poll" });
-  }
-
-  async function confirmDelete() {
-    if (!pendingDelete?.id) return;
-    setBusy(true);
-    setError("");
-    try {
-      await deleteEstateAlert(pendingDelete.id);
-      setPolls((prev) => prev.filter((row) => row.id !== pendingDelete.id));
-      showSuccess("Poll deleted.");
-      setPendingDelete(null);
-    } catch (err) {
-      setError(err?.message || "Failed to delete poll");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const estateOptions = useMemo(
-    () => (overview?.estates ?? []).map((row) => ({ value: row.id, label: row.name })),
-    [overview]
-  );
 
   return (
-    <AppShell title="Estate Polls">
-      <EstateManagerPageShell
-        eyebrow="Estate Polls"
-        title="Polls"
-        description="Launch votes that are easy to create, edit, and track from a phone-first estate manager flow."
-        icon={<Vote size={22} />}
-        accent="from-rose-500 to-pink-500"
-        stats={[
-          { label: "Polls", value: polls.length, helper: "Published votes" },
-          {
-            label: "Options",
-            value: Math.max(...[2, ...polls.map((poll) => (poll.pollOptions || []).length)]),
-            helper: "Largest poll size"
-          }
-        ]}
-      >
+    <div className="bg-[#f8f9fa] font-sans text-[#2b3437] min-h-screen flex flex-col">
+      <header className="sticky top-0 w-full z-50 bg-[#f8f9fa]/90 backdrop-blur-xl flex justify-between items-center px-4 h-14">
+        <button onClick={() => navigate(-1)} className="p-2 text-[#4955b3] active:bg-indigo-50 rounded-full">
+          <ArrowLeft size={22} strokeWidth={2.5} />
+        </button>
+        <h1 className="text-[#2b3437] font-black tracking-tight text-base">Polls</h1>
+        <button className="relative p-2 text-[#4955b3] active:bg-indigo-50 rounded-full">
+          <Bell size={20} strokeWidth={2.5} />
+          <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-rose-500 rounded-full border-2 border-[#f8f9fa]" />
+        </button>
+      </header>
 
-        <EstateManagerSection title="Create a poll" subtitle="Keep results visible on the page, then open the poll composer only when needed.">
-          <button
-            type="button"
-            onClick={() => setComposeOpen(true)}
-            className="w-full rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition-all active:scale-95 dark:bg-white dark:text-slate-900"
-          >
-            New Poll
+      <main className="flex-1 px-5 pb-32">
+        <div className="mt-6 mb-8">
+          <span className="text-[#4955b3] font-bold tracking-widest text-[10px] uppercase mb-1 block">Governance Center</span>
+          <h2 className="text-3xl font-black tracking-tight text-[#2b3437]">Community Voice</h2>
+        </div>
+
+        <div className="bg-slate-200/50 p-1 rounded-2xl flex mb-8">
+          <button onClick={() => setActiveTab("active")} className={`flex-1 py-2.5 rounded-xl text-xs font-black transition-all ${activeTab === "active" ? 'bg-white text-[#4955b3] shadow-sm' : 'text-slate-500'}`}>
+            ACTIVE ({categorized.active.length})
           </button>
-        </EstateManagerSection>
+          <button onClick={() => setActiveTab("closed")} className={`flex-1 py-2.5 rounded-xl text-xs font-black transition-all ${activeTab === "closed" ? 'bg-white text-[#4955b3] shadow-sm' : 'text-slate-500'}`}>
+            CLOSED ({categorized.closed.length})
+          </button>
+        </div>
 
-        <EstateManagerSection title="Poll results" subtitle="Monitor how each vote is landing without losing mobile readability.">
-          {loading ? <p className="mt-3 text-sm text-slate-500">Loading...</p> : null}
-          {!loading && polls.length === 0 ? <p className="mt-3 text-sm text-slate-500">No polls yet.</p> : null}
-          <div className="mt-3 space-y-4">
-            {polls.map((poll) => (
-              <CardSurface
-                as="article"
-                key={poll.id}
-                className="rounded-[1.6rem] border-slate-200/80 bg-white/80 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/70"
-                accent="from-rose-100/80 via-white/10 to-transparent"
-                glow="bg-rose-300/40"
-              >
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0">
-                    <h4 className="truncate text-sm font-bold">{poll.title}</h4>
-                    <p className="mt-1 text-[11px] text-slate-500">
-                      {poll.createdAt ? new Date(poll.createdAt).toLocaleString() : ""}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => startEdit(poll)}
-                      className="rounded-full border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(poll.id)}
-                      className="rounded-full border border-rose-200 bg-rose-50 px-2 py-1 text-[11px] font-semibold text-rose-600 transition hover:bg-rose-100 dark:border-rose-700/60 dark:bg-rose-900/40 dark:text-rose-200"
-                    >
-                      Delete
-                    </button>
-                  </div>
+        <div className="space-y-4">
+          {categorized.visible.map((poll) => (
+            <div key={poll.id} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
+              <div className="flex justify-between items-start mb-4">
+                <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${activeTab === 'active' ? 'bg-[#85f6e5]/40 text-[#005c53]' : 'bg-slate-100 text-slate-500'}`}>
+                  {activeTab === 'active' ? 'Live' : 'Closed'}
+                </span>
+                <div className="flex gap-2">
+                   <button onClick={() => setSelectedPoll(poll)} className="p-1 text-slate-400"><Eye size={18} /></button>
                 </div>
-                <div className="mt-3 space-y-2">
-                  {(poll.pollResults || []).map((row) => (
-                    <div key={`${poll.id}-${row.index}`} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-900/60">
-                      <div className="flex items-center justify-between">
-                        <span>{row.option}</span>
-                        <span className="font-semibold">{row.count} votes</span>
-                      </div>
-                      <div className="mt-2 h-2 w-full rounded-full bg-slate-100 dark:bg-slate-800">
-                        <div className="h-2 rounded-full bg-indigo-500" style={{ width: `${row.percent}%` }} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardSurface>
-            ))}
-          </div>
-        </EstateManagerSection>
-      </EstateManagerPageShell>
-
-      <MobileBottomSheet open={composeOpen} title="Create Poll" onClose={() => setComposeOpen(false)} width="720px" height="90dvh">
-        <form onSubmit={async (event) => { const ok = await handleSubmit(event); if (ok) setComposeOpen(false); }} className="grid gap-3">
-          <label className="block">
-            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Estate</span>
-            <select value={estateId} onChange={(event) => setEstateId(event.target.value)} className={estateFieldClassName}>
-              {estateOptions.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Question</span>
-            <input value={question} onChange={(event) => setQuestion(event.target.value)} className={estateFieldClassName} placeholder="Should we repaint the gate?" required />
-          </label>
-          <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Options</p>
-            {options.map((opt, idx) => (
-              <div key={`poll-option-${idx}`} className="flex items-center gap-2">
-                <input value={opt} onChange={(event) => updateOption(idx, event.target.value)} className={estateFieldClassName} placeholder={`Option ${idx + 1}`} />
-                {options.length > 2 ? <button type="button" onClick={() => removeOption(idx)} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-50 dark:border-slate-700">Remove</button> : null}
               </div>
-            ))}
-            <button type="button" onClick={addOption} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300">
-              Add option
-            </button>
+
+              <h3 className="text-lg font-black mb-4 leading-tight text-[#2b3437]">{poll.title}</h3>
+
+              {/* Preview of Top Results */}
+              <div className="space-y-3">
+                {(poll.pollResults || []).slice(0, 2).map((row, rIdx) => (
+                  <div key={rIdx} className="space-y-1">
+                    <div className="flex justify-between text-[10px] font-black uppercase">
+                      <span className="text-slate-500 truncate pr-4">{row.option}</span>
+                      <span className="text-[#4955b3]">{row.percent}%</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-[#f1f4f6] rounded-full overflow-hidden">
+                      <div className="h-full bg-[#4955b3] rounded-full" style={{ width: `${row.percent}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-6 pt-4 border-t border-slate-50 flex justify-between items-center">
+                <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                  <Users size={12} />
+                  {poll.pollResults?.reduce((a, b) => a + (b.count || 0), 0) || 0} Votes
+                </div>
+
+                <div className="flex gap-3">
+                  {activeTab === 'active' && (
+                    <button
+                      onClick={() => setPollToClose(poll)}
+                      disabled={busy}
+                      className="flex items-center gap-1 text-[10px] font-black text-[#4955b3] uppercase border border-indigo-100 px-3 py-1.5 rounded-lg active:bg-indigo-50 disabled:opacity-50"
+                    >
+                      <Lock size={12} /> End Poll
+                    </button>
+                  )}
+                  <button onClick={() => handleDelete(poll.id)} className="text-slate-300 active:text-rose-500 transition-colors">
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </main>
+
+      <button onClick={() => setComposeOpen(true)} className="fixed bottom-6 right-6 w-14 h-14 bg-[#4955b3] text-white rounded-2xl flex items-center justify-center shadow-2xl z-40 active:scale-90 transition-all">
+        <PlusCircle size={28} />
+      </button>
+
+      {/* View Results Detail Sheet */}
+      <MobileBottomSheet open={!!selectedPoll} title="Poll Results" onClose={() => setSelectedPoll(null)}>
+        {selectedPoll && (
+          <div className="p-6">
+            <h3 className="text-xl font-black text-[#2b3437] mb-6 leading-tight">{selectedPoll.title}</h3>
+            <div className="space-y-6">
+              {selectedPoll.pollResults?.map((row, idx) => (
+                <div key={idx} className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-slate-700">{row.option}</span>
+                    <div className="text-right">
+                      <span className="text-sm font-black text-[#4955b3]">{row.percent}%</span>
+                      <p className="text-[10px] text-slate-400 font-bold">{row.count} votes</p>
+                    </div>
+                  </div>
+                  <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden flex">
+                    <div className="h-full bg-[#4955b3] rounded-full transition-all duration-1000" style={{ width: `${row.percent}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-8 p-4 bg-indigo-50 rounded-2xl flex items-center gap-3">
+               <CheckCircle2 className="text-[#4955b3]" />
+               <p className="text-xs font-bold text-[#4955b3]">This poll is representative of {selectedPoll.pollResults?.reduce((a, b) => a + (b.count || 0), 0) || 0} residents.</p>
+            </div>
           </div>
-          <button type="submit" disabled={busy || !estateId} className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition-all active:scale-95 disabled:opacity-50 dark:bg-white dark:text-slate-900">
-            {busy ? "Publishing..." : "Publish Poll"}
+        )}
+      </MobileBottomSheet>
+
+      <MobileBottomSheet open={composeOpen} title="New Community Poll" onClose={() => setComposeOpen(false)}>
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          <textarea value={question} onChange={e => setQuestion(e.target.value)} className="w-full bg-slate-100 border-none rounded-2xl p-4 font-bold text-slate-800 placeholder:text-slate-400" placeholder="What's the question?" rows={3} required />
+          <div className="space-y-3">
+            {options.map((opt, idx) => (
+              <input key={idx} value={opt} onChange={e => setOptions(prev => prev.map((o, i) => i === idx ? e.target.value : o))} className="w-full bg-slate-100 border-none rounded-xl px-4 py-3 font-bold text-sm" placeholder={`Option ${idx + 1}`} required />
+            ))}
+            <button type="button" onClick={() => setOptions([...options, ""])} className="text-xs font-black text-[#4955b3] uppercase">+ Add Option</button>
+          </div>
+          <button type="submit" disabled={busy} className="w-full bg-[#4955b3] text-white py-4 rounded-2xl font-black uppercase shadow-lg disabled:opacity-50">
+            {busy ? "Publishing..." : "Launch Poll"}
           </button>
         </form>
       </MobileBottomSheet>
 
-      {editingId ? (
-        <MobileBottomSheet open={!!editingId} title="Edit Poll" onClose={closeEdit} width="720px" height="90dvh">
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Edit Poll</p>
-                <h3 className="mt-1 text-lg font-bold text-slate-900 dark:text-white">Update question</h3>
+      <MobileBottomSheet open={!!pollToClose} title="End Poll" onClose={() => setPollToClose(null)}>
+        {pollToClose ? (
+          <div className="p-6 space-y-6">
+            <div className="space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                <Lock size={22} />
               </div>
+              <div>
+                <h3 className="text-xl font-black text-[#2b3437] leading-tight">End this poll?</h3>
+                <p className="mt-2 text-sm text-slate-500 leading-relaxed">
+                  Residents will no longer be able to vote, and this poll will move to the closed tab immediately.
+                </p>
+              </div>
+              <div className="rounded-2xl bg-slate-100 px-4 py-4">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Poll Question</p>
+                <p className="mt-2 text-sm font-bold text-slate-800">{pollToClose.title}</p>
+              </div>
+            </div>
+            <div className="flex gap-3">
               <button
                 type="button"
-                onClick={closeEdit}
-                className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200"
+                onClick={() => setPollToClose(null)}
+                className="flex-1 rounded-2xl border border-slate-200 bg-white py-4 text-sm font-black text-slate-600"
               >
                 Cancel
               </button>
-            </div>
-            <form onSubmit={handleUpdate} className="mt-4 grid gap-3">
-              <label className="block">
-                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Question</span>
-                <input
-                  value={editingQuestion}
-                  onChange={(event) => setEditingQuestion(event.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
-                  required
-                />
-              </label>
-              <div className="space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Options</p>
-                {editingOptions.map((opt, idx) => (
-                  <div key={`edit-poll-option-${idx}`} className="flex items-center gap-2">
-                    <input
-                      value={opt}
-                      onChange={(event) => updateEditingOption(idx, event.target.value)}
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70"
-                      placeholder={`Option ${idx + 1}`}
-                    />
-                    {editingOptions.length > 2 ? (
-                      <button
-                        type="button"
-                        onClick={() => removeEditingOption(idx)}
-                        className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-50 dark:border-slate-700"
-                      >
-                        Remove
-                      </button>
-                    ) : null}
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={addEditingOption}
-                  className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300"
-                >
-                  Add option
-                </button>
-              </div>
               <button
-                type="submit"
+                type="button"
+                onClick={() => handleClosePoll(pollToClose)}
                 disabled={busy}
-                className="rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition-all active:scale-95 disabled:opacity-50 dark:bg-white dark:text-slate-900"
+                className="flex-1 rounded-2xl bg-[#4955b3] py-4 text-sm font-black text-white shadow-lg shadow-indigo-100 disabled:opacity-50"
               >
-                {busy ? "Saving..." : "Save Changes"}
-              </button>
-            </form>
-          </div>
-        </MobileBottomSheet>
-      ) : null}
-
-      {pendingDelete ? (
-        <MobileBottomSheet open={!!pendingDelete} title="Delete Poll" onClose={() => setPendingDelete(null)} width="560px" height="46dvh">
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Confirm Delete</p>
-                <h3 className="mt-1 text-lg font-bold text-slate-900 dark:text-white">Delete poll?</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setPendingDelete(null)}
-                className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200"
-              >
-                Cancel
-              </button>
-            </div>
-            <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
-              This will permanently delete <span className="font-semibold">{pendingDelete.title}</span>.
-            </p>
-            <div className="mt-4 flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setPendingDelete(null)}
-                className="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200"
-              >
-                Keep
-              </button>
-              <button
-                type="button"
-                onClick={confirmDelete}
-                disabled={busy}
-                className="flex-1 rounded-2xl bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white transition-all active:scale-95 disabled:opacity-50"
-              >
-                {busy ? "Deleting..." : "Delete"}
+                {busy ? "Ending..." : "Yes, End Poll"}
               </button>
             </div>
           </div>
-        </MobileBottomSheet>
-      ) : null}
-    </AppShell>
+        ) : null}
+      </MobileBottomSheet>
+    </div>
   );
-}
+};
+
+export default EstatePollsPage;
