@@ -15,6 +15,8 @@ import { resolveNotificationRoute } from "../utils/notificationRouting";
 import { notify } from "../utils/notifier";
 import { registerFcmPushSubscription, setupForegroundMessageListener } from "../services/pushMessagingService";
 import { isNativeApp } from "../utils/nativeRuntime";
+import { isFirebaseConfigured } from "../config/firebase";
+import { playPanicAlertSound } from "../utils/notificationSound";
 
 const NotificationsContext = createContext(null);
 const POLL_INTERVAL_MS = 45000;
@@ -51,6 +53,7 @@ export function NotificationsProvider({ children }) {
   const [permission, setPermission] = useState(
     () => (typeof window !== "undefined" && window.Notification ? window.Notification.permission : "unsupported")
   );
+  const [pushStatus, setPushStatus] = useState("idle");
   const isMountedRef = useRef(false);
   const shownNotificationIdsRef = useRef(new Set());
 
@@ -184,7 +187,15 @@ export function NotificationsProvider({ children }) {
   useEffect(() => {
     if (nativeApp) return;
     if (permission !== "granted") return;
-    registerFcmPushSubscription().catch(() => {});
+    registerFcmPushSubscription()
+      .then((result) => {
+        if (!isMountedRef.current) return;
+        setPushStatus(result?.status || "local_only");
+      })
+      .catch(() => {
+        if (!isMountedRef.current) return;
+        setPushStatus("local_only");
+      });
   }, [nativeApp, permission]);
 
   useEffect(() => {
@@ -193,6 +204,9 @@ export function NotificationsProvider({ children }) {
       .forEach((item) => {
         if (shownNotificationIdsRef.current.has(item.id)) return;
         shownNotificationIdsRef.current.add(item.id);
+        if (item.kind === "safety.panic") {
+          playPanicAlertSound();
+        }
         notify({
           type: item.priority === "critical" ? "warning" : "info",
           title: item.title,
@@ -285,21 +299,71 @@ export function NotificationsProvider({ children }) {
   }
 
   async function enableBrowserAlerts() {
+    if (nativeApp) {
+      setPermission("unsupported");
+      setPushStatus("native_not_implemented");
+      return {
+        ok: false,
+        permission: "unsupported",
+        pushStatus: "native_not_implemented",
+        message: "Native mobile push notifications are not wired up yet in this build."
+      };
+    }
+
     const nextPermission = await requestBrowserNotificationPermission();
     setPermission(nextPermission);
-    if (nextPermission !== "granted") return nextPermission;
+    if (nextPermission !== "granted") {
+      const deniedStatus = nextPermission === "denied" ? "permission_denied" : "permission_required";
+      setPushStatus(deniedStatus);
+      return {
+        ok: false,
+        permission: nextPermission,
+        pushStatus: deniedStatus,
+        message:
+          nextPermission === "denied"
+            ? "Browser alerts are blocked. Allow notifications in your browser settings."
+            : "Notification permission was not granted."
+      };
+    }
+
+    if (!isFirebaseConfigured) {
+      setPushStatus("local_only");
+      return {
+        ok: true,
+        permission: nextPermission,
+        pushStatus: "local_only",
+        message: "Browser alerts are enabled for this tab, but background web push is not configured yet."
+      };
+    }
+
     try {
       const registration = await registerFcmPushSubscription();
+      const nextPushStatus = registration?.status || "local_only";
+      setPushStatus(nextPushStatus);
       if (registration?.status !== "registered") {
         await registerPushSubscription({
           endpoint: "browser-notification",
           keys: { ua: navigator.userAgent }
         });
       }
+      return {
+        ok: true,
+        permission: nextPermission,
+        pushStatus: nextPushStatus,
+        message:
+          registration?.status === "registered"
+            ? "Browser alerts and web push notifications are enabled."
+            : "Browser alerts are enabled, but background push is limited on this device."
+      };
     } catch {
-      // Keep notification permission flow non-blocking.
+      setPushStatus("local_only");
+      return {
+        ok: true,
+        permission: nextPermission,
+        pushStatus: "local_only",
+        message: "Browser alerts are enabled for this tab, but background push registration failed."
+      };
     }
-    return nextPermission;
   }
 
   const value = useMemo(() => {
@@ -310,6 +374,9 @@ export function NotificationsProvider({ children }) {
       connected,
       unreadCount,
       permission,
+      pushStatus,
+      nativeApp,
+      firebaseConfigured: isFirebaseConfigured,
       refresh: () => refresh({ silent: true }),
       markRead: handleMarkRead,
       markAllRead: handleMarkAllRead,
@@ -318,7 +385,7 @@ export function NotificationsProvider({ children }) {
       syncVisitRequestNotifications,
       enableBrowserAlerts
     };
-  }, [items, loading, connected, permission]);
+  }, [items, loading, connected, permission, pushStatus, nativeApp]);
 
   return <NotificationsContext.Provider value={value}>{children}</NotificationsContext.Provider>;
 }

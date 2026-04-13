@@ -1,86 +1,69 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Activity, Clock3, DoorOpen, FileText, Info, LogOut, MessageSquare, Phone, Settings2, Siren } from "lucide-react";
-import NotificationBell from "../../components/notifications/NotificationBell";
-import NotificationPanel from "../../components/notifications/NotificationPanel";
-import RenewNowModal from "../../components/subscription/RenewNowModal";
-import SubscriptionStatusBanner from "../../components/subscription/SubscriptionStatusBanner";
-import AppShell from "../../layouts/AppShell";
-import { useDashboardData } from "../../hooks/useDashboardData";
-import useSubscription from "../../hooks/useSubscription";
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { motion } from "framer-motion";
+import { 
+  Bell, 
+  ClipboardCheck, 
+  Users, 
+  MessageSquare, 
+  DoorOpen, 
+  PhoneCall, 
+  ShieldAlert, 
+  Settings, 
+  CreditCard,
+  History,
+  CalendarDays,
+  User,
+  LayoutGrid,
+  Unlock,
+  Zap,
+  AlertTriangle,
+  ShieldCheck,
+  Activity
+} from "lucide-react";
+
+import { useApiQuery, useSocketQueryInvalidation } from "../../hooks/useApi";
+import { endpoints } from "../../services/endpoints";
+import { normalizeDashboard } from "../../services/dashboardService";
 import { getHomeownerContext } from "../../services/homeownerService";
 import { useAuth } from "../../state/AuthContext";
 import { useNotifications } from "../../state/NotificationsContext";
-import { useSocketEvents } from "../../hooks/useSocketEvents";
+import useSubscription from "../../hooks/useSubscription";
+
+const QUERY_KEY = ["homeowner", "overview"];
+const quickActionFeatureByRoute = {
+  "/dashboard/homeowner/messages": "chat_call_verification",
+  "/dashboard/homeowner/appointments": "visitor_scheduling",
+  "/dashboard/homeowner/estate-messages": "chat_call_verification",
+  "/dashboard/homeowner/estate-video-calls": "chat_call_verification",
+  "/dashboard/homeowner/estate-audio-calls": "chat_call_verification",
+};
 
 export default function HomeownerDashboardPage() {
-  const { subscription, can } = useSubscription();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { unreadCount } = useNotifications();
-  const navigate = useNavigate();
-  const [managedByEstate, setManagedByEstate] = useState(false);
-  const [logoutBusy, setLogoutBusy] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [renewModalOpen, setRenewModalOpen] = useState(false);
-  const notificationsPanelRef = useRef(null);
-  const notificationsButtonRef = useRef(null);
-  const {
-    metrics,
-    activity,
-    waitingRoom,
-    session,
-    messages,
-    loading,
-    error,
-    connected,
-    incomingCall,
-    clearIncomingCall,
-    realtimeEnabled,
-    refresh
-  } =
-    useDashboardData();
-  const homeownerName = user?.fullName?.trim() || "Homeowner";
-  const initials = homeownerName.slice(0, 1).toUpperCase();
-  const systemLabel = realtimeEnabled ? (connected ? "System Live" : loading ? "Connecting" : "Realtime Offline") : "Online";
-  const setupPercent = useMemo(() => {
-    if (loading) return 0;
-    const score =
-      Number(metrics.activeVisitors > 0) * 35 +
-      Number(metrics.pendingApprovals === 0) * 25 +
-      Number(metrics.unreadMessages === 0) * 20 +
-      Number(connected || !realtimeEnabled) * 20;
-    return Math.max(5, Math.min(95, score));
-  }, [metrics.activeVisitors, metrics.pendingApprovals, metrics.unreadMessages, connected, realtimeEnabled, loading]);
-  const totalSignals = useMemo(
-    () =>
-      (Number(metrics.activeVisitors) || 0) +
-      (Number(metrics.pendingApprovals) || 0) +
-      (Number(metrics.callsToday) || 0) +
-      (Number(metrics.unreadMessages) || 0),
-    [metrics.activeVisitors, metrics.pendingApprovals, metrics.callsToday, metrics.unreadMessages]
-  );
-  const queueLoadPercent = useMemo(() => {
-    const queue = Number(waitingRoom.length) || 0;
-    const active = Number(metrics.activeVisitors) || 0;
-    const denom = queue + active;
-    if (denom <= 0) return 0;
-    return Math.round((queue / denom) * 100);
-  }, [waitingRoom.length, metrics.activeVisitors]);
-  const conversationPercent = useMemo(() => {
-    const unread = Number(metrics.unreadMessages) || 0;
-    const total = unread + (messages.length > 0 ? 1 : 0);
-    if (total <= 0) return 0;
-    return Math.round((unread / total) * 100);
-  }, [metrics.unreadMessages, messages.length]);
+  const { hasFeature } = useSubscription();
+  const [homeownerContext, setHomeownerContext] = useState({ managedByEstate: false, estateName: "" });
+  
+  const { data, isLoading, isError, refetch, isFetching } = useApiQuery({
+    queryKey: QUERY_KEY,
+    url: endpoints.dashboard.overview,
+    select: normalizeDashboard,
+    refetchInterval: 30000
+  });
+
+  useSocketQueryInvalidation(QUERY_KEY, ["dashboard.snapshot", "dashboard.patch", "incoming-call", "connect"]);
+
+  const overview = data ?? normalizeDashboard({});
 
   useEffect(() => {
     let active = true;
     async function loadContext() {
       try {
         const data = await getHomeownerContext();
-        if (active) setManagedByEstate(Boolean(data?.managedByEstate));
+        if (active) setHomeownerContext(data ?? { managedByEstate: false, estateName: "" });
       } catch {
-        if (active) setManagedByEstate(false);
+        if (active) setHomeownerContext({ managedByEstate: false, estateName: "" });
       }
     }
     loadContext();
@@ -88,423 +71,248 @@ export default function HomeownerDashboardPage() {
       active = false;
     };
   }, []);
+  
+  // 1. DYNAMIC GREETING LOGIC
+  const greeting = useMemo(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good Morning";
+    if (hour < 17) return "Good Afternoon";
+    return "Good Evening";
+  }, []);
 
-  useEffect(() => {
-    if (!notificationsOpen) return undefined;
+  const firstName = useMemo(() => {
+    return overview.profile?.fullName?.split(" ")[0] || user?.fullName?.split(" ")[0] || "Resident";
+  }, [overview.profile?.fullName, user?.fullName]);
 
-    function handleOutside(event) {
-      const target = event.target;
-      if (notificationsPanelRef.current?.contains(target)) return;
-      if (notificationsButtonRef.current?.contains(target)) return;
-      setNotificationsOpen(false);
-    }
-
-    function handleEscape(event) {
-      if (event.key === "Escape") setNotificationsOpen(false);
-    }
-
-    document.addEventListener("pointerdown", handleOutside, true);
-    document.addEventListener("keydown", handleEscape);
-
-    return () => {
-      document.removeEventListener("pointerdown", handleOutside, true);
-      document.removeEventListener("keydown", handleEscape);
-    };
-  }, [notificationsOpen]);
-
-  useSocketEvents(
-    useMemo(
-      () => ({
-        ALERT_CREATED: () => refresh(),
-        ALERT_UPDATED: () => refresh(),
-        ALERT_DELETED: () => refresh(),
-        PAYMENT_STATUS_UPDATED: () => refresh()
-      }),
-      [refresh]
-    )
-  );
-
-  async function handleLogout() {
-    if (logoutBusy) return;
-    setLogoutBusy(true);
-    try {
-      await logout();
-    } catch {
-      // Continue with redirect even if logout request fails.
-    } finally {
-      setLogoutBusy(false);
-      navigate("/login");
-    }
-  }
-
-  function handleNotificationsToggle(event) {
-    event?.stopPropagation?.();
-    setNotificationsOpen((prev) => !prev);
-  }
-
-  const taskGroups = [
-    {
-      label: "Approvals",
-      to: "/dashboard/homeowner/visits",
-      icon: <Activity size={14} />,
-      percent: totalSignals > 0 ? Math.round(((Number(metrics.pendingApprovals) || 0) / totalSignals) * 100) : 0
-    },
-    {
-      label: "Visits",
-      to: "/dashboard/homeowner/visits",
-      icon: <Activity size={14} />,
-      percent: totalSignals > 0 ? Math.round(((Number(metrics.activeVisitors) || 0) / totalSignals) * 100) : 0
-    },
-    {
-      label: "Messages",
-      to: "/dashboard/homeowner/messages",
-      icon: <MessageSquare size={14} />,
-      percent: totalSignals > 0 ? Math.round(((Number(metrics.unreadMessages) || 0) / totalSignals) * 100) : 0
-    },
-    {
-      label: "Doors",
-      to: "/dashboard/homeowner/doors",
-      icon: <DoorOpen size={14} />,
-      percent: connected || !realtimeEnabled ? 100 : loading ? 40 : 0
-    },
-    {
-      label: "Calls",
-      to: "/dashboard/homeowner/messages",
-      icon: <Phone size={14} />,
-      percent: totalSignals > 0 ? Math.round(((Number(metrics.callsToday) || 0) / totalSignals) * 100) : 0
-    }
-  ];
-  const actionItems = useMemo(() => {
-    const base = [
-      ...taskGroups,
-      {
-        label: "Panic",
-        to: "/dashboard/homeowner/safety",
-        icon: <Siren size={14} />,
-        percent: 100
-      },
-      {
-        label: "Settings",
-        to: "/dashboard/homeowner/settings",
-        icon: <Settings2 size={14} />,
-        percent: 100
-      }
-    ];
-
-    if (managedByEstate) {
-      base.push(
-        {
-          label: "Live Queue",
-          to: "/dashboard/homeowner/live-queue",
-          icon: <Activity size={14} />,
-          percent: 100
-        },
-        {
-          label: "Receipts",
-          to: "/dashboard/homeowner/receipts",
-          icon: <FileText size={14} />,
-          percent: 100
-        },
-        {
-          label: "Automation",
-          to: "/dashboard/homeowner/automation",
-          icon: <Settings2 size={14} />,
-          percent: 100
-        },
-        {
-          label: "Digital Access",
-          to: "/dashboard/homeowner/access-passes",
-          icon: <DoorOpen size={14} />,
-          percent: 100,
-          disabled: !can("create_qr")
-        }
-      );
-    } else {
-      base.push({
-        label: "Billing",
-        to: "/billing/paywall",
-        icon: <FileText size={14} />,
-        percent: 100
+  const isEstateManagedHomeowner = Boolean(homeownerContext?.managedByEstate);
+  const quickActions = useMemo(() => {
+    if (isEstateManagedHomeowner) {
+      return [
+        { to: "/dashboard/homeowner/estate-broadcasts", icon: <Bell size={24} />, label: "Broadcasts" },
+        { to: "/dashboard/homeowner/estate-meetings", icon: <CalendarDays size={24} />, label: "Meetings" },
+        { to: "/dashboard/homeowner/estate-polls", icon: <Activity size={24} />, label: "Polls" },
+        { to: "/dashboard/homeowner/estate-dues", icon: <CreditCard size={24} />, label: "Dues" },
+        { to: "/dashboard/homeowner/estate-maintenance", icon: <AlertTriangle size={24} />, label: "Maintenance" },
+        { to: "/dashboard/homeowner/estate-doors", icon: <DoorOpen size={24} />, label: "Doors" },
+        { to: "/dashboard/homeowner/estate-approvals", icon: <ClipboardCheck size={24} />, label: "Approvals" },
+        { to: "/dashboard/homeowner/estate-messages", icon: <MessageSquare size={24} />, label: "Messages" },
+        { to: "/dashboard/homeowner/estate-video-calls", icon: <PhoneCall size={24} />, label: "Video Calls" },
+        { to: "/dashboard/homeowner/estate-audio-calls", icon: <PhoneCall size={24} />, label: "Audio Calls" },
+        { to: "/dashboard/homeowner/estate-alerts", icon: <Bell size={24} />, label: "Alerts" },
+        { to: "/dashboard/homeowner/estate-panic", icon: <ShieldAlert size={24} />, label: "Panic", color: "text-rose-600", bg: "bg-rose-50" }
+      ].filter((item) => {
+        const requiredFeature = quickActionFeatureByRoute[item.to];
+        return requiredFeature ? hasFeature(requiredFeature) : true;
       });
     }
+    return [
+      { to: "/dashboard/homeowner/messages", icon: <ClipboardCheck size={24} />, label: "Approvals" },
+      { to: "/dashboard/homeowner/visits", icon: <Users size={24} />, label: "Visits" },
+      { to: "/dashboard/homeowner/messages", icon: <MessageSquare size={24} />, label: "Inbox" },
+      { to: "/dashboard/homeowner/doors", icon: <DoorOpen size={24} />, label: "Doors" },
+      { to: "/dashboard/homeowner/emergency-contacts", icon: <PhoneCall size={24} />, label: "Calls" },
+      { to: "/dashboard/homeowner/safety", icon: <ShieldAlert size={24} />, label: "Panic", color: "text-rose-600", bg: "bg-rose-50" },
+      { to: "/dashboard/homeowner/settings", icon: <Settings size={24} />, label: "Settings" },
+      { to: "/billing/paywall", icon: <CreditCard size={24} />, label: "Billing" }
+    ].filter((item) => {
+      const requiredFeature = quickActionFeatureByRoute[item.to];
+      return requiredFeature ? hasFeature(requiredFeature) : true;
+    });
+  }, [hasFeature, isEstateManagedHomeowner]);
 
-    return base;
-  }, [taskGroups, managedByEstate, can]);
+  if (isLoading) return <LoadingState />;
 
   return (
-    <AppShell title="Homeowner Overview" showTopBar={false}>
-      <div className="mx-auto w-full max-w-4xl space-y-8 px-2 py-3 sm:px-3 sm:py-4">
-        <SubscriptionStatusBanner subscription={subscription} onPrimaryAction={() => setRenewModalOpen(true)} />
-        <section className="rounded-[1.6rem] border border-slate-200/70 bg-white/95 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/90 sm:p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="grid h-11 w-11 place-items-center rounded-full bg-sky-100 text-sm font-bold text-sky-700 dark:bg-sky-900/30 dark:text-sky-300">
-                {initials}
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-slate-500">Hello!</p>
-                <p className="text-xl font-black text-slate-900 dark:text-white">{homeownerName}</p>
-              </div>
+    <div className="bg-[#f8f9fa] min-h-screen pb-32 font-sans overflow-x-hidden">
+      {/* Top Header */}
+      <header className="fixed top-0 w-full z-[100] bg-white/80 backdrop-blur-md border-b border-slate-100 px-6 py-4 flex justify-between items-center">
+        <div className="max-w-5xl mx-auto w-full flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full border-2 border-indigo-100 bg-indigo-600 flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-200">
+              {firstName[0]}
             </div>
-            <div className="relative flex items-center gap-2">
-              <div ref={notificationsButtonRef}>
-                <NotificationBell
-                  unreadCount={unreadCount}
-                  isOpen={notificationsOpen}
-                  onClick={handleNotificationsToggle}
-                />
-              </div>
-              <button
-                type="button"
-                onClick={handleLogout}
-                disabled={logoutBusy}
-                aria-label={logoutBusy ? "Signing out" : "Sign out"}
-                title={logoutBusy ? "Signing out" : "Sign out"}
-                className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200/80 bg-white text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200 dark:hover:bg-slate-800"
-              >
-                <LogOut size={16} className={logoutBusy ? "animate-pulse" : ""} />
-              </button>
-              {notificationsOpen ? (
-                <div ref={notificationsPanelRef}>
-                  <NotificationPanel onClose={() => setNotificationsOpen(false)} />
-                </div>
-              ) : null}
-            </div>
-          </div>
-        </section>
-
-        <section className="rounded-[2rem] border border-slate-200/70 bg-white/95 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/90 sm:p-7">
-          <article className="rounded-[1.4rem] bg-gradient-to-br from-violet-600 to-indigo-700 p-5 text-white shadow-lg shadow-violet-500/20 sm:p-6">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-2xl font-bold text-violet-100">Welcome {homeownerName}</p>
-                <p className="mt-1 text-xs font-semibold uppercase tracking-wider text-violet-200">{systemLabel}</p>
-              </div>
-              <ProgressRing value={loading ? 0 : setupPercent} />
-            </div>
-            <div className="mt-4 flex items-center gap-2">
-              <Link
-                to="/dashboard/homeowner/visits"
-                className="rounded-xl bg-white/90 px-4 py-2 text-sm font-bold text-indigo-700 transition-all hover:bg-white active:scale-95"
-              >
-                View Visit
-              </Link>
-              {managedByEstate ? (
-                <span className="rounded-xl bg-white/20 px-3 py-2 text-xs font-semibold text-white/90">Managed by estate</span>
-              ) : null}
-              {!managedByEstate ? (
-                <Link to="/billing/paywall" className="rounded-xl bg-white/20 px-3 py-2 text-xs font-semibold text-white/90">
-                  {subscription?.planName || "View Plan"}
-                </Link>
-              ) : null}
-            </div>
-            {!managedByEstate && subscription ? (
-              <div className="mt-4 rounded-xl bg-white/10 px-4 py-3 text-xs text-white/90">
-                <p className="font-semibold">{subscription.planName}</p>
-                <p>
-                  Doors: {subscription?.limits?.maxDoors ?? 0} · Status: {subscription.status}
-                  {subscription.expiresAt ? ` · Expires ${new Date(subscription.expiresAt).toLocaleDateString()}` : ""}
-                </p>
-              </div>
-            ) : null}
-          </article>
-        </section>
-
-        {error ? (
-          <div className="flex items-center gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-rose-700 dark:border-rose-900/30 dark:bg-rose-900/20 dark:text-rose-400">
-            <Info size={18} />
-            <p className="text-sm font-medium">{error}</p>
-          </div>
-        ) : null}
-        {incomingCall?.sessionId ? (
-          <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/30 dark:bg-emerald-900/20">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
-                  Incoming Call
-                </p>
-                <p className="mt-1 text-sm font-semibold text-emerald-900 dark:text-emerald-100">
-                  {incomingCall?.visitorName || "Visitor"} is at your door.
-                </p>
-                <p className="mt-1 text-xs text-emerald-700/90 dark:text-emerald-200/90">
-                  Session ID: {incomingCall.sessionId}
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <Link
-                  to={`/session/${incomingCall.sessionId}/audio`}
-                  className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
-                >
-                  Open Call
-                </Link>
-                <button
-                  type="button"
-                  onClick={clearIncomingCall}
-                  className="rounded-lg border border-emerald-300 px-3 py-2 text-xs font-semibold text-emerald-700 dark:border-emerald-700 dark:text-emerald-200"
-                >
-                  Dismiss
-                </button>
-              </div>
-            </div>
-          </section>
-        ) : null}
-
-        <section className="space-y-4">
-          <h3 className="text-2xl font-black text-slate-900 dark:text-white">In Progress</h3>
-          <div className="-mx-1 flex snap-x gap-3 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-            <div className="min-w-[17rem] snap-start rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/70">
-              <p className="text-[11px] font-semibold text-slate-500">Visitor Queue</p>
-              <p className="mt-1 text-base font-bold text-slate-900 dark:text-white">
-                {waitingRoom.length > 0 ? `${waitingRoom.length} waiting` : "No visitors waiting"}
+            <div>
+              <h1 className="font-bold text-lg text-slate-900 leading-none">Home Security</h1>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter mt-1">
+                {isFetching ? "Syncing..." : "Live Connection"}
               </p>
-              <div className="mt-3 h-1.5 w-full rounded-full bg-slate-200 dark:bg-slate-700">
-                <div className="h-1.5 rounded-full bg-sky-500" style={{ width: `${queueLoadPercent}%` }} />
-              </div>
-            </div>
-            <div className="min-w-[17rem] snap-start rounded-2xl border border-slate-200 bg-[#fff6ef] p-4 dark:border-slate-700 dark:bg-[#422b23]">
-              <p className="text-[11px] font-semibold text-slate-500">Conversation</p>
-              <p className="mt-1 text-base font-bold text-slate-900 dark:text-white">
-                {messages[0]?.text ? "Message received" : "No active chat"}
-              </p>
-              <div className="mt-3 h-1.5 w-full rounded-full bg-orange-100 dark:bg-orange-900/40">
-                <div className="h-1.5 rounded-full bg-orange-400" style={{ width: `${conversationPercent}%` }} />
-              </div>
             </div>
           </div>
+          <Link to="/dashboard/notifications" className="relative p-2.5 bg-slate-50 text-slate-600 rounded-full hover:bg-indigo-50 hover:text-indigo-600 transition-all">
+            <Bell size={18} />
+            {unreadCount > 0 && (
+                <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white" />
+            )}
+          </Link>
+        </div>
+      </header>
+
+      <main className="pt-24 px-6 max-w-4xl mx-auto space-y-8">
+        {/* Hero Section Redesign */}
+        <section>
+          <div className="mb-6">
+            <h2 className="font-extrabold text-3xl text-slate-900 tracking-tight">{greeting}, {firstName}</h2>
+            <p className="text-slate-500 text-sm font-medium">
+              {isEstateManagedHomeowner
+                ? `Your residence is covered by ${homeownerContext?.estateName || "your estate"} plan benefits.`
+                : "Your residence is currently under protection."}
+            </p>
+          </div>
+
+        {/* --- ADD THIS SECTION ABOVE THE HERO/BENTO SECTION --- */}
+
+<section className="space-y-4">
+  {/* Top Tier Action */}
+  <Link
+    to="/dashboard/homeowner/appointments"
+    className="group w-full bg-indigo-600 hover:bg-indigo-700 p-4 rounded-[1.5rem] flex items-center justify-between transition-all shadow-xl shadow-indigo-100"
+  >
+    <div className="flex items-center gap-3">
+      <div className="bg-white/20 p-2 rounded-xl text-white">
+        <Users size={20} />
+      </div>
+      <span className="text-white font-bold text-sm tracking-tight">Invite New Guest</span>
+    </div>
+    <div className="bg-white/10 group-hover:bg-white/20 p-2 rounded-full transition-colors">
+      <Unlock size={16} className="text-white" />
+    </div>
+  </Link>
+
+  {/* Resident QR Card */}
+  <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
+    <div className="flex flex-col sm:flex-row">
+      
+      {/* Visual Side */}
+      <div className="bg-slate-900 p-8 sm:w-1/2 flex flex-col justify-between relative overflow-hidden">
+        {/* Decorative Grid Pattern */}
+        <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', size: '20px 20px' }}></div>
+        
+        <div className="relative z-10">
+          <h3 className="text-white text-2xl font-extrabold leading-tight">Your Resident<br/>QR Code</h3>
+        </div>
+        
+        <div className="mt-8 relative z-10">
+          <p className="text-slate-400 text-xs font-medium mb-4">Use this code for quick entry and identity verification at all estate checkpoints.</p>
+          <Link
+            to="/dashboard/homeowner/doors"
+            className="inline-flex bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold uppercase tracking-widest px-6 py-3 rounded-xl transition-all active:scale-95 shadow-lg shadow-indigo-900/50"
+          >
+            Show My Code
+          </Link>
+        </div>
+      </div>
+
+    
+
+    </div>
+  </div>
+</section>
+
+{/* --- THEN FOLLOWS YOUR PREVIOUS BENTO/STATS SECTION --- */}
         </section>
 
+        {/* Quick Actions Grid */}
         <section className="space-y-4">
-          <h3 className="text-2xl font-black text-slate-900 dark:text-white">Action Items</h3>
-          <div className="grid grid-cols-3 gap-3">
-            {actionItems.map((group) => (
-              <ActionItemGridCard
-                key={group.label}
-                to={group.to}
-                icon={group.icon}
-                label={group.label}
-                title={group.disabled ? "This action is currently limited by your subscription." : ""}
-                disabled={Boolean(group.disabled)}
+          <div className="flex justify-between items-end">
+            <h3 className="font-bold text-lg text-slate-800">Action Items</h3>
+            <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">Quick Access</span>
+          </div>
+          <div className={`grid gap-4 ${isEstateManagedHomeowner ? "grid-cols-3 md:grid-cols-6" : "grid-cols-4 md:grid-cols-8"}`}>
+            {quickActions.map((item) => (
+              <ActionIcon
+                key={`${item.to}-${item.label}`}
+                to={item.to}
+                icon={item.icon}
+                label={item.label}
+                color={item.color}
+                bg={item.bg}
               />
             ))}
           </div>
         </section>
 
-        <section className="space-y-3 pb-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xl font-black text-slate-900 dark:text-white">Recent Activity</h3>
-            <Link to="/dashboard/homeowner/visits" className="text-sm font-semibold text-indigo-600 dark:text-indigo-400">
-              See all
-            </Link>
+        {/* Activity Feed */}
+        <section className="space-y-6 pb-12">
+          <div className="flex justify-between items-center">
+            <h3 className="font-bold text-lg text-slate-800">Recent Activity</h3>
+            <Link to="/dashboard/homeowner/activity" className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">View All</Link>
           </div>
-          <div className="space-y-2 rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900/80 sm:p-4">
-            {activity.length === 0 ? (
-              <p className="px-2 py-4 text-sm text-slate-500">No recent visitor logs.</p>
-            ) : (
-              activity.slice(0, 4).map((item, idx) => (
-                <article
-                  key={`${item?.id ?? "activity"}-${idx}`}
-                  className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 dark:border-slate-700 dark:bg-slate-800/80"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-bold text-slate-900 dark:text-white">{item?.event || "Activity"}</p>
-                      <p className="mt-0.5 text-xs text-slate-500">{item?.details || item?.visitor || "Visitor activity update"}</p>
+          <div className="space-y-3">
+            {overview.activity?.length > 0 ? (
+                overview.activity.slice(0, 5).map((item, idx) => (
+                    <div key={idx} className="flex items-start gap-4 p-4 bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+                        <div className="w-10 h-10 rounded-2xl bg-slate-50 flex-shrink-0 flex items-center justify-center text-indigo-600">
+                            {item.event?.toLowerCase().includes('door') ? <Unlock size={18} /> : <Zap size={18} />}
+                        </div>
+                        <div className="flex-1 flex justify-between items-start">
+                            <div className="space-y-0.5">
+                                <p className="font-bold text-sm text-slate-900">{item.event}</p>
+                                <p className="text-slate-500 text-xs leading-tight">{item.details || item.message}</p>
+                            </div>
+                            <span className="text-[9px] font-black text-slate-400 uppercase ml-2 bg-slate-50 px-2 py-1 rounded-md">
+                                {formatTime(item.createdAt || item.time)}
+                            </span>
+                        </div>
                     </div>
-                    <span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${activityTone(item?.event)}`}>
-                      {activityLabel(item?.event)}
-                    </span>
-                  </div>
-                  <div className="mt-2 inline-flex items-center gap-1 text-[11px] text-slate-500">
-                    <Clock3 size={12} />
-                    {item?.time || "Just now"}
-                  </div>
-                </article>
-              ))
+                ))
+            ) : (
+                <div className="p-8 text-center border-2 border-dashed border-slate-200 rounded-[2rem]">
+                    <p className="text-sm text-slate-500 font-medium italic">Your security timeline is clear.</p>
+                </div>
             )}
           </div>
-          {/* <p className="text-xs text-slate-500">Session: {session?.state || "Idle"}</p> */}
         </section>
-      </div>
-      <RenewNowModal open={renewModalOpen} subscription={subscription} onClose={() => setRenewModalOpen(false)} />
-    </AppShell>
-  );
-}
+      </main>
 
-function ProgressRing({ value }) {
-  return (
-    <div
-      className="grid h-14 w-14 place-items-center rounded-full bg-white/20 text-xs font-bold text-white"
-      style={{ background: `conic-gradient(#ffffff ${value * 3.6}deg, rgba(255,255,255,0.25) 0deg)` }}
-      aria-label={`${value}%`}
-    >
-      <span className="grid h-11 w-11 place-items-center rounded-full bg-indigo-700/90">{value}%</span>
+      {/* Bottom Navigation Fix: Using fixed background and z-index to stay visible */}
+      <nav className="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-8 pt-4 bg-white border-t border-slate-100 z-[9999] shadow-[0_-10px_40px_rgba(0,0,0,0.08)]">
+        <NavItem to="/dashboard/homeowner/overview" icon={<LayoutGrid size={22} />} label="Home" active />
+        <NavItem to="/dashboard/homeowner/visits" icon={<History size={22} />} label="Activity" />
+        <NavItem to="/dashboard/homeowner/appointments" icon={<CalendarDays size={22} />} label="Schedule" />
+        <NavItem to="/dashboard/homeowner/messages" icon={<MessageSquare size={22} />} label="Inbox" />
+        <NavItem to="/dashboard/homeowner/settings" icon={<User size={22} />} label="Profile" />
+      </nav>
     </div>
   );
 }
 
-function activityLabel(event) {
-  const text = String(event || "").toLowerCase();
-  if (text.includes("approved") || text.includes("allowed")) return "Approved";
-  if (text.includes("denied") || text.includes("rejected")) return "Denied";
-  if (text.includes("message")) return "Message";
-  if (text.includes("call")) return "Call";
-  return "Update";
-}
-
-function activityTone(event) {
-  const text = String(event || "").toLowerCase();
-  if (text.includes("approved") || text.includes("allowed")) {
-    return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300";
-  }
-  if (text.includes("denied") || text.includes("rejected")) {
-    return "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300";
-  }
-  if (text.includes("message")) {
-    return "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300";
-  }
-  return "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300";
-}
-
-function PercentPill({ value }) {
-  return (
-    <span
-      className="grid h-10 w-10 place-items-center rounded-full text-[11px] font-bold text-violet-700"
-      style={{ background: `conic-gradient(#8b5cf6 ${value * 3.6}deg, #e5e7eb 0deg)` }}
-    >
-      <span className="grid h-8 w-8 place-items-center rounded-full bg-white dark:bg-slate-900">{value}%</span>
-    </span>
-  );
-}
-
-function ActionItemGridCard({ label, to, icon, title = "", disabled = false }) {
-  if (disabled) {
+// Sub-components
+function ActionIcon({ to, icon, label, color = "text-indigo-600", bg = "bg-white" }) {
     return (
-      <div
-        title={title}
-        className="rounded-[1.4rem] border border-slate-200 bg-slate-100/80 px-3 py-4 text-center opacity-70 shadow-sm dark:border-slate-700 dark:bg-slate-900/60"
-      >
-        <div className="mx-auto flex w-full max-w-[4.25rem] items-center justify-center">
-          <span className="grid h-12 w-12 place-items-center rounded-2xl bg-slate-200 text-slate-500 shadow-sm dark:bg-slate-800 dark:text-slate-400">
-            {icon}
-          </span>
-        </div>
-        <p className="mt-3 text-xs font-bold leading-5 text-slate-700 dark:text-slate-200">{label}</p>
-      </div>
+        <Link to={to} className="flex flex-col items-center gap-2 group outline-none">
+            <div className={`w-full aspect-square rounded-[1.3rem] ${bg} shadow-sm border border-slate-100 flex items-center justify-center ${color} group-hover:scale-105 group-active:scale-95 transition-all duration-200`}>
+                {icon}
+            </div>
+            <span className="text-[10px] font-bold text-slate-500 uppercase text-center truncate w-full tracking-tighter">{label}</span>
+        </Link>
     );
-  }
+}
 
-  return (
-    <Link
-      to={to}
-      title={title}
-      className="group rounded-[1.4rem] border border-slate-200 bg-white px-3 py-4 text-center shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md active:translate-y-0 active:shadow-sm dark:border-slate-700 dark:bg-slate-900/80"
-    >
-      <div className="mx-auto flex w-full max-w-[4.25rem] items-center justify-center">
-        <span className="grid h-12 w-12 place-items-center rounded-2xl bg-violet-100 text-violet-600 shadow-sm transition group-hover:scale-105 dark:bg-violet-500/20 dark:text-violet-300">
-          {icon}
-        </span>
-      </div>
-      <p className="mt-3 text-xs font-bold leading-5 text-slate-900 dark:text-white">{label}</p>
-    </Link>
-  );
+function NavItem({ to, icon, label, active = false }) {
+    return (
+        <Link to={to} className={`flex flex-col items-center justify-center min-w-[64px] transition-all active:scale-90 ${active ? 'text-indigo-600' : 'text-slate-400'}`}>
+            <div className={`${active ? 'bg-indigo-50 p-2 rounded-xl' : ''}`}>
+              {icon}
+            </div>
+            <span className="text-[9px] font-black uppercase mt-1 tracking-tight">{label}</span>
+        </Link>
+    );
+}
+
+function LoadingState() {
+    return (
+        <div className="min-h-screen flex items-center justify-center bg-white flex-col gap-6">
+            <div className="relative">
+              <div className="w-16 h-16 border-4 border-slate-100 border-t-indigo-600 rounded-full animate-spin"></div>
+              <ShieldCheck className="absolute inset-0 m-auto text-indigo-600" size={24} />
+            </div>
+            <p className="text-xs font-black text-slate-400 uppercase tracking-[0.3em] animate-pulse">Establishing Secure Link</p>
+        </div>
+    );
+}
+
+function formatTime(value) {
+  if (!value) return "Just now";
+  const date = new Date(value);
+  return new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(date);
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { CheckCircle2, Clock3, MessageSquare, Phone, RefreshCw, ShieldCheck, Video, XCircle } from "lucide-react";
 import AppShell from "../../layouts/AppShell";
 import { fetchVisitorSnapshotFileUrl } from "../../services/advancedService";
@@ -14,6 +14,7 @@ const channelOptions = [
 
 export default function HomeownerLiveQueuePage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -23,6 +24,10 @@ export default function HomeownerLiveQueuePage() {
   const snapshotInFlightRef = useRef(new Set());
   const [channelBySession, setChannelBySession] = useState({});
   const [targetBySession, setTargetBySession] = useState({});
+  const defaultChannel = useMemo(() => {
+    const raw = String(searchParams.get("channel") || "").trim().toLowerCase();
+    return ["message", "audio", "video"].includes(raw) ? raw : "";
+  }, [searchParams]);
 
   const loadQueue = useCallback(async ({ background = false } = {}) => {
     if (!background) {
@@ -36,6 +41,10 @@ export default function HomeownerLiveQueuePage() {
       setChannelBySession((prev) => {
         const next = { ...prev };
         nextRows.forEach((row) => {
+          if (!next[row.id] && defaultChannel) {
+            next[row.id] = defaultChannel;
+            return;
+          }
           if (!next[row.id] && row?.preferredCommunicationChannel) {
             next[row.id] = row.preferredCommunicationChannel;
           }
@@ -58,7 +67,7 @@ export default function HomeownerLiveQueuePage() {
     } finally {
       if (!background) setLoading(false);
     }
-  }, []);
+  }, [defaultChannel]);
 
   useEffect(() => {
     loadQueue();

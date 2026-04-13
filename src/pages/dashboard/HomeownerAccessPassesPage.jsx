@@ -3,6 +3,27 @@ import AppShell from "../../layouts/AppShell";
 import { createHomeownerAccessPass, deactivateHomeownerAccessPass, getHomeownerAccessPasses, getHomeownerDoors } from "../../services/homeownerService";
 import { showError, showSuccess } from "../../utils/flash";
 
+const PASS_PRESETS = {
+  one_time_pin: {
+    label: "One-Time Visitor Code",
+    passType: "pin",
+    validForHours: 24,
+    maxUses: 1
+  },
+  monthly_pin: {
+    label: "Monthly Visitor Code",
+    passType: "pin",
+    validForHours: 720,
+    maxUses: 100
+  },
+  monthly_qr: {
+    label: "Monthly Visitor QR",
+    passType: "qr",
+    validForHours: 720,
+    maxUses: 100
+  }
+};
+
 export default function HomeownerAccessPassesPage() {
   const [passes, setPasses] = useState([]);
   const [doors, setDoors] = useState([]);
@@ -68,6 +89,15 @@ export default function HomeownerAccessPassesPage() {
 
   const activeCount = useMemo(() => passes.filter((row) => row.isActive).length, [passes]);
 
+  function applyPreset(presetKey) {
+    const preset = PASS_PRESETS[presetKey];
+    if (!preset) return;
+    setForm((prev) => ({
+      ...prev,
+      ...preset
+    }));
+  }
+
   return (
     <AppShell title="Digital Access">
       <div className="mx-auto max-w-4xl space-y-4 pb-16">
@@ -82,6 +112,17 @@ export default function HomeownerAccessPassesPage() {
         </section>
 
         <section className="rounded-[2rem] border border-slate-200 bg-white/95 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/90">
+          <div className="mb-4 flex flex-wrap gap-2">
+            <button type="button" onClick={() => applyPreset("one_time_pin")} className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-bold text-slate-700">
+              One-Time Code
+            </button>
+            <button type="button" onClick={() => applyPreset("monthly_pin")} className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-bold text-slate-700">
+              1-Month Code
+            </button>
+            <button type="button" onClick={() => applyPreset("monthly_qr")} className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-bold text-slate-700">
+              1-Month QR
+            </button>
+          </div>
           <form className="grid gap-3 md:grid-cols-2" onSubmit={handleCreate}>
             <Field label="Label">
               <input value={form.label} onChange={(event) => setForm((prev) => ({ ...prev, label: event.target.value }))} className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-950" />
@@ -103,7 +144,7 @@ export default function HomeownerAccessPassesPage() {
               </select>
             </Field>
             <Field label="Valid For (hours)">
-              <input type="number" min="1" max="168" value={form.validForHours} onChange={(event) => setForm((prev) => ({ ...prev, validForHours: Number(event.target.value) }))} className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-950" />
+              <input type="number" min="1" max="744" value={form.validForHours} onChange={(event) => setForm((prev) => ({ ...prev, validForHours: Number(event.target.value) }))} className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-950" />
             </Field>
             <Field label="Max Uses">
               <input type="number" min="1" max="100" value={form.maxUses} onChange={(event) => setForm((prev) => ({ ...prev, maxUses: Number(event.target.value) }))} className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-950" />

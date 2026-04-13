@@ -1,374 +1,493 @@
-﻿import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import AppShell from "../../layouts/AppShell";
-import MobileBottomSheet from "../../components/mobile/MobileBottomSheet";
-import { useAuth } from "../../state/AuthContext";
+import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import {
-  getBillingPlans,
-  getMySubscription,
-  initializePaystackPayment,
-  listPaymentPurposes,
-  requestSubscription
-} from "../../services/paymentService";
+  ArrowRight,
+  Bell,
+  BrainCircuit,
+  CheckCircle2,
+  ChevronLeft,
+  CreditCard,
+  History,
+  LayoutGrid,
+  User,
+  XCircle,
+  Zap,
+  CalendarDays,
+  MessageSquare
+} from "lucide-react";
+import { initializePaystackPayment, getBillingPlans, getMySubscription, getReferralSummary, requestSubscription } from "../../services/paymentService";
 import { getHomeownerContext } from "../../services/homeownerService";
+import { useAuth } from "../../state/AuthContext";
+import { useNotifications } from "../../state/NotificationsContext";
+import { env } from "../../config/env";
 import { showError, showSuccess } from "../../utils/flash";
+import { openPlanLockedModal } from "../../utils/blocking";
 
-const PLAN_FEATURES = {
-  estate_starter: [
-    "Up to 3 doors",
-    "Trial only - 30 days"
-  ],
-  estate_basic: [
-    "Realtime alerts",
-    "Visitor logs",
-    "Resident management",
-    "Mobile dashboard"
-  ],
-  estate_growth: [
-    "Chat + call access",
-    "Multi-admin roles",
-    "Visitor scheduling",
-    "Access windows",
-    "Analytics"
-  ],
-  estate_pro: [
-    "Advanced analytics",
-    "Security audit logs",
-    "Multi-location control",
-    "Role permissions",
-    "Priority support"
-  ],
-  estate_enterprise: [
-    "Unlimited doors",
-    "SLA + API access",
-    "Custom annual contract"
-  ],
-  free: [
-    "1 door",
-    "Basic notifications",
-    "Limited logs"
-  ],
-  home_pro: [
-    "Chat + call verification",
-    "Visitor history",
-    "Visitor scheduling",
-    "Advanced notifications"
-  ],
-  home_premium: [
-    "Multiple doors",
-    "Access time windows",
-    "Priority support",
-    "Advanced privacy controls"
-  ]
-};
-
-const PLAN_ORDER = [
-  "estate_starter",
-  "estate_basic",
-  "estate_growth",
-  "estate_pro",
-  "estate_enterprise",
-  "free",
-  "home_pro",
-  "home_premium"
-];
-
-export default function HomeownerPaywallPage() {
+export default function SubscriptionCenter() {
+  const navigate = useNavigate();
   const { user } = useAuth();
-  const [purposes, setPurposes] = useState([]);
+  const { unreadCount } = useNotifications();
+  const [billingCycle, setBillingCycle] = useState("monthly");
+  const [loading, setLoading] = useState(true);
+  const [busyPlanId, setBusyPlanId] = useState("");
   const [subscription, setSubscription] = useState(null);
   const [plans, setPlans] = useState([]);
-  const [submitting, setSubmitting] = useState("");
-  const [billingCycle, setBillingCycle] = useState("monthly");
-  const [error, setError] = useState("");
-  const [checkoutUrl, setCheckoutUrl] = useState("");
-  const [confirmCheckoutOpen, setConfirmCheckoutOpen] = useState(false);
-  const navigate = useNavigate();
+  const [referral, setReferral] = useState(null);
+  const [managedContext, setManagedContext] = useState({ managedByEstate: false, estateName: "" });
+
+  const firstName = user?.fullName?.split(" ")[0] || user?.email || "User";
+  const isFetching = loading;
+  const audience = String(user?.role || "homeowner").toLowerCase() === "estate" ? "estate" : "homeowner";
+  const isEstateAudience = audience === "estate";
+
+  useEffect(() => {
+    let active = true;
+    async function loadContext() {
+      if (user?.role !== "homeowner") return;
+      try {
+        const data = await getHomeownerContext();
+        if (!active) return;
+        setManagedContext(data ?? { managedByEstate: false, estateName: "" });
+      } catch {
+        if (!active) return;
+        setManagedContext({ managedByEstate: false, estateName: "" });
+      }
+    }
+    loadContext();
+    return () => {
+      active = false;
+    };
+  }, [user?.role]);
+
+  useEffect(() => {
+    if (user?.role !== "homeowner") return;
+    if (!managedContext?.managedByEstate) return;
+    openPlanLockedModal({
+      managedByEstate: true,
+      estateName: managedContext?.estateName || "",
+      featureLabel: "Billing"
+    });
+    navigate("/dashboard/homeowner/overview", { replace: true });
+  }, [managedContext?.estateName, managedContext?.managedByEstate, navigate, user?.role]);
 
   useEffect(() => {
     let active = true;
 
-    async function load() {
+    async function loadBillingData() {
+      setLoading(true);
       try {
-        const [subscriptionData, purposeData, planData, context] = await Promise.all([
+        const [subscriptionData, planRows, referralData] = await Promise.all([
           getMySubscription(),
-          listPaymentPurposes(),
           getBillingPlans(),
-          user?.role === "homeowner" ? getHomeownerContext() : Promise.resolve(null)
+          getReferralSummary()
         ]);
         if (!active) return;
-        if (user?.role === "homeowner" && context?.managedByEstate) {
-          navigate("/dashboard/homeowner/overview", { replace: true });
-          return;
-        }
-        setSubscription(subscriptionData);
-        setPurposes(purposeData);
-        setPlans(planData);
-      } catch (requestError) {
+        setSubscription(subscriptionData || null);
+        setPlans((Array.isArray(planRows) ? planRows : []).filter((plan) => String(plan.audience || "").toLowerCase() === audience));
+        setReferral(referralData || null);
+      } catch (error) {
         if (!active) return;
-        setError(requestError.message ?? "Failed to load billing data");
+        showError(error?.message || "Failed to load subscription data.");
+      } finally {
+        if (active) setLoading(false);
       }
     }
 
-    load();
+    loadBillingData();
     return () => {
       active = false;
     };
-  }, [navigate, user?.role]);
+  }, [audience]);
+
+  const currentPlanId = String(subscription?.plan || "free");
+  const currentPlan = useMemo(
+    () => plans.find((plan) => String(plan.id) === currentPlanId) || null,
+    [currentPlanId, plans]
+  );
   
-  useEffect(() => {
-    if (error) showError(error);
-  }, [error]);
-
-  const activePlanName = useMemo(() => {
-    if (!subscription?.plan) return "Free";
-    const plan = plans.find((item) => item.id === subscription.plan);
-    return plan?.name ?? subscription.plan;
-  }, [plans, subscription]);
-
-  const visiblePlans = useMemo(() => {
-    const audience = user?.role === "estate" ? "estate" : "homeowner";
-    return plans
-      .filter((plan) => !plan.hidden)
-      .filter((plan) => (plan.audience || "homeowner") === audience)
-      .sort((a, b) => PLAN_ORDER.indexOf(a.id) - PLAN_ORDER.indexOf(b.id));
-  }, [plans, user?.role]);
-
-  const backPath = user?.role === "estate" ? "/dashboard/estate" : "/dashboard/homeowner/overview";
-  const dashboardLabel = user?.role === "estate" ? "Estate Dashboard" : "Homeowner Dashboard";
+  const availablePlans = useMemo(() => {
+    const rows = plans.length ? plans : fallbackFreePlan(subscription, audience);
+    return rows.map((plan, index) => ({
+      ...plan,
+      current: String(plan.id) === currentPlanId,
+      recommended: String(plan.id) === (isEstateAudience ? "estate_growth" : "home_pro"),
+      primary: String(plan.id) === (isEstateAudience ? "estate_growth" : "home_pro"),
+      ctaLabel: getPlanCtaLabel(plan.id)
+    }));
+  }, [currentPlanId, isEstateAudience, plans, subscription]);
 
   async function handleSelectPlan(plan) {
-    setSubmitting(plan.id);
-    setError("");
+    if (!plan?.id || busyPlanId) return;
+    if (String(plan.id) === currentPlanId) {
+      showSuccess("You are already on this plan.");
+      return;
+    }
 
+    setBusyPlanId(String(plan.id));
     try {
-      if (!plan.selfServe) {
-        navigate("/contact");
+      if (Number(plan.amount || 0) <= 0) {
+        await requestSubscription(plan.id);
+        showSuccess(`${plan.name} activated.`);
+        const latestSubscription = await getMySubscription();
+        setSubscription(latestSubscription || null);
         return;
       }
-      if (plan.amount === 0) {
-        await requestSubscription(plan.id);
-        const refreshed = await getMySubscription();
-        setSubscription(refreshed);
-        showSuccess(
-          `Free plan activated. You can manage up to ${plan.maxDoors} door${plan.maxDoors === 1 ? "" : "s"} and ${plan.maxQrCodes} QR code${plan.maxQrCodes === 1 ? "" : "s"}.`
-        );
-      } else {
-        const isLocalHost = ["localhost", "127.0.0.1"].includes(window.location.hostname);
-        const callbackUrl = !isLocalHost && window.location.protocol === "https:"
-          ? `${window.location.origin}/billing/callback`
-          : undefined;
-        const initialized = await initializePaystackPayment(plan.id, callbackUrl, billingCycle);
-        if (!initialized?.authorization_url) {
-          throw new Error("Unable to start Paystack checkout");
-        }
-        setCheckoutUrl(initialized.authorization_url);
-        setConfirmCheckoutOpen(true);
+
+      const callbackUrl = `${env.publicAppUrl.replace(/\/+$/, "")}/billing/callback`;
+      const payment = await initializePaystackPayment(plan.id, callbackUrl, billingCycle);
+      const authorizationUrl = payment?.authorizationUrl || payment?.authorization_url;
+      if (!authorizationUrl) {
+        throw new Error("Payment link was not returned.");
       }
-    } catch (requestError) {
-      setError(requestError.message ?? "Failed to process plan request");
+      window.location.assign(authorizationUrl);
+    } catch (error) {
+      showError(error?.message || "Unable to continue with this plan.");
     } finally {
-      setSubmitting("");
+      setBusyPlanId("");
     }
   }
 
-  function confirmCheckoutRedirect() {
-    if (!checkoutUrl) return;
-    const target = checkoutUrl;
-    setCheckoutUrl("");
-    setConfirmCheckoutOpen(false);
-    window.location.href = target;
+  if (user?.role === "homeowner" && managedContext?.managedByEstate) {
+    return null;
   }
 
   return (
-    <AppShell >
-
-      <section className="rounded-3xl border border-slate-200 bg-white/95 p-4 sm:p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/90">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="font-heading text-xl font-bold">Current Plan</h2>
-            <p className="mt-1 text-sm text-slate-500">{subscription?.planName || activePlanName}</p>
-            {subscription?.limits ? (
-            <p className="mt-1 text-xs text-slate-500">
-              Limit: {subscription.limits.maxDoors} door(s), {subscription.limits.maxQrCodes} QR code(s), {subscription.limits.maxAdmins ?? 1} admin(s)
-            </p>
-            ) : null}
-            {subscription?.expiresAt ? <p className="mt-1 text-xs text-slate-500">Expires: {new Date(subscription.expiresAt).toLocaleString()}</p> : null}
-            {subscription?.trialDaysRemaining > 0 ? (
-              <p className="mt-1 text-xs font-medium text-amber-600 dark:text-amber-300">
-                Trial ends in {subscription.trialDaysRemaining} day{subscription.trialDaysRemaining === 1 ? "" : "s"}.
-              </p>
-            ) : null}
-          </div>
-          <button
-            type="button"
-            onClick={() => navigate(backPath)}
-            className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white"
-          >
-            Back to {dashboardLabel}
-          </button>
-        </div>
-        <div className="mt-4 inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-800">
-          <button
-            type="button"
-            onClick={() => setBillingCycle("monthly")}
-            className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
-              billingCycle === "monthly" ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900" : "text-slate-600 dark:text-slate-300"
-            }`}
-          >
-            Monthly
-          </button>
-          <button
-            type="button"
-            onClick={() => setBillingCycle("yearly")}
-            className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
-              billingCycle === "yearly" ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900" : "text-slate-600 dark:text-slate-300"
-            }`}
-          >
-            Yearly
-          </button>
-        </div>
-      </section>
-
-      <section className="mt-4 grid gap-3 sm:mt-6 sm:gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {visiblePlans.map((plan) => (
-          <article
-            key={plan.id}
-            className="rounded-3xl border border-slate-200 bg-white/95 p-4 sm:p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/90"
-          >
-            <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">{plan.name}</p>
-            <p className="mt-2 text-2xl font-bold">
-              {!plan.selfServe
-                ? "Custom"
-                : formatMoney(resolvePlanAmount(plan, billingCycle), plan.currency)}
-              <span className="ml-1 text-sm font-medium text-slate-500">
-                {!plan.selfServe ? "annual contract" : `/${billingCycle === "yearly" ? "year" : "month"}`}
-              </span>
-            </p>
-            <p className="text-xs text-slate-500">{(plan.currency || "NGN").toUpperCase()}</p>
-            <p className="mt-2 text-sm text-slate-500">Up to {plan.maxDoors} doors</p>
-            <p className="text-sm text-slate-500">Up to {plan.maxQrCodes} QR codes</p>
-            {plan.trialDays ? (
-              <p className="mt-1 text-xs font-medium text-brand-700 dark:text-brand-300">Trial only - {plan.trialDays} days</p>
-            ) : null}
-            {plan.description ? <p className="mt-1 text-xs text-slate-500">{plan.description}</p> : null}
-            {Array.isArray(PLAN_FEATURES[plan.id]) ? (
-              <ul className="mt-3 space-y-1 text-xs text-slate-600 dark:text-slate-300">
-                {PLAN_FEATURES[plan.id].map((feature) => (
-                  <li key={feature}>- {feature}</li>
-                ))}
-              </ul>
-            ) : null}
-            {Array.isArray(plan?.restrictions) && plan.restrictions.length > 0 ? (
-              <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-900/30 dark:bg-rose-900/20 dark:text-rose-300">
-                Restricted: {plan.restrictions.map(formatFeatureLabel).join(", ")}
-              </div>
-            ) : null}
-
-            <button
-              type="button"
-              disabled={submitting === plan.id || subscription?.plan === plan.id}
-              onClick={() => handleSelectPlan(plan)}
-              className="mt-4 w-full rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-900"
+    <div className="min-h-screen bg-[#f8f9fa] font-sans text-slate-900 antialiased flex flex-col">
+      {/* HEADER WITH BACK BUTTON AND BILLING TITLE */}
+      <header className="fixed top-0 w-full z-[100] bg-white/80 backdrop-blur-md border-b border-slate-100 px-6 py-4 flex justify-between items-center">
+        <div className="max-w-5xl mx-auto w-full flex justify-between items-center">
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => navigate(-1)} 
+              className="p-2.5 bg-slate-50 text-slate-600 rounded-full hover:bg-slate-100 transition-colors"
             >
-              {subscription?.plan === plan.id
-                ? "Current plan"
-                : submitting === plan.id
-                  ? "Processing..."
-                  : !plan.selfServe
-                    ? "Contact sales"
-                    : plan.amount === 0
-                    ? "Activate free"
-                    : `Pay with Paystack (${billingCycle === "yearly" ? "Yearly" : "Monthly"})`}
+              <ChevronLeft size={20} />
             </button>
-          </article>
-        ))}
-      </section>
+            <div className="flex items-center gap-3">
+             
+              <div>
+                <h1 className="font-bold text-lg text-slate-900 leading-none">Billing</h1>
+               
+              </div>
+            </div>
+          </div>
+          <Link to="/dashboard/notifications" className="relative p-2.5 bg-slate-50 text-slate-600 rounded-full hover:bg-indigo-50 hover:text-indigo-600 transition-all">
+            <Bell size={18} />
+            {unreadCount > 0 && (
+                <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white" />
+            )}
+          </Link>
+        </div>
+      </header>
 
-      <section className="mt-6 rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/90">
-        <h3 className="font-heading text-lg font-bold">Manual Payment Instructions</h3>
-        {purposes.length === 0 ? (
-          <p className="mt-2 text-sm text-slate-500">No manual payment account configured.</p>
-        ) : (
-          <div className="mt-3 space-y-3">
-            {purposes.map((purpose) => (
-              <div
-                key={purpose.id}
-                className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800"
+      <main className="flex-grow pt-28 pb-32 px-6 max-w-5xl mx-auto w-full">
+        <div className="mb-12">
+          <h2 className="text-4xl font-black text-slate-900 tracking-tighter mb-2">Manage Your Plan</h2>
+          <p className="text-slate-500 font-medium">
+            {isEstateAudience
+              ? "View your live estate subscription, capacity, and upgrade options."
+              : "View your live homeowner subscription, real plan limits, and upgrade options."}
+          </p>
+        </div>
+
+        {/* Status Bento Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+          <div className="md:col-span-2 bg-indigo-600 rounded-[2rem] p-8 relative overflow-hidden text-white shadow-xl shadow-indigo-200">
+            <div className="relative z-10 flex flex-col h-full justify-between">
+              <div>
+                <span className="text-[10px] uppercase tracking-[0.2em] font-black opacity-80">Current Subscription</span>
+                <div className="flex items-baseline gap-3 mt-3">
+                  <h3 className="text-5xl font-black tracking-tighter">{loading ? "..." : currentPlan?.name || subscription?.plan || "Free"}</h3>
+                  <span className="bg-white/20 px-3 py-1 rounded-full text-[10px] font-black uppercase">{subscription?.status || "active"}</span>
+                </div>
+                <p className="mt-4 text-indigo-100 max-w-sm font-medium leading-relaxed">
+                  {loading
+                    ? "Loading your plan details..."
+                    : isEstateAudience
+                      ? `This plan supports up to ${subscription?.limits?.maxDoors ?? subscription?.maxDoors ?? 0} houses / doors and ${subscription?.limits?.maxQrCodes ?? subscription?.maxQrCodes ?? 0} QR code(s).`
+                      : `This plan supports up to ${subscription?.limits?.maxDoors ?? subscription?.maxDoors ?? 0} door(s) and ${subscription?.limits?.maxQrCodes ?? subscription?.maxQrCodes ?? 0} QR code(s).`}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const firstPaidPlan = availablePlans.find((plan) => !plan.current && Number(plan.amount || 0) > 0);
+                  if (firstPaidPlan) handleSelectPlan(firstPaidPlan);
+                }}
+                className="mt-8 bg-white text-indigo-600 w-fit px-8 py-3.5 rounded-2xl font-bold text-sm active:scale-95 transition-all shadow-lg"
               >
-                <p className="text-sm font-semibold">{purpose.name}</p>
-                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{purpose.description}</p>
-                <p className="mt-2 text-xs font-medium text-slate-500">{purpose.accountInfo}</p>
+                Upgrade Now
+              </button>
+            </div>
+            <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-20 -mt-20" />
+          </div>
+
+          <div className="bg-white border border-slate-100 rounded-[2rem] p-8 flex flex-col justify-between shadow-sm">
+            <div>
+              <span className="text-[10px] uppercase tracking-[0.2em] font-black text-slate-400">Referrals</span>
+              <h3 className="text-xl font-bold mt-2 text-slate-900">{loading ? "Loading..." : `${Number(referral?.totalReferrals || 0)} referral(s)`}</h3>
+              <p className="mt-2 text-sm text-slate-500 leading-relaxed font-medium">
+                {loading ? "Fetching referral rewards..." : `Reward balance: ${formatCurrency(referral?.totalRewards || 0)}`}
+              </p>
+            </div>
+            <button type="button" onClick={() => navigate("/dashboard/homeowner/settings")} className="flex items-center gap-2 text-indigo-600 font-black text-sm hover:translate-x-1 transition-transform mt-6">
+              View Account <ArrowRight size={16} />
+            </button>
+          </div>
+        </div>
+
+        <section className="space-y-8">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <h3 className="text-2xl font-black tracking-tight">Available Plans</h3>
+            <div className="bg-slate-100 p-1.5 rounded-2xl flex w-fit self-start md:self-auto">
+              <button
+                onClick={() => setBillingCycle("monthly")}
+                className={`${billingCycle === "monthly" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"} px-5 py-2 rounded-xl text-xs font-black transition-all`}
+              >
+                Monthly
+              </button>
+              <button
+                onClick={() => setBillingCycle("yearly")}
+                className={`${billingCycle === "yearly" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"} px-5 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2`}
+              >
+                Yearly
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {availablePlans.map((plan) => (
+              <div
+                key={plan.id}
+                className={`relative rounded-[2.5rem] p-8 border transition-all duration-300 ${
+                  plan.primary ? "bg-white border-indigo-600 shadow-2xl shadow-indigo-100 scale-105 z-10" : "bg-white border-slate-100 hover:shadow-lg"
+                }`}
+              >
+                {plan.recommended ? (
+                  <span className="absolute top-6 right-8 bg-indigo-600 text-white text-[9px] font-black uppercase px-3 py-1 rounded-full tracking-widest">
+                    {isEstateAudience ? "Popular" : "Best Value"}
+                  </span>
+                ) : null}
+                <div className="mb-8">
+                  <h4 className="font-black text-xl mb-1">{plan.name}</h4>
+                  {plan.description ? <p className="text-sm font-medium text-slate-500 mb-4 min-h-[2.5rem]">{plan.description}</p> : null}
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-4xl font-black tracking-tighter">{formatPlanAmount(plan, billingCycle)}</span>
+                    <span className="text-slate-400 font-bold text-sm">/{billingCycle === "yearly" ? "year" : (plan.billingLabel || "month")}</span>
+                  </div>
+                </div>
+
+                <ul className="space-y-4 mb-10">
+                  {buildPlanFeatures(plan, audience).map((feature) => (
+                    <li key={`${plan.id}-${feature.text}`} className="flex items-center gap-3 text-sm font-medium text-slate-600">
+                      {feature.included ? <CheckCircle2 size={20} className="text-indigo-500" /> : <XCircle size={20} className="text-slate-300" />}
+                      {feature.text}
+                    </li>
+                  ))}
+                </ul>
+
+                <button
+                  type="button"
+                  disabled={plan.current || busyPlanId === String(plan.id)}
+                  onClick={() => handleSelectPlan(plan)}
+                  className={`w-full py-4 rounded-2xl font-black text-sm transition-all active:scale-95 ${
+                    plan.current
+                      ? "bg-slate-50 text-slate-400 cursor-not-allowed border border-slate-100"
+                      : plan.primary
+                        ? "bg-indigo-600 text-white shadow-lg shadow-indigo-100"
+                        : "bg-slate-900 text-white hover:bg-slate-800"
+                  }`}
+                >
+                  {plan.current ? "Current Plan" : busyPlanId === String(plan.id) ? "Please wait..." : plan.ctaLabel}
+                </button>
               </div>
             ))}
           </div>
-        )}
-        <p className="mt-4 text-xs text-slate-500">
-          Need help? <Link to="/contact" className="font-semibold text-brand-600 dark:text-brand-300">Contact support</Link>.
-        </p>
-      </section>
+        </section>
 
-      <ConfirmLeaveModal
-        open={confirmCheckoutOpen}
-        title="Continue to Paystack?"
-        message="You are about to leave Qring and continue payment in an external checkout page."
-        onClose={() => setConfirmCheckoutOpen(false)}
-        onConfirm={confirmCheckoutRedirect}
-      />
-    </AppShell>
+        <section className="mt-20 grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
+          <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white flex flex-col justify-center">
+            <h4 className="text-3xl font-black tracking-tighter mb-4">Why upgrade?</h4>
+            <p className="text-slate-400 font-medium leading-relaxed mb-8">
+              Your available features now come directly from the live plan catalog and subscription policy in the backend.
+            </p>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="p-5 bg-white/5 border border-white/10 rounded-2xl">
+                <Zap className="text-indigo-400 mb-3" size={24} />
+                <h5 className="font-bold text-xs uppercase tracking-widest">Live Limits</h5>
+              </div>
+              <div className="p-5 bg-white/5 border border-white/10 rounded-2xl">
+                <BrainCircuit className="text-indigo-400 mb-3" size={24} />
+                <h5 className="font-bold text-xs uppercase tracking-widest">Real Features</h5>
+              </div>
+            </div>
+          </div>
+          <div className="rounded-[2.5rem] overflow-hidden min-h-[350px] shadow-xl">
+            <img
+              src={isEstateAudience
+                ? "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80&w=800"
+                : "https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&q=80&w=800"}
+              className="w-full h-full object-cover"
+              alt={isEstateAudience ? "Secure Estate" : "Secure Home"}
+            />
+          </div>
+        </section>
+      </main>
+
+      {isEstateAudience ? (
+        <nav className="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-8 pt-4 bg-white border-t border-slate-100 z-[9999] shadow-[0_-10px_40px_rgba(0,0,0,0.08)]">
+          <NavItem to="/dashboard/estate" icon={<LayoutGrid size={22} />} label="Home" />
+          <NavItem to="/dashboard/estate/logs" icon={<History size={22} />} label="Logs" />
+          <NavItem to="/dashboard/estate/meetings" icon={<CalendarDays size={22} />} label="Meetings" />
+          <NavItem to="/dashboard/estate/broadcasts" icon={<MessageSquare size={22} />} label="Inbox" />
+          <NavItem to="/dashboard/estate/settings" icon={<User size={22} />} label="Profile" active />
+        </nav>
+      ) : (
+        <nav className="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-8 pt-4 bg-white border-t border-slate-100 z-[9999] shadow-[0_-10px_40px_rgba(0,0,0,0.08)]">
+          <NavItem to="/dashboard/homeowner/overview" icon={<LayoutGrid size={22} />} label="Home" />
+          <NavItem to="/dashboard/homeowner/visits" icon={<History size={22} />} label="Activity" />
+          <NavItem to="/dashboard/homeowner/appointments" icon={<CalendarDays size={22} />} label="Schedule" />
+          <NavItem to="/dashboard/homeowner/messages" icon={<MessageSquare size={22} />} label="Inbox" />
+          <NavItem to="/dashboard/homeowner/settings" icon={<User size={22} />} label="Profile" active />
+        </nav>
+      )}
+    </div>
   );
 }
 
-function formatFeatureLabel(value) {
-  return String(value || "")
-    .split("_")
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
-
-function formatMoney(amount, currency = "NGN") {
-  const safeAmount = Number(amount || 0);
-  const safeCurrency = String(currency || "NGN").toUpperCase();
-  try {
-    return new Intl.NumberFormat("en", {
-      style: "currency",
-      currency: safeCurrency,
-      maximumFractionDigits: 0,
-    }).format(safeAmount);
-  } catch {
-    return `${safeCurrency} ${safeAmount.toLocaleString("en-US")}`;
+function buildPlanFeatures(plan, audience = "homeowner") {
+  const planId = String(plan?.id || "");
+  const estateFeatures = {
+    estate_starter: [
+      "Up to 3 houses",
+      "Full system access (limited scale)",
+      "Trial only - 30 days"
+    ],
+    estate_basic: [
+      "Up to 10 houses",
+      "Realtime alerts",
+      "Visitor logs",
+      "Resident management",
+      "Mobile dashboard"
+    ],
+    estate_plus: [
+      "Everything in Basic",
+      "Visitor scheduling",
+      "Access time windows",
+      "Chat + call verification"
+    ],
+    estate_growth: [
+      "Everything in Plus",
+      "Multi-admin roles",
+      "Analytics dashboard",
+      "Activity tracking"
+    ],
+    estate_pro: [
+      "Everything in Growth",
+      "Advanced analytics",
+      "Security audit logs",
+      "Role permissions",
+      "Priority support"
+    ]
+  };
+  const homeownerFeatures = {
+    free: [
+      "1 door",
+      "Basic notifications",
+      "Limited logs"
+    ],
+    home_pro: [
+      "Chat + call verification",
+      "Visitor history",
+      "Visitor scheduling",
+      "Advanced notifications"
+    ],
+    home_premium: [
+      "Multiple doors",
+      "Access time windows",
+      "Priority support",
+      "Advanced privacy controls"
+    ]
+  };
+  const mapped = audience === "estate" ? estateFeatures[planId] : homeownerFeatures[planId];
+  if (mapped?.length) {
+    return mapped.map((text) => ({ text, included: true }));
   }
+  const enabled = (Array.isArray(plan.enabledFeatures) ? plan.enabledFeatures : []).slice(0, 5).map((feature) => ({
+    text: prettifyFeature(feature),
+    included: true
+  }));
+  return enabled;
 }
 
-function resolvePlanAmount(plan, cycle) {
-  const base = Number(plan?.amount || 0);
-  return cycle === "yearly" ? base * 12 : base;
+function prettifyFeature(value) {
+  return String(value || "")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (match) => match.toUpperCase());
 }
 
-function ConfirmLeaveModal({ open, title, message, onClose, onConfirm }) {
-  if (!open) return null;
+function formatPlanAmount(plan, billingCycle) {
+  const amount = Number(
+    billingCycle === "yearly"
+      ? (plan?.billingCycles?.yearly?.amount ?? plan?.yearlyAmount ?? (Number(plan.amount || 0) * 12))
+      : (plan?.billingCycles?.monthly?.amount ?? plan?.monthlyAmount ?? Number(plan.amount || 0))
+  );
+  if (amount <= 0) return "Free";
+  return new Intl.NumberFormat("en-NG", {
+    style: "currency",
+    currency: String(plan.currency || "NGN"),
+    maximumFractionDigits: 0
+  }).format(amount);
+}
+
+function formatCurrency(value) {
+  return new Intl.NumberFormat("en-NG", {
+    style: "currency",
+    currency: "NGN",
+    maximumFractionDigits: 0
+  }).format(Number(value || 0));
+}
+
+function fallbackFreePlan(subscription, audience = "homeowner") {
+  const fallbackId = audience === "estate" ? "estate_starter" : "free";
+  return [
+    {
+      id: String(subscription?.plan || fallbackId),
+      name: String(subscription?.plan || fallbackId).replace(/_/g, " ").replace(/\b\w/g, (match) => match.toUpperCase()),
+      amount: 0,
+      currency: "NGN",
+      billingLabel: "month",
+      maxDoors: subscription?.limits?.maxDoors ?? 0,
+      maxQrCodes: subscription?.limits?.maxQrCodes ?? 0,
+      maxAdmins: 1,
+      monthlyAmount: 0,
+      yearlyAmount: 0,
+      description: "",
+      enabledFeatures: [],
+      restrictions: []
+    }
+  ];
+}
+
+function getPlanCtaLabel(planId) {
+  const labels = {
+    estate_starter: "Start Free Trial",
+    estate_basic: "Start Basic",
+    estate_plus: "Choose Plus",
+    estate_growth: "Choose Growth",
+    estate_pro: "Start Pro",
+    free: "Get Started Free",
+    home_pro: "Choose Home Pro",
+    home_premium: "Choose Home Premium",
+  };
+  return labels[String(planId || "")] || "Choose Plan";
+}
+
+function NavItem({ to, icon, label, active = false }) {
   return (
-    <MobileBottomSheet open={open} title={title} onClose={onClose} width="560px" height="46dvh">
-      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
-        <p className="text-sm text-slate-600 dark:text-slate-300">{message}</p>
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold dark:border-slate-700"
-          >
-            Stay
-          </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            className="rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white dark:bg-white dark:text-slate-900"
-          >
-            Continue
-          </button>
-        </div>
-      </div>
-    </MobileBottomSheet>
+    <Link to={to} className={`flex flex-col items-center gap-1 transition-all ${active ? "text-indigo-600" : "text-slate-400 hover:text-slate-500"}`}>
+      <div className={`${active ? "bg-indigo-50 p-2 rounded-xl" : "p-2"}`}>{icon}</div>
+      <span className="text-[9px] font-black uppercase mt-0.5 tracking-tight">{label}</span>
+    </Link>
   );
 }

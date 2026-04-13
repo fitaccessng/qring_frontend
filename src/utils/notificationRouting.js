@@ -3,13 +3,20 @@ export function resolveNotificationRoute({ role, kind, payload }) {
   const safeKind = String(kind || "").toLowerCase();
   const data = payload && typeof payload === "object" ? payload : {};
   const alertType = String(data.alertType || data.type || data.alert_type || "").toLowerCase();
+  const sessionId = String(data.sessionId || data.visitId || data.session_id || "").trim();
+
+  function homeownerSessionRoute() {
+    return sessionId
+      ? `/dashboard/homeowner/messages?sessionId=${encodeURIComponent(sessionId)}`
+      : "/dashboard/homeowner/messages";
+  }
 
   if (typeof data.route === "string" && data.route.startsWith("/")) {
     return data.route;
   }
 
   if (safeKind.startsWith("visitor.") || safeKind.startsWith("call.") || safeKind.startsWith("appointment.")) {
-    return safeRole === "estate" ? "/dashboard/estate/logs" : "/dashboard/homeowner/visits";
+    return safeRole === "estate" ? "/dashboard/estate/logs" : homeownerSessionRoute();
   }
 
   if (safeKind === "estate.assignment") {
@@ -49,12 +56,19 @@ export function resolveNotificationRoute({ role, kind, payload }) {
     return "/dashboard/notifications";
   }
 
+  if (safeKind === "safety.panic") {
+    if (safeRole === "estate") return "/dashboard/estate/emergency";
+    if (safeRole === "security") return "/dashboard/security/emergency";
+    if (safeRole === "homeowner") return "/dashboard/homeowner/safety";
+    return "/dashboard/notifications";
+  }
+
   if (safeKind.startsWith("access.")) {
-    return safeRole === "estate" ? "/dashboard/estate/logs" : "/dashboard/homeowner/visits";
+    return safeRole === "estate" ? "/dashboard/estate/logs" : homeownerSessionRoute();
   }
 
   if (safeKind.startsWith("visitor.")) {
-    return safeRole === "estate" ? "/dashboard/estate/logs" : "/dashboard/homeowner/visits";
+    return safeRole === "estate" ? "/dashboard/estate/logs" : homeownerSessionRoute();
   }
 
   if (safeRole === "homeowner") return "/dashboard/notifications";

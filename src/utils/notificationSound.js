@@ -70,3 +70,7 @@ export function playMessageNotificationSound() {
 export function playIncomingCallNotificationSound() {
   playToneSequence([660, 880, 660], 0.14, 0.05, 0.06);
 }
+
+export function playPanicAlertSound() {
+  playToneSequence([880, 740, 880, 740, 990], 0.18, 0.06, 0.09);
+}

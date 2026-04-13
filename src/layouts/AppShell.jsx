@@ -6,6 +6,8 @@ import BrandMark from "../components/BrandMark";
 import NotificationBell from "../components/notifications/NotificationBell";
 import NotificationPanel from "../components/notifications/NotificationPanel";
 import { useNotifications } from "../state/NotificationsContext";
+import { getUserInitials } from "../utils/profile";
+import useSubscription from "../hooks/useSubscription";
 
 const navByRole = {
   homeowner: [
@@ -60,6 +62,35 @@ const navByRole = {
   ]
 };
 
+const estateManagedHomeownerNav = [
+  { to: "/dashboard/homeowner/overview", label: "Overview", icon: "overview" },
+  { to: "/dashboard/homeowner/estate-broadcasts", label: "Broadcasts", icon: "broadcast" },
+  { to: "/dashboard/homeowner/estate-meetings", label: "Meetings", icon: "meeting" },
+  { to: "/dashboard/homeowner/estate-polls", label: "Polls", icon: "polls" },
+  { to: "/dashboard/homeowner/estate-dues", label: "Dues", icon: "dues" },
+  { to: "/dashboard/homeowner/estate-maintenance", label: "Maintenance", icon: "maintenance" },
+  { to: "/dashboard/homeowner/estate-doors", label: "Doors", icon: "doors" },
+  { to: "/dashboard/homeowner/estate-approvals", label: "Approvals", icon: "messages" },
+  { to: "/dashboard/homeowner/estate-messages", label: "Messages", icon: "messages" },
+  { to: "/dashboard/homeowner/estate-video-calls", label: "Video Calls", icon: "messages" },
+  { to: "/dashboard/homeowner/estate-audio-calls", label: "Audio Calls", icon: "messages" },
+  { to: "/dashboard/homeowner/estate-alerts", label: "Alerts", icon: "bell_ring" },
+  { to: "/dashboard/homeowner/estate-panic", label: "Panic", icon: "shield" },
+  { to: "/dashboard/homeowner/settings", label: "Settings", icon: "settings" }
+];
+
+const featureRequirementByRoute = {
+  "/dashboard/homeowner/appointments": "visitor_scheduling",
+  "/dashboard/homeowner/access-passes": "visitor_scheduling",
+  "/dashboard/homeowner/messages": "chat_call_verification",
+  "/dashboard/homeowner/estate-messages": "chat_call_verification",
+  "/dashboard/homeowner/estate-video-calls": "chat_call_verification",
+  "/dashboard/homeowner/estate-audio-calls": "chat_call_verification",
+  "/dashboard/estate/stats": "analytics",
+  "/dashboard/estate/logs": "visitor_logs",
+  "/dashboard/estate/security": "multi_admin_roles"
+};
+
 const HOMEOWNER_CONTEXT_CACHE_TTL_MS = 2 * 60 * 1000;
 
 let homeownerContextCache = null;
@@ -91,9 +122,10 @@ function onboardingSeenForUser(user) {
   return keys.some((key) => localStorage.getItem(key) === "true");
 }
 
-export default function AppShell({ title, children, showTopBar = true }) {
+export default function AppShell({ title, children, showTopBar = true, showMobileNav = true }) {
   const { user, logout } = useAuth();
   const { unreadCount } = useNotifications();
+  const { hasFeature } = useSubscription();
   const navigate = useNavigate();
   const location = useLocation();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -102,16 +134,24 @@ export default function AppShell({ title, children, showTopBar = true }) {
   const [logoutBusy, setLogoutBusy] = useState(false);
   const notificationsPanelRef = useRef(null);
   const notificationsButtonRef = useRef(null);
+  const pathname = location?.pathname || "";
+  const normalizedPathname = useMemo(() => pathname.replace(/\/+$/, "") || "/", [pathname]);
+  const routeRole = useMemo(() => {
+    if (pathname.startsWith("/dashboard/estate")) return "estate";
+    if (pathname.startsWith("/dashboard/homeowner")) return "homeowner";
+    if (pathname.startsWith("/dashboard/security")) return "security";
+    if (pathname.startsWith("/dashboard/admin")) return "admin";
+    return user?.role ?? null;
+  }, [pathname, user?.role]);
 
   const showProfileHeader = useMemo(() => {
-    const path = location?.pathname || "";
-    return path === "/dashboard/homeowner/overview" || path === "/dashboard/estate";
-  }, [location?.pathname]);
+    return pathname === "/dashboard/homeowner/overview" || pathname === "/dashboard/estate";
+  }, [pathname]);
   const showBackHeader = useMemo(() => {
     if (!showTopBar) return false;
     if (showProfileHeader) return false;
-    return user?.role === "estate" || user?.role === "homeowner" || user?.role === "security";
-  }, [showTopBar, showProfileHeader, user?.role]);
+    return routeRole === "estate" || routeRole === "homeowner" || routeRole === "security";
+  }, [showTopBar, showProfileHeader, routeRole]);
   const isEstateManagedHomeowner = useMemo(
     () =>
       user?.role === "homeowner" &&
@@ -119,14 +159,18 @@ export default function AppShell({ title, children, showTopBar = true }) {
         (typeof user?.email === "string" && user.email.toLowerCase().endsWith("@estate.useqring.online"))),
     [user?.role, user?.email, homeownerContext]
   );
-  const isEstateUser = user?.role === "estate";
+  const isEstateUser = routeRole === "estate";
 
   const navItems = useMemo(() => {
-    const base = navByRole[user?.role] ?? [];
-    if (user?.role !== "homeowner") return base;
+    const base = navByRole[routeRole] ?? [];
+    if (routeRole !== "homeowner") return base;
 
-    if (homeownerContextLoading || isEstateManagedHomeowner) {
+    if (homeownerContextLoading) {
       return base.filter((item) => item.to !== "/billing/paywall");
+    }
+
+    if (isEstateManagedHomeowner) {
+      return estateManagedHomeownerNav;
     }
 
     const estateOnly = new Set([
@@ -136,11 +180,20 @@ export default function AppShell({ title, children, showTopBar = true }) {
       "/dashboard/homeowner/maintenance"
     ]);
     return base.filter((item) => !estateOnly.has(item.to));
-  }, [user?.role, isEstateManagedHomeowner, homeownerContextLoading]);
+  }, [routeRole, isEstateManagedHomeowner, homeownerContextLoading]);
   const profileName = useMemo(() => user?.fullName?.trim() || user?.email || "User", [user?.fullName, user?.email]);
-  const initials = useMemo(() => String(profileName).slice(0, 1).toUpperCase(), [profileName]);
+  const initials = useMemo(() => getUserInitials(profileName), [profileName]);
   const mobileNavItems = useMemo(() => {
-    if (user?.role === "homeowner") {
+    if (routeRole === "homeowner") {
+      if (isEstateManagedHomeowner) {
+        return [
+          { to: "/dashboard/homeowner/overview", label: "Home", icon: "overview" },
+          { to: "/dashboard/homeowner/estate-alerts", label: "Estate", icon: "broadcast" },
+          { to: "/dashboard/homeowner/estate-dues", label: "Dues", icon: "dues" },
+          { to: "/dashboard/homeowner/estate-messages", label: "Messages", icon: "messages" },
+          { to: "/dashboard/homeowner/estate-panic", label: "Panic", icon: "shield" }
+        ];
+      }
       return [
         { to: "/dashboard/homeowner/overview", label: "Home", icon: "overview" },
         { to: "/dashboard/homeowner/visits", label: "Visits", icon: "visits" },
@@ -149,7 +202,7 @@ export default function AppShell({ title, children, showTopBar = true }) {
         { to: "/dashboard/homeowner/doors", label: "Doors", icon: "doors" }
       ];
     }
-    if (user?.role === "estate") {
+    if (routeRole === "estate") {
       return [
         { to: "/dashboard/estate", label: "Overview", icon: "estate" },
         { to: "/dashboard/estate/invites", label: "Owners", icon: "invite" },
@@ -158,7 +211,7 @@ export default function AppShell({ title, children, showTopBar = true }) {
         { to: "/dashboard/estate/assign", label: "Assign", icon: "assign" }
       ];
     }
-    if (user?.role === "security") {
+    if (routeRole === "security") {
       return [
         { to: "/dashboard/security", label: "Gate", icon: "shield" },
         { to: "/dashboard/security/messages", label: "Messages", icon: "messages" },
@@ -166,13 +219,32 @@ export default function AppShell({ title, children, showTopBar = true }) {
       ];
     }
     return navItems.filter((item) => !item.to.endsWith("/settings")).slice(0, 4);
-  }, [navItems, user?.role]);
-  const isEstateMobileNav = user?.role === "estate";
-  const showHelpButton = user?.role === "estate" || user?.role === "security";
-  const mobileContentBottomPaddingClass = isEstateMobileNav
-    ? "pb-[calc(10.75rem+env(safe-area-inset-bottom))] sm:pb-[calc(9.5rem+env(safe-area-inset-bottom))]"
-    : "pb-[calc(9.5rem+env(safe-area-inset-bottom))] sm:pb-[calc(9rem+env(safe-area-inset-bottom))]";
-  const mobileBottomSpacerClass = isEstateMobileNav ? "h-28 lg:hidden" : "h-20 lg:hidden";
+  }, [isEstateManagedHomeowner, navItems, routeRole]);
+  const filteredNavItems = useMemo(() => {
+    return navItems.filter((item) => {
+      if (isEstateManagedHomeowner && item.to === "/billing/paywall") return false;
+      const requiredFeature = featureRequirementByRoute[item.to];
+      if (!requiredFeature) return true;
+      return hasFeature(requiredFeature);
+    });
+  }, [hasFeature, isEstateManagedHomeowner, navItems]);
+  const filteredMobileNavItems = useMemo(() => {
+    return mobileNavItems.filter((item) => {
+      if (isEstateManagedHomeowner && item.to === "/billing/paywall") return false;
+      const requiredFeature = featureRequirementByRoute[item.to];
+      if (!requiredFeature) return true;
+      return hasFeature(requiredFeature);
+    });
+  }, [hasFeature, isEstateManagedHomeowner, mobileNavItems]);
+  const isEstateMobileNav = routeRole === "estate";
+  const showHelpButton = routeRole === "estate" || routeRole === "security";
+  const mobileContentBottomPaddingClass = !showMobileNav
+    ? "pb-8 sm:pb-8"
+    : isEstateMobileNav
+      ? "pb-[calc(11.5rem+env(safe-area-inset-bottom))] sm:pb-[calc(10rem+env(safe-area-inset-bottom))]"
+      : "pb-[calc(9.5rem+env(safe-area-inset-bottom))] sm:pb-[calc(9rem+env(safe-area-inset-bottom))]";
+  const mobileBottomSpacerClass = !showMobileNav ? "hidden" : isEstateMobileNav ? "h-28 lg:hidden" : "h-20 lg:hidden";
+  const showEstateCreateDoorFab = showMobileNav && isEstateMobileNav && normalizedPathname === "/dashboard/estate";
   const canGoBack = typeof window !== "undefined" && window.history.length > 1;
   const isNativeApp = useMemo(() => {
     try {
@@ -236,6 +308,7 @@ export default function AppShell({ title, children, showTopBar = true }) {
     if (!notificationsOpen) return;
     const handleOutside = (event) => {
       const target = event.target;
+      if (target instanceof Element && target.closest('[data-notification-panel-root="true"]')) return;
       if (notificationsPanelRef.current?.contains(target)) return;
       if (notificationsButtonRef.current?.contains(target)) return;
       setNotificationsOpen(false);
@@ -302,7 +375,7 @@ export default function AppShell({ title, children, showTopBar = true }) {
             </div>
           </div>
           <nav className="space-y-2">
-            {navItems.map((item) => (
+            {filteredNavItems.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
@@ -395,19 +468,7 @@ export default function AppShell({ title, children, showTopBar = true }) {
                         onClick={handleNotificationsToggle}
                       />
                     </div>
-                    {isEstateUser ? (
-                      <button
-                        type="button"
-                        onClick={handleLogout}
-                        disabled={logoutBusy}
-                        className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200 dark:hover:bg-slate-800"
-                        aria-label="Logout"
-                        title="Logout"
-                      >
-                        <LogoutIcon />
-                        {logoutBusy ? "Logging out..." : "Logout"}
-                      </button>
-                    ) : null}
+                   
                     {notificationsOpen ? (
                       <div ref={notificationsPanelRef}>
                         <NotificationPanel onClose={() => setNotificationsOpen(false)} />
@@ -424,17 +485,48 @@ export default function AppShell({ title, children, showTopBar = true }) {
           </div>
         </main>
       </div>
-      {mobileNavItems.length > 0 ? (
+      {showMobileNav && filteredMobileNavItems.length > 0 ? (
+        <Link
+          to="/dashboard/estate/doors"
+          className={`fixed right-4 z-[10000] flex h-14 w-14 items-center justify-center rounded-full bg-[linear-gradient(135deg,#00346f_0%,#004a99_100%)] text-white shadow-[0_18px_40px_rgba(0,52,111,0.28)] transition active:scale-95 sm:right-6 lg:hidden ${
+            isEstateMobileNav
+              ? "bottom-[calc(6.6rem+env(safe-area-inset-bottom))]"
+              : "bottom-[calc(5.7rem+env(safe-area-inset-bottom))]"
+          } ${
+            showEstateCreateDoorFab ? "opacity-100" : "pointer-events-none opacity-0"
+          }`}
+          aria-label="Create door"
+          title="Create door"
+        >
+          <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M7 3h10v18H7z" />
+            <path d="M10 12h.01" />
+            <path d="M20 6v6" />
+            <path d="M17 9h6" />
+          </svg>
+        </Link>
+      ) : null}
+      {showMobileNav && filteredMobileNavItems.length > 0 ? (
         <div
           aria-hidden="true"
-          className="pointer-events-none fixed inset-x-0 bottom-0 z-[9998] h-[calc(6.8rem+env(safe-area-inset-bottom))] bg-gradient-to-t from-slate-100/95 via-slate-100/75 to-transparent backdrop-blur-md dark:from-slate-950/95 dark:via-slate-950/75 lg:hidden"
+          className={`pointer-events-none fixed inset-x-0 bottom-0 z-[9998] bg-gradient-to-t from-slate-100/95 via-slate-100/75 to-transparent backdrop-blur-md dark:from-slate-950/95 dark:via-slate-950/75 lg:hidden ${
+            isEstateMobileNav
+              ? "h-[calc(6rem+env(safe-area-inset-bottom))]"
+              : "h-[calc(6.8rem+env(safe-area-inset-bottom))]"
+          }`}
         />
       ) : null}
-      {mobileNavItems.length > 0 ? (
-        <nav className="fixed inset-x-0 bottom-3 z-[9999] px-3 pb-[max(0.2rem,env(safe-area-inset-bottom))] lg:hidden">
-          <div className="relative mx-auto max-w-md rounded-[1.35rem] border border-slate-200/60 bg-[#ebe8f8]/95 px-3 py-2 shadow-[0_12px_32px_rgba(76,29,149,0.16)] backdrop-blur-md dark:border-slate-700 dark:bg-slate-900/90">
+      {showMobileNav && filteredMobileNavItems.length > 0 ? (
+        <nav className={`fixed inset-x-0 bottom-0 z-[9999] lg:hidden ${isEstateMobileNav ? "px-0 pb-0" : "px-3 pb-[max(0.2rem,env(safe-area-inset-bottom))]"}`}>
+          <div
+            className={`relative mx-auto border border-slate-200/60 bg-[#ebe8f8]/95 px-3 py-2 shadow-[0_12px_32px_rgba(76,29,149,0.16)] backdrop-blur-md dark:border-slate-700 dark:bg-slate-900/90 ${
+              isEstateMobileNav
+                ? "max-w-none rounded-none rounded-t-[1.35rem] pb-[max(0.65rem,env(safe-area-inset-bottom))]"
+                : "max-w-md rounded-[1.35rem]"
+            }`}
+          >
             <div className={`flex items-stretch gap-1 ${isEstateMobileNav ? "h-14 sm:h-14" : "h-12 sm:h-12"}`}>
-              {mobileNavItems.map((item) => (
+              {filteredMobileNavItems.map((item) => (
                 <NavLink
                   key={`mobile-${item.to}`}
                   to={item.to}
