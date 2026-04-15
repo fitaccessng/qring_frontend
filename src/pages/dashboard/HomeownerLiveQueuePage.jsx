@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { CheckCircle2, Clock3, MessageSquare, Phone, RefreshCw, ShieldCheck, Video, XCircle } from "lucide-react";
 import AppShell from "../../layouts/AppShell";
 import { fetchVisitorSnapshotFileUrl } from "../../services/advancedService";
-import { decideVisit, getResidentVisits } from "../../services/residentService";
+import { decideVisit, getHomeownerVisits } from "../../services/homeownerService";
 import { useSocketEvents } from "../../hooks/useSocketEvents";
 
 const channelOptions = [
@@ -12,7 +12,7 @@ const channelOptions = [
   { key: "video", label: "Video", icon: Video }
 ];
 
-export default function ResidentLiveQueuePage() {
+export default function HomeownerLiveQueuePage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [rows, setRows] = useState([]);
@@ -35,7 +35,7 @@ export default function ResidentLiveQueuePage() {
       setError("");
     }
     try {
-      const data = await getResidentVisits();
+      const data = await getHomeownerVisits();
       const nextRows = Array.isArray(data) ? data : [];
       setRows(nextRows);
       setChannelBySession((prev) => {

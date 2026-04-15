@@ -16,7 +16,7 @@ import {
   UserPlus
 } from "lucide-react";
 import { useNotifications } from "../../state/NotificationsContext";
-import { getResidentSettings, updateResidentSettings } from "../../services/residentSettingsService";
+import { getHomeownerSettings, updateHomeownerSettings } from "../../services/homeownerSettingsService";
 import { showError, showSuccess } from "../../utils/flash";
 import { formatEmergencyContact, parseEmergencyContact } from "../../utils/emergencyContacts";
 
@@ -26,7 +26,7 @@ const EMPTY_FORM = {
   relationship: ""
 };
 
-export default function ResidentEmergencyContactsPage() {
+export default function HomeownerEmergencyContactsPage() {
   const navigate = useNavigate();
   const { unreadCount } = useNotifications();
   const [loading, setLoading] = useState(true);
@@ -41,7 +41,7 @@ export default function ResidentEmergencyContactsPage() {
     async function loadContacts() {
       setLoading(true);
       try {
-        const data = await getResidentSettings();
+        const data = await getHomeownerSettings();
         if (!active) return;
         const knownContacts = Array.isArray(data?.knownContacts) ? data.knownContacts : [];
         setSettings(data || null);
@@ -81,7 +81,7 @@ export default function ResidentEmergencyContactsPage() {
         allowDeliveryDropAtGate: Boolean(settings.allowDeliveryDropAtGate),
         smsFallbackEnabled: Boolean(settings.smsFallbackEnabled)
       };
-      const updated = await updateResidentSettings(payload);
+      const updated = await updateHomeownerSettings(payload);
       setSettings((prev) => ({ ...(prev || {}), ...(updated || {}), knownContacts: payload.knownContacts }));
       setContacts(nextContacts);
       showSuccess(successMessage);

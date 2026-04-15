@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import AppShell from "../../layouts/AppShell";
-import { createMaintenanceRequest } from "../../services/residentService";
+import { createHomeownerMaintenanceRequest } from "../../services/homeownerService";
 import { showError, showSuccess } from "../../utils/flash";
 
-export default function ResidentMaintenancePage() {
+export default function HomeownerMaintenancePage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
@@ -15,7 +15,7 @@ export default function ResidentMaintenancePage() {
     setBusy(true);
     setError("");
     try {
-      await createMaintenanceRequest({
+      await createHomeownerMaintenanceRequest({
         title: title.trim(),
         description: description.trim()
       });

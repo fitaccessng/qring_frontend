@@ -7,10 +7,10 @@ import {
   Search
 } from "lucide-react";
 
-import { decideVisit, endResidentSession, getResidentAppointments, getResidentVisits } from "../../services/residentService";
+import { decideVisit, endHomeownerSession, getHomeownerAppointments, getHomeownerVisits } from "../../services/homeownerService";
 import { useNotifications } from "../../state/NotificationsContext";
 
-export default function ResidentVisitsPage() {
+export default function HomeownerVisitsPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { refresh, syncVisitRequestNotifications, unreadCount } = useNotifications();
@@ -35,8 +35,8 @@ export default function ResidentVisitsPage() {
     if (!background) { setLoading(true); setError(""); }
     try {
       const [visitData, appointmentData] = await Promise.all([
-        getResidentVisits(),
-        getResidentAppointments()
+        getHomeownerVisits(),
+        getHomeownerAppointments()
       ]);
       setRows(visitData || []);
       setAppointments(appointmentData || []);

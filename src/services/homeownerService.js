@@ -1,3 +1,6 @@
+export async function generateHomeownerDoorQr(doorId) {
+  return apiRequest(`/homeowner/doors/${doorId}/qr`, { method: "POST" });
+}
 import { apiRequest, apiUpload } from "./apiClient";
 import { getVisitorSessionToken } from "./visitorSessionToken";
 
@@ -219,6 +222,14 @@ export async function createHomeownerDoor(payload) {
 
 export async function createMaintenanceRequest(payload) {
   const response = await apiRequest("/homeowner/maintenance-requests", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+  return response?.data ?? null;
+}
+
+export async function createHomeownerMaintenanceRequest(payload) {
+  const response = await apiRequest("/homeowner/maintenance", {
     method: "POST",
     body: JSON.stringify(payload)
   });

@@ -21,16 +21,16 @@ import { useAuth } from '../../state/AuthContext';
 import { useNotifications } from '../../state/NotificationsContext';
 import { env } from "../../config/env";
 import {
-  createResidentDoor,
-  generateDoorQr,
-  getResidentDoors
-} from "../../services/residentService";
+  createHomeownerDoor,
+  generateHomeownerDoorQr,
+  getHomeownerDoors
+} from "../../services/homeownerService";
 import { showError, showSuccess } from "../../utils/flash";
 
 // Components
 import QrPrintDesigner from "../../components/qr/QrPrintDesigner";
 
-export default function ResidentDoorsPage() {
+export default function HomeownerDoorsPage() {
   const navigate = useNavigate();
   const { token } = useAuth();
   const { unreadCount: globalUnreadCount } = useNotifications();
@@ -53,7 +53,7 @@ export default function ResidentDoorsPage() {
     if (!token) return;
     setLoading(true);
     try {
-      const doorData = await getResidentDoors();
+      const doorData = await getHomeownerDoors();
       const doorList = doorData?.doors ?? [];
       setDoors(doorList);
       setSubscription(doorData?.subscription ?? null);
@@ -79,7 +79,7 @@ export default function ResidentDoorsPage() {
     }
     setCreatingDoor(true);
     try {
-      const res = await createResidentDoor({ name: newDoorName, generateQr: true, mode: "direct", plan: "single" });
+      const res = await createHomeownerDoor({ name: newDoorName, generateQr: true, mode: "direct", plan: "single" });
       const createdDoor = res?.door ?? null;
       if (!createdDoor) {
         throw new Error("Door was created but no door data was returned.");

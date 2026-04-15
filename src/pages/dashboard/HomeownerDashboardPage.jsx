@@ -25,12 +25,12 @@ import {
 import { useApiQuery, useSocketQueryInvalidation } from "../../hooks/useApi";
 import { endpoints } from "../../services/endpoints";
 import { normalizeDashboard } from "../../services/dashboardService";
-import { getResidentContext } from "../../services/residentService";
+import { getHomeownerContext } from "../../services/homeownerService";
 import { useAuth } from "../../state/AuthContext";
 import { useNotifications } from "../../state/NotificationsContext";
 import useSubscription from "../../hooks/useSubscription";
 
-const QUERY_KEY = ["resident", "overview"];
+const QUERY_KEY = ["homeowner", "overview"];
 const quickActionFeatureByRoute = {
   "/dashboard/resident/messages": "chat_call_verification",
   "/dashboard/resident/appointments": "visitor_scheduling",
@@ -39,11 +39,11 @@ const quickActionFeatureByRoute = {
   "/dashboard/resident/estate-audio-calls": "chat_call_verification",
 };
 
-export default function ResidentDashboardPage() {
+export default function HomeownerDashboardPage() {
   const { user } = useAuth();
   const { unreadCount } = useNotifications();
   const { hasFeature } = useSubscription();
-  const [residentContext, setResidentContext] = useState({ managedByEstate: false, estateName: "" });
+  const [homeownerContext, setHomeownerContext] = useState({ managedByEstate: false, estateName: "" });
   
   const { data, isLoading, isError, refetch, isFetching } = useApiQuery({
     queryKey: QUERY_KEY,
@@ -60,10 +60,10 @@ export default function ResidentDashboardPage() {
     let active = true;
     async function loadContext() {
       try {
-        const data = await getResidentContext();
-        if (active) setResidentContext(data ?? { managedByEstate: false, estateName: "" });
+        const data = await getHomeownerContext();
+        if (active) setHomeownerContext(data ?? { managedByEstate: false, estateName: "" });
       } catch {
-        if (active) setResidentContext({ managedByEstate: false, estateName: "" });
+        if (active) setHomeownerContext({ managedByEstate: false, estateName: "" });
       }
     }
     loadContext();
@@ -84,9 +84,9 @@ export default function ResidentDashboardPage() {
     return overview.profile?.fullName?.split(" ")[0] || user?.fullName?.split(" ")[0] || "Resident";
   }, [overview.profile?.fullName, user?.fullName]);
 
-  const isEstateManagedResident = Boolean(residentContext?.managedByEstate);
+  const isEstateManagedHomeowner = Boolean(homeownerContext?.managedByEstate);
   const quickActions = useMemo(() => {
-    if (isEstateManagedResident) {
+    if (isEstateManagedHomeowner) {
       return [
         { to: "/dashboard/resident/estate-broadcasts", icon: <Bell size={24} />, label: "Broadcasts" },
         { to: "/dashboard/homeowner/estate-meetings", icon: <CalendarDays size={24} />, label: "Meetings" },

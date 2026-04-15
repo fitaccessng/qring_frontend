@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import AppShell from "../../layouts/AppShell";
-import { getResidentSettings, updateResidentSettings } from "../../services/residentSettingsService";
+import { getHomeownerSettings, updateHomeownerSettings } from "../../services/homeownerSettingsService";
 import { showError, showSuccess } from "../../utils/flash";
 
-export default function ResidentAutomationPage() {
+export default function HomeownerAutomationPage() {
   const [settings, setSettings] = useState({
     pushAlerts: true,
     soundAlerts: true,
@@ -24,7 +24,7 @@ export default function ResidentAutomationPage() {
     async function load() {
       setLoading(true);
       try {
-        const data = await getResidentSettings();
+        const data = await getHomeownerSettings();
         if (!active) return;
         const next = {
           pushAlerts: Boolean(data?.pushAlerts),
@@ -64,7 +64,7 @@ export default function ResidentAutomationPage() {
           .map((item) => item.trim())
           .filter(Boolean)
       };
-      const updated = await updateResidentSettings(payload);
+      const updated = await updateHomeownerSettings(payload);
       setSettings((prev) => ({
         ...prev,
         ...updated,

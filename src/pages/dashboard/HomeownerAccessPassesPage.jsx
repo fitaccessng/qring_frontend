@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "../../layouts/AppShell";
-import { createResidentAccessPass, deactivateResidentAccessPass, getResidentAccessPasses, getResidentDoors } from "../../services/residentService";
+import { createHomeownerAccessPass, deactivateHomeownerAccessPass, getHomeownerAccessPasses, getHomeownerDoors } from "../../services/homeownerService";
 import { showError, showSuccess } from "../../utils/flash";
 
 const PASS_PRESETS = {
@@ -24,7 +24,7 @@ const PASS_PRESETS = {
   }
 };
 
-export default function ResidentAccessPassesPage() {
+export default function HomeownerAccessPassesPage() {
   const [passes, setPasses] = useState([]);
   const [doors, setDoors] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -42,7 +42,7 @@ export default function ResidentAccessPassesPage() {
   async function load() {
     setLoading(true);
     try {
-      const [passRows, doorData] = await Promise.all([getResidentAccessPasses(), getResidentDoors()]);
+      const [passRows, doorData] = await Promise.all([getHomeownerAccessPasses(), getHomeownerDoors()]);
       setPasses(passRows);
       setDoors(doorData?.doors || []);
       if (!form.doorId && (doorData?.doors || []).length) {

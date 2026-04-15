@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "../../layouts/AppShell";
 import { listMyEstateAlerts, payEstateAlert, respondEstateMeeting, voteEstatePoll } from "../../services/estateService";
-import { uploadPaymentProof } from "../../services/residentService";
+import { uploadPaymentProof } from "../../services/homeownerService";
 import { showError, showSuccess } from "../../utils/flash";
 import { useSocketEvents } from "../../hooks/useSocketEvents";
 
-export default function ResidentAlertsPage() {
+export default function HomeownerAlertsPage() {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [payingAlertId, setPayingAlertId] = useState("");

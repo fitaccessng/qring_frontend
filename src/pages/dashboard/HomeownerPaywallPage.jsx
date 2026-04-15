@@ -16,7 +16,7 @@ import {
   MessageSquare
 } from "lucide-react";
 import { initializePaystackPayment, getBillingPlans, getMySubscription, getReferralSummary, requestSubscription } from "../../services/paymentService";
-import { getResidentContext } from "../../services/residentService";
+import { getHomeownerContext } from "../../services/homeownerService";
 import { useAuth } from "../../state/AuthContext";
 import { useNotifications } from "../../state/NotificationsContext";
 import { env } from "../../config/env";

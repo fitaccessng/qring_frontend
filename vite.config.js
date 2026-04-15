@@ -25,10 +25,16 @@ export default defineConfig(({ mode }) => {
       chunkSizeWarningLimit: 1000,
       rollupOptions: {
         output: {
-          manualChunks: {
-            firebase: ["firebase/app", "firebase/auth"],
-            router: ["react-router-dom"],
-            socket: ["socket.io-client"]
+          manualChunks(id) {
+            if (id.includes('firebase/app') || id.includes('firebase/auth')) {
+              return 'firebase';
+            }
+            if (id.includes('react-router-dom')) {
+              return 'router';
+            }
+            if (id.includes('socket.io-client')) {
+              return 'socket';
+            }
           }
         }
       }
