@@ -150,13 +150,13 @@ export default function SignupPage() {
             options={[
               {
                 value: "homeowner",
-                label: "Homeowner",
+                label: "Resident",
                 description: "Manage your home, visitors, doors, and alerts.",
                 icon: Home
               },
               {
                 value: "estate",
-                label: "Estate User",
+                label: "Estate Management",
                 description: "Run an estate with resident access, visitor logs, and oversight tools.",
                 icon: Building2
               }

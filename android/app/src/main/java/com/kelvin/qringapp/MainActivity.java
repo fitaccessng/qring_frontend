@@ -1,4 +1,4 @@
-package com.qring.aoo;
+package com.kelvin.qringapp;
 
 import com.getcapacitor.BridgeActivity;
 
