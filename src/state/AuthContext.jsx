@@ -183,7 +183,8 @@ export function AuthProvider({ children }) {
     });
 
   const resumeGoogleRedirect = async () => {
-    setLoading(true);
+    // Don't set loading state - this is just a check for previous redirect result
+    // and shouldn't block user interaction with the form
     try {
       const result = await authService.resumeGoogleRedirectAuth();
       if (!result) return null;
@@ -193,8 +194,9 @@ export function AuthProvider({ children }) {
         return { intent: "signin", data };
       }
       return result;
-    } finally {
-      setLoading(false);
+    } catch (error) {
+      // Silently fail - it's just a redirect check, not a user action
+      return null;
     }
   };
 

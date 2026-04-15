@@ -154,7 +154,7 @@ export default function HomeownerDashboardPage() {
             <h2 className="font-extrabold text-3xl text-slate-900 tracking-tight">{greeting}, {firstName}</h2>
             <p className="text-slate-500 text-sm font-medium">
               {isEstateManagedHomeowner
-                ? `Your residence is covered by ${residentContext?.estateName || "your estate"} plan benefits.`
+                ? `Your residence is covered by ${homeownerContext?.estateName || "your estate"} plan benefits.`
                 : "Your residence is currently under protection."}
             </p>
           </div>
@@ -217,7 +217,7 @@ export default function HomeownerDashboardPage() {
             <h3 className="font-bold text-lg text-slate-800">Action Items</h3>
             <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">Quick Access</span>
           </div>
-          <div className={`grid gap-4 ${isEstateManagedResident ? "grid-cols-3 md:grid-cols-6" : "grid-cols-4 md:grid-cols-8"}`}>
+          <div className={`grid gap-4 ${isEstateManagedHomeowner ? "grid-cols-3 md:grid-cols-6" : "grid-cols-4 md:grid-cols-8"}`}>
             {quickActions.map((item) => (
               <ActionIcon
                 key={`${item.to}-${item.label}`}

@@ -45,6 +45,7 @@ export default function useSubscription() {
       graceDaysLeft: subscription?.graceDaysLeft ?? 0,
       isBillPayer: Boolean(subscription?.isBillPayer),
       warningPhase: subscription?.warningPhase ?? null,
+      inSignupTrial: Boolean(subscription?.inSignupTrial),
       hasFeature: (featureKey) => hasSubscriptionFeature(subscription, featureKey),
       can: (actionKey) => subscription?.can?.(actionKey) ?? true,
     }),
