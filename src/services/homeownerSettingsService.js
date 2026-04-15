@@ -1,20 +1,20 @@
 import { apiRequest } from "./apiClient";
 
-export async function getHomeownerSettings() {
-  const response = await apiRequest("/homeowner/settings");
+export async function getResidentSettings() {
+  const response = await apiRequest("/resident/settings");
   return response?.data ?? null;
 }
 
-export async function updateHomeownerSettings(payload) {
-  const response = await apiRequest("/homeowner/settings", {
+export async function updateResidentSettings(payload) {
+  const response = await apiRequest("/resident/settings", {
     method: "PUT",
     body: JSON.stringify(payload)
   });
   return response?.data ?? null;
 }
 
-export async function updateHomeownerProfile(payload) {
-  const response = await apiRequest("/homeowner/profile", {
+export async function updateResidentProfile(payload) {
+  const response = await apiRequest("/resident/profile", {
     method: "PUT",
     body: JSON.stringify(payload)
   });

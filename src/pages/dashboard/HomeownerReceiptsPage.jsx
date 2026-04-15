@@ -1,7 +1,7 @@
 import AppShell from "../../layouts/AppShell";
 import PaymentLogsSample from "../../components/advanced/PaymentLogsSample";
 
-export default function HomeownerReceiptsPage() {
+export default function ResidentReceiptsPage() {
   return (
     <AppShell title="Digital Receipts">
       <div className="mx-auto w-full max-w-4xl">

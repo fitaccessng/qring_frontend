@@ -1,7 +1,7 @@
 import { apiRequest, apiUpload } from "./apiClient";
 import { getVisitorSessionToken } from "./visitorSessionToken";
 
-function getStoredHomeownerIdentity() {
+function getStoredResidentIdentity() {
   if (typeof localStorage === "undefined") return {};
   try {
     const user = JSON.parse(localStorage.getItem("qring_user") || "null");
@@ -18,35 +18,35 @@ function getStoredHomeownerIdentity() {
 
 function getDoorOwnershipCandidates(door) {
   return {
-    homeownerIds: [
-      door?.homeownerId,
+    residentIds: [
+      door?.residentId,
       door?.ownerId,
       door?.userId,
-      door?.assignedHomeownerId,
-      door?.homeowner?.id,
+      door?.assignedResidentId,
+      door?.resident?.id,
       door?.owner?.id,
       door?.user?.id
     ]
       .filter((value) => value != null && value !== "")
       .map((value) => String(value)),
-    homeownerEmails: [
-      door?.homeownerEmail,
+    residentEmails: [
+      door?.residentEmail,
       door?.ownerEmail,
       door?.userEmail,
-      door?.homeowner?.email,
+      door?.resident?.email,
       door?.owner?.email,
       door?.user?.email
     ]
       .filter((value) => typeof value === "string" && value.trim())
       .map((value) => value.trim().toLowerCase()),
-    homeownerNames: [
-      door?.homeownerName,
+    residentNames: [
+      door?.residentName,
       door?.ownerName,
       door?.userName,
-      door?.homeowner?.fullName,
+      door?.resident?.fullName,
       door?.owner?.fullName,
       door?.user?.fullName,
-      door?.homeowner?.name,
+      door?.resident?.name,
       door?.owner?.name,
       door?.user?.name
     ]
@@ -55,7 +55,7 @@ function getDoorOwnershipCandidates(door) {
   };
 }
 
-function filterAssignedHomeownerDoors(doors, options = {}) {
+function filterAssignedResidentDoors(doors, options = {}) {
   const rows = Array.isArray(doors) ? doors : [];
   if (!rows.length) return [];
   const failClosed = Boolean(options?.failClosed);

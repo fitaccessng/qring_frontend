@@ -637,7 +637,6 @@ export default function ScanPage() {
           </div>
         ) : null}
       </article>
-    </div>
       )}
     </div>
   );

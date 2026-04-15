@@ -25,25 +25,25 @@ import {
 import { useApiQuery, useSocketQueryInvalidation } from "../../hooks/useApi";
 import { endpoints } from "../../services/endpoints";
 import { normalizeDashboard } from "../../services/dashboardService";
-import { getHomeownerContext } from "../../services/homeownerService";
+import { getResidentContext } from "../../services/residentService";
 import { useAuth } from "../../state/AuthContext";
 import { useNotifications } from "../../state/NotificationsContext";
 import useSubscription from "../../hooks/useSubscription";
 
-const QUERY_KEY = ["homeowner", "overview"];
+const QUERY_KEY = ["resident", "overview"];
 const quickActionFeatureByRoute = {
-  "/dashboard/homeowner/messages": "chat_call_verification",
-  "/dashboard/homeowner/appointments": "visitor_scheduling",
-  "/dashboard/homeowner/estate-messages": "chat_call_verification",
-  "/dashboard/homeowner/estate-video-calls": "chat_call_verification",
-  "/dashboard/homeowner/estate-audio-calls": "chat_call_verification",
+  "/dashboard/resident/messages": "chat_call_verification",
+  "/dashboard/resident/appointments": "visitor_scheduling",
+  "/dashboard/resident/estate-messages": "chat_call_verification",
+  "/dashboard/resident/estate-video-calls": "chat_call_verification",
+  "/dashboard/resident/estate-audio-calls": "chat_call_verification",
 };
 
-export default function HomeownerDashboardPage() {
+export default function ResidentDashboardPage() {
   const { user } = useAuth();
   const { unreadCount } = useNotifications();
   const { hasFeature } = useSubscription();
-  const [homeownerContext, setHomeownerContext] = useState({ managedByEstate: false, estateName: "" });
+  const [residentContext, setResidentContext] = useState({ managedByEstate: false, estateName: "" });
   
   const { data, isLoading, isError, refetch, isFetching } = useApiQuery({
     queryKey: QUERY_KEY,
@@ -60,10 +60,10 @@ export default function HomeownerDashboardPage() {
     let active = true;
     async function loadContext() {
       try {
-        const data = await getHomeownerContext();
-        if (active) setHomeownerContext(data ?? { managedByEstate: false, estateName: "" });
+        const data = await getResidentContext();
+        if (active) setResidentContext(data ?? { managedByEstate: false, estateName: "" });
       } catch {
-        if (active) setHomeownerContext({ managedByEstate: false, estateName: "" });
+        if (active) setResidentContext({ managedByEstate: false, estateName: "" });
       }
     }
     loadContext();
@@ -84,11 +84,11 @@ export default function HomeownerDashboardPage() {
     return overview.profile?.fullName?.split(" ")[0] || user?.fullName?.split(" ")[0] || "Resident";
   }, [overview.profile?.fullName, user?.fullName]);
 
-  const isEstateManagedHomeowner = Boolean(homeownerContext?.managedByEstate);
+  const isEstateManagedResident = Boolean(residentContext?.managedByEstate);
   const quickActions = useMemo(() => {
-    if (isEstateManagedHomeowner) {
+    if (isEstateManagedResident) {
       return [
-        { to: "/dashboard/homeowner/estate-broadcasts", icon: <Bell size={24} />, label: "Broadcasts" },
+        { to: "/dashboard/resident/estate-broadcasts", icon: <Bell size={24} />, label: "Broadcasts" },
         { to: "/dashboard/homeowner/estate-meetings", icon: <CalendarDays size={24} />, label: "Meetings" },
         { to: "/dashboard/homeowner/estate-polls", icon: <Activity size={24} />, label: "Polls" },
         { to: "/dashboard/homeowner/estate-dues", icon: <CreditCard size={24} />, label: "Dues" },
@@ -154,7 +154,7 @@ export default function HomeownerDashboardPage() {
             <h2 className="font-extrabold text-3xl text-slate-900 tracking-tight">{greeting}, {firstName}</h2>
             <p className="text-slate-500 text-sm font-medium">
               {isEstateManagedHomeowner
-                ? `Your residence is covered by ${homeownerContext?.estateName || "your estate"} plan benefits.`
+                ? `Your residence is covered by ${residentContext?.estateName || "your estate"} plan benefits.`
                 : "Your residence is currently under protection."}
             </p>
           </div>
@@ -164,7 +164,7 @@ export default function HomeownerDashboardPage() {
 <section className="space-y-4">
   {/* Top Tier Action */}
   <Link
-    to="/dashboard/homeowner/appointments"
+    to="/dashboard/resident/appointments"
     className="group w-full bg-indigo-600 hover:bg-indigo-700 p-4 rounded-[1.5rem] flex items-center justify-between transition-all shadow-xl shadow-indigo-100"
   >
     <div className="flex items-center gap-3">
@@ -194,7 +194,7 @@ export default function HomeownerDashboardPage() {
         <div className="mt-8 relative z-10">
           <p className="text-slate-400 text-xs font-medium mb-4">Use this code for quick entry and identity verification at all estate checkpoints.</p>
           <Link
-            to="/dashboard/homeowner/doors"
+            to="/dashboard/resident/doors"
             className="inline-flex bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold uppercase tracking-widest px-6 py-3 rounded-xl transition-all active:scale-95 shadow-lg shadow-indigo-900/50"
           >
             Show My Code
@@ -217,7 +217,7 @@ export default function HomeownerDashboardPage() {
             <h3 className="font-bold text-lg text-slate-800">Action Items</h3>
             <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">Quick Access</span>
           </div>
-          <div className={`grid gap-4 ${isEstateManagedHomeowner ? "grid-cols-3 md:grid-cols-6" : "grid-cols-4 md:grid-cols-8"}`}>
+          <div className={`grid gap-4 ${isEstateManagedResident ? "grid-cols-3 md:grid-cols-6" : "grid-cols-4 md:grid-cols-8"}`}>
             {quickActions.map((item) => (
               <ActionIcon
                 key={`${item.to}-${item.label}`}
@@ -235,7 +235,7 @@ export default function HomeownerDashboardPage() {
         <section className="space-y-6 pb-12">
           <div className="flex justify-between items-center">
             <h3 className="font-bold text-lg text-slate-800">Recent Activity</h3>
-            <Link to="/dashboard/homeowner/activity" className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">View All</Link>
+            <Link to="/dashboard/resident/activity" className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">View All</Link>
           </div>
           <div className="space-y-3">
             {overview.activity?.length > 0 ? (
@@ -266,11 +266,11 @@ export default function HomeownerDashboardPage() {
 
       {/* Bottom Navigation Fix: Using fixed background and z-index to stay visible */}
       <nav className="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-8 pt-4 bg-white border-t border-slate-100 z-[9999] shadow-[0_-10px_40px_rgba(0,0,0,0.08)]">
-        <NavItem to="/dashboard/homeowner/overview" icon={<LayoutGrid size={22} />} label="Home" active />
-        <NavItem to="/dashboard/homeowner/visits" icon={<History size={22} />} label="Activity" />
-        <NavItem to="/dashboard/homeowner/appointments" icon={<CalendarDays size={22} />} label="Schedule" />
-        <NavItem to="/dashboard/homeowner/messages" icon={<MessageSquare size={22} />} label="Inbox" />
-        <NavItem to="/dashboard/homeowner/settings" icon={<User size={22} />} label="Profile" />
+        <NavItem to="/dashboard/resident/overview" icon={<LayoutGrid size={22} />} label="Home" active />
+        <NavItem to="/dashboard/resident/visits" icon={<History size={22} />} label="Activity" />
+        <NavItem to="/dashboard/resident/appointments" icon={<CalendarDays size={22} />} label="Schedule" />
+        <NavItem to="/dashboard/resident/messages" icon={<MessageSquare size={22} />} label="Inbox" />
+        <NavItem to="/dashboard/resident/settings" icon={<User size={22} />} label="Profile" />
       </nav>
     </div>
   );

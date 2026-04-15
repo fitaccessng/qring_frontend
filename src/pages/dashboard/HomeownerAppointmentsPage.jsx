@@ -13,9 +13,9 @@ import { endpoints } from "../../services/endpoints";
 import { useAuth } from "../../state/AuthContext";
 import { useNotifications } from "../../state/NotificationsContext";
 
-export default function AppointmentsPage() {
+export default function ResidentAppointmentsPage() {
   const navigate = useNavigate(); // For the back button logic
-  const { user } = useAuth();
+  const { user } = useAuth(); // No change needed, but check for homeowner-specific logic below
   const { unreadCount } = useNotifications();
   const scrollContainerRef = useRef(null);
   const [selectedDate, setSelectedDate] = useState(() => toDateKey(new Date()));
@@ -23,8 +23,8 @@ export default function AppointmentsPage() {
   const [isLocating, setIsLocating] = useState(false);
 
   // Error Safeguard
-  const listUrl = endpoints?.appointments?.list || "/appointments";
-  const createUrl = endpoints?.appointments?.create || "/appointments";
+  const listUrl = endpoints?.appointments?.list || "/resident/appointments";
+  const createUrl = endpoints?.appointments?.create || "/resident/appointments";
 
   const { data: appointments, isLoading, refetch } = useApiQuery({
     queryKey: ["appointments", selectedDate],

@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import AppShell from "../../layouts/AppShell";
-import { createMaintenanceRequest } from "../../services/homeownerService";
+import { createMaintenanceRequest } from "../../services/residentService";
 import { showError, showSuccess } from "../../utils/flash";
 
-export default function HomeownerMaintenancePage() {
+export default function ResidentMaintenancePage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);

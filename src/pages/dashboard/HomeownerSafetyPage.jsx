@@ -11,18 +11,18 @@ import {
 import { useAuth } from '../../state/AuthContext';
 import { useSocketEvents } from "../../hooks/useSocketEvents";
 import { showError, showSuccess } from "../../utils/flash";
-import { getHomeownerContext, getHomeownerVisits } from "../../services/homeownerService";
-import { getHomeownerSettings } from "../../services/homeownerSettingsService";
+import { getResidentContext, getResidentVisits } from "../../services/residentService";
+import { getResidentSettings } from "../../services/residentSettingsService";
 import { getActivePanicAlerts, resolvePanicAlert, triggerPanicAlert } from "../../services/safetyService";
 
-export default function HomeownerSafetyPage() {
+export default function ResidentSafetyPage() {
   const navigate = useNavigate();
   const { user, language = 'English', globalUnreadCount = 0 } = useAuth();
 
   // Logic States
   const [loading, setLoading] = useState(true);
   const [transmissionStatus, setTransmissionStatus] = useState("idle");
-  const [homeownerContext, setHomeownerContext] = useState({ managedByEstate: false, estateName: "" });
+  const [residentContext, setResidentContext] = useState({ managedByEstate: false, estateName: "" });
   const [settings, setSettings] = useState({ knownContacts: [], smsFallbackEnabled: false });
   const [visits, setVisits] = useState([]);
   const [panicAlerts, setPanicAlerts] = useState([]);
@@ -45,11 +45,11 @@ export default function HomeownerSafetyPage() {
   const displaySeconds = (elapsedMs / 1000).toFixed(1);
 
   // Plan-based messaging
-  const planActionLabel = homeownerContext.managedByEstate
+  const planActionLabel = residentContext.managedByEstate
     ? "Hold 3s for Guard | 5s for SOS"
     : "Hold 3s for emergency contact | 5s for SOS";
 
-  const securityLabel = homeownerContext.managedByEstate ? "Guard Alert" : "Emergency Contact";
+  const securityLabel = residentContext.managedByEstate ? "Guard Alert" : "Emergency Contact";
 
   // Derived State
   const activeAlert = useMemo(() => (panicAlerts || []).find((item) => item.status === "active"), [panicAlerts]);

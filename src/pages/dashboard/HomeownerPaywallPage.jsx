@@ -16,14 +16,14 @@ import {
   MessageSquare
 } from "lucide-react";
 import { initializePaystackPayment, getBillingPlans, getMySubscription, getReferralSummary, requestSubscription } from "../../services/paymentService";
-import { getHomeownerContext } from "../../services/homeownerService";
+import { getResidentContext } from "../../services/residentService";
 import { useAuth } from "../../state/AuthContext";
 import { useNotifications } from "../../state/NotificationsContext";
 import { env } from "../../config/env";
 import { showError, showSuccess } from "../../utils/flash";
 import { openPlanLockedModal } from "../../utils/blocking";
 
-export default function SubscriptionCenter() {
+export default function ResidentSubscriptionCenter() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { unreadCount } = useNotifications();
@@ -37,15 +37,15 @@ export default function SubscriptionCenter() {
 
   const firstName = user?.fullName?.split(" ")[0] || user?.email || "User";
   const isFetching = loading;
-  const audience = String(user?.role || "homeowner").toLowerCase() === "estate" ? "estate" : "homeowner";
+  const audience = String(user?.role || "resident").toLowerCase() === "estate" ? "estate" : "resident";
   const isEstateAudience = audience === "estate";
 
   useEffect(() => {
     let active = true;
     async function loadContext() {
-      if (user?.role !== "homeowner") return;
+      if (user?.role !== "resident") return;
       try {
-        const data = await getHomeownerContext();
+        const data = await getResidentContext();
         if (!active) return;
         setManagedContext(data ?? { managedByEstate: false, estateName: "" });
       } catch {

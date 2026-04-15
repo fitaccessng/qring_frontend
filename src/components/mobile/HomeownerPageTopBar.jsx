@@ -5,10 +5,10 @@ import NotificationBell from "../notifications/NotificationBell";
 import NotificationPanel from "../notifications/NotificationPanel";
 import { useNotifications } from "../../state/NotificationsContext";
 
-export default function HomeownerPageTopBar({
+export default function ResidentPageTopBar({
   title,
   subtitle = "Resident Profile",
-  fallbackTo = "/dashboard/homeowner/overview"
+  fallbackTo = "/dashboard/resident/overview"
 }) {
   const navigate = useNavigate();
   const { unreadCount } = useNotifications();

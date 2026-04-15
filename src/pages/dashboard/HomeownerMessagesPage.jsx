@@ -8,18 +8,17 @@ import {
 import VoiceNoteRecorder from "../../components/VoiceNoteRecorder";
 import { env } from "../../config/env";
 import { realtimeTransportOptions } from "../../services/socketConfig";
-import { resolveVoiceNoteUrl, uploadHomeownerVoiceNote } from "../../services/voiceNoteService";
+import { resolveVoiceNoteUrl, uploadResidentVoiceNote } from "../../services/voiceNoteService";
 import { playMessageNotificationSound } from "../../utils/notificationSound";
-import {
-  deleteHomeownerSessionMessage,
-  getHomeownerMessages,
-  getHomeownerSessionMessages,
-  sendHomeownerSessionMessage
-} from "../../services/homeownerService";
+  deleteResidentSessionMessage,
+  getResidentMessages,
+  getResidentSessionMessages,
+  sendResidentSessionMessage
+} from "../../services/residentService";
 import { useAuth } from "../../state/AuthContext";
 import { useNotifications } from "../../state/NotificationsContext";
 
-export default function HomeownerMessagesPage() {
+export default function ResidentMessagesPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { unreadCount: globalUnreadCount } = useNotifications();
@@ -54,7 +53,7 @@ export default function HomeownerMessagesPage() {
       setLoading(true);
       setError("");
       try {
-        const data = await getHomeownerMessages();
+        const data = await getResidentMessages();
         if (!active) return;
         const normalized = (data || []).map((thread) => ({
           ...thread,

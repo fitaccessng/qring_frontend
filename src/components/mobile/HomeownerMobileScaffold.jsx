@@ -1,6 +1,6 @@
 import { NavLink } from "react-router-dom";
 
-export default function HomeownerMobileScaffold({
+export default function ResidentMobileScaffold({
   topBar,
   children,
   navItems,

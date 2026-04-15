@@ -123,28 +123,40 @@ export default function MobileBottomSheet({
     >
       <motion.div
         ref={sheetRef}
-        style={{ y, height: sheetHeight }}
+        style={{
+          y,
+          height: sheetHeight,
+          width: '100%',
+          maxWidth: 720,
+          maxHeight: '90vh',
+          borderTopLeftRadius: '1.75rem',
+          borderTopRightRadius: '1.75rem',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          background: 'var(--tw-bg-opacity,1) #fff',
+        }}
         drag="y"
         dragConstraints={{ top: 0, bottom: sheetHeight }}
         dragElastic={0.2}
         onDragEnd={(e, info) => {
           const velocity = info.velocity.y;
           const offset = info.offset.y;
-
           if (velocity > 1200 || offset > sheetHeight * 0.4) {
             onClose?.();
             return;
           }
-
           const distances = resolvedSnapPoints.map((p) => {
             const snapY = sheetHeight - p * viewportHeight;
             return Math.abs(y.get() - snapY);
           });
-
           const closest = distances.indexOf(Math.min(...distances));
           snapTo(closest);
         }}
-        className="flex w-full max-w-[720px] flex-col rounded-t-[1.75rem] bg-white shadow-xl dark:bg-slate-900"
+        className="w-full max-w-[720px] flex flex-col rounded-t-[1.75rem] bg-white shadow-xl dark:bg-slate-900"
+        tabIndex={-1}
+        aria-modal="true"
+        role="dialog"
       >
         {/* Handle */}
         <div className="shrink-0 py-3">
@@ -169,11 +181,12 @@ export default function MobileBottomSheet({
         <div
           ref={contentRef}
           className={`min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-3 pb-[calc(4rem+env(safe-area-inset-bottom))] ${contentClassName}`}
+          style={{ maxHeight: 'calc(90vh - 120px)', WebkitOverflowScrolling: 'touch' }}
         >
           {children}
         </div>
 
-        {/* 🔥 Sticky Footer (CTA area) */}
+        {/* Sticky Footer (CTA area) */}
         {footer && (
           <div className="shrink-0 border-t bg-white px-4 py-3 pb-[calc(1rem+env(safe-area-inset-bottom))] dark:bg-slate-900">
             {footer}
