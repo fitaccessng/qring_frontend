@@ -1,4 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+function ConsentModal({ open, onAccept }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full border border-slate-200">
+        <h2 className="text-lg font-bold mb-2">Visitor Data Consent</h2>
+        <p className="text-sm text-slate-700 mb-4">
+          Do you consent to your data being saved for 30 days to enable visitor management? This is required to proceed.
+        </p>
+        <button
+          className="w-full rounded-xl bg-brand-500 px-4 py-3 text-sm font-semibold text-white hover:bg-brand-600"
+          onClick={onAccept}
+        >
+          I Consent & Continue
+        </button>
+      </div>
+    </div>
+  );
+}
 import { useNavigate, useParams } from "react-router-dom";
 import { io } from "socket.io-client";
 import { apiRequest } from "../../services/apiClient";
@@ -73,6 +92,10 @@ async function submitVisitorRequestWithRetry(payload, onRetry) {
 }
 
 export default function ScanPage() {
+    const [showConsent, setShowConsent] = useState(() => {
+      // Only show once per session
+      return !window.sessionStorage.getItem("qring_visitor_consent");
+    });
   const { qrId } = useParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -398,6 +421,15 @@ export default function ScanPage() {
 
   return (
     <div className="min-h-[100dvh] bg-slate-50 px-3 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 dark:bg-slate-950 sm:grid sm:place-items-center sm:p-4">
+      <ConsentModal
+        open={showConsent}
+        onAccept={() => {
+          setShowConsent(false);
+          window.sessionStorage.setItem("qring_visitor_consent", "1");
+        }}
+      />
+      {/* The rest of the page is blocked until consent is given */}
+      {showConsent ? null : (
       <article className="mx-auto w-full max-w-lg rounded-3xl border border-slate-200 bg-white/95 p-4 shadow-soft dark:border-slate-800 dark:bg-slate-900/90 sm:p-7">
         <h1 className="font-heading text-2xl font-bold sm:text-3xl">Qring Visitor Access</h1>
         <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-300">
@@ -605,6 +637,8 @@ export default function ScanPage() {
           </div>
         ) : null}
       </article>
+    </div>
+      )}
     </div>
   );
 }

@@ -23,6 +23,7 @@ export default function SignupPage() {
   const [signupSuccess, setSignupSuccess] = useState(false);
   const [pendingCredentials, setPendingCredentials] = useState(null);
   const [verification, setVerification] = useState({ sending: false, status: "" });
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -52,6 +53,10 @@ export default function SignupPage() {
 
   const onSubmit = async (event) => {
     event.preventDefault();
+    if (!agreedToTerms) {
+      setError("You must agree to the Terms and Conditions to sign up.");
+      return;
+    }
     setError("");
     setSubmitting(true);
     try {
@@ -109,6 +114,10 @@ export default function SignupPage() {
   };
 
   const onGoogleSignUp = async () => {
+    if (!agreedToTerms) {
+      setError("You must agree to the Terms and Conditions to sign up.");
+      return;
+    }
     setError("");
     setSubmitting(true);
     try {
@@ -163,6 +172,19 @@ export default function SignupPage() {
             ]}
           />
 
+          <div className="flex items-center gap-2">
+            <input
+              id="agree-terms"
+              type="checkbox"
+              checked={agreedToTerms}
+              onChange={e => setAgreedToTerms(e.target.checked)}
+              className="accent-brand-500 w-4 h-4"
+              required
+            />
+            <label htmlFor="agree-terms" className="text-xs text-slate-700 dark:text-slate-300 select-none">
+              I agree to the <a href="/terms" target="_blank" rel="noopener noreferrer" className="underline text-brand-500">Terms and Conditions</a>
+            </label>
+          </div>
           {error ? <p className="text-sm text-danger">{error}</p> : null}
           <button
             type="submit"
