@@ -104,7 +104,7 @@ export default function EstateCreatePage() {
       showSuccess(`Estate created: ${created?.name ?? name}`);
       setName("");
       setIsFormOpen(false);
-      refresh().catch(() => {});
+      await refresh().catch(() => {});
     } catch (requestError) {
       showError(requestError.message ?? "Failed to create estate");
     } finally {

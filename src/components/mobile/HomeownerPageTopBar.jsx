@@ -8,7 +8,7 @@ import { useNotifications } from "../../state/NotificationsContext";
 export default function ResidentPageTopBar({
   title,
   subtitle = "Resident Profile",
-  fallbackTo = "/dashboard/resident/overview"
+  fallbackTo = "/dashboard/homeowner/overview"
 }) {
   const navigate = useNavigate();
   const { unreadCount } = useNotifications();

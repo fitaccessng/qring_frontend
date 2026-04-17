@@ -32,11 +32,11 @@ import useSubscription from "../../hooks/useSubscription";
 
 const QUERY_KEY = ["homeowner", "overview"];
 const quickActionFeatureByRoute = {
-  "/dashboard/resident/messages": "chat_call_verification",
-  "/dashboard/resident/appointments": "visitor_scheduling",
-  "/dashboard/resident/estate-messages": "chat_call_verification",
-  "/dashboard/resident/estate-video-calls": "chat_call_verification",
-  "/dashboard/resident/estate-audio-calls": "chat_call_verification",
+  "/dashboard/homeowner/messages": "chat_call_verification",
+  "/dashboard/homeowner/appointments": "visitor_scheduling",
+  "/dashboard/homeowner/estate-messages": "chat_call_verification",
+  "/dashboard/homeowner/estate-video-calls": "chat_call_verification",
+  "/dashboard/homeowner/estate-audio-calls": "chat_call_verification",
 };
 
 export default function HomeownerDashboardPage() {
@@ -88,7 +88,7 @@ export default function HomeownerDashboardPage() {
   const quickActions = useMemo(() => {
     if (isEstateManagedHomeowner) {
       return [
-        { to: "/dashboard/resident/estate-broadcasts", icon: <Bell size={24} />, label: "Broadcasts" },
+        { to: "/dashboard/homeowner/estate-broadcasts", icon: <Bell size={24} />, label: "Broadcasts" },
         { to: "/dashboard/homeowner/estate-meetings", icon: <CalendarDays size={24} />, label: "Meetings" },
         { to: "/dashboard/homeowner/estate-polls", icon: <Activity size={24} />, label: "Polls" },
         { to: "/dashboard/homeowner/estate-dues", icon: <CreditCard size={24} />, label: "Dues" },
@@ -128,8 +128,8 @@ export default function HomeownerDashboardPage() {
       <header className="fixed top-0 w-full z-[100] bg-white/80 backdrop-blur-md border-b border-slate-100 px-6 py-4 flex justify-between items-center">
         <div className="max-w-5xl mx-auto w-full flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full border-2 border-indigo-100 bg-indigo-600 flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-200">
-              {firstName[0]}
+            <div className="w-10 h-10 rounded-full border-2 border-slate-200 bg-slate-100 flex items-center justify-center font-bold text-slate-600 shadow-sm">
+              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
             </div>
             <div>
               <h1 className="font-bold text-lg text-slate-900 leading-none">Home Security</h1>
@@ -164,7 +164,7 @@ export default function HomeownerDashboardPage() {
 <section className="space-y-4">
   {/* Top Tier Action */}
   <Link
-    to="/dashboard/resident/appointments"
+    to="/dashboard/homeowner/appointments"
     className="group w-full bg-indigo-600 hover:bg-indigo-700 p-4 rounded-[1.5rem] flex items-center justify-between transition-all shadow-xl shadow-indigo-100"
   >
     <div className="flex items-center gap-3">
@@ -194,7 +194,7 @@ export default function HomeownerDashboardPage() {
         <div className="mt-8 relative z-10">
           <p className="text-slate-400 text-xs font-medium mb-4">Use this code for quick entry and identity verification at all estate checkpoints.</p>
           <Link
-            to="/dashboard/resident/doors"
+            to="/dashboard/homeowner/doors"
             className="inline-flex bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold uppercase tracking-widest px-6 py-3 rounded-xl transition-all active:scale-95 shadow-lg shadow-indigo-900/50"
           >
             Show My Code
@@ -235,7 +235,7 @@ export default function HomeownerDashboardPage() {
         <section className="space-y-6 pb-12">
           <div className="flex justify-between items-center">
             <h3 className="font-bold text-lg text-slate-800">Recent Activity</h3>
-            <Link to="/dashboard/resident/activity" className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">View All</Link>
+            <Link to="/dashboard/homeowner/activity" className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">View All</Link>
           </div>
           <div className="space-y-3">
             {overview.activity?.length > 0 ? (
@@ -266,11 +266,11 @@ export default function HomeownerDashboardPage() {
 
       {/* Bottom Navigation Fix: Using fixed background and z-index to stay visible */}
       <nav className="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-8 pt-4 bg-white border-t border-slate-100 z-[9999] shadow-[0_-10px_40px_rgba(0,0,0,0.08)]">
-        <NavItem to="/dashboard/resident/overview" icon={<LayoutGrid size={22} />} label="Home" active />
-        <NavItem to="/dashboard/resident/visits" icon={<History size={22} />} label="Activity" />
-        <NavItem to="/dashboard/resident/appointments" icon={<CalendarDays size={22} />} label="Schedule" />
-        <NavItem to="/dashboard/resident/messages" icon={<MessageSquare size={22} />} label="Inbox" />
-        <NavItem to="/dashboard/resident/settings" icon={<User size={22} />} label="Profile" />
+        <NavItem to="/dashboard/homeowner/overview" icon={<LayoutGrid size={22} />} label="Home" active />
+        <NavItem to="/dashboard/homeowner/visits" icon={<History size={22} />} label="Activity" />
+        <NavItem to="/dashboard/homeowner/appointments" icon={<CalendarDays size={22} />} label="Schedule" />
+        <NavItem to="/dashboard/homeowner/messages" icon={<MessageSquare size={22} />} label="Inbox" />
+        <NavItem to="/dashboard/homeowner/settings" icon={<User size={22} />} label="Profile" />
       </nav>
     </div>
   );

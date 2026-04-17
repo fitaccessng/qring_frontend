@@ -142,7 +142,30 @@ export default function LoginPage() {
             onToggle={() => setShowPassword((prev) => !prev)}
             onChange={(value) => setForm((prev) => ({ ...prev, password: value }))}
           />
-          {error ? <p className="text-sm text-danger">{error}</p> : null}
+          {error ? (
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 dark:border-rose-900/30 dark:bg-rose-950/20">
+              <div className="flex items-start gap-3">
+                <svg className="h-5 w-5 flex-shrink-0 text-rose-600 dark:text-rose-400 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+                <div className="flex-1">
+                  <p className="font-semibold text-rose-900 dark:text-rose-200">Sign in failed</p>
+                  <p className="mt-1 text-sm text-rose-800 dark:text-rose-300 leading-relaxed">
+                    {error.includes("invited estate") ? (
+                      <>
+                        We couldn't sign you in with those credentials.
+                        <br />
+                        <span className="mt-2 block font-medium">If you're an invited estate resident:</span>
+                        <span className="block text-xs mt-1">Ask your estate manager to resend your invite so your access details can be refreshed.</span>
+                      </>
+                    ) : (
+                      error
+                    )}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : null}
           {verificationState.needed ? (
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <p className="text-xs font-semibold text-slate-800">Verify your email</p>

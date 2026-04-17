@@ -29,6 +29,7 @@ import {
   ArrowUp
 } from "lucide-react";
 import { useNotifications } from "../../state/NotificationsContext";
+import { useEstateNotifications } from "../../hooks/useEstateNotifications";
 import { showError } from "../../utils/flash";
 import useEstateOverviewState from "../../hooks/useEstateOverviewState";
 
@@ -53,8 +54,8 @@ const EXTRA_TOOLKIT_ITEMS = [
 ];
 
 export default function EstateManagerDashboard() {
-  const { unreadCount } = useNotifications();
   const { overview, estateId, setEstateId, loading, error } = useEstateOverviewState();
+  const { unreadCount } = useEstateNotifications(estateId);
   const [showAllToolkit, setShowAllToolkit] = useState(false);
 
   useEffect(() => {
@@ -187,7 +188,7 @@ export default function EstateManagerDashboard() {
 
   return (
     <div className="bg-[#f8f9fa] text-slate-800 min-h-screen pb-32 font-sans overflow-x-hidden">
-      <header className="bg-white/80 backdrop-blur-xl border-b border-slate-100 fixed top-0 w-full z-50 flex justify-between items-center px-4 md:px-6 h-16">
+      <header className="backdrop-blur-xl border-b border-slate-100 fixed top-0 w-full z-50 flex justify-between items-center px-4 md:px-6 h-16">
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-9 h-9 flex-shrink-0 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center">
             <ShieldCheck size={18} className="text-indigo-600" />
@@ -225,7 +226,7 @@ export default function EstateManagerDashboard() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6">
-          <div className="md:col-span-5 bg-white p-6 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col justify-between">
+          <div className="md:col-span-7 bg-white p-6 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col justify-between">
             <div className="min-w-0">
               <div className="flex justify-between items-start mb-6 md:mb-8">
                 <div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600 flex-shrink-0">

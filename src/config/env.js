@@ -16,11 +16,11 @@ const isDev = Boolean(import.meta.env.DEV);
 
 const defaultApiBase =
   typeof window !== "undefined" && isDev
-    ? `${window.location.origin}/api/v1`
+    ? `http://localhost:8000/api/v1`
     : `${productionBackendOrigin}/api/v1`;
 const defaultSocketUrl =
   typeof window !== "undefined" && isDev
-    ? window.location.origin
+    ? `http://localhost:8000`
     : productionBackendOrigin;
 const defaultLivekitUrl = "";
 const defaultPublicAppUrl =

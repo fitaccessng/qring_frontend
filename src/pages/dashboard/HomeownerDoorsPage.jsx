@@ -373,11 +373,11 @@ export default function HomeownerDoorsPage() {
 
       {/* BOTTOM NAV */}
       <nav className="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-8 pt-4 bg-white border-t border-slate-100 z-[9999] shadow-[0_-10px_40px_rgba(0,0,0,0.08)]">
-        <NavItem to="/dashboard/resident/overview" icon={<LayoutGrid size={22} />} label="Home" />
-        <NavItem to="/dashboard/resident/visits" icon={<History size={22} />} label="Activity" />
-        <NavItem to="/dashboard/resident/appointments" icon={<CalendarDays size={22} />} label="Schedule" />
-        <NavItem to="/dashboard/resident/doors" icon={<KeyRound size={22} />} label="Access" active />
-        <NavItem to="/dashboard/resident/settings" icon={<User size={22} />} label="Profile" />
+        <NavItem to="/dashboard/homeowner/overview" icon={<LayoutGrid size={22} />} label="Home" />
+        <NavItem to="/dashboard/homeowner/visits" icon={<History size={22} />} label="Activity" />
+        <NavItem to="/dashboard/homeowner/appointments" icon={<CalendarDays size={22} />} label="Schedule" />
+        <NavItem to="/dashboard/homeowner/doors" icon={<KeyRound size={22} />} label="Access" active />
+        <NavItem to="/dashboard/homeowner/settings" icon={<User size={22} />} label="Profile" />
       </nav>
     </div>
   );

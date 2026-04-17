@@ -34,8 +34,7 @@ import { useNotifications } from "../../state/NotificationsContext";
 import { useTheme } from "../../state/ThemeContext";
 import { showError, showSuccess } from "../../utils/flash";
 
-const DEFAULT_PROFILE_IMAGE =
-  "https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=200&h=200&fit=crop";
+const DEFAULT_PROFILE_IMAGE = null; // Use SVG placeholder instead
 
 const DEFAULT_SETTINGS = {
   pushAlerts: true,
@@ -339,8 +338,16 @@ export default function HomeownerSettingsPage() {
       <main className="pt-24 px-6 max-w-2xl mx-auto">
         <section className="bg-white rounded-[2.5rem] p-6 mb-8 border border-slate-100 shadow-sm flex items-center gap-5 dark:bg-slate-900 dark:border-slate-800">
           <div className="relative">
-            <img src={profileImg} alt="Profile" className="w-20 h-20 rounded-full object-cover ring-4 ring-indigo-50 dark:ring-slate-800" />
-            <button onClick={() => openModal("profile")} className="absolute -bottom-1 -right-1 bg-indigo-600 text-white p-2 rounded-full">
+            {profileImg ? (
+              <img src={profileImg} alt="Profile" className="w-20 h-20 rounded-full object-cover ring-4 ring-indigo-50 dark:ring-slate-800" />
+            ) : (
+              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-600 ring-4 ring-indigo-50 dark:ring-slate-800 flex items-center justify-center">
+                <svg className="w-12 h-12 text-slate-500 dark:text-slate-400" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                </svg>
+              </div>
+            )}
+            <button onClick={() => openModal("profile")} className="absolute -bottom-1 -right-1 bg-indigo-600 text-white p-2 rounded-full hover:bg-indigo-700 transition-colors">
               <Edit3 size={12} />
             </button>
           </div>
