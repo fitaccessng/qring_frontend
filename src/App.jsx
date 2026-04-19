@@ -18,7 +18,6 @@ import CompliancePage from "./pages/landing/CompliancePage";
 import RequestDemoPage from "./pages/landing/RequestDemoPage";
 import LoginPage from "./pages/auth/LoginPage";
 import AdminLoginPage from "./pages/auth/AdminLoginPage";
-import AdminSignupPage from "./pages/auth/AdminSignupPage";
 import SignupPage from "./pages/auth/SignupPage";
 import GoogleRolePage from "./pages/auth/GoogleRolePage";
 import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
@@ -206,7 +205,7 @@ function AppRoutes() {
               <Route element={<PublicOnlyRoute />}>
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/admin/login" element={<AdminLoginPage />} />
-                <Route path="/admin/signup" element={<AdminSignupPage />} />
+                <Route path="/admin/signup" element={<Navigate to="/admin/login" replace />} />
                 <Route path="/signup" element={<SignupPage />} />
                 <Route path="/google-role" element={<GoogleRolePage />} />
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />

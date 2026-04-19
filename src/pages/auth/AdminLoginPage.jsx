@@ -127,14 +127,9 @@ export default function AdminLoginPage() {
           </button>
 
           <div className="text-center text-xs text-slate-500">
-            <div className="space-x-3">
-              <Link to="/admin/signup" className="hover:text-brand-500">
-                Create admin
-              </Link>
-              <Link to="/login" className="hover:text-brand-500">
-                User login
-              </Link>
-            </div>
+            <Link to="/login" className="hover:text-brand-500">
+              User login
+            </Link>
           </div>
         </form>
       </AuthCard>
