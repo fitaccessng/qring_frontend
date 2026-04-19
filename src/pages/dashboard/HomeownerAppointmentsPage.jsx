@@ -70,22 +70,33 @@ export default function ResidentAppointmentsPage() {
     async function loadData() {
       setLoading(true);
       try {
-        const [appointmentRows, doorData] = await Promise.all([
+        const [appointmentsResult, doorsResult] = await Promise.allSettled([
           getHomeownerAppointments(),
           getHomeownerDoors()
         ]);
         if (!active) return;
 
-        const nextDoors = Array.isArray(doorData?.doors) ? doorData.doors : [];
-        setAppointments(Array.isArray(appointmentRows) ? appointmentRows : []);
-        setDoors(nextDoors);
-        setForm((current) => ({
-          ...current,
-          doorId: current.doorId || nextDoors[0]?.id || ""
-        }));
-      } catch (error) {
-        if (!active) return;
-        showError(error?.message || "Unable to load appointments.");
+        if (appointmentsResult.status === "fulfilled") {
+          setAppointments(Array.isArray(appointmentsResult.value) ? appointmentsResult.value : []);
+        } else {
+          setAppointments([]);
+          showError(appointmentsResult.reason?.message || "Unable to load appointments.");
+        }
+
+        if (doorsResult.status === "fulfilled") {
+          const nextDoors = Array.isArray(doorsResult.value?.doors) ? doorsResult.value.doors : [];
+          setDoors(nextDoors);
+          setForm((current) => ({
+            ...current,
+            doorId:
+              nextDoors.some((door) => String(door?.id) === String(current.doorId))
+                ? current.doorId
+                : nextDoors[0]?.id || ""
+          }));
+        } else {
+          setDoors([]);
+          showError(doorsResult.reason?.message || "Unable to load doors.");
+        }
       } finally {
         if (active) setLoading(false);
       }

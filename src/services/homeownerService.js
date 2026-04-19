@@ -196,7 +196,7 @@ export async function endHomeownerSession(sessionId) {
 
 export async function getHomeownerDoors() {
   const response = await apiRequest("/homeowner/doors", { noCache: true });
-  const data = response?.data;
+  const data = response?.data ?? response;
   const managedByEstate = Boolean(data?.subscription?.managedByEstate);
   if (Array.isArray(data)) {
     return {
