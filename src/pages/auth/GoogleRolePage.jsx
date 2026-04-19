@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Building2, CheckCircle2, Home, UserRound } from "lucide-react";
+import { Building2, CheckCircle2, Home } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import AuthCard from "../../components/AuthCard";
 import { useAuth } from "../../state/AuthContext";
@@ -26,14 +26,8 @@ export default function GoogleRolePage() {
     setError("");
 
     try {
-      const mappedRole = role === "resident" ? "homeowner" : role;
-      if (role === "resident") {
-        localStorage.setItem(onboardingIntentKey, "resident");
-      } else {
-        localStorage.removeItem(onboardingIntentKey);
-      }
-
-      const data = await googleSignUp(mappedRole);
+      localStorage.removeItem(onboardingIntentKey);
+      const data = await googleSignUp(role);
       if (intent === "signup") {
         setShowSuccess(true);
         localStorage.setItem(MOBILE_ONBOARDING_INTENT_KEY, "1");
@@ -78,7 +72,7 @@ export default function GoogleRolePage() {
             options={[
               {
                 value: "homeowner",
-                label: "Homeowner",
+                label: "Resident / Homeowner",
                 description: "Control your home access, visitors, doors, and notifications.",
                 icon: Home
               },
@@ -87,12 +81,6 @@ export default function GoogleRolePage() {
                 label: "Estate Manager",
                 description: "Manage multiple homes, residents, security operations, and estate activity.",
                 icon: Building2
-              },
-              {
-                value: "resident",
-                label: "Resident",
-                description: "Join an estate-linked home account and continue with resident onboarding.",
-                icon: UserRound
               }
             ]}
           />

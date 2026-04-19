@@ -224,7 +224,7 @@ export default function HomeownerDoorsPage() {
                 value={newDoorName}
                 onChange={(e) => setNewDoorName(e.target.value)}
                 placeholder="e.g. Side Gate"
-                className="flex-1 bg-slate-50 border-transparent rounded-xl px-4 py-3 text-sm focus:ring-2 ring-indigo-500/20 outline-none transition-all"
+                className="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-sm focus:ring-2 ring-indigo-500/20 outline-none transition-all"
               />
               <button
                 disabled={creatingDoor}
