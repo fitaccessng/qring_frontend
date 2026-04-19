@@ -96,7 +96,7 @@ function filterAssignedHomeownerDoors(doors, options = {}) {
 
   if (!hasAnyOwnershipMetadata) return failClosed ? [] : rows;
 
-  return rows.filter((door) => {
+  const filtered = rows.filter((door) => {
     const candidates = getDoorOwnershipCandidates(door);
     if (currentUserId && candidates.homeownerIds.includes(currentUserId)) return true;
     if (currentUserEmail && candidates.homeownerEmails.includes(currentUserEmail)) return true;
@@ -104,6 +104,9 @@ function filterAssignedHomeownerDoors(doors, options = {}) {
     if (currentUsername && candidates.homeownerNames.includes(currentUsername)) return true;
     return false;
   });
+
+  if (filtered.length > 0 || failClosed) return filtered;
+  return rows;
 }
 
 // Backwards-compatible export name.
@@ -192,7 +195,7 @@ export async function endHomeownerSession(sessionId) {
 }
 
 export async function getHomeownerDoors() {
-  const response = await apiRequest("/homeowner/doors");
+  const response = await apiRequest("/homeowner/doors", { noCache: true });
   const data = response?.data;
   const managedByEstate = Boolean(data?.subscription?.managedByEstate);
   if (Array.isArray(data)) {

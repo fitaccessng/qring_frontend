@@ -53,6 +53,16 @@ export default function ResidentAppointmentsPage() {
     () => appointments.filter((item) => toDateKey(item?.startsAt || item?.createdAt || new Date()) === selectedDate),
     [appointments, selectedDate]
   );
+  const doorNameById = useMemo(
+    () =>
+      new Map(
+        doors.map((door) => [
+          String(door?.id || ""),
+          door?.gateLabel || door?.name || door?.entryPoint || "Door"
+        ])
+      ),
+    [doors]
+  );
 
   useEffect(() => {
     let active = true;
@@ -66,7 +76,7 @@ export default function ResidentAppointmentsPage() {
         ]);
         if (!active) return;
 
-        const nextDoors = doorData?.doors ?? [];
+        const nextDoors = Array.isArray(doorData?.doors) ? doorData.doors : [];
         setAppointments(Array.isArray(appointmentRows) ? appointmentRows : []);
         setDoors(nextDoors);
         setForm((current) => ({
@@ -135,7 +145,18 @@ export default function ResidentAppointmentsPage() {
       };
 
       const created = await createHomeownerAppointment(payload);
-      setAppointments((current) => [created, ...current]);
+      setAppointments((current) => [
+        {
+          ...created,
+          doorId: created?.doorId || payload.doorId,
+          doorName:
+            created?.doorName ||
+            created?.entryPoint ||
+            doorNameById.get(String(payload.doorId)) ||
+            "Door"
+        },
+        ...current
+      ]);
       setIsModalOpen(false);
       setForm((current) => ({
         ...current,
@@ -235,7 +256,7 @@ export default function ResidentAppointmentsPage() {
                     <div>
                       <p className="font-bold text-sm text-slate-900">{appt.visitorName}</p>
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">
-                        {appt.entryPoint || appt.doorName || "Door"} • {appt.visitorContact || appt.visitorEmail || "No contact"}
+                        {appt.entryPoint || appt.doorName || doorNameById.get(String(appt.doorId || "")) || "Door"} - {appt.visitorContact || appt.visitorEmail || "No contact"}
                       </p>
                       <p className="text-[10px] font-bold text-slate-300 uppercase tracking-tight mt-1">
                         {formatDateTime(appt.startsAt)} - {formatDateTime(appt.endsAt)}

@@ -49,8 +49,11 @@ function toNotification(raw, role) {
 function buildPopupStorageKey(user) {
   const userId = String(user?.id || "").trim();
   const role = String(user?.role || "").trim().toLowerCase();
-  if (!userId || !role) return "";
-  return `${NOTIFICATION_POPUP_STORAGE_PREFIX}:${role}:${userId}`;
+  const email = typeof user?.email === "string" ? user.email.trim().toLowerCase() : "";
+  if (!role) return "";
+  if (userId) return `${NOTIFICATION_POPUP_STORAGE_PREFIX}:${role}:id:${userId}`;
+  if (email) return `${NOTIFICATION_POPUP_STORAGE_PREFIX}:${role}:email:${email}`;
+  return "";
 }
 
 function readSeenPopupIds(storageKey) {
