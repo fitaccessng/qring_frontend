@@ -72,10 +72,12 @@ function buildPopupStorageKey(user) {
   return "";
 }
 
+
+// Use sessionStorage to prevent repeated popups per session (login/refresh)
 function readSeenPopupIds(storageKey) {
   if (typeof window === "undefined" || !storageKey) return new Set();
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(storageKey) || "[]");
+    const parsed = JSON.parse(window.sessionStorage.getItem(storageKey) || "[]");
     if (!Array.isArray(parsed)) return new Set();
     return new Set(parsed.map((value) => String(value || "").trim()).filter(Boolean));
   } catch {
@@ -87,7 +89,7 @@ function writeSeenPopupIds(storageKey, ids) {
   if (typeof window === "undefined" || !storageKey) return;
   try {
     const next = Array.from(ids).filter(Boolean).slice(-MAX_POPUP_TRACKED_IDS);
-    window.localStorage.setItem(storageKey, JSON.stringify(next));
+    window.sessionStorage.setItem(storageKey, JSON.stringify(next));
   } catch {
     // Ignore storage failures and keep notifications functional.
   }
