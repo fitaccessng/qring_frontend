@@ -34,6 +34,22 @@ const SOCKET_EVENTS = new Set([
   "VISITOR_REQUESTED"
 ]);
 
+function getNotificationSeenKey(item) {
+  const notificationId = String(item?.id || "").trim();
+  const payload = parseNotificationPayload(item?.payload);
+  const sessionId = String(item?.sessionId || payload?.sessionId || payload?.session_id || "").trim();
+  const appointmentId = String(payload?.appointmentId || payload?.appointment_id || "").trim();
+  const createdAt = String(item?.createdAt || item?.created_at || payload?.createdAt || "").trim();
+  const kind = String(item?.kind || item?.type || payload?.kind || payload?.type || "").trim().toLowerCase();
+  const message = String(item?.message || item?.body || payload?.message || payload?.body || "").trim();
+
+  if (notificationId) {
+    return `id:${notificationId}`;
+  }
+
+  return `meta:${kind}|${sessionId}|${appointmentId}|${createdAt}|${message}`;
+}
+
 function toNotification(raw, role) {
   const payload = parseNotificationPayload(raw?.payload);
   return normalizeNotification(
@@ -236,8 +252,8 @@ export function NotificationsProvider({ children }) {
   }, [nativeApp, permission]);
 
   useEffect(() => {
-    const currentIds = items.map((item) => String(item?.id || "").trim()).filter(Boolean);
-    if (currentIds.length === 0) {
+    const currentSeenKeys = items.map((item) => getNotificationSeenKey(item)).filter(Boolean);
+    if (currentSeenKeys.length === 0) {
       if (!hasHydratedPopupStateRef.current) {
         hasHydratedPopupStateRef.current = true;
       }
@@ -245,8 +261,8 @@ export function NotificationsProvider({ children }) {
     }
 
     if (!hasHydratedPopupStateRef.current) {
-      currentIds.forEach((id) => {
-        seenPopupIdsRef.current.add(id);
+      currentSeenKeys.forEach((seenKey) => {
+        seenPopupIdsRef.current.add(seenKey);
       });
       hasHydratedPopupStateRef.current = true;
       writeSeenPopupIds(popupStorageKey, seenPopupIdsRef.current);
@@ -257,11 +273,11 @@ export function NotificationsProvider({ children }) {
     items
       .filter((item) => item.unread)
       .forEach((item) => {
-        const notificationId = String(item?.id || "").trim();
-        if (!notificationId) return;
-        if (seenPopupIdsRef.current.has(notificationId)) return;
+        const seenKey = getNotificationSeenKey(item);
+        if (!seenKey) return;
+        if (seenPopupIdsRef.current.has(seenKey)) return;
 
-        seenPopupIdsRef.current.add(notificationId);
+        seenPopupIdsRef.current.add(seenKey);
         didChange = true;
         if (item.kind === "safety.panic") {
           playPanicAlertSound();
@@ -272,14 +288,14 @@ export function NotificationsProvider({ children }) {
           message: item.message,
           kind: item.kind,
           route: item.route,
-          dedupeKey: `notification:${notificationId}`,
+          dedupeKey: `notification:${seenKey}`,
           duration: item.priority === "critical" ? 5200 : 3600
         });
       });
 
-    currentIds.forEach((id) => {
-      if (seenPopupIdsRef.current.has(id)) return;
-      seenPopupIdsRef.current.add(id);
+    currentSeenKeys.forEach((seenKey) => {
+      if (seenPopupIdsRef.current.has(seenKey)) return;
+      seenPopupIdsRef.current.add(seenKey);
       didChange = true;
     });
 
