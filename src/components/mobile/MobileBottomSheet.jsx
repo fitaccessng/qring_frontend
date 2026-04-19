@@ -1,159 +1,218 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { motion, useMotionValue, animate, useTransform } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
+import {
+  motion,
+  useMotionValue,
+  animate,
+  useDragControls,
+} from "framer-motion";
 import { X } from "lucide-react";
 
-export default function MobileBottomSheet({
+export default function BottomSheet({
   open,
-  title,
   onClose,
+  title,
   children,
-  footer = null,
-  snapPoints = [0.4, 0.8, 0.96], // Using 0.96 to leave a small gap at top for "sheet" feel
-  initialSnap = 1,
-  zIndex = 50,
-  headerActions = null,
-  contentClassName = ""
+  footer,
 }) {
-  const contentRef = useRef(null);
   const y = useMotionValue(0);
-  const [viewportHeight, setViewportHeight] = useState(typeof window !== 'undefined' ? window.innerHeight : 0);
+  const dragControls = useDragControls();
+  const contentRef = useRef(null);
 
-  const resolvedSnapPoints = useMemo(
-    () => [...snapPoints].sort((a, b) => a - b),
-    [snapPoints]
-  );
+  const [vh, setVh] = useState(0);
+  const [isMobile, setIsMobile] = useState(true);
+  const [atTop, setAtTop] = useState(true);
 
-  // ✅ 1. Real-time Viewport Tracking
+  // ✅ TRUE viewport height (fixes mobile bugs)
   useEffect(() => {
-    const updateHeight = () => {
-      // visualViewport is much more accurate for mobile keyboards/resizing
-      const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-      setViewportHeight(vh);
+    const update = () => {
+      const height =
+        window.visualViewport?.height || window.innerHeight;
+
+      setVh(height);
+      setIsMobile(window.innerWidth < 768);
     };
 
-    updateHeight();
-    window.addEventListener("resize", updateHeight);
-    window.visualViewport?.addEventListener("resize", updateHeight);
+    update();
+    window.visualViewport?.addEventListener("resize", update);
+    window.addEventListener("resize", update);
+
     return () => {
-      window.removeEventListener("resize", updateHeight);
-      window.visualViewport?.removeEventListener("resize", updateHeight);
+      window.visualViewport?.removeEventListener("resize", update);
+      window.removeEventListener("resize", update);
     };
   }, []);
 
-  // ✅ 2. Precise Snap Function
-  const snapTo = (index) => {
-    const snapPercentage = resolvedSnapPoints[index];
-    const targetY = viewportHeight - viewportHeight * snapPercentage;
-
-    animate(y, targetY, {
-      type: "spring",
-      stiffness: 350,
-      damping: 35,
-      restDelta: 0.5
-    });
-  };
-
-  // ✅ 3. Auto-fit logic on Open
+  // ✅ open/close animation
   useEffect(() => {
-    if (open && viewportHeight) {
-      // Small timeout to ensure DOM is painted
-      const timer = setTimeout(() => {
-        const content = contentRef.current;
-        const isLong = content && content.scrollHeight > viewportHeight * 0.4;
-        snapTo(isLong ? resolvedSnapPoints.length - 1 : initialSnap);
-      }, 30);
-      return () => clearTimeout(timer);
+    if (open) {
+      y.set(vh);
+      requestAnimationFrame(() => {
+        animate(y, 0, {
+          type: "spring",
+          stiffness: 260,
+          damping: 28,
+        });
+      });
+    } else {
+      animate(y, vh);
     }
-  }, [open, viewportHeight]);
+  }, [open, vh]);
 
-  // ✅ 4. Body Scroll Lock
+  // ✅ lock scroll
   useEffect(() => {
-    if (!open) return;
-    const original = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = original; };
+    if (open) {
+      document.body.style.overflow = "hidden";
+      return () => (document.body.style.overflow = "");
+    }
   }, [open]);
 
-  // 5. Opacity Backdrop Animation
-  const backdropOpacity = useTransform(y, [viewportHeight, viewportHeight * 0.5], [0, 1]);
+  // ✅ ESC support
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
 
   if (!open) return null;
 
+  // ======================
+  // 💻 DESKTOP MODAL
+  // ======================
+  if (!isMobile) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+        <div
+          className="absolute inset-0 bg-black/40"
+          onClick={onClose}
+        />
+
+        <motion.div
+          initial={{ scale: 0.96, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="
+            relative w-full max-w-lg 
+            bg-white rounded-2xl shadow-xl 
+            flex flex-col overflow-hidden
+            max-h-[90dvh]
+          "
+        >
+          <div className="flex justify-between p-4 border-b">
+            <h3>{title}</h3>
+            <button onClick={onClose}>
+              <X />
+            </button>
+          </div>
+
+          <div className="p-4 overflow-y-auto flex-1">
+            {children}
+          </div>
+
+          {footer && (
+            <div className="p-4 border-t">
+              {footer}
+            </div>
+          )}
+        </motion.div>
+      </div>
+    );
+  }
+
+  // ======================
+  // 📱 MOBILE SHEET (ELITE)
+  // ======================
   return (
-    <div className="fixed inset-0 flex justify-center" style={{ zIndex }}>
-      {/* Backdrop */}
-      <motion.div 
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        style={{ opacity: backdropOpacity }}
-        className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
+    <div
+      className="fixed inset-0 z-50 flex items-end"
+      style={{ height: vh }}
+    >
+      {/* backdrop */}
+      <div
+        className="absolute inset-0 bg-black/40"
         onClick={onClose}
       />
 
       <motion.div
-        drag="y"
-        dragConstraints={{ top: 0, bottom: viewportHeight }}
-        dragElastic={0.05} // Low elasticity prevents "glitching" on scroll
-        style={{ 
-          y, 
-          height: viewportHeight, // Forces the container to match the actual viewable area
-          bottom: 0,
-          position: 'absolute'
+        style={{
+          y,
+          height: vh, // 🔥 CRITICAL FIX
         }}
-        onDragEnd={(_, info) => {
-          const velocity = info.velocity.y;
-          const offset = info.offset.y;
-
-          if (velocity > 500 || offset > viewportHeight * 0.3) {
+        drag="y"
+        dragControls={dragControls}
+        dragListener={false}
+        dragConstraints={{ top: 0, bottom: vh }}
+        dragElastic={0.08}
+        onDragEnd={(e, info) => {
+          if (info.offset.y > 120 || info.velocity.y > 500) {
             onClose();
           } else {
-            // Find closest snap point based on final position
-            const currentY = y.get();
-            const distances = resolvedSnapPoints.map(p => 
-              Math.abs(currentY - (viewportHeight - viewportHeight * p))
-            );
-            snapTo(distances.indexOf(Math.min(...distances)));
+            animate(y, 0, {
+              type: "spring",
+              stiffness: 260,
+              damping: 28,
+            });
           }
         }}
-        className="w-full max-w-[720px] flex flex-col rounded-t-[2rem] bg-white shadow-2xl dark:bg-slate-900"
+        className="
+          w-full bg-white 
+          rounded-t-[20px]
+          shadow-xl
+          flex flex-col
+          overflow-hidden
+        "
       >
-        {/* Handle Bar Area */}
-        <div className="shrink-0 pt-3 pb-1 cursor-grab active:cursor-grabbing">
-          <div className="mx-auto h-1.5 w-12 rounded-full bg-slate-200 dark:bg-slate-700" />
+        {/* HANDLE */}
+        <div
+          onPointerDown={(e) => dragControls.start(e)}
+          className="py-3 flex justify-center"
+        >
+          <div className="w-10 h-1.5 bg-gray-300 rounded-full" />
         </div>
 
-        {/* Header: Fixed Height */}
-        <header className="flex shrink-0 items-center justify-between px-6 py-3 border-b border-slate-50 dark:border-slate-800">
-          <h3 className="text-lg font-bold text-slate-900 dark:text-white truncate">
-            {title}
-          </h3>
-          <div className="flex items-center gap-2">
-            {headerActions}
-            <button onClick={onClose} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800">
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        </header>
+        {/* HEADER */}
+        <div
+          onPointerDown={(e) => dragControls.start(e)}
+          className="flex justify-between items-center px-4 pb-3"
+        >
+          <h3 className="font-semibold">{title}</h3>
+          <button onClick={onClose}>
+            <X />
+          </button>
+        </div>
 
-        {/* Content: Flexible & Scrollable */}
+        {/* CONTENT (ONLY SCROLL AREA) */}
         <div
           ref={contentRef}
-          className={`flex-1 overflow-y-auto px-6 py-4 overscroll-contain touch-pan-y ${contentClassName}`}
-          // This allows scrolling even when the sheet is being dragged
-          onPointerDown={(e) => e.stopPropagation()} 
+          onScroll={(e) =>
+            setAtTop(e.currentTarget.scrollTop <= 0)
+          }
+          onPointerDown={(e) => {
+            if (atTop) dragControls.start(e);
+          }}
+          className="
+            flex-1 overflow-y-auto 
+            px-4 pb-4 
+            overscroll-contain
+          "
         >
-          {/* Use a wrapper to ensure height is calculated correctly */}
-          <div className="min-h-full w-full pb-10">
-            {children}
-          </div>
+          {children}
         </div>
 
-        {/* Footer: Fixed Height */}
+        {/* FOOTER (ALWAYS VISIBLE) */}
         {footer && (
-          <footer className="shrink-0 border-t border-slate-50 bg-white/95 backdrop-blur px-6 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))] dark:bg-slate-900 dark:border-slate-800">
+          <div
+            className="
+              border-t p-4 
+              bg-white
+            "
+          >
             {footer}
-          </footer>
+          </div>
         )}
+
+        {/* SAFE AREA */}
+        <div className="h-[env(safe-area-inset-bottom)] bg-white" />
       </motion.div>
     </div>
   );

@@ -20,6 +20,8 @@ import { playPanicAlertSound } from "../utils/notificationSound";
 
 const NotificationsContext = createContext(null);
 const POLL_INTERVAL_MS = 45000;
+const NOTIFICATION_POPUP_STORAGE_PREFIX = "qring_notification_popup_seen";
+const MAX_POPUP_TRACKED_IDS = 500;
 const SOCKET_EVENTS = new Set([
   "notification.created",
   "notification.updated",
@@ -44,6 +46,34 @@ function toNotification(raw, role) {
   );
 }
 
+function buildPopupStorageKey(user) {
+  const userId = String(user?.id || "").trim();
+  const role = String(user?.role || "").trim().toLowerCase();
+  if (!userId || !role) return "";
+  return `${NOTIFICATION_POPUP_STORAGE_PREFIX}:${role}:${userId}`;
+}
+
+function readSeenPopupIds(storageKey) {
+  if (typeof window === "undefined" || !storageKey) return new Set();
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(storageKey) || "[]");
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(parsed.map((value) => String(value || "").trim()).filter(Boolean));
+  } catch {
+    return new Set();
+  }
+}
+
+function writeSeenPopupIds(storageKey, ids) {
+  if (typeof window === "undefined" || !storageKey) return;
+  try {
+    const next = Array.from(ids).filter(Boolean).slice(-MAX_POPUP_TRACKED_IDS);
+    window.localStorage.setItem(storageKey, JSON.stringify(next));
+  } catch {
+    // Ignore storage failures and keep notifications functional.
+  }
+}
+
 export function NotificationsProvider({ children }) {
   const { user } = useAuth();
   const nativeApp = isNativeApp();
@@ -55,7 +85,9 @@ export function NotificationsProvider({ children }) {
   );
   const [pushStatus, setPushStatus] = useState("idle");
   const isMountedRef = useRef(false);
-  const shownNotificationIdsRef = useRef(new Set());
+  const popupStorageKey = useMemo(() => buildPopupStorageKey(user), [user]);
+  const seenPopupIdsRef = useRef(new Set());
+  const hasHydratedPopupStateRef = useRef(false);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -66,8 +98,10 @@ export function NotificationsProvider({ children }) {
 
   useEffect(() => {
     setItems([]);
-    shownNotificationIdsRef.current.clear();
-  }, [user?.id, user?.role]);
+    seenPopupIdsRef.current = readSeenPopupIds(popupStorageKey);
+    hasHydratedPopupStateRef.current = false;
+    writeSeenPopupIds(popupStorageKey, seenPopupIdsRef.current);
+  }, [popupStorageKey]);
 
   async function refresh({ silent = false } = {}) {
     if (!user?.role) return [];
@@ -199,11 +233,33 @@ export function NotificationsProvider({ children }) {
   }, [nativeApp, permission]);
 
   useEffect(() => {
+    const currentIds = items.map((item) => String(item?.id || "").trim()).filter(Boolean);
+    if (currentIds.length === 0) {
+      if (!hasHydratedPopupStateRef.current) {
+        hasHydratedPopupStateRef.current = true;
+      }
+      return;
+    }
+
+    if (!hasHydratedPopupStateRef.current) {
+      currentIds.forEach((id) => {
+        seenPopupIdsRef.current.add(id);
+      });
+      hasHydratedPopupStateRef.current = true;
+      writeSeenPopupIds(popupStorageKey, seenPopupIdsRef.current);
+      return;
+    }
+
+    let didChange = false;
     items
       .filter((item) => item.unread)
       .forEach((item) => {
-        if (shownNotificationIdsRef.current.has(item.id)) return;
-        shownNotificationIdsRef.current.add(item.id);
+        const notificationId = String(item?.id || "").trim();
+        if (!notificationId) return;
+        if (seenPopupIdsRef.current.has(notificationId)) return;
+
+        seenPopupIdsRef.current.add(notificationId);
+        didChange = true;
         if (item.kind === "safety.panic") {
           playPanicAlertSound();
         }
@@ -213,10 +269,21 @@ export function NotificationsProvider({ children }) {
           message: item.message,
           kind: item.kind,
           route: item.route,
+          dedupeKey: `notification:${notificationId}`,
           duration: item.priority === "critical" ? 5200 : 3600
         });
       });
-  }, [items]);
+
+    currentIds.forEach((id) => {
+      if (seenPopupIdsRef.current.has(id)) return;
+      seenPopupIdsRef.current.add(id);
+      didChange = true;
+    });
+
+    if (didChange) {
+      writeSeenPopupIds(popupStorageKey, seenPopupIdsRef.current);
+    }
+  }, [items, popupStorageKey]);
 
   async function handleMarkRead(notificationId) {
     if (!notificationId) return;

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
 import {
   ArrowLeft,
   Bell,
@@ -17,17 +18,19 @@ import {
   Settings,
   CheckCircle2,
   Clock,
-  TrendingUp
+  TrendingUp,
+  X
 } from 'lucide-react';
 import {
   createEstateAlert,
   listEstateAlertPayments,
   listEstateAlerts,
+  sendEstateAlertReminder,
 } from "../../services/estateService";
 import { showError, showSuccess } from "../../utils/flash";
 import { useSocketEvents } from "../../hooks/useSocketEvents";
 import { getDashboardSocket } from "../../services/socketClient";
-import MobileBottomSheet from "../../components/mobile/MobileBottomSheet";
+import useResponsiveSheet from "../../hooks/useResponsiveSheet";
 import { estateFieldClassName, estateTextareaClassName } from "../../components/mobile/EstateManagerPageShell";
 import useEstateOverviewState from "../../hooks/useEstateOverviewState";
 import { useNavigate } from "react-router-dom";
@@ -106,6 +109,27 @@ const EstateDuesPage = () => {
     finally { setBusy(false); }
   };
 
+  const latestAlert = alerts[0] || null;
+
+  const handleSendReminder = async () => {
+    if (!latestAlert?.id) {
+      showError("Create a due first before sending reminders.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const result = await sendEstateAlertReminder(latestAlert.id);
+      const reminded = Number(result?.reminded ?? 0);
+      const emailed = Number(result?.emailed ?? 0);
+      showSuccess(reminded > 0 ? `Reminder sent to ${reminded} homeowner${reminded === 1 ? "" : "s"}${emailed ? `, email delivered to ${emailed}` : ""}.` : "No unpaid homeowners to remind.");
+      await refresh();
+    } catch (err) {
+      showError(err?.message || "Failed to send reminders");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const paymentRows = useMemo(() =>
     payments.flatMap((alert) =>
       (alert.homeowners ?? []).map((row) => ({
@@ -156,7 +180,11 @@ const EstateDuesPage = () => {
             <h2 className="text-4xl font-black tracking-tight text-[#2b3437] font-headline">Dues Management</h2>
           </div>
           <div className="flex flex-col sm:flex-row gap-3">
-            <button className="bg-slate-200/50 text-[#2b3437] px-6 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 active:scale-95 transition-all w-full sm:w-auto text-sm">
+            <button
+              onClick={handleSendReminder}
+              disabled={busy || !latestAlert?.id}
+              className="bg-slate-200/50 text-[#2b3437] px-6 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 active:scale-95 transition-all w-full sm:w-auto text-sm disabled:opacity-50"
+            >
               <Send size={18} strokeWidth={2.5} />
               Send Reminder
             </button>
@@ -276,12 +304,8 @@ const EstateDuesPage = () => {
       {/* Mobile Bottom Navigation */}
 
 
-      <MobileBottomSheet
-        open={composeOpen}
-        onClose={() => setComposeOpen(false)}
-        title="Create New Levy"
-      >
-        <form onSubmit={handleSubmit} className="p-2 space-y-4">
+      <DuesComposerSheet open={composeOpen} onClose={() => setComposeOpen(false)} busy={busy}>
+        <form id="estate-dues-form" onSubmit={handleSubmit} className="space-y-4 pt-1">
           <div className="space-y-1">
             <label className="text-[10px] font-black uppercase text-slate-400 px-1">Levy Title</label>
             <input
@@ -315,16 +339,87 @@ const EstateDuesPage = () => {
               value={dueDate} onChange={e => setDueDate(e.target.value)}
             />
           </div>
-          <button
-            disabled={busy}
-            className="w-full bg-[#4955b3] text-white py-5 rounded-[1.5rem] font-black uppercase tracking-widest mt-4 disabled:opacity-50 shadow-lg shadow-indigo-100 active:scale-95 transition-all"
-          >
-            {busy ? "Broadcasting..." : "Confirm & Send"}
-          </button>
         </form>
-      </MobileBottomSheet>
+      </DuesComposerSheet>
     </div>
   );
 };
 
 export default EstateDuesPage;
+
+function DuesComposerSheet({ open, onClose, busy, children }) {
+  const sheet = useResponsiveSheet({ open, onClose });
+
+  if (!open) return null;
+
+  const footer = (
+    <div className="border-t border-slate-100 bg-white px-5 py-4">
+      <button
+        type="submit"
+        form="estate-dues-form"
+        disabled={busy}
+        className="w-full bg-[#4955b3] text-white py-5 rounded-[1.5rem] font-black uppercase tracking-widest shadow-lg shadow-indigo-100 active:scale-95 transition-all"
+      >
+        {busy ? "Broadcasting..." : "Confirm & Send"}
+      </button>
+    </div>
+  );
+
+  if (!sheet.isMobile) {
+    return (
+      <div className="fixed inset-0 z-[140] flex items-center justify-center px-4">
+        <button type="button" className="absolute inset-0 bg-slate-900/45 backdrop-blur-sm" onClick={onClose} aria-label="Close dues form" />
+        <motion.section
+          initial={{ opacity: 0, scale: 0.97, y: 12 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          className="relative w-full max-w-2xl overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_28px_80px_rgba(15,23,42,0.2)]"
+        >
+          <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#4955b3]">Financial Oversight</p>
+              <h3 className="mt-2 text-2xl font-black text-[#2b3437]">Create New Levy</h3>
+            </div>
+            <button type="button" onClick={onClose} className="rounded-2xl bg-slate-50 p-3 text-slate-500 transition-all hover:bg-slate-100">
+              <X size={18} />
+            </button>
+          </div>
+          <div className="max-h-[70dvh] overflow-y-auto px-6 py-6">{children}</div>
+          {footer}
+        </motion.section>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-[140] flex items-end" style={{ height: sheet.viewportHeight || undefined }}>
+      <button type="button" className="absolute inset-0 bg-slate-900/45" onClick={onClose} aria-label="Close dues form" />
+      <motion.section
+        {...sheet.mobileSheetProps}
+        className="relative flex w-full flex-col overflow-hidden rounded-t-[2rem] bg-white shadow-[0_-18px_40px_rgba(15,23,42,0.16)]"
+      >
+        <div onPointerDown={sheet.startDrag} className="flex justify-center py-3">
+          <div className="h-1.5 w-12 rounded-full bg-slate-300" />
+        </div>
+        <div onPointerDown={sheet.startDrag} className="flex items-start justify-between px-5 pb-4">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#4955b3]">Financial Oversight</p>
+            <h3 className="mt-2 text-xl font-black text-[#2b3437]">Create New Levy</h3>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-2xl bg-slate-50 p-3 text-slate-500">
+            <X size={18} />
+          </button>
+        </div>
+        <div
+          ref={sheet.contentRef}
+          onScroll={sheet.onContentScroll}
+          onPointerDown={sheet.onContentPointerDown}
+          className="flex-1 overflow-y-auto px-5 pb-4"
+        >
+          {children}
+        </div>
+        {footer}
+        <div className="h-[env(safe-area-inset-bottom)] bg-white" />
+      </motion.section>
+    </div>
+  );
+}

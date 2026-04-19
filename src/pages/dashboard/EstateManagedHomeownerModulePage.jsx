@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Navigate, useNavigate, useLocation } from "react-router-dom";
+import { motion } from "framer-motion";
 import { 
   ArrowLeft, 
   Bell, 
@@ -14,7 +15,8 @@ import {
   BarChart3,
   ChevronRight,
   Clock,
-  Info
+  Info,
+  X
 } from 'lucide-react';
 
 // Services & Hooks
@@ -29,7 +31,7 @@ import {
   createMaintenanceRequest 
 } from "../../services/homeownerService";
 import { showError, showSuccess } from "../../utils/flash";
-import MobileBottomSheet from "../../components/mobile/MobileBottomSheet";
+import useResponsiveSheet from "../../hooks/useResponsiveSheet";
 import { 
   estateFieldClassName, 
   estatePrimaryButtonClassName, 
@@ -290,8 +292,8 @@ const EstateManagedHomeownerModulePage = () => {
       )}
 
       {/* Maintenance Bottom Sheet */}
-      <MobileBottomSheet open={composeOpen} onClose={() => setComposeOpen(false)} title="Report Maintenance">
-        <form onSubmit={handleMaintenanceSubmit} className="space-y-6 p-4">
+      <ResidentMaintenanceSheet open={composeOpen} onClose={() => setComposeOpen(false)}>
+        <form onSubmit={handleMaintenanceSubmit} className="space-y-6 p-5 pt-1">
           <div className="space-y-1">
             <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Issue Title</label>
             <input value={title} onChange={e => setTitle(e.target.value)} className={estateFieldClassName} placeholder="e.g., Leaking kitchen pipe" required />
@@ -304,9 +306,71 @@ const EstateManagedHomeownerModulePage = () => {
             {busy ? "Submitting..." : "Submit Report"}
           </button>
         </form>
-      </MobileBottomSheet>
+      </ResidentMaintenanceSheet>
     </div>
   );
 };
 
 export default EstateManagedHomeownerModulePage;
+
+function ResidentMaintenanceSheet({ open, onClose, children }) {
+  const sheet = useResponsiveSheet({ open, onClose });
+
+  if (!open) return null;
+
+  if (!sheet.isMobile) {
+    return (
+      <div className="fixed inset-0 z-[140] flex items-center justify-center px-4">
+        <button type="button" className="absolute inset-0 bg-slate-900/45 backdrop-blur-sm" onClick={onClose} aria-label="Close maintenance report" />
+        <motion.section
+          initial={{ opacity: 0, scale: 0.97, y: 12 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          className="relative w-full max-w-xl overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_28px_80px_rgba(15,23,42,0.2)]"
+        >
+          <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#4955b3]">Unit Operations</p>
+              <h3 className="mt-2 text-2xl font-black text-[#2b3437]">Report Maintenance</h3>
+            </div>
+            <button type="button" onClick={onClose} className="rounded-2xl bg-slate-50 p-3 text-slate-500 transition-all hover:bg-slate-100">
+              <X size={18} />
+            </button>
+          </div>
+          <div className="max-h-[72dvh] overflow-y-auto">{children}</div>
+        </motion.section>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-[140] flex items-end" style={{ height: sheet.viewportHeight || undefined }}>
+      <button type="button" className="absolute inset-0 bg-slate-900/45" onClick={onClose} aria-label="Close maintenance report" />
+      <motion.section
+        {...sheet.mobileSheetProps}
+        className="relative flex w-full flex-col overflow-hidden rounded-t-[2rem] bg-white shadow-[0_-18px_40px_rgba(15,23,42,0.16)]"
+      >
+        <div onPointerDown={sheet.startDrag} className="flex justify-center py-3">
+          <div className="h-1.5 w-12 rounded-full bg-slate-300" />
+        </div>
+        <div onPointerDown={sheet.startDrag} className="flex items-start justify-between px-5 pb-4">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#4955b3]">Unit Operations</p>
+            <h3 className="mt-2 text-xl font-black text-[#2b3437]">Report Maintenance</h3>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-2xl bg-slate-50 p-3 text-slate-500">
+            <X size={18} />
+          </button>
+        </div>
+        <div
+          ref={sheet.contentRef}
+          onScroll={sheet.onContentScroll}
+          onPointerDown={sheet.onContentPointerDown}
+          className="flex-1 overflow-y-auto"
+        >
+          {children}
+        </div>
+        <div className="h-[env(safe-area-inset-bottom)] bg-white" />
+      </motion.section>
+    </div>
+  );
+}

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 import {
   ArrowLeft,
   Bell,
@@ -13,7 +14,8 @@ import {
   CreditCard,
   Building2,
   Settings,
-  Users
+  Users,
+  X
 } from 'lucide-react';
 
 // Services & Hooks
@@ -21,7 +23,7 @@ import { createEstateAlert, deleteEstateAlert, listEstateAlerts, updateEstateAle
 import { showError, showSuccess } from "../../utils/flash";
 import { useSocketEvents } from "../../hooks/useSocketEvents";
 import useEstateOverviewState from "../../hooks/useEstateOverviewState";
-import MobileBottomSheet from "../../components/mobile/MobileBottomSheet";
+import useResponsiveSheet from "../../hooks/useResponsiveSheet";
 import { estateFieldClassName, estatePrimaryButtonClassName, estateTextareaClassName } from "../../components/mobile/EstateManagerPageShell";
 
 const EstateBroadcastsPage = () => {
@@ -189,9 +191,12 @@ const EstateBroadcastsPage = () => {
 
       {/* Mobile Bottom Navigation */}
 
-
-      <MobileBottomSheet open={composeOpen} onClose={() => setComposeOpen(false)} title={editingId ? "Edit Broadcast" : "New Broadcast"}>
-        <form onSubmit={handleSubmit} className="space-y-6 p-4">
+      <BroadcastComposerSheet
+        open={composeOpen}
+        onClose={() => setComposeOpen(false)}
+        titleText={editingId ? "Edit Broadcast" : "New Broadcast"}
+      >
+        <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-1">
             <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Subject</label>
             <input value={title} onChange={e => setTitle(e.target.value)} className={estateFieldClassName} placeholder="e.g., Water Maintenance" required />
@@ -204,9 +209,97 @@ const EstateBroadcastsPage = () => {
             {busy ? "Sending..." : editingId ? "Update" : "Broadcast Now"}
           </button>
         </form>
-      </MobileBottomSheet>
+      </BroadcastComposerSheet>
     </div>
   );
 };
 
 export default EstateBroadcastsPage;
+
+function BroadcastComposerSheet({
+  open,
+  onClose,
+  titleText,
+  children,
+}) {
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[140]">
+      {/* Overlay */}
+      <div
+        className="absolute inset-0 bg-slate-900/50"
+        onClick={onClose}
+      />
+
+      {/* MODAL */}
+      <div
+        className="
+          absolute inset-x-0 bottom-0
+          bg-white
+
+          h-[75dvh]
+          max-h-[100dvh]
+
+          flex flex-col
+          overflow-hidden
+
+          rounded-t-[2rem]
+
+          md:top-1/2 md:left-1/2 md:bottom-auto md:right-auto
+          md:-translate-x-1/2 md:-translate-y-1/2
+          md:max-h-[90vh]
+          md:w-full md:max-w-2xl
+          md:rounded-2xl
+
+          shadow-[0_-18px_40px_rgba(15,23,42,0.16)]
+        "
+      >
+        {/* HEADER (fixed) */}
+        <div className="shrink-0 px-5 py-4 border-b border-slate-100">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#4955b3]">
+                Communications Hub
+              </p>
+              <h3 className="mt-2 text-xl font-black text-[#2b3437]">
+                {titleText}
+              </h3>
+            </div>
+
+            <button
+              onClick={onClose}
+              className="rounded-2xl bg-slate-50 p-3 text-slate-500"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+
+        {/* 🔥 ONLY SCROLL AREA */}
+        <div
+          className="
+            flex-1
+            min-h-0
+            overflow-y-auto
+            px-5
+            pb-10
+            overscroll-contain
+          "
+          style={{
+            WebkitOverflowScrolling: "touch",
+          }}
+        >
+          <div className="space-y-6 pt-4">
+            {children}
+          </div>
+        </div>
+
+        {/* SAFE AREA */}
+        <div className="h-[env(safe-area-inset-bottom)] bg-white" />
+      </div>
+    </div>
+  );
+}
+
+

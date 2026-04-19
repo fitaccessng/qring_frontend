@@ -236,13 +236,7 @@ export default function HomeownerEmergencyContactsPage() {
         </div>
       </main>
 
-      <nav className="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-8 pt-4 bg-white border-t border-slate-100 z-[9999] shadow-[0_-10px_40px_rgba(0,0,0,0.08)]">
-        <NavItem to="/dashboard/homeowner/overview" icon={<LayoutGrid size={22} />} label="Home" />
-        <NavItem to="/dashboard/homeowner/visits" icon={<History size={22} />} label="Activity" />
-        <NavItem to="/dashboard/homeowner/safety" icon={<Shield size={22} />} label="Safety" active />
-        <NavItem to="/dashboard/homeowner/doors" icon={<KeyRound size={22} />} label="Access" />
-        <NavItem to="/dashboard/homeowner/settings" icon={<UserIcon size={22} />} label="Profile" />
-      </nav>
+     
 
       <div className="fixed top-0 right-0 -z-10 w-1/2 h-full opacity-40 pointer-events-none overflow-hidden">
         <div className="absolute top-0 right-0 w-full h-1/2 bg-gradient-to-bl from-indigo-100/50 via-transparent to-transparent blur-3xl" />
