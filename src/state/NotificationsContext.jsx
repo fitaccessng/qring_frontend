@@ -14,6 +14,7 @@ import { normalizeNotification, parseNotificationPayload } from "../utils/notifi
 import { resolveNotificationRoute } from "../utils/notificationRouting";
 import { notify } from "../utils/notifier";
 import { registerFcmPushSubscription, setupForegroundMessageListener } from "../services/pushMessagingService";
+import { registerNativePushNotifications } from "../services/nativePushService";
 import { isNativeApp } from "../utils/nativeRuntime";
 import { isFirebaseConfigured } from "../config/firebase";
 import { playPanicAlertSound } from "../utils/notificationSound";
@@ -33,6 +34,7 @@ const SOCKET_EVENTS = new Set([
   "PAYMENT_STATUS_UPDATED",
   "VISITOR_REQUESTED"
 ]);
+const LEGACY_WELCOME_NOTIFICATION_MESSAGE = "Welcome to Qring dashboard. Notifications are now active.";
 
 function getNotificationSeenKey(item) {
   const notificationId = String(item?.id || "").trim();
@@ -60,6 +62,12 @@ function toNotification(raw, role) {
       payload
     })
   );
+}
+
+function shouldSuppressPopupNotification(item) {
+  const message = String(item?.message || "").trim();
+  const kind = String(item?.kind || "").trim().toLowerCase();
+  return kind === "system" && message === LEGACY_WELCOME_NOTIFICATION_MESSAGE;
 }
 
 function buildPopupStorageKey(user) {
@@ -227,6 +235,20 @@ export function NotificationsProvider({ children }) {
   }, [user?.id, user?.role]);
 
   useEffect(() => {
+    if (!nativeApp) return;
+    registerNativePushNotifications()
+      .then((result) => {
+        if (!isMountedRef.current) return;
+        setPermission(result?.ok ? "granted" : "prompt");
+        setPushStatus(result?.status || "unsupported");
+      })
+      .catch(() => {
+        if (!isMountedRef.current) return;
+        setPushStatus("native_registration_failed");
+      });
+  }, [nativeApp]);
+
+  useEffect(() => {
     if (nativeApp) return () => {};
     let dispose = () => {};
     setupForegroundMessageListener(() => {
@@ -281,6 +303,9 @@ export function NotificationsProvider({ children }) {
 
         seenPopupIdsRef.current.add(seenKey);
         didChange = true;
+        if (shouldSuppressPopupNotification(item)) {
+          return;
+        }
         if (item.kind === "safety.panic") {
           playPanicAlertSound();
         }
@@ -388,14 +413,27 @@ export function NotificationsProvider({ children }) {
 
   async function enableBrowserAlerts() {
     if (nativeApp) {
-      setPermission("unsupported");
-      setPushStatus("native_not_implemented");
-      return {
-        ok: false,
-        permission: "unsupported",
-        pushStatus: "native_not_implemented",
-        message: "Native mobile push notifications are not wired up yet in this build."
-      };
+      try {
+        const result = await registerNativePushNotifications();
+        const nextPermission = result?.ok ? "granted" : "prompt";
+        setPermission(nextPermission);
+        setPushStatus(result?.status || "unsupported");
+        return {
+          ok: !!result?.ok,
+          permission: nextPermission,
+          pushStatus: result?.status || "unsupported",
+          message: result?.message || "Native notification setup completed."
+        };
+      } catch {
+        setPermission("prompt");
+        setPushStatus("native_registration_failed");
+        return {
+          ok: false,
+          permission: "prompt",
+          pushStatus: "native_registration_failed",
+          message: "Native notification registration failed on this device."
+        };
+      }
     }
 
     const nextPermission = await requestBrowserNotificationPermission();

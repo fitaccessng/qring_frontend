@@ -32,6 +32,12 @@ const KIND_META = [
     priority: "critical"
   },
   {
+    match: (kind) => kind.startsWith("safety.panic"),
+    category: "security",
+    title: "Panic Update",
+    priority: "critical"
+  },
+  {
     match: (kind) => kind.includes("system") || kind.includes("update"),
     category: "system",
     title: "System Update",

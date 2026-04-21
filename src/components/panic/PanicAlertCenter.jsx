@@ -1,9 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PanicAlertModal from "./PanicAlertModal";
-import { acknowledgePanicAlert, getActivePanicAlerts } from "../../services/safetyService";
+import {
+  acknowledgePanicAlert,
+  getActivePanicAlerts,
+  ignorePanicAlert,
+  reportFalsePanicAlert,
+  respondToPanicAlert
+} from "../../services/safetyService";
 import { getDashboardSocket } from "../../services/socketClient";
 import { useAuth } from "../../state/AuthContext";
+import { showError, showSuccess } from "../../utils/flash";
 
 export default function PanicAlertCenter() {
   const navigate = useNavigate();
@@ -38,13 +45,12 @@ export default function PanicAlertCenter() {
   }, [user?.id]);
 
   const currentAlert = useMemo(() => {
-    if (user?.role !== "security" && user?.role !== "estate") return null;
-
     const visibleAlerts = alerts.filter(
       (item) =>
         item.userId !== user?.id &&
         item.status === "active" &&
-        !dismissedAlertIds.includes(item.id)
+        !dismissedAlertIds.includes(item.id) &&
+        !(item.ignoredUserIds || []).includes(user?.id)
     );
     return visibleAlerts[0] ?? null;
   }, [alerts, dismissedAlertIds, user?.id, user?.role]);
@@ -87,6 +93,48 @@ export default function PanicAlertCenter() {
     }
   }
 
+  async function handleRespond() {
+    if (!currentAlert?.id) return;
+    setBusy(true);
+    try {
+      await respondToPanicAlert(currentAlert.id);
+      showSuccess("You are marked as responding.");
+      await loadActiveAlerts();
+    } catch (error) {
+      showError(error?.message || "Unable to mark you as responding.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleIgnore() {
+    if (!currentAlert?.id) return;
+    setBusy(true);
+    try {
+      await ignorePanicAlert(currentAlert.id);
+      setDismissedAlertIds((prev) => (prev.includes(currentAlert.id) ? prev : [...prev, currentAlert.id]));
+      await loadActiveAlerts();
+    } catch (error) {
+      showError(error?.message || "Unable to ignore this alert.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleReportFalse() {
+    if (!currentAlert?.id) return;
+    setBusy(true);
+    try {
+      await reportFalsePanicAlert(currentAlert.id);
+      showSuccess("This panic alert was flagged for review.");
+      await loadActiveAlerts();
+    } catch (error) {
+      showError(error?.message || "Unable to report this alert.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function handleDismiss() {
     if (!currentAlert?.acknowledged) return;
     setDismissedAlertIds((prev) => (prev.includes(currentAlert.id) ? prev : [...prev, currentAlert.id]));
@@ -108,8 +156,12 @@ export default function PanicAlertCenter() {
     <PanicAlertModal
       alert={currentAlert}
       busy={busy}
-      canAcknowledge
+      canAcknowledge={user?.role === "security" || user?.role === "estate" || user?.role === "admin"}
+      canRespond={user?.role === "homeowner"}
       onAcknowledge={handleAcknowledge}
+      onRespond={handleRespond}
+      onIgnore={handleIgnore}
+      onReportFalse={handleReportFalse}
       onOpenDetails={handleOpenDetails}
       onDismiss={handleDismiss}
     />

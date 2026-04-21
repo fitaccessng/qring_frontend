@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import {
   Award,
   Bell,
+  MapPin,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
@@ -28,6 +29,7 @@ import {
   updateHomeownerProfile,
   updateHomeownerSettings
 } from "../../services/homeownerSettingsService";
+import { getCurrentDeviceLocation } from "../../utils/locationService";
 import { useAuth } from "../../state/AuthContext";
 import { useLanguage } from "../../state/LanguageContext";
 import { useNotifications } from "../../state/NotificationsContext";
@@ -45,6 +47,15 @@ const DEFAULT_SETTINGS = {
   knownContacts: [],
   allowDeliveryDropAtGate: true,
   smsFallbackEnabled: false,
+  nearbyPanicAlertsEnabled: true,
+  nearbyPanicAlertRadiusMeters: 500,
+  nearbyPanicAvailability: "always",
+  nearbyPanicCustomSchedule: [],
+  nearbyPanicReceiveFrom: "everyone",
+  nearbyPanicMutedUntil: null,
+  nearbyPanicSameAreaLabel: "",
+  panicIdentityVisibility: "masked",
+  safetyHomeLocation: { lat: null, lng: null },
   managedByEstate: false,
   estateId: null,
   estateName: null,
@@ -85,6 +96,7 @@ export default function HomeownerSettingsPage() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingSecurity, setSavingSecurity] = useState(false);
   const [savingPreference, setSavingPreference] = useState("");
+  const [savingPanicNetwork, setSavingPanicNetwork] = useState(false);
   const [pendingExternalAction, setPendingExternalAction] = useState("");
 
   useEffect(() => {
@@ -215,6 +227,46 @@ export default function HomeownerSettingsPage() {
   async function handleThemeToggle() {
     toggleTheme();
     showSuccess(`Theme switched to ${isDark ? "light" : "dark"} mode.`);
+  }
+
+  async function handlePanicNetworkSave(patch = {}, successMessage = "Panic network updated.") {
+    const previousSettings = settings;
+    const nextSettings = { ...settings, ...patch };
+    setSettings(nextSettings);
+    setSavingPanicNetwork(true);
+    try {
+      const updated = await updateHomeownerSettings(buildSettingsPayload(nextSettings));
+      setSettings((prev) => ({ ...prev, ...updated }));
+      showSuccess(successMessage);
+    } catch (error) {
+      setSettings(previousSettings);
+      showError(error?.message || "Failed to update panic network settings.");
+    } finally {
+      setSavingPanicNetwork(false);
+    }
+  }
+
+  async function handleCaptureSafetyLocation() {
+    setSavingPanicNetwork(true);
+    try {
+      const result = await getCurrentDeviceLocation({ enableHighAccuracy: false });
+      if (!result?.ok || !result?.coords) {
+        throw new Error("Location capture was not available.");
+      }
+      const patch = {
+        safetyHomeLocation: {
+          lat: Number(result.coords.latitude),
+          lng: Number(result.coords.longitude)
+        }
+      };
+      const updated = await updateHomeownerSettings(buildSettingsPayload({ ...settings, ...patch }));
+      setSettings((prev) => ({ ...prev, ...updated }));
+      showSuccess("Home safety location saved for nearby panic matching.");
+    } catch (error) {
+      showError(error?.message || "Unable to capture your location.");
+    } finally {
+      setSavingPanicNetwork(false);
+    }
   }
 
   function handleLanguageSelect(nextLanguage) {
@@ -380,6 +432,147 @@ export default function HomeownerSettingsPage() {
             <SettingsItem icon={<Globe />} label="Language" sublabel={selectedLanguage?.label || "English"} color="bg-slate-50 text-slate-600" onClick={() => openModal("language")} />
             <SettingsItem icon={<HelpCircle />} label="FAQs" color="bg-slate-50 text-slate-600" onClick={() => openExternalPermission("faq")} />
             <SettingsItem icon={<HelpCircle />} label="Support" color="bg-slate-50 text-slate-600" onClick={() => openExternalPermission("support")} />
+          </SettingsGroup>
+
+          <SettingsGroup title="Panic Network">
+            <div className="rounded-[1.6rem] border border-slate-100 bg-white px-4 py-4 dark:border-slate-800 dark:bg-slate-900">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-black text-slate-900 dark:text-white">Allow Nearby Panic Alerts</p>
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    Alert trusted people nearby who have chosen to help.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={savingPanicNetwork}
+                  onClick={() => handlePanicNetworkSave({ nearbyPanicAlertsEnabled: !settings.nearbyPanicAlertsEnabled })}
+                  className={`w-11 h-6 rounded-full relative transition-all ${settings.nearbyPanicAlertsEnabled ? "bg-emerald-600" : "bg-slate-200 dark:bg-slate-700"}`}
+                >
+                  <div className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-all ${settings.nearbyPanicAlertsEnabled ? "right-1" : "left-1"}`} />
+                </button>
+              </div>
+
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <InlineSelect
+                  label="Alert Radius"
+                  value={String(settings.nearbyPanicAlertRadiusMeters || 500)}
+                  disabled={savingPanicNetwork}
+                  options={[
+                    { value: "200", label: "200m" },
+                    { value: "500", label: "500m" },
+                    { value: "1000", label: "1km" }
+                  ]}
+                  onChange={(value) => handlePanicNetworkSave({ nearbyPanicAlertRadiusMeters: Number(value) })}
+                />
+                <InlineSelect
+                  label="Availability"
+                  value={settings.nearbyPanicAvailability || "always"}
+                  disabled={savingPanicNetwork}
+                  options={[
+                    { value: "always", label: "Always" },
+                    { value: "night_only", label: "Night Only" },
+                    { value: "custom", label: "Custom Schedule" }
+                  ]}
+                  onChange={(value) =>
+                    handlePanicNetworkSave({
+                      nearbyPanicAvailability: value,
+                      nearbyPanicCustomSchedule:
+                        value === "custom"
+                          ? [{ days: [0, 1, 2, 3, 4, 5, 6], start: "20:00", end: "06:00" }]
+                          : settings.nearbyPanicCustomSchedule
+                    })
+                  }
+                />
+                <InlineSelect
+                  label="Receive From"
+                  value={settings.nearbyPanicReceiveFrom || "everyone"}
+                  disabled={savingPanicNetwork}
+                  options={[
+                    { value: "everyone", label: "Everyone" },
+                    { value: "verified_only", label: "Verified Users Only" },
+                    { value: "same_area", label: "Same Street / Area" }
+                  ]}
+                  onChange={(value) => handlePanicNetworkSave({ nearbyPanicReceiveFrom: value })}
+                />
+                <InlineSelect
+                  label="Identity"
+                  value={settings.panicIdentityVisibility || "masked"}
+                  disabled={savingPanicNetwork}
+                  options={[
+                    { value: "masked", label: "Masked" },
+                    { value: "public", label: "Public" }
+                  ]}
+                  onChange={(value) => handlePanicNetworkSave({ panicIdentityVisibility: value })}
+                />
+              </div>
+
+              <div className="mt-4 grid gap-4 sm:grid-cols-[1fr_auto]">
+                <InputGroup
+                  label="Area Label"
+                  value={settings.nearbyPanicSameAreaLabel || ""}
+                  onChange={(value) => setSettings((current) => ({ ...current, nearbyPanicSameAreaLabel: value }))}
+                />
+                <button
+                  type="button"
+                  disabled={savingPanicNetwork}
+                  onClick={() => handlePanicNetworkSave({ nearbyPanicSameAreaLabel: settings.nearbyPanicSameAreaLabel || "" }, "Area label saved.")}
+                  className="self-end rounded-2xl bg-slate-900 px-4 py-4 text-sm font-black text-white dark:bg-white dark:text-slate-900"
+                >
+                  Save Area
+                </button>
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={savingPanicNetwork}
+                  onClick={() => handlePanicNetworkSave({ nearbyPanicMutedUntil: addMuteHours(1) }, "Nearby panic alerts muted for 1 hour.")}
+                  className="rounded-full border border-slate-200 px-4 py-2 text-xs font-black uppercase tracking-wide text-slate-700 dark:border-slate-700 dark:text-slate-200"
+                >
+                  Mute 1 Hour
+                </button>
+                <button
+                  type="button"
+                  disabled={savingPanicNetwork}
+                  onClick={() => handlePanicNetworkSave({ nearbyPanicMutedUntil: endOfTodayIso() }, "Nearby panic alerts muted for today.")}
+                  className="rounded-full border border-slate-200 px-4 py-2 text-xs font-black uppercase tracking-wide text-slate-700 dark:border-slate-700 dark:text-slate-200"
+                >
+                  Mute Today
+                </button>
+                <button
+                  type="button"
+                  disabled={savingPanicNetwork}
+                  onClick={() => handlePanicNetworkSave({ nearbyPanicMutedUntil: null }, "Nearby panic alerts resumed.")}
+                  className="rounded-full border border-emerald-200 px-4 py-2 text-xs font-black uppercase tracking-wide text-emerald-700 dark:border-emerald-800 dark:text-emerald-300"
+                >
+                  Unmute
+                </button>
+              </div>
+
+              <div className="mt-5 rounded-[1.4rem] border border-indigo-100 bg-indigo-50/70 p-4 dark:border-indigo-900/30 dark:bg-indigo-950/20">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-black text-slate-900 dark:text-white">Home Safety Location</p>
+                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                      Used to match you with nearby panic alerts inside your chosen radius.
+                    </p>
+                    <p className="mt-2 text-xs font-bold text-slate-600 dark:text-slate-300">
+                      {formatSafetyLocation(settings.safetyHomeLocation)}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={savingPanicNetwork}
+                    onClick={handleCaptureSafetyLocation}
+                    className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-4 py-3 text-xs font-black uppercase tracking-wide text-white"
+                  >
+                    <MapPin size={14} />
+                    {savingPanicNetwork ? "Saving..." : "Use Current Location"}
+                  </button>
+                </div>
+              </div>
+            </div>
           </SettingsGroup>
 
           {!settings.managedByEstate && (
@@ -696,8 +889,37 @@ function buildSettingsPayload(settings) {
     autoApproveKnownContacts: Boolean(settings.autoApproveKnownContacts),
     knownContacts: Array.isArray(settings.knownContacts) ? settings.knownContacts : [],
     allowDeliveryDropAtGate: Boolean(settings.allowDeliveryDropAtGate),
-    smsFallbackEnabled: Boolean(settings.smsFallbackEnabled)
+    smsFallbackEnabled: Boolean(settings.smsFallbackEnabled),
+    nearbyPanicAlertsEnabled: Boolean(settings.nearbyPanicAlertsEnabled),
+    nearbyPanicAlertRadiusMeters: Number(settings.nearbyPanicAlertRadiusMeters || 500),
+    nearbyPanicAvailability: String(settings.nearbyPanicAvailability || "always"),
+    nearbyPanicCustomSchedule: Array.isArray(settings.nearbyPanicCustomSchedule) ? settings.nearbyPanicCustomSchedule : [],
+    nearbyPanicReceiveFrom: String(settings.nearbyPanicReceiveFrom || "everyone"),
+    nearbyPanicMutedUntil: settings.nearbyPanicMutedUntil || null,
+    nearbyPanicSameAreaLabel: String(settings.nearbyPanicSameAreaLabel || ""),
+    panicIdentityVisibility: String(settings.panicIdentityVisibility || "masked"),
+    safetyHomeLocation: {
+      lat: Number(settings?.safetyHomeLocation?.lat ?? 0) || null,
+      lng: Number(settings?.safetyHomeLocation?.lng ?? 0) || null
+    }
   };
+}
+
+function addMuteHours(hours) {
+  return new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
+}
+
+function endOfTodayIso() {
+  const date = new Date();
+  date.setHours(23, 59, 59, 999);
+  return date.toISOString();
+}
+
+function formatSafetyLocation(location) {
+  const lat = Number(location?.lat);
+  const lng = Number(location?.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return "No saved location yet.";
+  return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
 }
 
 function normalizePlanLabel(value) {
@@ -742,6 +964,26 @@ function InputGroup({ label, value, onChange, type = "text", readOnly = false })
         className="w-full bg-slate-50 border border-slate-400 rounded-2xl p-4 text-sm font-bold focus:ring-2 focus:ring-indigo-500 dark:bg-slate-800 dark:text-white"
       />
     </div>
+  );
+}
+
+function InlineSelect({ label, value, onChange, options, disabled = false }) {
+  return (
+    <label className="flex flex-col gap-1 text-left">
+      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">{label}</span>
+      <select
+        value={value}
+        disabled={disabled}
+        onChange={(event) => onChange?.(event.target.value)}
+        className="w-full rounded-2xl border border-slate-300 bg-slate-50 p-4 text-sm font-bold text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 

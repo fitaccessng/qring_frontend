@@ -1,10 +1,14 @@
-import { AlertTriangle, ArrowRight, ShieldCheck, X } from "lucide-react";
+import { AlertTriangle, ArrowRight, Flag, Phone, ShieldCheck, UserCheck, X } from "lucide-react";
 
 export default function PanicAlertModal({
   alert,
   busy = false,
   canAcknowledge = true,
+  canRespond = false,
   onAcknowledge,
+  onRespond,
+  onIgnore,
+  onReportFalse,
   onOpenDetails,
   onDismiss
 }) {
@@ -27,25 +31,42 @@ export default function PanicAlertModal({
 
           <div className="mt-6 rounded-[1.6rem] border border-white/10 bg-white/5 p-5">
             <p className="text-2xl font-bold">{alert.userName || "Resident"}</p>
-            <p className="mt-2 text-sm text-white/80">{alert.location?.doorName || alert.unitLabel || "Location unavailable"}</p>
+            <p className="mt-2 text-sm text-white/80">
+              {alert.location?.blurredAddress || alert.location?.doorName || alert.unitLabel || "Location unavailable"}
+            </p>
             <p className="mt-4 text-xs uppercase tracking-[0.28em] text-rose-200">
               {alert.acknowledged ? "Acknowledged" : "Awaiting acknowledgement"}
             </p>
             <p className="mt-2 text-sm text-white/70">
               Triggered {alert.createdAt ? new Date(alert.createdAt).toLocaleString() : "just now"}
             </p>
+            {alert.responderCount ? (
+              <p className="mt-2 text-sm text-emerald-300">{alert.responderCount} responder{alert.responderCount === 1 ? "" : "s"} already in motion.</p>
+            ) : null}
           </div>
 
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            <button
-              type="button"
-              disabled={busy || !canAcknowledge || alert.acknowledged}
-              onClick={onAcknowledge}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-white px-5 py-3.5 text-sm font-semibold text-black disabled:opacity-60"
-            >
-              <ShieldCheck className="h-4 w-4" />
-              {busy ? "Acknowledging..." : alert.acknowledged ? "Acknowledged" : "Acknowledge"}
-            </button>
+            {canAcknowledge ? (
+              <button
+                type="button"
+                disabled={busy || !canAcknowledge || alert.acknowledged}
+                onClick={onAcknowledge}
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-white px-5 py-3.5 text-sm font-semibold text-black disabled:opacity-60"
+              >
+                <ShieldCheck className="h-4 w-4" />
+                {busy ? "Acknowledging..." : alert.acknowledged ? "Acknowledged" : "Acknowledge"}
+              </button>
+            ) : canRespond ? (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={onRespond}
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-emerald-500 px-5 py-3.5 text-sm font-semibold text-white disabled:opacity-60"
+              >
+                <UserCheck className="h-4 w-4" />
+                {busy ? "Updating..." : "I'm Responding"}
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={onOpenDetails}
@@ -55,6 +76,36 @@ export default function PanicAlertModal({
               <ArrowRight className="h-4 w-4" />
             </button>
           </div>
+
+          {canRespond ? (
+            <div className="mt-3 grid gap-3 sm:grid-cols-3">
+              <a
+                href={alert.userPhone ? `tel:${alert.userPhone}` : undefined}
+                className={`inline-flex items-center justify-center gap-2 rounded-full border border-white/15 px-4 py-3 text-sm font-semibold ${alert.userPhone ? "bg-white/5 text-white" : "bg-white/5 text-white/40 pointer-events-none"}`}
+              >
+                <Phone className="h-4 w-4" />
+                Call User
+              </a>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={onIgnore}
+                className="inline-flex items-center justify-center gap-2 rounded-full border border-white/15 bg-transparent px-4 py-3 text-sm font-semibold text-white/80 disabled:opacity-60"
+              >
+                <X className="h-4 w-4" />
+                Ignore
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={onReportFalse}
+                className="inline-flex items-center justify-center gap-2 rounded-full border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm font-semibold text-amber-100 disabled:opacity-60"
+              >
+                <Flag className="h-4 w-4" />
+                Report False
+              </button>
+            </div>
+          ) : null}
 
           {alert.acknowledged ? (
             <button
