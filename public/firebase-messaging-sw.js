@@ -41,11 +41,20 @@ importScripts("/firebase-messaging-compat.js");
         const title = payload?.notification?.title || payload?.data?.title || "Qring Alert";
         const body = payload?.notification?.body || payload?.data?.body || "You have a new notification.";
         const data = payload?.data || {};
+        const actionSet = data?.actionSet || "";
+        const actions = actionSet === "panic_response"
+          ? [
+              { action: "respond", title: "I'm Responding" },
+              { action: "ignore", title: "Ignore" },
+              { action: "report_false", title: "Report False" },
+            ]
+          : [];
         self.registration.showNotification(title, {
           body,
           data,
-          icon: "/icon-192.png",
-          badge: "/icon-192.png",
+          actions,
+          icon: "/qring_logo.png",
+          badge: "/qring_logo.png",
         });
       };
       show();
@@ -59,6 +68,11 @@ self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const data = event?.notification?.data || {};
   const route = typeof data.route === "string" ? data.route : "";
-  const url = route && route.startsWith("/") ? route : "/";
+  const panicId = typeof data.panicId === "string" ? data.panicId : "";
+  const action = typeof event.action === "string" ? event.action : "";
+  const url =
+    action && panicId
+      ? `/dashboard/homeowner/safety?panicAction=${encodeURIComponent(action)}&panicId=${encodeURIComponent(panicId)}`
+      : route && route.startsWith("/") ? route : "/";
   event.waitUntil(clients.openWindow(url));
 });

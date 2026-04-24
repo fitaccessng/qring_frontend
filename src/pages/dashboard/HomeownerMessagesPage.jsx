@@ -278,7 +278,7 @@ export default function HomeownerMessagesPage() {
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 placeholder="Type secure reply..."
-                className="w-full bg-slate-50 border-none rounded-2xl py-4 pl-5 pr-24 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-600/10"
+                className="w-full bg-slate-50 border border-slate-300 rounded-2xl py-4 pl-5 pr-24 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-600/10"
               />
               <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
                 <VoiceNoteRecorder onSend={handleSendVoiceNote} />
@@ -292,7 +292,11 @@ export default function HomeownerMessagesPage() {
       </main>
 
       {/* Bottom Navigation */}
+<<<<<<< HEAD
      
+=======
+    
+>>>>>>> 0fdd799755b08ac01a92e9d93143562b7cba3b19
     </div>
   );
 }

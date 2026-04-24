@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Bell, Plus, Calendar, Clock, Users, Edit3, Trash2, MapPin, Eye } from "lucide-react";
+import { motion } from "framer-motion";
+import { ArrowLeft, Bell, Plus, Calendar, Clock, Users, Edit3, Trash2, MapPin, Eye, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { createEstateAlert, deleteEstateAlert, listEstateAlerts, updateEstateAlert } from "../../services/estateService";
@@ -7,7 +8,7 @@ import { showError, showSuccess } from "../../utils/flash";
 import { useSocketEvents } from "../../hooks/useSocketEvents";
 import { getDashboardSocket } from "../../services/socketClient";
 import useEstateOverviewState from "../../hooks/useEstateOverviewState";
-import MobileBottomSheet from "../../components/mobile/MobileBottomSheet";
+import useResponsiveSheet from "../../hooks/useResponsiveSheet";
 import { estateFieldClassName, estateTextareaClassName } from "../../components/mobile/EstateManagerPageShell";
 
 const EMPTY_FORM = { title: "", agenda: "", dateTime: "" };
@@ -348,17 +349,27 @@ const EstateMeetingsPage = () => {
         </div>
       </main>
 
-      <MobileBottomSheet
+      <MeetingSheetFrame
         open={composeOpen}
-        title={editingId ? "Edit Meeting" : "Schedule Meeting"}
         onClose={() => {
           setComposeOpen(false);
           setEditingId("");
           setFormData(EMPTY_FORM);
         }}
-        height="88dvh"
+        eyebrow="Governance"
+        title={editingId ? "Edit Meeting" : "Schedule Meeting"}
+        footer={(
+          <button
+            type="submit"
+            form="estate-meeting-form"
+            disabled={busy}
+            className="w-full bg-[#4955b3] text-white py-4 rounded-2xl font-black uppercase text-sm tracking-widest shadow-lg shadow-indigo-100 transition-all active:scale-95 disabled:opacity-50"
+          >
+            {busy ? (editingId ? "Saving..." : "Scheduling...") : editingId ? "Save Changes" : "Create Meeting"}
+          </button>
+        )}
       >
-        <form onSubmit={handleSubmit} className="grid gap-4 mt-4">
+        <form id="estate-meeting-form" onSubmit={handleSubmit} className="grid gap-4 p-5 pt-1">
           <label className="block">
             <span className="mb-1 block text-xs font-black uppercase text-slate-400">Meeting Title</span>
             <input
@@ -386,15 +397,17 @@ const EstateMeetingsPage = () => {
               onChange={(e) => setFormData({ ...formData, dateTime: e.target.value })}
             />
           </label>
-          <button type="submit" disabled={busy} className="bg-[#4955b3] text-white py-4 rounded-2xl font-black uppercase text-sm tracking-widest shadow-lg shadow-indigo-100 transition-all active:scale-95 disabled:opacity-50">
-            {busy ? (editingId ? "Saving..." : "Scheduling...") : editingId ? "Save Changes" : "Create Meeting"}
-          </button>
         </form>
-      </MobileBottomSheet>
+      </MeetingSheetFrame>
 
-      <MobileBottomSheet open={detailsOpen} title="Meeting Details" onClose={() => setDetailsOpen(false)} height="88dvh">
+      <MeetingSheetFrame
+        open={detailsOpen}
+        title="Meeting Details"
+        eyebrow="Governance"
+        onClose={() => setDetailsOpen(false)}
+      >
         {selectedMeeting ? (
-          <div className="space-y-6 p-1">
+          <div className="space-y-6 p-5 pt-1">
             <div className="rounded-[2rem] bg-white border border-slate-100 p-5">
               <div className="flex items-start justify-between gap-4">
                 <div>
@@ -467,25 +480,120 @@ const EstateMeetingsPage = () => {
             </div>
           </div>
         ) : null}
-      </MobileBottomSheet>
+      </MeetingSheetFrame>
 
-      <MobileBottomSheet open={!!pendingDelete} title="Delete Meeting" onClose={() => setPendingDelete(null)} height="35dvh">
-        <div className="p-2">
-          <p className="text-slate-500 font-medium mb-6">
-            Are you sure you want to delete <span className="text-slate-900 font-bold">"{pendingDelete?.title}"</span>? This action cannot be undone.
-          </p>
+      <MeetingSheetFrame
+        open={!!pendingDelete}
+        title="Delete Meeting"
+        eyebrow="Governance"
+        onClose={() => setPendingDelete(null)}
+        panelClassName="md:max-w-lg"
+        footer={(
           <div className="grid grid-cols-2 gap-4">
             <button onClick={() => setPendingDelete(null)} className="py-4 bg-slate-100 rounded-2xl font-bold text-slate-600 uppercase text-xs tracking-widest">
               Cancel
             </button>
-            <button onClick={confirmDelete} disabled={busy} className="py-4 bg-rose-500 rounded-2xl font-bold text-white uppercase text-xs tracking-widest shadow-lg shadow-rose-100">
+            <button onClick={confirmDelete} disabled={busy} className="py-4 bg-rose-500 rounded-2xl font-bold text-white uppercase text-xs tracking-widest shadow-lg shadow-rose-100 disabled:opacity-50">
               {busy ? "Deleting..." : "Confirm"}
             </button>
           </div>
+        )}
+      >
+        <div className="p-5 pt-1">
+          <p className="text-slate-500 font-medium mb-6">
+            Are you sure you want to delete <span className="text-slate-900 font-bold">"{pendingDelete?.title}"</span>? This action cannot be undone.
+          </p>
         </div>
-      </MobileBottomSheet>
+      </MeetingSheetFrame>
     </div>
   );
 };
 
 export default EstateMeetingsPage;
+function MeetingSheetFrame({
+  open,
+  onClose,
+  eyebrow,
+  title,
+  footer = null,
+  children,
+}) {
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[140]">
+      {/* Overlay */}
+      <div
+        className="absolute inset-0 bg-slate-900/50"
+        onClick={onClose}
+      />
+
+      {/* MODAL */}
+      <div
+        className="
+          absolute inset-x-0 bottom-0
+          bg-white
+
+          h-[100dvh]
+          overflow-hidden
+
+          md:inset-auto md:top-1/2 md:left-1/2
+          md:-translate-x-1/2 md:-translate-y-1/2
+          md:max-h-[90vh]
+          md:w-full md:max-w-2xl
+          md:rounded-2xl
+
+          flex flex-col
+        "
+      >
+        {/* HEADER (NOT SCROLLABLE) */}
+        <div className="shrink-0 px-5 py-4 border-b border-slate-100">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-indigo-600">
+                {eyebrow}
+              </p>
+              <h3 className="mt-2 text-xl font-black text-slate-900">
+                {title}
+              </h3>
+            </div>
+
+            <button
+              onClick={onClose}
+              className="rounded-2xl bg-slate-50 p-3 text-slate-500"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+
+        {/* 🔥 SCROLLABLE CONTENT (THIS IS THE KEY FIX) */}
+        <div
+          className="
+            flex-1
+            overflow-y-auto
+            px-5
+            pb-10
+            min-h-0
+          "
+          style={{
+            WebkitOverflowScrolling: "touch",
+          }}
+        >
+          <div className="space-y-4 pt-4">
+            {children}
+          </div>
+
+          {/* FOOTER INSIDE SCROLL */}
+          {footer && (
+            <div className="mt-6 border-t border-slate-100 pt-4">
+              {footer}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+

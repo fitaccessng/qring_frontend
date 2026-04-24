@@ -16,7 +16,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 
-import { addEstateHome, createEstateHomeowner, inviteHomeowner } from "../../services/estateService";
+import { createEstateHomeowner, inviteHomeowner } from "../../services/estateService";
 import { showError, showSuccess } from "../../utils/flash";
 import useEstateOverviewState from "../../hooks/useEstateOverviewState";
 
@@ -81,7 +81,9 @@ const EstateInvitesPage = () => {
           estateId,
           fullName: form.fullName.trim(),
           email: cleanEmail,
-          password: temporaryPassword
+          password: temporaryPassword,
+          unitName: form.unitNumber.trim(),
+          doorName: "Main Door"
         });
       } catch (err) {
         if (Number(err?.status) !== 409) throw err;
@@ -92,20 +94,6 @@ const EstateInvitesPage = () => {
           throw new Error("That email is already registered. If this resident already has an account, resend their invite from the resident list.");
         }
         created = existingHomeowner;
-      }
-
-      const alreadyLinkedToUnit = (overview?.homes || []).some(
-        (home) =>
-          home?.homeownerId === created?.id &&
-          String(home?.name || "").trim().toLowerCase() === form.unitNumber.trim().toLowerCase()
-      );
-
-      if (created?.id && form.unitNumber.trim() && !alreadyLinkedToUnit) {
-        await addEstateHome({
-          estateId,
-          homeownerId: created.id,
-          name: form.unitNumber.trim()
-        });
       }
 
       const inviteResult = created?.id

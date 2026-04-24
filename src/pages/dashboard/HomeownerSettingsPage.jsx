@@ -36,7 +36,11 @@ import { useNotifications } from "../../state/NotificationsContext";
 import { useTheme } from "../../state/ThemeContext";
 import { showError, showSuccess } from "../../utils/flash";
 
+<<<<<<< HEAD
 const DEFAULT_PROFILE_IMAGE = null;
+=======
+const DEFAULT_PROFILE_IMAGE = null; 
+>>>>>>> 0fdd799755b08ac01a92e9d93143562b7cba3b19
 
 const DEFAULT_SETTINGS = {
   pushAlerts: true,
@@ -139,7 +143,11 @@ export default function HomeownerSettingsPage() {
   }, [user]);
 
   useEffect(() => {
+<<<<<<< HEAD
     if (!activeModal) return undefined;
+=======
+    if (!isModalOpen) return undefined;
+>>>>>>> 0fdd799755b08ac01a92e9d93143562b7cba3b19
 
     const onKeyDown = (event) => {
       if (event.key === "Escape") {
@@ -161,15 +169,34 @@ export default function HomeownerSettingsPage() {
     buildUsernameFromEmail(profileForm.email || user?.email || settings?.profile?.email) ||
     "user";
   const displayedPlan = stats.plan.replace("HOME_", "");
+<<<<<<< HEAD
 
+=======
+  
+>>>>>>> 0fdd799755b08ac01a92e9d93143562b7cba3b19
   const securityBadge = useMemo(() => {
     if (settings.managedByEstate) return settings.estateName || "Estate Linked";
     return "Personal Account";
   }, [settings.estateName, settings.managedByEstate]);
 
+<<<<<<< HEAD
   function openModal(modalType) {
     setActiveModal(modalType);
     if (modalType === "profile") {
+=======
+  const modalTitle =
+    activeView === "profile"
+      ? "Edit Profile"
+      : activeView === "security"
+        ? "Privacy & Security"
+        : activeView === "language"
+          ? "Language"
+          : "Open External Page";
+
+  function openModal(view) {
+    setActiveView(view);
+    if (view === "profile") {
+>>>>>>> 0fdd799755b08ac01a92e9d93143562b7cba3b19
       setProfileForm(buildProfileForm(user, settings.profile));
     }
     if (modalType === "security") {
@@ -408,7 +435,11 @@ export default function HomeownerSettingsPage() {
         <div className="space-y-8">
           <SettingsGroup title="Account">
             <SettingsItem icon={<User />} label="Edit Profile" color="bg-blue-50 text-blue-600" onClick={() => openModal("profile")} />
+<<<<<<< HEAD
             <SettingsItem icon={<ShieldCheck />} label="Privacy & Security" sublabel={securityBadge} color="bg-emerald-50 text-emerald-600" onClick={() => openModal("privacy")} />
+=======
+            <SettingsItem icon={<ShieldCheck />} label="Privacy & Security" sublabel={securityBadge} color="bg-emerald-50 text-emerald-600" onClick={() => openModal("security")} />
+>>>>>>> 0fdd799755b08ac01a92e9d93143562b7cba3b19
             <SettingsItem icon={<Key />} label="Change Password" color="bg-slate-50 text-slate-600" onClick={() => openModal("security")} />
           </SettingsGroup>
 
@@ -423,11 +454,16 @@ export default function HomeownerSettingsPage() {
 
           <SettingsGroup title="Panic Network">
             <div className="rounded-[1.6rem] border border-slate-100 bg-white px-4 py-4 dark:border-slate-800 dark:bg-slate-900">
+<<<<<<< HEAD
               <button
                 onClick={() => openModal("panic")}
                 className="w-full flex items-start justify-between gap-4 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl p-2 transition-colors"
               >
                 <div className="text-left">
+=======
+              <div className="flex items-start justify-between gap-4">
+                <div>
+>>>>>>> 0fdd799755b08ac01a92e9d93143562b7cba3b19
                   <p className="text-sm font-black text-slate-900 dark:text-white">Allow Nearby Panic Alerts</p>
                   <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                     Alert trusted people nearby who have chosen to help.
@@ -436,6 +472,7 @@ export default function HomeownerSettingsPage() {
                 <button
                   type="button"
                   disabled={savingPanicNetwork}
+<<<<<<< HEAD
                   onClick={(e) => {
                     e.stopPropagation();
                     handlePanicNetworkSave({ nearbyPanicAlertsEnabled: !settings.nearbyPanicAlertsEnabled });
@@ -448,6 +485,137 @@ export default function HomeownerSettingsPage() {
             </div>
           </SettingsGroup>
 
+=======
+                  onClick={() => handlePanicNetworkSave({ nearbyPanicAlertsEnabled: !settings.nearbyPanicAlertsEnabled })}
+                  className={`w-11 h-6 rounded-full relative transition-all ${settings.nearbyPanicAlertsEnabled ? "bg-emerald-600" : "bg-slate-200 dark:bg-slate-700"}`}
+                >
+                  <div className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-all ${settings.nearbyPanicAlertsEnabled ? "right-1" : "left-1"}`} />
+                </button>
+              </div>
+
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <InlineSelect
+                  label="Alert Radius"
+                  value={String(settings.nearbyPanicAlertRadiusMeters || 500)}
+                  disabled={savingPanicNetwork}
+                  options={[
+                    { value: "200", label: "200m" },
+                    { value: "500", label: "500m" },
+                    { value: "1000", label: "1km" }
+                  ]}
+                  onChange={(value) => handlePanicNetworkSave({ nearbyPanicAlertRadiusMeters: Number(value) })}
+                />
+                <InlineSelect
+                  label="Availability"
+                  value={settings.nearbyPanicAvailability || "always"}
+                  disabled={savingPanicNetwork}
+                  options={[
+                    { value: "always", label: "Always" },
+                    { value: "night_only", label: "Night Only" },
+                    { value: "custom", label: "Custom Schedule" }
+                  ]}
+                  onChange={(value) =>
+                    handlePanicNetworkSave({
+                      nearbyPanicAvailability: value,
+                      nearbyPanicCustomSchedule:
+                        value === "custom"
+                          ? [{ days: [0, 1, 2, 3, 4, 5, 6], start: "20:00", end: "06:00" }]
+                          : settings.nearbyPanicCustomSchedule
+                    })
+                  }
+                />
+                <InlineSelect
+                  label="Receive From"
+                  value={settings.nearbyPanicReceiveFrom || "everyone"}
+                  disabled={savingPanicNetwork}
+                  options={[
+                    { value: "everyone", label: "Everyone" },
+                    { value: "verified_only", label: "Verified Users Only" },
+                    { value: "same_area", label: "Same Street / Area" }
+                  ]}
+                  onChange={(value) => handlePanicNetworkSave({ nearbyPanicReceiveFrom: value })}
+                />
+                <InlineSelect
+                  label="Identity"
+                  value={settings.panicIdentityVisibility || "masked"}
+                  disabled={savingPanicNetwork}
+                  options={[
+                    { value: "masked", label: "Masked" },
+                    { value: "public", label: "Public" }
+                  ]}
+                  onChange={(value) => handlePanicNetworkSave({ panicIdentityVisibility: value })}
+                />
+              </div>
+
+              <div className="mt-4 grid gap-4 sm:grid-cols-[1fr_auto]">
+                <InputGroup
+                  label="Area Label"
+                  value={settings.nearbyPanicSameAreaLabel || ""}
+                  onChange={(value) => setSettings((current) => ({ ...current, nearbyPanicSameAreaLabel: value }))}
+                />
+                <button
+                  type="button"
+                  disabled={savingPanicNetwork}
+                  onClick={() => handlePanicNetworkSave({ nearbyPanicSameAreaLabel: settings.nearbyPanicSameAreaLabel || "" }, "Area label saved.")}
+                  className="self-end rounded-2xl bg-slate-900 px-4 py-4 text-sm font-black text-white dark:bg-white dark:text-slate-900"
+                >
+                  Save Area
+                </button>
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={savingPanicNetwork}
+                  onClick={() => handlePanicNetworkSave({ nearbyPanicMutedUntil: addMuteHours(1) }, "Nearby panic alerts muted for 1 hour.")}
+                  className="rounded-full border border-slate-200 px-4 py-2 text-xs font-black uppercase tracking-wide text-slate-700 dark:border-slate-700 dark:text-slate-200"
+                >
+                  Mute 1 Hour
+                </button>
+                <button
+                  type="button"
+                  disabled={savingPanicNetwork}
+                  onClick={() => handlePanicNetworkSave({ nearbyPanicMutedUntil: endOfTodayIso() }, "Nearby panic alerts muted for today.")}
+                  className="rounded-full border border-slate-200 px-4 py-2 text-xs font-black uppercase tracking-wide text-slate-700 dark:border-slate-700 dark:text-slate-200"
+                >
+                  Mute Today
+                </button>
+                <button
+                  type="button"
+                  disabled={savingPanicNetwork}
+                  onClick={() => handlePanicNetworkSave({ nearbyPanicMutedUntil: null }, "Nearby panic alerts resumed.")}
+                  className="rounded-full border border-emerald-200 px-4 py-2 text-xs font-black uppercase tracking-wide text-emerald-700 dark:border-emerald-800 dark:text-emerald-300"
+                >
+                  Unmute
+                </button>
+              </div>
+
+              <div className="mt-5 rounded-[1.4rem] border border-indigo-100 bg-indigo-50/70 p-4 dark:border-indigo-900/30 dark:bg-indigo-950/20">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-black text-slate-900 dark:text-white">Home Safety Location</p>
+                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                      Used to match you with nearby panic alerts inside your chosen radius.
+                    </p>
+                    <p className="mt-2 text-xs font-bold text-slate-600 dark:text-slate-300">
+                      {formatSafetyLocation(settings.safetyHomeLocation)}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={savingPanicNetwork}
+                    onClick={handleCaptureSafetyLocation}
+                    className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-4 py-3 text-xs font-black uppercase tracking-wide text-white"
+                  >
+                    <MapPin size={14} />
+                    {savingPanicNetwork ? "Saving..." : "Use Current Location"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </SettingsGroup>
+
+>>>>>>> 0fdd799755b08ac01a92e9d93143562b7cba3b19
           {!settings.managedByEstate && (
             <SettingsGroup title="Subscription">
               <SettingsItem icon={<CreditCard />} label="Billing & Subscription" badge={stats.plan} onClick={() => navigate("/billing/paywall")} />
@@ -460,6 +628,7 @@ export default function HomeownerSettingsPage() {
         </div>
       </main>
 
+<<<<<<< HEAD
       {/* Dedicated Modals */}
       <ProfileModal
         isOpen={activeModal === "profile"}
@@ -509,11 +678,35 @@ export default function HomeownerSettingsPage() {
         handlePanicNetworkSave={handlePanicNetworkSave}
         handleCaptureSafetyLocation={handleCaptureSafetyLocation}
       />
+=======
+      {/* Modal / Bottom Sheet */}
+      {isModalOpen && (
+        <HomeownerSettingsSheet
+          onClose={closeModal}
+          title={modalTitle}
+          activeView={activeView}
+          savingProfile={savingProfile}
+          savingSecurity={savingSecurity}
+          confirmExternalNavigation={confirmExternalNavigation}
+          handleProfileSave={handleProfileSave}
+          handleSecuritySave={handleSecuritySave}
+          profileForm={profileForm}
+          setProfileForm={setProfileForm}
+          passwordForm={passwordForm}
+          setPasswordForm={setPasswordForm}
+          languageOptions={languageOptions}
+          language={language}
+          handleLanguageSelect={handleLanguageSelect}
+          pendingExternalAction={pendingExternalAction}
+        />
+      )}
+>>>>>>> 0fdd799755b08ac01a92e9d93143562b7cba3b19
     </div>
   );
 }
 
 /**
+<<<<<<< HEAD
  * Profile Modal Component
  */
 function ProfileModal({ isOpen, onClose, profileForm, setProfileForm, savingProfile, handleProfileSave }) {
@@ -521,6 +714,128 @@ function ProfileModal({ isOpen, onClose, profileForm, setProfileForm, savingProf
 
   return (
     <ModalWrapper onClose={onClose} title="Edit Profile">
+=======
+ * Bottom Sheet Modal Component
+ */
+
+
+function HomeownerSettingsSheet({ 
+  onClose, 
+  title, 
+  activeView, 
+  handleProfileSave, 
+  handleSecuritySave, 
+  savingProfile, 
+  savingSecurity,
+  profileForm,
+  setProfileForm,
+  passwordForm,
+  setPasswordForm,
+  languageOptions,
+  handleLanguageSelect,
+  language,
+  confirmExternalNavigation,
+  pendingExternalAction
+}) {
+  const sheetRef = React.useRef(null);
+
+  // Focus and Scroll Management
+  useEffect(() => {
+    if (sheetRef.current) {
+      // 1. Move focus to modal for accessibility and focus trap
+      sheetRef.current.focus();
+      // 2. Ensure the element is fully in the viewport
+      sheetRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
+    }
+  }, [activeView]);
+
+  // Focus Trap Logic
+  useEffect(() => {
+    const handleFocusTrap = (e) => {
+      if (e.key !== 'Tab' || !sheetRef.current) return;
+
+      const focusableSelector = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+      const focusableElements = sheetRef.current.querySelectorAll(focusableSelector);
+      
+      if (focusableElements.length === 0) return;
+
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
+
+      if (e.shiftKey) { // Shift + Tab
+        if (document.activeElement === firstElement) {
+          lastElement.focus();
+          e.preventDefault();
+        }
+      } else { // Tab
+        if (document.activeElement === lastElement) {
+          firstElement.focus();
+          e.preventDefault();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleFocusTrap);
+    return () => window.removeEventListener('keydown', handleFocusTrap);
+  }, [activeView]);
+
+  return (
+    <div className="fixed inset-0 z-[200] flex items-end justify-center">
+      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} />
+      <div 
+        ref={sheetRef}
+        tabIndex="-1" // Necessary to allow focus on a div
+        className="relative w-full max-w-xl bg-white rounded-t-[3rem] p-8 shadow-2xl animate-in slide-in-from-bottom duration-300 dark:bg-slate-900 outline-none"
+      >
+        <div className="flex justify-between items-center mb-8">
+          <h3 className="text-xl font-black text-slate-900 dark:text-white">{title}</h3>
+          <button onClick={onClose} className="p-2 bg-slate-100 rounded-full dark:bg-slate-800 dark:text-slate-400">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="max-h-[70vh] overflow-y-auto pb-10">
+          <HomeownerSettingsSheetContent 
+            activeView={activeView}
+            handleProfileSave={handleProfileSave}
+            handleSecuritySave={handleSecuritySave}
+            savingProfile={savingProfile}
+            savingSecurity={savingSecurity}
+            profileForm={profileForm}
+            setProfileForm={setProfileForm}
+            passwordForm={passwordForm}
+            setPasswordForm={setPasswordForm}
+            languageOptions={languageOptions}
+            handleLanguageSelect={handleLanguageSelect}
+            language={language}
+            confirmExternalNavigation={confirmExternalNavigation}
+            pendingExternalAction={pendingExternalAction}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HomeownerSettingsSheetContent({
+  activeView,
+  handleProfileSave,
+  handleSecuritySave,
+  savingProfile,
+  savingSecurity,
+  profileForm,
+  setProfileForm,
+  passwordForm,
+  setPasswordForm,
+  languageOptions,
+  handleLanguageSelect,
+  language,
+  confirmExternalNavigation,
+  pendingExternalAction
+}) {
+  if (activeView === "profile") {
+    return (
+>>>>>>> 0fdd799755b08ac01a92e9d93143562b7cba3b19
       <form className="space-y-4" onSubmit={handleProfileSave}>
         <InputGroup
           label="Full Name"
@@ -528,13 +843,21 @@ function ProfileModal({ isOpen, onClose, profileForm, setProfileForm, savingProf
           onChange={(value) => setProfileForm((prev) => ({ ...prev, fullName: value }))}
         />
         <InputGroup
+<<<<<<< HEAD
           style={{ border: "2px solid black", backgroundColor: "#f9fafb" }}
+=======
+         style={{ border:"2px solid black", backgroundColor: "#f9fafb" }}
+>>>>>>> 0fdd799755b08ac01a92e9d93143562b7cba3b19
           label="Username"
           value={profileForm.username}
           onChange={(value) => setProfileForm((prev) => ({ ...prev, username: value }))}
         />
         <InputGroup label="Email" value={profileForm.email} readOnly />
         <InputGroup
+<<<<<<< HEAD
+=======
+    
+>>>>>>> 0fdd799755b08ac01a92e9d93143562b7cba3b19
           label="Phone"
           value={profileForm.phone}
           onChange={(value) => setProfileForm((prev) => ({ ...prev, phone: value }))}
@@ -557,6 +880,7 @@ function ProfileModal({ isOpen, onClose, profileForm, setProfileForm, savingProf
           {savingProfile ? "Saving..." : "Save Profile"}
         </button>
       </form>
+<<<<<<< HEAD
     </ModalWrapper>
   );
 }
@@ -600,6 +924,13 @@ function SecurityModal({ isOpen, onClose, passwordForm, setPasswordForm, savingS
 
   return (
     <ModalWrapper onClose={onClose} title="Change Password">
+=======
+    );
+  }
+
+  if (activeView === "security") {
+    return (
+>>>>>>> 0fdd799755b08ac01a92e9d93143562b7cba3b19
       <form className="space-y-4" onSubmit={handleSecuritySave}>
         <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
           Update your password to keep your homeowner account secure.
@@ -630,6 +961,7 @@ function SecurityModal({ isOpen, onClose, passwordForm, setPasswordForm, savingS
           {savingSecurity ? "Updating..." : "Change Password"}
         </button>
       </form>
+<<<<<<< HEAD
     </ModalWrapper>
   );
 }
@@ -642,6 +974,13 @@ function LanguageModal({ isOpen, onClose, languageOptions, language, handleLangu
 
   return (
     <ModalWrapper onClose={onClose} title="Select Language">
+=======
+    );
+  }
+
+  if (activeView === "language") {
+    return (
+>>>>>>> 0fdd799755b08ac01a92e9d93143562b7cba3b19
       <div className="space-y-3">
         {languageOptions.map((option) => {
           const isSelected = option.code === language;
@@ -665,6 +1004,7 @@ function LanguageModal({ isOpen, onClose, languageOptions, language, handleLangu
           );
         })}
       </div>
+<<<<<<< HEAD
     </ModalWrapper>
   );
 }
@@ -677,6 +1017,13 @@ function ExternalModal({ isOpen, onClose, pendingExternalAction, confirmExternal
 
   return (
     <ModalWrapper onClose={onClose} title="Open External Page">
+=======
+    );
+  }
+
+  if (activeView === "external") {
+    return (
+>>>>>>> 0fdd799755b08ac01a92e9d93143562b7cba3b19
       <div className="space-y-5">
         <p className="text-sm font-bold text-slate-600 dark:text-slate-300">
           You are about to open the {pendingExternalAction === "support" ? "support" : "FAQs"} page in a new tab.
@@ -689,6 +1036,7 @@ function ExternalModal({ isOpen, onClose, pendingExternalAction, confirmExternal
           Continue
         </button>
       </div>
+<<<<<<< HEAD
     </ModalWrapper>
   );
 }
@@ -907,6 +1255,13 @@ function ModalWrapper({ children, onClose, title }) {
   );
 }
 
+=======
+    );
+  }
+
+  return null;
+}
+>>>>>>> 0fdd799755b08ac01a92e9d93143562b7cba3b19
 /**
  * Helper Functions & Small Components
  */
@@ -1013,7 +1368,10 @@ function InputGroup({ label, value, onChange, type = "text", readOnly = false, s
         value={value}
         readOnly={readOnly}
         onChange={onChange ? (e) => onChange(e.target.value) : undefined}
+<<<<<<< HEAD
         style={style}
+=======
+>>>>>>> 0fdd799755b08ac01a92e9d93143562b7cba3b19
         className="w-full bg-slate-50 border border-slate-400 rounded-2xl p-4 text-sm font-bold focus:ring-2 focus:ring-indigo-500 dark:bg-slate-800 dark:text-white"
       />
     </div>
@@ -1084,4 +1442,8 @@ function SettingsItem({ icon, label, sublabel, color, toggle = false, checked = 
       </div>
     </div>
   );
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 0fdd799755b08ac01a92e9d93143562b7cba3b19

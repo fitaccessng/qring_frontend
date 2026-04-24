@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { motion } from "framer-motion";
 import {
   ArrowLeft,
   Bell,
@@ -8,7 +9,8 @@ import {
   Users,
   Lock,
   Eye,
-  CheckCircle2
+  CheckCircle2,
+  X
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -17,7 +19,7 @@ import { createEstateAlert, deleteEstateAlert, listEstateAlerts, updateEstateAle
 import { showError, showSuccess } from "../../utils/flash";
 import { useSocketEvents } from "../../hooks/useSocketEvents";
 import useEstateOverviewState from "../../hooks/useEstateOverviewState";
-import MobileBottomSheet from "../../components/mobile/MobileBottomSheet";
+import useResponsiveSheet from "../../hooks/useResponsiveSheet";
 
 const EstatePollsPage = () => {
   const navigate = useNavigate();
@@ -202,9 +204,15 @@ const EstatePollsPage = () => {
       </button>
 
       {/* View Results Detail Sheet */}
-      <MobileBottomSheet open={!!selectedPoll} title="Poll Results" onClose={() => setSelectedPoll(null)}>
+      <PollSheetFrame
+        open={!!selectedPoll}
+        onClose={() => setSelectedPoll(null)}
+        eyebrow="Governance Center"
+        title="Poll Results"
+        panelClassName="md:max-w-xl"
+      >
         {selectedPoll && (
-          <div className="p-6">
+          <div className="p-6 pt-1">
             <h3 className="text-xl font-black text-[#2b3437] mb-6 leading-tight">{selectedPoll.title}</h3>
             <div className="space-y-6">
               {selectedPoll.pollResults?.map((row, idx) => (
@@ -228,10 +236,16 @@ const EstatePollsPage = () => {
             </div>
           </div>
         )}
-      </MobileBottomSheet>
+      </PollSheetFrame>
 
-      <MobileBottomSheet open={composeOpen} title="New Community Poll" onClose={() => setComposeOpen(false)}>
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+      <PollSheetFrame
+        open={composeOpen}
+        onClose={() => setComposeOpen(false)}
+        eyebrow="Governance Center"
+        title="New Community Poll"
+        panelClassName="md:max-w-xl"
+      >
+        <form onSubmit={handleSubmit} className="p-6 pt-1 space-y-6">
           <textarea value={question} onChange={e => setQuestion(e.target.value)} className="w-full bg-slate-100 border-none rounded-2xl p-4 font-bold text-slate-800 placeholder:text-slate-400" placeholder="What's the question?" rows={3} required />
           <div className="space-y-3">
             {options.map((opt, idx) => (
@@ -243,11 +257,17 @@ const EstatePollsPage = () => {
             {busy ? "Publishing..." : "Launch Poll"}
           </button>
         </form>
-      </MobileBottomSheet>
+      </PollSheetFrame>
 
-      <MobileBottomSheet open={!!pollToClose} title="End Poll" onClose={() => setPollToClose(null)}>
+      <PollSheetFrame
+        open={!!pollToClose}
+        onClose={() => setPollToClose(null)}
+        eyebrow="Governance Center"
+        title="End Poll"
+        panelClassName="md:max-w-lg"
+      >
         {pollToClose ? (
-          <div className="p-6 space-y-6">
+          <div className="p-6 pt-1 space-y-6">
             <div className="space-y-3">
               <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
                 <Lock size={22} />
@@ -282,9 +302,71 @@ const EstatePollsPage = () => {
             </div>
           </div>
         ) : null}
-      </MobileBottomSheet>
+      </PollSheetFrame>
     </div>
   );
 };
 
 export default EstatePollsPage;
+
+function PollSheetFrame({ open, onClose, eyebrow, title, panelClassName = "", children }) {
+  const sheet = useResponsiveSheet({ open, onClose });
+
+  if (!open) return null;
+
+  if (!sheet.isMobile) {
+    return (
+      <div className="fixed inset-0 z-[140] flex items-center justify-center px-4">
+        <button type="button" className="absolute inset-0 bg-slate-900/45 backdrop-blur-sm" onClick={onClose} aria-label={`Close ${title}`} />
+        <motion.section
+          initial={{ opacity: 0, scale: 0.97, y: 12 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          className={`relative w-full overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_28px_80px_rgba(15,23,42,0.2)] ${panelClassName}`}
+        >
+          <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#4955b3]">{eyebrow}</p>
+              <h3 className="mt-2 text-2xl font-black text-[#2b3437]">{title}</h3>
+            </div>
+            <button type="button" onClick={onClose} className="rounded-2xl bg-slate-50 p-3 text-slate-500 transition-all hover:bg-slate-100">
+              <X size={18} />
+            </button>
+          </div>
+          <div className="max-h-[75dvh] overflow-y-auto">{children}</div>
+        </motion.section>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-[140] flex items-end" style={{ height: sheet.viewportHeight || undefined }}>
+      <button type="button" className="absolute inset-0 bg-slate-900/45" onClick={onClose} aria-label={`Close ${title}`} />
+      <motion.section
+        {...sheet.mobileSheetProps}
+        className="relative flex w-full flex-col overflow-hidden rounded-t-[2rem] bg-white shadow-[0_-18px_40px_rgba(15,23,42,0.16)]"
+      >
+        <div onPointerDown={sheet.startDrag} className="flex justify-center py-3">
+          <div className="h-1.5 w-12 rounded-full bg-slate-300" />
+        </div>
+        <div onPointerDown={sheet.startDrag} className="flex items-start justify-between px-5 pb-4">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#4955b3]">{eyebrow}</p>
+            <h3 className="mt-2 text-xl font-black text-[#2b3437]">{title}</h3>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-2xl bg-slate-50 p-3 text-slate-500">
+            <X size={18} />
+          </button>
+        </div>
+        <div
+          ref={sheet.contentRef}
+          onScroll={sheet.onContentScroll}
+          onPointerDown={sheet.onContentPointerDown}
+          className="flex-1 overflow-y-auto"
+        >
+          {children}
+        </div>
+        <div className="h-[env(safe-area-inset-bottom)] bg-white" />
+      </motion.section>
+    </div>
+  );
+}

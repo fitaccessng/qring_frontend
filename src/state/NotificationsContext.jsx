@@ -15,12 +15,15 @@ import { resolveNotificationRoute } from "../utils/notificationRouting";
 import { notify } from "../utils/notifier";
 import { registerNativePushSubscription } from "../services/nativePushService";
 import { registerFcmPushSubscription, setupForegroundMessageListener } from "../services/pushMessagingService";
+import { registerNativePushNotifications } from "../services/nativePushService";
 import { isNativeApp } from "../utils/nativeRuntime";
 import { isFirebaseConfigured } from "../config/firebase";
 import { playPanicAlertSound } from "../utils/notificationSound";
 
 const NotificationsContext = createContext(null);
 const POLL_INTERVAL_MS = 45000;
+const NOTIFICATION_POPUP_STORAGE_PREFIX = "qring_notification_popup_seen";
+const MAX_POPUP_TRACKED_IDS = 500;
 const SOCKET_EVENTS = new Set([
   "notification.created",
   "notification.updated",
@@ -32,6 +35,23 @@ const SOCKET_EVENTS = new Set([
   "PAYMENT_STATUS_UPDATED",
   "VISITOR_REQUESTED"
 ]);
+const LEGACY_WELCOME_NOTIFICATION_MESSAGE = "Welcome to Qring dashboard. Notifications are now active.";
+
+function getNotificationSeenKey(item) {
+  const notificationId = String(item?.id || "").trim();
+  const payload = parseNotificationPayload(item?.payload);
+  const sessionId = String(item?.sessionId || payload?.sessionId || payload?.session_id || "").trim();
+  const appointmentId = String(payload?.appointmentId || payload?.appointment_id || "").trim();
+  const createdAt = String(item?.createdAt || item?.created_at || payload?.createdAt || "").trim();
+  const kind = String(item?.kind || item?.type || payload?.kind || payload?.type || "").trim().toLowerCase();
+  const message = String(item?.message || item?.body || payload?.message || payload?.body || "").trim();
+
+  if (notificationId) {
+    return `id:${notificationId}`;
+  }
+
+  return `meta:${kind}|${sessionId}|${appointmentId}|${createdAt}|${message}`;
+}
 
 function toNotification(raw, role) {
   const payload = parseNotificationPayload(raw?.payload);
@@ -45,6 +65,45 @@ function toNotification(raw, role) {
   );
 }
 
+function shouldSuppressPopupNotification(item) {
+  const message = String(item?.message || "").trim();
+  const kind = String(item?.kind || "").trim().toLowerCase();
+  return kind === "system" && message === LEGACY_WELCOME_NOTIFICATION_MESSAGE;
+}
+
+function buildPopupStorageKey(user) {
+  const userId = String(user?.id || "").trim();
+  const role = String(user?.role || "").trim().toLowerCase();
+  const email = typeof user?.email === "string" ? user.email.trim().toLowerCase() : "";
+  if (!role) return "";
+  if (userId) return `${NOTIFICATION_POPUP_STORAGE_PREFIX}:${role}:id:${userId}`;
+  if (email) return `${NOTIFICATION_POPUP_STORAGE_PREFIX}:${role}:email:${email}`;
+  return "";
+}
+
+
+// Use sessionStorage to prevent repeated popups per session (login/refresh)
+function readSeenPopupIds(storageKey) {
+  if (typeof window === "undefined" || !storageKey) return new Set();
+  try {
+    const parsed = JSON.parse(window.sessionStorage.getItem(storageKey) || "[]");
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(parsed.map((value) => String(value || "").trim()).filter(Boolean));
+  } catch {
+    return new Set();
+  }
+}
+
+function writeSeenPopupIds(storageKey, ids) {
+  if (typeof window === "undefined" || !storageKey) return;
+  try {
+    const next = Array.from(ids).filter(Boolean).slice(-MAX_POPUP_TRACKED_IDS);
+    window.sessionStorage.setItem(storageKey, JSON.stringify(next));
+  } catch {
+    // Ignore storage failures and keep notifications functional.
+  }
+}
+
 export function NotificationsProvider({ children }) {
   const { user } = useAuth();
   const nativeApp = isNativeApp();
@@ -56,7 +115,9 @@ export function NotificationsProvider({ children }) {
   );
   const [pushStatus, setPushStatus] = useState("idle");
   const isMountedRef = useRef(false);
-  const shownNotificationIdsRef = useRef(new Set());
+  const popupStorageKey = useMemo(() => buildPopupStorageKey(user), [user]);
+  const seenPopupIdsRef = useRef(new Set());
+  const hasHydratedPopupStateRef = useRef(false);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -67,8 +128,10 @@ export function NotificationsProvider({ children }) {
 
   useEffect(() => {
     setItems([]);
-    shownNotificationIdsRef.current.clear();
-  }, [user?.id, user?.role]);
+    seenPopupIdsRef.current = readSeenPopupIds(popupStorageKey);
+    hasHydratedPopupStateRef.current = false;
+    writeSeenPopupIds(popupStorageKey, seenPopupIdsRef.current);
+  }, [popupStorageKey]);
 
   async function refresh({ silent = false } = {}) {
     if (!user?.role) return [];
@@ -173,6 +236,20 @@ export function NotificationsProvider({ children }) {
   }, [user?.id, user?.role]);
 
   useEffect(() => {
+    if (!nativeApp) return;
+    registerNativePushNotifications()
+      .then((result) => {
+        if (!isMountedRef.current) return;
+        setPermission(result?.ok ? "granted" : "prompt");
+        setPushStatus(result?.status || "unsupported");
+      })
+      .catch(() => {
+        if (!isMountedRef.current) return;
+        setPushStatus("native_registration_failed");
+      });
+  }, [nativeApp]);
+
+  useEffect(() => {
     if (nativeApp) return () => {};
     let dispose = () => {};
     setupForegroundMessageListener(() => {
@@ -200,6 +277,7 @@ export function NotificationsProvider({ children }) {
   }, [nativeApp, permission]);
 
   useEffect(() => {
+<<<<<<< HEAD
     if (!nativeApp || !user?.id) return;
     registerNativePushSubscription({
       onNotification: (notification) => {
@@ -225,11 +303,38 @@ export function NotificationsProvider({ children }) {
   }, [nativeApp, user?.id]);
 
   useEffect(() => {
+=======
+    const currentSeenKeys = items.map((item) => getNotificationSeenKey(item)).filter(Boolean);
+    if (currentSeenKeys.length === 0) {
+      if (!hasHydratedPopupStateRef.current) {
+        hasHydratedPopupStateRef.current = true;
+      }
+      return;
+    }
+
+    if (!hasHydratedPopupStateRef.current) {
+      currentSeenKeys.forEach((seenKey) => {
+        seenPopupIdsRef.current.add(seenKey);
+      });
+      hasHydratedPopupStateRef.current = true;
+      writeSeenPopupIds(popupStorageKey, seenPopupIdsRef.current);
+      return;
+    }
+
+    let didChange = false;
+>>>>>>> 0fdd799755b08ac01a92e9d93143562b7cba3b19
     items
       .filter((item) => item.unread)
       .forEach((item) => {
-        if (shownNotificationIdsRef.current.has(item.id)) return;
-        shownNotificationIdsRef.current.add(item.id);
+        const seenKey = getNotificationSeenKey(item);
+        if (!seenKey) return;
+        if (seenPopupIdsRef.current.has(seenKey)) return;
+
+        seenPopupIdsRef.current.add(seenKey);
+        didChange = true;
+        if (shouldSuppressPopupNotification(item)) {
+          return;
+        }
         if (item.kind === "safety.panic") {
           playPanicAlertSound();
         }
@@ -239,10 +344,21 @@ export function NotificationsProvider({ children }) {
           message: item.message,
           kind: item.kind,
           route: item.route,
+          dedupeKey: `notification:${seenKey}`,
           duration: item.priority === "critical" ? 5200 : 3600
         });
       });
-  }, [items]);
+
+    currentSeenKeys.forEach((seenKey) => {
+      if (seenPopupIdsRef.current.has(seenKey)) return;
+      seenPopupIdsRef.current.add(seenKey);
+      didChange = true;
+    });
+
+    if (didChange) {
+      writeSeenPopupIds(popupStorageKey, seenPopupIdsRef.current);
+    }
+  }, [items, popupStorageKey]);
 
   async function handleMarkRead(notificationId) {
     if (!notificationId) return;
@@ -327,6 +443,7 @@ export function NotificationsProvider({ children }) {
   async function enableBrowserAlerts() {
     if (nativeApp) {
       try {
+<<<<<<< HEAD
         const result = await registerNativePushSubscription({
           onNotification: () => refresh({ silent: true }),
           onAction: () => refresh({ silent: true }),
@@ -351,6 +468,26 @@ export function NotificationsProvider({ children }) {
           permission: "denied",
           pushStatus: "registration_failed",
           message: "Native push registration failed on this device."
+=======
+        const result = await registerNativePushNotifications();
+        const nextPermission = result?.ok ? "granted" : "prompt";
+        setPermission(nextPermission);
+        setPushStatus(result?.status || "unsupported");
+        return {
+          ok: !!result?.ok,
+          permission: nextPermission,
+          pushStatus: result?.status || "unsupported",
+          message: result?.message || "Native notification setup completed."
+        };
+      } catch {
+        setPermission("prompt");
+        setPushStatus("native_registration_failed");
+        return {
+          ok: false,
+          permission: "prompt",
+          pushStatus: "native_registration_failed",
+          message: "Native notification registration failed on this device."
+>>>>>>> 0fdd799755b08ac01a92e9d93143562b7cba3b19
         };
       }
     }

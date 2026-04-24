@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { motion } from "framer-motion";
 import { 
   ArrowLeft, 
   Bell, 
@@ -28,6 +29,7 @@ import { useAuth } from "../../state/AuthContext";
 import { useApiQuery } from "../../hooks/useApi";
 import { endpoints } from "../../services/endpoints";
 import useEstateOverviewState from "../../hooks/useEstateOverviewState";
+import useResponsiveSheet from "../../hooks/useResponsiveSheet";
 
 export default function EstateSettingsPage() {
   const navigate = useNavigate();
@@ -127,12 +129,12 @@ export default function EstateSettingsPage() {
       </header>
 
       {/* --- Main Content --- */}
-      <main className="pt-24 pb-32 px-6 max-w-2xl mx-auto space-y-8">
+      <main className="pt-24 pb-32 px-6 max-w-2xl mx-auto space-y-6">
         
         {/* Profile Bento Card */}
-        <section className="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-xl shadow-indigo-900/5 text-center relative overflow-hidden">
+        <section className="bg-white rounded-[2.5rem] p-7 border border-slate-100 shadow-xl shadow-indigo-900/5 text-center relative overflow-hidden">
           <div className="relative z-10">
-            <div className="relative inline-block mb-4">
+            <div className="relative inline-block mb-3">
               <div className="w-24 h-24 rounded-[2rem] bg-indigo-50 flex items-center justify-center overflow-hidden border-4 border-white shadow-lg">
                 <img src={profile.avatar} alt="Admin" className="w-full h-full object-cover" />
               </div>
@@ -152,7 +154,7 @@ export default function EstateSettingsPage() {
         </section>
 
         {/* Section: Account Settings */}
-        <section className="space-y-3">
+        <section className="space-y-2.5">
           <h3 className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Account Configuration</h3>
           <div className="bg-white rounded-[2rem] border border-slate-100 overflow-hidden shadow-sm">
             <SettingsRow 
@@ -177,7 +179,7 @@ export default function EstateSettingsPage() {
         </section>
 
         {/* Section: Estate Controls */}
-        <section className="space-y-3">
+        <section className="space-y-2.5">
           <h3 className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Management</h3>
           <div className="bg-white rounded-[2rem] border border-slate-100 overflow-hidden shadow-sm">
             <SettingsRow 
@@ -202,11 +204,11 @@ export default function EstateSettingsPage() {
         </section>
 
         {/* Section: App Preferences */}
-        <section className="space-y-3">
+        <section className="space-y-2.5">
           <h3 className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Preferences</h3>
           <div className="bg-white rounded-[2rem] border border-slate-100 overflow-hidden shadow-sm">
-            <div className="flex items-center justify-between p-5 hover:bg-slate-50 transition-colors cursor-pointer group">
-              <div className="flex items-center gap-4">
+            <div className="flex items-center justify-between px-5 py-4 hover:bg-slate-50 transition-colors cursor-pointer group">
+              <div className="flex items-center gap-3.5">
                 <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-500 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-all">
                   <Moon size={18} />
                 </div>
@@ -233,17 +235,27 @@ export default function EstateSettingsPage() {
           className="w-full py-5 rounded-[2rem] flex items-center justify-center gap-3 text-rose-500 font-black text-xs uppercase tracking-widest hover:bg-rose-50 transition-all border border-transparent hover:border-rose-100 active:scale-95"
         >
           <LogOut size={18} />
-          Terminate Session
+          Logout
         </button>
 
         {/* ===== MODALS ===== */}
 
         {/* Personal Details Modal */}
         {activeModal === "personalDetails" && (
-          <BottomModal onClose={() => setActiveModal(null)}>
-            <div className="space-y-4">
-              <h2 className="text-lg font-black text-slate-900">Edit Personal Details</h2>
-              <div className="space-y-3">
+          <BottomModal
+            title="Edit Personal Details"
+            onClose={() => setActiveModal(null)}
+            footer={
+              <button 
+                onClick={() => setActiveModal(null)}
+                className="w-full py-3 bg-indigo-600 text-white rounded-xl font-black text-sm hover:bg-indigo-700 transition-all"
+              >
+                Save Changes
+              </button>
+            }
+          >
+            <div className="space-y-3.5">
+              <div className="space-y-2.5">
                 <div>
                   <label className="text-xs font-black text-slate-600 uppercase">Full Name</label>
                   <input 
@@ -263,22 +275,26 @@ export default function EstateSettingsPage() {
                   />
                 </div>
               </div>
-              <button 
-                onClick={() => setActiveModal(null)}
-                className="w-full py-3 bg-indigo-600 text-white rounded-xl font-black text-sm hover:bg-indigo-700 transition-all"
-              >
-                Save Changes
-              </button>
             </div>
           </BottomModal>
         )}
 
         {/* Password & Security Modal */}
         {activeModal === "password" && (
-          <BottomModal onClose={() => setActiveModal(null)}>
-            <div className="space-y-4">
-              <h2 className="text-lg font-black text-slate-900">Password & Security</h2>
-              <div className="space-y-3">
+          <BottomModal
+            title="Password & Security"
+            onClose={() => setActiveModal(null)}
+            footer={
+              <button 
+                onClick={() => setActiveModal(null)}
+                className="w-full py-3 bg-indigo-600 text-white rounded-xl font-black text-sm hover:bg-indigo-700 transition-all"
+              >
+                Update Password
+              </button>
+            }
+          >
+            <div className="space-y-3.5">
+              <div className="space-y-2.5">
                 <div>
                   <label className="text-xs font-black text-slate-600 uppercase">Current Password</label>
                   <input 
@@ -304,24 +320,17 @@ export default function EstateSettingsPage() {
                   />
                 </div>
               </div>
-              <button 
-                onClick={() => setActiveModal(null)}
-                className="w-full py-3 bg-indigo-600 text-white rounded-xl font-black text-sm hover:bg-indigo-700 transition-all"
-              >
-                Update Password
-              </button>
             </div>
           </BottomModal>
         )}
 
         {/* Estates Modal */}
         {activeModal === "estates" && (
-          <BottomModal onClose={() => setActiveModal(null)}>
-            <div className="space-y-4">
-              <h2 className="text-lg font-black text-slate-900">My Estates</h2>
-              <div className="space-y-2 max-h-96 overflow-y-auto">
+          <BottomModal title="My Estates" onClose={() => setActiveModal(null)}>
+            <div className="space-y-3.5">
+              <div className="space-y-2">
                 {overview?.estates?.map((estate) => (
-                  <div key={estate.id} className="p-4 bg-slate-50 rounded-xl border border-slate-200 hover:border-indigo-300 transition-all cursor-pointer">
+                  <div key={estate.id} className="px-4 py-3.5 bg-slate-50 rounded-xl border border-slate-200 hover:border-indigo-300 transition-all cursor-pointer">
                     <h3 className="font-black text-slate-900">{estate.name}</h3>
                     <p className="text-xs text-slate-500 mt-1">Status: <span className="uppercase font-black">{estate.status}</span></p>
                     <p className="text-xs text-slate-500 mt-1">Doors: {(overview?.doors ?? []).filter(d => String(d.estateId || d.homeId) === String(estate.id)).length}</p>
@@ -335,18 +344,17 @@ export default function EstateSettingsPage() {
 
         {/* Compliance Rules Modal */}
         {activeModal === "compliance" && (
-          <BottomModal onClose={() => setActiveModal(null)}>
-            <div className="space-y-4">
-              <h2 className="text-lg font-black text-slate-900">Compliance Rules</h2>
-              <div className="space-y-3">
-                <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-200">
+          <BottomModal title="Compliance Rules" onClose={() => setActiveModal(null)}>
+            <div className="space-y-3.5">
+              <div className="space-y-2.5">
+                <div className="px-4 py-3.5 bg-indigo-50 rounded-xl border border-indigo-200">
                   <h3 className="font-black text-indigo-900 text-sm">Access Protocols</h3>
                   <p className="text-xs text-indigo-700 mt-2">✓ Two-factor authentication enabled</p>
                   <p className="text-xs text-indigo-700">✓ Session timeout: 30 minutes</p>
                   <p className="text-xs text-indigo-700">✓ IP whitelist active</p>
                   <p className="text-xs text-indigo-700">✓ Audit logs enabled</p>
                 </div>
-                <div className="p-4 bg-rose-50 rounded-xl border border-rose-200">
+                <div className="px-4 py-3.5 bg-rose-50 rounded-xl border border-rose-200">
                   <h3 className="font-black text-rose-900 text-sm">Security Guidelines</h3>
                   <p className="text-xs text-rose-700 mt-2">• Update password every 90 days</p>
                   <p className="text-xs text-rose-700">• Never share credentials</p>
@@ -359,12 +367,11 @@ export default function EstateSettingsPage() {
 
         {/* Connected Devices Modal */}
         {activeModal === "devices" && (
-          <BottomModal onClose={() => setActiveModal(null)}>
-            <div className="space-y-4">
-              <h2 className="text-lg font-black text-slate-900">Connected Devices</h2>
-              <div className="space-y-2 max-h-96 overflow-y-auto">
+          <BottomModal title="Connected Devices" onClose={() => setActiveModal(null)}>
+            <div className="space-y-3.5">
+              <div className="space-y-2">
                 {overview?.doors?.filter(d => String(d.estateId || d.homeId) === String(currentEstateId)).map((door) => (
-                  <div key={door.id} className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex justify-between items-center">
+                  <div key={door.id} className="px-4 py-3.5 bg-slate-50 rounded-xl border border-slate-200 flex justify-between items-center">
                     <div>
                       <h3 className="font-black text-slate-900">{door.name || door.doorName}</h3>
                       <p className="text-xs text-slate-500 mt-1">Device ID: {door.deviceId || "N/A"}</p>
@@ -383,11 +390,24 @@ export default function EstateSettingsPage() {
 
         {/* Notifications Preferences Modal */}
         {activeModal === "notifications" && (
-          <BottomModal onClose={() => setActiveModal(null)}>
-            <div className="space-y-4">
-              <h2 className="text-lg font-black text-slate-900">Notification Preferences</h2>
-              <div className="space-y-3">
-                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
+          <BottomModal
+            title="Notification Preferences"
+            onClose={() => setActiveModal(null)}
+            footer={
+              <button 
+                onClick={() => {
+                  // TODO: Save notification preferences to backend
+                  setActiveModal(null);
+                }}
+                className="w-full py-3 bg-indigo-600 text-white rounded-xl font-black text-sm hover:bg-indigo-700 transition-all"
+              >
+                Save Preferences
+              </button>
+            }
+          >
+            <div className="space-y-3.5">
+              <div className="space-y-2.5">
+                <div className="px-4 py-3.5 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center">
                       <Smartphone size={18} className="text-indigo-600" />
@@ -404,7 +424,7 @@ export default function EstateSettingsPage() {
                     <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${notificationPrefs.pushNotifications ? 'left-7' : 'left-1'}`} />
                   </button>
                 </div>
-                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
+                <div className="px-4 py-3.5 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
                       <Bell size={18} className="text-emerald-600" />
@@ -422,15 +442,6 @@ export default function EstateSettingsPage() {
                   </button>
                 </div>
               </div>
-              <button 
-                onClick={() => {
-                  // TODO: Save notification preferences to backend
-                  setActiveModal(null);
-                }}
-                className="w-full py-3 bg-indigo-600 text-white rounded-xl font-black text-sm hover:bg-indigo-700 transition-all"
-              >
-                Save Preferences
-              </button>
             </div>
           </BottomModal>
         )}
@@ -447,8 +458,8 @@ export default function EstateSettingsPage() {
 
 function SettingsRow({ icon, label, value, onEdit, isEditing }) {
   return (
-    <div className="flex items-center justify-between p-5 border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors group">
-      <div className="flex items-center gap-4 flex-1">
+    <div className="flex items-center justify-between px-5 py-4 border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors group">
+      <div className="flex items-center gap-3.5 flex-1">
         <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-500 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-all">
           {icon}
         </div>
@@ -483,28 +494,77 @@ function NavItem({ to, icon, label, active = false }) {
 }
 
 // Bottom Modal Component
-function BottomModal({ children, onClose }) {
+function BottomModal({ children, onClose, title, footer = null }) {
   return (
-    <>
-      {/* Overlay */}
-      <div 
-        className="fixed inset-0 z-[1000] bg-black/40 backdrop-blur-sm"
-        onClick={onClose}
-      />
+    <div className="fixed inset-0 z-[140] flex items-end md:items-center md:justify-center">
       
-      {/* Modal */}
-      <div className="fixed bottom-0 left-0 right-0 z-[1001] bg-white rounded-t-[2rem] p-6 max-w-2xl mx-auto w-full max-h-[80vh] overflow-y-auto animate-in slide-in-from-bottom duration-300">
-        <button 
-          onClick={onClose}
-          className="absolute top-4 right-4 p-2 hover:bg-slate-100 rounded-lg transition-all text-slate-500"
+      {/* Overlay */}
+      <button
+        type="button"
+        className="absolute inset-0 bg-slate-900/50"
+        onClick={onClose}
+        aria-label={`Close ${title}`}
+      />
+
+      {/* MODAL */}
+      <div
+        className="
+          relative flex w-full flex-col bg-white overflow-hidden
+
+          h-[100dvh]
+          md:h-auto md:max-h-[90vh]
+          md:max-w-2xl md:rounded-2xl
+
+          md:shadow-[0_28px_80px_rgba(15,23,42,0.2)]
+        "
+      >
+        {/* HEADER (fixed, not scrollable) */}
+        <div className="shrink-0 px-5 py-4 border-b border-slate-100">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-indigo-600">
+                Profile & Settings
+              </p>
+              <h3 className="mt-2 text-xl font-black text-slate-900">
+                {title}
+              </h3>
+            </div>
+
+            <button
+              onClick={onClose}
+              className="rounded-2xl bg-slate-50 p-3 text-slate-500"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+
+        {/* SCROLL AREA (THIS FIXES EVERYTHING) */}
+        <div
+          className="
+            flex-1
+            overflow-y-auto
+            px-5
+            pb-10
+            min-h-0
+          "
+          style={{
+            WebkitOverflowScrolling: "touch",
+          }}
         >
-          <X size={20} />
-        </button>
-        
-        <div className="pr-6">
-          {children}
+          <div className="space-y-3.5 pt-4">
+            {children}
+          </div>
+
+          {footer && (
+            <div className="mt-6 border-t border-slate-100 pt-4">
+              {footer}
+            </div>
+          )}
         </div>
       </div>
-    </>
+    </div>
   );
 }
+
+

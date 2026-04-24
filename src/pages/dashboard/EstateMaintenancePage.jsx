@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion } from "framer-motion";
 import {
   ArrowLeft,
   Bell,
@@ -29,7 +30,7 @@ import { showError, showSuccess } from "../../utils/flash";
 import { useSocketEvents } from "../../hooks/useSocketEvents";
 import { getDashboardSocket } from "../../services/socketClient";
 import useEstateOverviewState from "../../hooks/useEstateOverviewState";
-import MobileBottomSheet from "../../components/mobile/MobileBottomSheet";
+import useResponsiveSheet from "../../hooks/useResponsiveSheet";
 import { estateFieldClassName } from "../../components/mobile/EstateManagerPageShell";
 
 const EstateMaintenancePage = () => {
@@ -254,8 +255,14 @@ const EstateMaintenancePage = () => {
       </button>
 
       {/* CREATE FORM SHEET */}
-      <MobileBottomSheet open={formOpen} title="New Maintenance Request" onClose={() => setFormOpen(false)}>
-        <form onSubmit={handleCreateRequest} className="space-y-6 p-2">
+      <MaintenanceSheetFrame
+        open={formOpen}
+        onClose={() => setFormOpen(false)}
+        eyebrow="Central Command"
+        title="New Maintenance Request"
+        panelClassName="md:max-w-xl"
+      >
+        <form onSubmit={handleCreateRequest} className="space-y-6 p-5 pt-1">
           <div>
             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Issue Title</label>
             <input
@@ -299,11 +306,17 @@ const EstateMaintenancePage = () => {
             {isSubmitting ? 'Posting...' : 'Post Request'}
           </button>
         </form>
-      </MobileBottomSheet>
+      </MaintenanceSheetFrame>
 
       {/* CONTEXT SWITCHER SHEET */}
-      <MobileBottomSheet open={controlsOpen} title="Operations Management" onClose={() => setControlsOpen(false)}>
-        <div className="grid gap-6 p-2">
+      <MaintenanceSheetFrame
+        open={controlsOpen}
+        onClose={() => setControlsOpen(false)}
+        eyebrow="Central Command"
+        title="Operations Management"
+        panelClassName="md:max-w-lg"
+      >
+        <div className="grid gap-6 p-5 pt-1">
           <label className="block">
             <span className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">Estate Context</span>
             <select
@@ -316,7 +329,7 @@ const EstateMaintenancePage = () => {
           </label>
           <button onClick={() => setControlsOpen(false)} className="w-full bg-slate-100 text-[#2b3437] py-4 rounded-2xl font-black uppercase tracking-widest">Close</button>
         </div>
-      </MobileBottomSheet>
+      </MaintenanceSheetFrame>
 
       {/* --- BOTTOM NAV BAR --- */}
 
@@ -325,3 +338,87 @@ const EstateMaintenancePage = () => {
 };
 
 export default EstateMaintenancePage;
+
+function MaintenanceSheetFrame({
+  open,
+  onClose,
+  eyebrow,
+  title,
+  panelClassName = "",
+  children,
+}) {
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[140]">
+      {/* Overlay */}
+      <div
+        className="absolute inset-0 bg-slate-900/50"
+        onClick={onClose}
+      />
+
+      {/* MODAL WRAPPER */}
+      <div
+        className="
+          absolute inset-x-0 bottom-0
+          bg-white
+
+          h-[100dvh]
+          max-h-[100dvh]
+
+          flex flex-col
+          overflow-hidden
+
+          rounded-t-[2rem]
+          shadow-[0_-18px_40px_rgba(15,23,42,0.16)]
+
+          md:top-1/2 md:left-1/2 md:bottom-auto md:right-auto
+          md:-translate-x-1/2 md:-translate-y-1/2
+          md:max-h-[90vh]
+          md:w-full md:max-w-xl
+          md:rounded-2xl
+        "
+      >
+        {/* HEADER (fixed) */}
+        <div className="shrink-0 px-5 py-4 border-b border-slate-100">
+          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#4955b3]">
+            {eyebrow}
+          </p>
+
+          <div className="flex items-center justify-between mt-2">
+            <h3 className="text-xl font-black text-[#2b3437]">
+              {title}
+            </h3>
+
+            <button
+              onClick={onClose}
+              className="rounded-2xl bg-slate-50 p-3 text-slate-500"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+
+        {/* 🔥 SCROLL AREA (ONLY THIS SCROLLS) */}
+        <div
+          className="
+            flex-1
+            min-h-0
+            overflow-y-auto
+            px-5
+            pb-10
+            overscroll-contain
+          "
+          style={{
+            WebkitOverflowScrolling: "touch",
+          }}
+        >
+          <div className="space-y-6 pt-4">
+            {children}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+

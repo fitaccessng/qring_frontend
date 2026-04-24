@@ -1,3 +1,12 @@
 node_modules
 dist
 .vite
+tmp-visual-pass
+.gradle/
+.gradle-user-home/
+.android-user-home/
+.npm-cache/
+.build/
+android/.gradle-user-home/
+android/.gradle/
+android/build/

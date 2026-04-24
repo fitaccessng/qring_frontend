@@ -44,10 +44,7 @@ const PRIMARY_TOOLKIT_ITEMS = [
 
 const EXTRA_TOOLKIT_ITEMS = [
   { label: "Estates", icon: <Building2 size={20} />, to: "/dashboard/estate/create" },
-  { label: "Homes", icon: <Home size={20} />, to: "/dashboard/estate/homes" },
-  { label: "Doors", icon: <DoorOpen size={20} />, to: "/dashboard/estate/doors" },
   { label: "Residents", icon: <UserPlus size={20} />, to: "/dashboard/estate/invites" },
-  { label: "Mappings", icon: <Network size={20} />, to: "/dashboard/estate/mappings" },
   { label: "Security", icon: <Shield size={20} />, to: "/dashboard/estate/security" },
   { label: "Logs", icon: <ClipboardList size={20} />, to: "/dashboard/estate/logs" },
   { label: "Settings", icon: <Settings size={20} />, to: "/dashboard/estate/settings" }
@@ -203,8 +200,8 @@ export default function EstateManagerDashboard() {
         </Link>
       </header>
 
-      <main className="pt-24 px-4 md:px-6 max-w-5xl mx-auto space-y-8 md:space-y-10">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+      <main className="pt-24 px-4 md:px-6 max-w-5xl mx-auto space-y-7 md:space-y-8">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-5">
           <div className="min-w-0">
             <span className="text-indigo-600 font-bold uppercase tracking-[0.2em] text-[10px] mb-2 block">Executive Dashboard</span>
             <h1 className="text-3xl md:text-4xl font-black tracking-tighter text-slate-900 truncate">Estate Overview</h1>
@@ -225,10 +222,10 @@ export default function EstateManagerDashboard() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6">
-          <div className="md:col-span-7 bg-white p-6 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col justify-between">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-5">
+          <div className="md:col-span-7 bg-white p-6 md:p-7 rounded-[2rem] md:rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col justify-between">
             <div className="min-w-0">
-              <div className="flex justify-between items-start mb-6 md:mb-8">
+              <div className="flex justify-between items-start mb-5 md:mb-6">
                 <div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600 flex-shrink-0">
                   <Crown size={22} fill="currentColor" fillOpacity={0.2} />
                 </div>
@@ -237,11 +234,11 @@ export default function EstateManagerDashboard() {
                 </span>
               </div>
               <h3 className="text-xl md:text-2xl font-black text-slate-900 mb-1 truncate">{stats.estateName}</h3>
-              <p className="text-slate-500 font-medium text-xs md:text-sm mb-6 md:mb-8">
+              <p className="text-slate-500 font-medium text-xs md:text-sm mb-5 md:mb-6">
                 {toTitleCase(stats.tier)} management tier
               </p>
             </div>
-            <div className="space-y-4 md:space-y-5">
+            <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <span className="text-slate-400 font-black uppercase tracking-tighter text-[10px]">Active Doors</span>
                 <span className="font-black text-slate-900 text-sm">{activeDoors} / {maxDoors}</span>
@@ -249,11 +246,11 @@ export default function EstateManagerDashboard() {
               <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
                 <div className="bg-indigo-600 h-full transition-all duration-1000 ease-out rounded-full" style={{ width: `${progressPercentage}%` }} />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-2.5">
                 <MiniDetail label="Homes" value={stats.portfolio.homes} />
                 <MiniDetail label="Residents" value={stats.portfolio.residents} />
               </div>
-              <div className="pt-4 border-t border-slate-50 flex items-center gap-2 text-slate-400 text-[9px] font-black uppercase tracking-widest">
+              <div className="pt-3.5 border-t border-slate-50 flex items-center gap-2 text-slate-400 text-[9px] font-black uppercase tracking-widest">
                 <Calendar size={12} /> <span>Expires {stats.expiryDate}</span>
               </div>
             </div>
@@ -262,14 +259,14 @@ export default function EstateManagerDashboard() {
 
         </div>
 
-        <section className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.95fr)] gap-4 md:gap-6">
+        <section className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.95fr)] gap-4 md:gap-5">
 
 
 
         </section>
 
         <section>
-          <div className="flex items-center justify-between mb-6 md:mb-8 px-1">
+          <div className="flex items-center justify-between mb-5 md:mb-6 px-1">
             <h2 className="text-xl md:text-2xl font-black tracking-tight text-slate-900">Toolkit</h2>
             <button
               type="button"
@@ -280,7 +277,7 @@ export default function EstateManagerDashboard() {
               {showAllToolkit ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
             </button>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
             {toolkitItems.map((item) => (
               <ToolkitItem key={item.label} {...item} />
             ))}
@@ -288,8 +285,8 @@ export default function EstateManagerDashboard() {
         </section>
 
         <section className="pb-4">
-          <h2 className="text-xl md:text-2xl font-black tracking-tight mb-6 md:mb-8 px-1 text-slate-900">Assets</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-5">
+          <h2 className="text-xl md:text-2xl font-black tracking-tight mb-5 md:mb-6 px-1 text-slate-900">Assets</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
             <AssetCard count={stats.portfolio.estates} label="Estates" icon={<Building2 size={18} />} primary />
             <AssetCard count={stats.portfolio.homes} label="Homes" icon={<Home size={18} />} />
             <AssetCard count={stats.portfolio.doors} label="Doors" icon={<DoorOpen size={18} />} />
@@ -327,9 +324,9 @@ function ToolkitItem({ icon, label, to }) {
   return (
     <Link
       to={to}
-      className="group bg-white p-5 md:p-7 rounded-[1.8rem] md:rounded-[2.5rem] text-center hover:bg-indigo-600 hover:text-white transition-all border border-slate-100 shadow-sm active:scale-95 flex flex-col items-center justify-center"
+      className="group bg-white p-5 md:p-6 rounded-[1.8rem] md:rounded-[2.5rem] text-center hover:bg-indigo-600 hover:text-white transition-all border border-slate-100 shadow-sm active:scale-95 flex flex-col items-center justify-center"
     >
-      <div className="mb-2 text-indigo-600 transition-colors group-hover:text-white">{icon}</div>
+      <div className="mb-2.5 text-indigo-600 transition-colors group-hover:text-white">{icon}</div>
       <span className="text-[9px] font-black uppercase tracking-tight">{label}</span>
     </Link>
   );
@@ -337,8 +334,8 @@ function ToolkitItem({ icon, label, to }) {
 
 function AssetCard({ count, label, icon, primary = false }) {
   return (
-    <div className="bg-white p-5 md:p-8 rounded-[1.8rem] md:rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col items-center text-center">
-      <div className={`mb-3 p-2 rounded-lg ${primary ? "bg-indigo-50 text-indigo-600" : "bg-slate-50 text-slate-400"}`}>
+    <div className="bg-white p-5 md:p-6 rounded-[1.8rem] md:rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col items-center text-center">
+      <div className={`mb-2.5 p-2 rounded-lg ${primary ? "bg-indigo-50 text-indigo-600" : "bg-slate-50 text-slate-400"}`}>
         {icon}
       </div>
       <span className={`text-3xl md:text-5xl font-black mb-1 tracking-tighter ${primary ? "text-indigo-600" : "text-slate-900"}`}>{count}</span>
@@ -358,7 +355,7 @@ function BottomNavLink({ to, icon, label, active = false }) {
 
 function MiniDetail({ label, value }) {
   return (
-    <div className="rounded-2xl bg-slate-50 px-4 py-3 border border-slate-100">
+    <div className="rounded-2xl bg-slate-50 px-4 py-2.5 border border-slate-100">
       <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">{label}</p>
       <p className="mt-1 text-lg font-black text-slate-900">{value}</p>
     </div>

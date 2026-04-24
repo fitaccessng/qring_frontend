@@ -1,10 +1,7 @@
-export async function generateHomeownerDoorQr(doorId) {
-  return apiRequest(`/homeowner/doors/${doorId}/qr`, { method: "POST" });
-}
 import { apiRequest, apiUpload } from "./apiClient";
 import { getVisitorSessionToken } from "./visitorSessionToken";
 
-function getStoredResidentIdentity() {
+function getStoredHomeownerIdentity() {
   if (typeof localStorage === "undefined") return {};
   try {
     const user = JSON.parse(localStorage.getItem("qring_user") || "null");
@@ -19,46 +16,65 @@ function getStoredResidentIdentity() {
   }
 }
 
+// Backwards-compatible alias (older UI copy used "resident").
+function getStoredResidentIdentity() {
+  return getStoredHomeownerIdentity();
+}
+
 function getDoorOwnershipCandidates(door) {
   return {
-    residentIds: [
-      door?.residentId,
+    homeownerIds: [
+      door?.homeownerId,
+      door?.homeOwnerId,
       door?.ownerId,
       door?.userId,
-      door?.assignedResidentId,
-      door?.resident?.id,
+      door?.assignedHomeownerId,
+      door?.homeowner?.id,
       door?.owner?.id,
-      door?.user?.id
+      door?.user?.id,
+      // Backwards-compatible fields:
+      door?.residentId,
+      door?.assignedResidentId,
+      door?.resident?.id
     ]
       .filter((value) => value != null && value !== "")
       .map((value) => String(value)),
-    residentEmails: [
-      door?.residentEmail,
+    homeownerEmails: [
+      door?.homeownerEmail,
+      door?.homeOwnerEmail,
       door?.ownerEmail,
       door?.userEmail,
-      door?.resident?.email,
+      door?.homeowner?.email,
       door?.owner?.email,
-      door?.user?.email
+      door?.user?.email,
+      // Backwards-compatible fields:
+      door?.residentEmail,
+      door?.resident?.email
     ]
       .filter((value) => typeof value === "string" && value.trim())
       .map((value) => value.trim().toLowerCase()),
-    residentNames: [
-      door?.residentName,
+    homeownerNames: [
+      door?.homeownerName,
+      door?.homeOwnerName,
       door?.ownerName,
       door?.userName,
-      door?.resident?.fullName,
+      door?.homeowner?.fullName,
       door?.owner?.fullName,
       door?.user?.fullName,
-      door?.resident?.name,
+      door?.homeowner?.name,
       door?.owner?.name,
-      door?.user?.name
+      door?.user?.name,
+      // Backwards-compatible fields:
+      door?.residentName,
+      door?.resident?.fullName,
+      door?.resident?.name
     ]
       .filter((value) => typeof value === "string" && value.trim())
       .map((value) => value.trim().toLowerCase())
   };
 }
 
-function filterAssignedResidentDoors(doors, options = {}) {
+function filterAssignedHomeownerDoors(doors, options = {}) {
   const rows = Array.isArray(doors) ? doors : [];
   if (!rows.length) return [];
   const failClosed = Boolean(options?.failClosed);
@@ -80,7 +96,7 @@ function filterAssignedResidentDoors(doors, options = {}) {
 
   if (!hasAnyOwnershipMetadata) return failClosed ? [] : rows;
 
-  return rows.filter((door) => {
+  const filtered = rows.filter((door) => {
     const candidates = getDoorOwnershipCandidates(door);
     if (currentUserId && candidates.homeownerIds.includes(currentUserId)) return true;
     if (currentUserEmail && candidates.homeownerEmails.includes(currentUserEmail)) return true;
@@ -88,6 +104,18 @@ function filterAssignedResidentDoors(doors, options = {}) {
     if (currentUsername && candidates.homeownerNames.includes(currentUsername)) return true;
     return false;
   });
+
+  if (filtered.length > 0 || failClosed) return filtered;
+  return rows;
+}
+
+// Backwards-compatible export name.
+function filterAssignedResidentDoors(doors, options = {}) {
+  return filterAssignedHomeownerDoors(doors, options);
+}
+
+export async function generateHomeownerDoorQr(doorId) {
+  return apiRequest(`/homeowner/doors/${doorId}/qr`, { method: "POST" });
 }
 
 export async function getHomeownerVisits() {
@@ -167,8 +195,8 @@ export async function endHomeownerSession(sessionId) {
 }
 
 export async function getHomeownerDoors() {
-  const response = await apiRequest("/homeowner/doors");
-  const data = response?.data;
+  const response = await apiRequest("/homeowner/doors", { noCache: true });
+  const data = response?.data ?? response;
   const managedByEstate = Boolean(data?.subscription?.managedByEstate);
   if (Array.isArray(data)) {
     return {

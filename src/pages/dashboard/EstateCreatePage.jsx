@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate, Link } from 'react-router-dom';
+import { motion } from "framer-motion";
 import {
   ArrowLeft,
   Bell,
@@ -12,14 +13,14 @@ import {
   ShieldCheck,
   QrCode,
   Layers,
-  X,
   LayoutGrid,
   History,
   CalendarDays,
   User,
   Printer,
   Download,
-  CheckCircle2
+  CheckCircle2,
+  X
 } from 'lucide-react';
 
 // Core State & Services
@@ -31,7 +32,7 @@ import {
 } from "../../services/estateService";
 import useEstateOverviewState from "../../hooks/useEstateOverviewState";
 import { showError, showSuccess } from "../../utils/flash";
-import MobileBottomSheet from "../../components/mobile/MobileBottomSheet";
+import useResponsiveSheet from "../../hooks/useResponsiveSheet";
 
 export default function EstateCreatePage() {
   const navigate = useNavigate();
@@ -409,8 +410,8 @@ export default function EstateCreatePage() {
       <iframe id="ifmcontentstoprint" title="print-frame" style={{ height: '0px', width: '0px', position: 'absolute' }}></iframe>
 
       {/* REGISTER ESTATE SHEET */}
-      <MobileBottomSheet open={isFormOpen} onClose={() => setIsFormOpen(false)} title="Register Estate">
-        <form className="p-2 space-y-8" onSubmit={onSubmit}>
+      <EstateCreationSheet open={isFormOpen} onClose={() => setIsFormOpen(false)}>
+        <form className="space-y-8" onSubmit={onSubmit}>
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-3xl flex items-center justify-center">
               <Building2 size={24} />
@@ -444,7 +445,7 @@ export default function EstateCreatePage() {
             </p>
           ) : null}
         </form>
-      </MobileBottomSheet>
+      </EstateCreationSheet>
 
 
     </div>
@@ -459,3 +460,62 @@ function NavItem({ to, icon, label, active = false }) {
     </Link>
   );
 }
+
+function EstateCreationSheet({ open, onClose, children }) {
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[140] flex items-end md:items-center md:justify-center">
+      {/* Overlay */}
+      <button
+        type="button"
+        className="absolute inset-0 bg-slate-900/45"
+        onClick={onClose}
+        aria-label="Close estate registration"
+      />
+
+      {/* SHEET */}
+      <div className="
+        relative flex w-full flex-col bg-white
+        rounded-t-[2rem] md:rounded-[2rem]
+        shadow-[0_-18px_40px_rgba(15,23,42,0.16)]
+        md:max-w-xl
+        h-[85dvh] md:h-auto md:max-h-[80dvh]
+        overflow-hidden
+      ">
+
+        {/* HEADER (fixed, not draggable) */}
+        <div className="shrink-0 flex items-start justify-between border-b border-slate-100 px-6 py-5">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-indigo-600">
+              Portfolio Control
+            </p>
+            <h3 className="mt-2 text-2xl font-black text-slate-900">
+              Register Estate
+            </h3>
+            <p className="mt-2 text-sm text-slate-500">
+              Add a new managed estate profile and unlock its shared QR flow.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-2xl bg-slate-50 p-3 text-slate-500"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* SCROLL AREA (ONLY SCROLL CONTAINER) */}
+        <div className="flex-1 min-h-0 overflow-y-auto px-6 py-6">
+          {children}
+        </div>
+
+        {/* safe area */}
+        <div className="h-[env(safe-area-inset-bottom)] bg-white" />
+      </div>
+    </div>
+  );
+}
+

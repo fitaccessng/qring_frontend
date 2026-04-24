@@ -56,7 +56,7 @@ export function resolveNotificationRoute({ role, kind, payload }) {
     return "/dashboard/notifications";
   }
 
-  if (safeKind === "safety.panic") {
+  if (safeKind.startsWith("safety.panic")) {
     if (safeRole === "estate") return "/dashboard/estate/emergency";
     if (safeRole === "security") return "/dashboard/security/emergency";
     if (safeRole === "homeowner") return "/dashboard/homeowner/safety";

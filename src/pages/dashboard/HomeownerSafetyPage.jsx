@@ -15,7 +15,10 @@ import { getHomeownerContext, getHomeownerVisits } from "../../services/homeowne
 import { getHomeownerSettings } from "../../services/homeownerSettingsService";
 import { getActivePanicAlerts, resolvePanicAlert, triggerPanicAlert } from "../../services/safetyService";
 import { getCurrentDeviceLocation } from "../../utils/locationService";
+<<<<<<< HEAD
 import PanicAudioPanel from "../../components/panic/PanicAudioPanel";
+=======
+>>>>>>> 0fdd799755b08ac01a92e9d93143562b7cba3b19
 
 export default function ResidentSafetyPage() {
   const navigate = useNavigate();
@@ -68,7 +71,15 @@ export default function ResidentSafetyPage() {
       ]);
       setVisits(vRows || []);
       setHomeownerContext(ctx || {});
-      setSettings({ knownContacts: sett?.knownContacts || [], smsFallbackEnabled: !!sett?.smsFallbackEnabled });
+      setSettings({
+        knownContacts: sett?.knownContacts || [],
+        smsFallbackEnabled: !!sett?.smsFallbackEnabled,
+        nearbyPanicAlertsEnabled: !!sett?.nearbyPanicAlertsEnabled,
+        nearbyPanicAlertRadiusMeters: Number(sett?.nearbyPanicAlertRadiusMeters || 500),
+        nearbyPanicAvailability: sett?.nearbyPanicAvailability || "always",
+        nearbyPanicReceiveFrom: sett?.nearbyPanicReceiveFrom || "everyone",
+        panicIdentityVisibility: sett?.panicIdentityVisibility || "masked"
+      });
       setPanicAlerts(alerts || []);
     } catch (err) {
       if (err.status !== 401) console.error("Safety sync failed", err);
@@ -160,6 +171,7 @@ export default function ResidentSafetyPage() {
     setTransmissionStatus("sending");
 
     try {
+<<<<<<< HEAD
       let location = null;
       try {
         const geo = await getCurrentDeviceLocation({ enableHighAccuracy: true });
@@ -173,11 +185,24 @@ export default function ResidentSafetyPage() {
       } catch {
         // Best-effort location for emergency routing.
       }
+=======
+      const locationResult = await getCurrentDeviceLocation({ enableHighAccuracy: false, timeout: 12000 });
+>>>>>>> 0fdd799755b08ac01a92e9d93143562b7cba3b19
       navigator.vibrate?.(severity === 'critical' ? [200, 100, 200, 100, 500] : [100, 50, 100]);
       await triggerPanicAlert({
         userId: user?.id,
         triggerMode: severity === "critical" ? "hold-critical" : "hold-security",
+<<<<<<< HEAD
         location
+=======
+        location: locationResult?.ok
+          ? {
+              lat: Number(locationResult.coords.latitude),
+              lng: Number(locationResult.coords.longitude),
+              source: locationResult.source || "device"
+            }
+          : undefined
+>>>>>>> 0fdd799755b08ac01a92e9d93143562b7cba3b19
       });
       setTransmissionStatus("success");
       showSuccess(severity === "critical" ? "Critical SOS sent." : `${securityLabel} alert sent.`);
@@ -335,7 +360,40 @@ export default function ResidentSafetyPage() {
         {/* Action Grid */}
         <section className="grid grid-cols-2 gap-4">
           <BentoSmall icon={<Group size={20} />} label="Rescue Circle" value={`${settings.knownContacts.length} Contacts`} onClick={() => navigate("/dashboard/homeowner/emergency-contacts")} />
-          <BentoSmall icon={<Settings size={20} />} label="Panic Settings" value="SMS & GPS" onClick={() => navigate("/dashboard/homeowner/settings")} />
+          <BentoSmall
+            icon={<Settings size={20} />}
+            label="Panic Settings"
+            value={`${settings.nearbyPanicAlertRadiusMeters || 500}m Radius`}
+            onClick={() => navigate("/dashboard/homeowner/settings")}
+          />
+        </section>
+
+        <section className="grid gap-4">
+          <div className="rounded-[2.2rem] border border-slate-100 bg-white p-5 shadow-sm">
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">Community Panic Network</p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <StatusPill
+                label="Nearby Alerts"
+                value={settings.nearbyPanicAlertsEnabled ? "Enabled" : "Off"}
+                tone={settings.nearbyPanicAlertsEnabled ? "success" : "muted"}
+              />
+              <StatusPill label="Receive From" value={humanizePreference(settings.nearbyPanicReceiveFrom || "everyone")} />
+              <StatusPill label="Availability" value={humanizePreference(settings.nearbyPanicAvailability || "always")} />
+              <StatusPill label="Identity" value={humanizePreference(settings.panicIdentityVisibility || "masked")} />
+            </div>
+          </div>
+
+          {activeAlert ? (
+            <div className="rounded-[2.2rem] border border-rose-100 bg-white p-5 shadow-sm">
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-rose-500">Live Response</p>
+              <p className="mt-2 text-2xl font-black text-slate-900">{activeAlert.responderCount || 0} Responding</p>
+              <p className="mt-1 text-sm text-slate-500">
+                {activeAlert.responders?.length
+                  ? activeAlert.responders.map((item) => item.name || "Responder").join(", ")
+                  : "Waiting for someone nearby, security, or your saved contacts to respond."}
+              </p>
+            </div>
+          ) : null}
         </section>
       </main>
 
@@ -364,6 +422,29 @@ function BentoSmall({ icon, label, value, onClick }) {
       <p className="text-xs font-bold text-slate-900">{value}</p>
     </button>
   );
+}
+
+function StatusPill({ label, value, tone = "default" }) {
+  const toneClass =
+    tone === "success"
+      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+      : tone === "muted"
+        ? "border-slate-200 bg-slate-50 text-slate-500"
+        : "border-indigo-200 bg-indigo-50 text-indigo-700";
+  return (
+    <div className={`rounded-[1.4rem] border px-4 py-3 ${toneClass}`}>
+      <p className="text-[10px] font-black uppercase tracking-[0.2em]">{label}</p>
+      <p className="mt-2 text-sm font-bold">{value}</p>
+    </div>
+  );
+}
+
+function humanizePreference(value) {
+  return String(value || "")
+    .split(/[_\s]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 function NavItem({ to, icon, label, active = false }) {

@@ -11,9 +11,14 @@
   },
   "dependencies": {
     "@capacitor/android": "^8.2.0",
+    "@capacitor/app": "^8.1.0",
     "@capacitor/cli": "^8.2.0",
     "@capacitor/core": "^8.2.0",
     "@capacitor/ios": "^8.2.0",
+<<<<<<< HEAD
+=======
+    "@capacitor/local-notifications": "^8.0.2",
+>>>>>>> 0fdd799755b08ac01a92e9d93143562b7cba3b19
     "@capacitor/push-notifications": "^8.0.3",
     "@tanstack/react-query": "^5.97.0",
     "axios": "^1.15.0",

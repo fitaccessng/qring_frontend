@@ -5,7 +5,7 @@ import {
   Power, Trash2, DoorOpen, LayoutGrid, Settings,
   Shield, User, Mail, Phone, X
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 
 // Service Imports
 import {
@@ -19,7 +19,7 @@ import {
 } from "../../services/estateService";
 import { showError, showSuccess } from "../../utils/flash";
 import useEstateOverviewState from "../../hooks/useEstateOverviewState";
-import MobileBottomSheet from "../../components/mobile/MobileBottomSheet";
+import useResponsiveSheet from "../../hooks/useResponsiveSheet";
 
 const defaultRules = {
   canApproveWithoutHomeowner: false,
@@ -186,21 +186,21 @@ const EstateSecurityPage = () => {
   return (
     <div className="bg-[#f8f9fa] min-h-screen font-sans pb-32">
 
-      {/* Premium Header */}
-      <header className="fixed top-0 w-full z-50 bg-[#f8f9fa]/80 backdrop-blur-xl flex justify-between items-center px-4 h-16 border-b border-slate-100">
-        <button onClick={() => navigate(-1)} className="p-2 text-[#4955b3] active:bg-indigo-50 rounded-full">
-          <ArrowLeft size={24} strokeWidth={2.5} />
-        </button>
-        <h1 className="text-[#2b3437] font-black tracking-tight text-lg">Security Control</h1>
-        <button className="relative p-2 text-[#4955b3] active:bg-indigo-50 rounded-full">
-          <Bell size={22} strokeWidth={2.5} />
-          <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-rose-500 rounded-full border-2 border-[#f8f9fa]" />
-        </button>
-      </header>
+  
+        <header className="fixed top-0 w-full z-50 bg-[#f8f9fa]/80 backdrop-blur-xl flex justify-between items-center px-4 h-16 border-b border-slate-100">
+          <button onClick={() => navigate(-1)} className="p-2 text-[#4955b3] active:bg-indigo-50 rounded-full">
+            <ArrowLeft size={24} strokeWidth={2.5} />
+          </button>
+          <h1 className="text-[#2b3437] font-black tracking-tight text-lg">Security Control</h1>
+          <button onClick={() => navigate('/dashboard/estate/notifications')} className="relative p-2 text-[#4955b3] active:bg-indigo-50 rounded-full">
+            <Bell size={22} strokeWidth={2.5} />
+            <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-rose-500 rounded-full border-2 border-[#f8f9fa]" />
+          </button>
+        </header>
 
-      <main className="pt-24 px-5 max-w-5xl mx-auto space-y-8">
+        <main className="pt-24 px-5 max-w-5xl mx-auto space-y-7">
 
-        {/* Hero Section */}
+          {/* Hero Section */}
         <section className="space-y-2">
           <span className="text-[#4955b3] font-black uppercase tracking-[0.2em] text-[10px]">Guard Oversight</span>
           <h2 className="text-3xl font-black text-[#2b3437] tracking-tight">System Access</h2>
@@ -209,19 +209,19 @@ const EstateSecurityPage = () => {
           </p>
         </section>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
 
           {/* Left Column: Safety Rules */}
-          <section className="lg:col-span-5 space-y-6">
-            <div className="bg-[#eaeff1] rounded-[2.5rem] p-7 shadow-sm">
-              <div className="flex items-center gap-3 mb-8">
+          <section className="lg:col-span-5 space-y-5">
+            <div className="bg-[#eaeff1] rounded-[2.5rem] p-6 shadow-sm">
+              <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-[#4955b3] shadow-sm">
                   <ShieldCheck size={20} />
                 </div>
                 <h3 className="text-lg font-black text-[#2b3437]">Safety Rules</h3>
               </div>
 
-              <div className="space-y-6">
+              <div className="space-y-5">
                 <RuleItem
                   title="Instant Approval"
                   desc="Security approves without homeowner"
@@ -244,13 +244,13 @@ const EstateSecurityPage = () => {
             </div>
 
             {/* System Status Card */}
-            <div className="bg-[#273492] rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-xl shadow-indigo-100">
+            <div className="bg-[#273492] rounded-[2.5rem] p-7 text-white relative overflow-hidden shadow-xl shadow-indigo-100">
               <div className="relative z-10">
-                <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center mb-6 border border-white/20">
+                <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center mb-5 border border-white/20">
                   <Shield size={24} className="text-white" />
                 </div>
                 <h3 className="text-2xl font-black mb-2">System Armed</h3>
-                <p className="text-indigo-200 text-xs mb-6 font-medium leading-relaxed opacity-80">
+                <p className="text-indigo-200 text-xs mb-5 font-medium leading-relaxed opacity-80">
                   Perimeter monitoring is active across {stats.total} registered personnel.
                 </p>
                 <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500/20 text-emerald-400 rounded-full text-[10px] font-black uppercase tracking-widest border border-emerald-500/30">
@@ -263,8 +263,8 @@ const EstateSecurityPage = () => {
 
           {/* Right Column: Staff Roster */}
           <section className="lg:col-span-7">
-            <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-50">
-              <div className="flex justify-between items-center mb-8">
+            <div className="bg-white rounded-[2.5rem] p-7 shadow-sm border border-slate-50">
+              <div className="flex justify-between items-center mb-6">
                 <div>
                   <h3 className="text-xl font-black text-[#2b3437]">Staff Roster</h3>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Security Personnel</p>
@@ -277,7 +277,7 @@ const EstateSecurityPage = () => {
                 </button>
               </div>
 
-              <div className="space-y-2 min-h-[300px]">
+              <div className="space-y-2.5 min-h-[300px]">
                 {loading ? (
                   <div className="flex flex-col items-center justify-center py-12 opacity-30">
                     <div className="w-8 h-8 border-4 border-[#4955b3] border-t-transparent rounded-full animate-spin mb-4" />
@@ -290,8 +290,8 @@ const EstateSecurityPage = () => {
                   </div>
                 ) : (
                   normalizedUsers.map((user) => (
-                    <div key={user.id} className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-2xl transition-all group">
-                      <div className="flex items-center gap-4">
+                    <div key={user.id} className="flex items-center justify-between px-3 py-3.5 hover:bg-slate-50 rounded-2xl transition-all group">
+                      <div className="flex items-center gap-3.5">
                         <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-[#4955b3]">
                           <User size={20} />
                         </div>
@@ -300,7 +300,7 @@ const EstateSecurityPage = () => {
                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{user.gateId || "General Gate"}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2.5">
                         <button
                           onClick={() => handleStatusToggle(user)}
                           disabled={securityActionId === user.id}
@@ -320,7 +320,7 @@ const EstateSecurityPage = () => {
               </div>
 
               {/* Stats Grid */}
-              <div className="mt-12 grid grid-cols-3 gap-4">
+              <div className="mt-8 grid grid-cols-3 gap-3">
                 <StatBox label="On Duty" val={stats.onDuty} color="text-[#4955b3]" />
                 <StatBox label="Off Duty" val={stats.offDuty} color="text-slate-400" />
                 <StatBox label="Total" val={stats.total} color="text-slate-400" />
@@ -331,12 +331,11 @@ const EstateSecurityPage = () => {
       </main>
 
       {/* Add Personnel Sheet */}
-      <MobileBottomSheet
+      <SecurityPersonnelSheet
         open={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
-        title="Register Personnel"
       >
-        <form onSubmit={handleAddUser} className="space-y-4 pb-12">
+        <form onSubmit={handleAddUser} className="space-y-3.5 p-5 pb-10 pt-1">
           <Input label="Full Name" value={securityForm.fullName} onChange={v => setSecurityForm(p => ({...p, fullName: v}))} />
           <Input label="Email Address" type="email" value={securityForm.email} onChange={v => setSecurityForm(p => ({...p, email: v}))} />
           <Input label="Password" type="password" value={securityForm.password} onChange={v => setSecurityForm(p => ({...p, password: v}))} />
@@ -349,7 +348,7 @@ const EstateSecurityPage = () => {
             {saving ? "Registering..." : "Confirm Registration"}
           </button>
         </form>
-      </MobileBottomSheet>
+      </SecurityPersonnelSheet>
 
       {/* Persistent Bottom Nav */}
 
@@ -359,7 +358,7 @@ const EstateSecurityPage = () => {
 
 // Sub-components for cleaner structure
 const RuleItem = ({ title, desc, active, onToggle }) => (
-  <div className="flex items-center justify-between">
+  <div className="flex items-center justify-between gap-4">
     <div className="flex-1 pr-4">
       <p className="font-bold text-[#2b3437] text-sm">{title}</p>
       <p className="text-[10px] text-slate-500 font-medium uppercase tracking-tighter">{desc}</p>
@@ -374,18 +373,18 @@ const RuleItem = ({ title, desc, active, onToggle }) => (
 );
 
 const StatBox = ({ label, val, color }) => (
-  <div className="bg-slate-50 p-4 rounded-3xl text-center">
+  <div className="bg-slate-50 p-3.5 rounded-3xl text-center">
     <p className="text-[9px] font-black text-slate-400 uppercase tracking-tighter mb-1">{label}</p>
     <p className={`text-2xl font-black ${color}`}>{val < 10 ? `0${val}` : val}</p>
   </div>
 );
 
 const Input = ({ label, value, onChange, ...props }) => (
-  <div className="space-y-1">
+  <div className="space-y-1.5">
     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">{label}</label>
     <input
       required
-      className="w-full bg-slate-50 border-none rounded-2xl py-4 px-5 font-bold text-sm focus:ring-2 focus:ring-indigo-500/10"
+      className="w-full bg-slate-50 border border-slate-300 rounded-2xl py-4 px-5 font-bold text-sm focus:ring-2 focus:ring-indigo-500/10"
       value={value}
       onChange={e => onChange(e.target.value)}
       {...props}
@@ -399,5 +398,65 @@ const NavBtn = ({ icon: Icon, label, active }) => (
     <span className="text-[9px] font-black uppercase tracking-tighter">{label}</span>
   </button>
 );
+
+function SecurityPersonnelSheet({ open, onClose, children }) {
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[140] flex items-end md:items-center md:justify-center">
+      {/* Overlay */}
+      <button
+        type="button"
+        className="absolute inset-0 bg-slate-900/45"
+        onClick={onClose}
+        aria-label="Close personnel form"
+      />
+
+      {/* SHEET */}
+      <div
+        className="
+          relative flex w-full flex-col bg-white
+          rounded-t-[2rem] md:rounded-[2rem]
+          shadow-[0_-18px_40px_rgba(15,23,42,0.16)]
+          md:max-w-xl
+          h-[100dvh] md:h-auto md:max-h-[80dvh]
+          overflow-hidden
+        "
+      >
+        {/* HEADER */}
+        <div className="shrink-0 flex items-start justify-between border-b border-slate-100 px-6 py-5">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#4955b3]">
+              Guard Oversight
+            </p>
+            <h3 className="mt-2 text-2xl font-black text-[#2b3437]">
+              Register Personnel
+            </h3>
+            <p className="mt-2 text-sm text-slate-500">
+              Provision a gate officer with credentials and assign duty location in one flow.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-2xl bg-slate-50 p-3 text-slate-500"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* CONTENT */}
+        <div className="flex-1 min-h-0 overflow-y-auto px-6 py-6">
+          {children}
+        </div>
+
+        {/* SAFE AREA */}
+        <div className="h-[env(safe-area-inset-bottom)] bg-white" />
+      </div>
+    </div>
+  );
+}
+
 
 export default EstateSecurityPage;

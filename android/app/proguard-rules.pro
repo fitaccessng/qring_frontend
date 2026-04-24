@@ -19,3 +19,7 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Keep manifest entry points stable under R8.
+-keep class com.kelvin.qringapp.MainActivity { *; }
+-keep class com.kelvin.qringapp.QringFirebaseMessagingService { *; }
