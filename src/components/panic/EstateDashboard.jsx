@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, ShieldAlert } from "lucide-react";
-import { acknowledgePanicAlert, getActivePanicAlerts, resolvePanicAlert, updatePanicAlertNotes } from "../../services/safetyService";
+import { acknowledgePanicAlert, getActivePanicAlerts, resolvePanicAlert } from "../../services/safetyService";
 import { useSocketEvents } from "../../hooks/useSocketEvents";
 import PanicAudioPanel from "./PanicAudioPanel";
 
@@ -8,7 +8,6 @@ export default function EstateDashboard({ roleLabel = "Emergency Response Dashbo
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busyKey, setBusyKey] = useState("");
-  const [notesByAlert, setNotesByAlert] = useState({});
   const [isOffline, setIsOffline] = useState(() => (typeof navigator !== "undefined" ? !navigator.onLine : false));
   const audioContextRef = useRef(null);
 
@@ -108,16 +107,6 @@ export default function EstateDashboard({ roleLabel = "Emergency Response Dashbo
     }
   }
 
-  async function handleSaveNotes(panicId) {
-    setBusyKey(`notes:${panicId}`);
-    try {
-      await updatePanicAlertNotes(panicId, notesByAlert[panicId] || "");
-      await load({ background: true });
-    } finally {
-      setBusyKey("");
-    }
-  }
-
   return (
     <div className="mx-auto max-w-6xl space-y-5">
       <section className="rounded-[2rem] border border-red-200 bg-[linear-gradient(135deg,#fff5f5_0%,#ffe4e6_100%)] p-5 shadow-[0_18px_40px_rgba(127,29,29,0.12)]">
@@ -167,11 +156,6 @@ export default function EstateDashboard({ roleLabel = "Emergency Response Dashbo
                     </span>
                   </div>
                   <p className="mt-2 text-sm text-white/78">{alert.location?.doorName || alert.unitLabel || "Unknown unit"}</p>
-                  {alert.responders?.length ? (
-                    <p className="mt-2 text-sm text-emerald-200">
-                      Responders: {alert.responders.map((item) => item.name || "Responder").join(", ")}
-                    </p>
-                  ) : null}
                   <p className="mt-2 text-xs uppercase tracking-[0.24em] text-rose-200">
                     {alert.acknowledged ? "Acknowledged" : "Needs response"} • {formatTime(alert.createdAt)}
                   </p>
@@ -198,27 +182,8 @@ export default function EstateDashboard({ roleLabel = "Emergency Response Dashbo
                 </button>
               </div>
             </div>
-<<<<<<< HEAD
             <div className="mt-4">
               <PanicAudioPanel alert={alert} canEnd={alert.acknowledged} />
-=======
-
-            <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
-              <textarea
-                value={notesByAlert[alert.id] ?? alert.incidentNotes ?? ""}
-                onChange={(event) => setNotesByAlert((current) => ({ ...current, [alert.id]: event.target.value }))}
-                placeholder="Add incident notes"
-                className="min-h-[96px] rounded-[1.4rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none placeholder:text-white/35"
-              />
-              <button
-                type="button"
-                disabled={busyKey === `notes:${alert.id}`}
-                onClick={() => handleSaveNotes(alert.id)}
-                className="rounded-full bg-white px-5 py-3 text-sm font-semibold text-black disabled:opacity-60"
-              >
-                {busyKey === `notes:${alert.id}` ? "Saving..." : "Save Notes"}
-              </button>
->>>>>>> 0fdd799755b08ac01a92e9d93143562b7cba3b19
             </div>
           </article>
         ))}

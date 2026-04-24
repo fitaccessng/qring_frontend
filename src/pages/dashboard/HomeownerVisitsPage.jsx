@@ -212,11 +212,7 @@ export default function HomeownerVisitsPage() {
       </main>
 
       {/* Bottom Navigation */}
-<<<<<<< HEAD
 
-=======
-    
->>>>>>> 0fdd799755b08ac01a92e9d93143562b7cba3b19
     </div>
   );
 }

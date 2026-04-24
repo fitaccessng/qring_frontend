@@ -9,11 +9,8 @@ android {
 
 apply from: "../capacitor-cordova-android-plugins/cordova.variables.gradle"
 dependencies {
-<<<<<<< HEAD
-=======
     implementation project(':capacitor-app')
     implementation project(':capacitor-local-notifications')
->>>>>>> 0fdd799755b08ac01a92e9d93143562b7cba3b19
     implementation project(':capacitor-push-notifications')
 
 }

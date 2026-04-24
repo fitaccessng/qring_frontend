@@ -1,203 +1,78 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import React, { useState, useMemo, useRef, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom"; // Added useNavigate
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Bell,
-  Plus,
-  User,
-  Phone,
-  CalendarOff,
-  ShieldCheck,
-  X,
-  MapPin,
-  DoorOpen,
-  Clock,
-  AlignLeft,
-  Navigation,
-  ArrowLeft,
-  Mail
+  Bell, Plus, User, Phone, CalendarOff, History,
+  CalendarDays, MessageSquare, LayoutGrid,
+  UserCircle, Trash2, ShieldCheck, X,
+  MapPin, DoorOpen, Clock, AlignLeft, Navigation,
+  ArrowLeft // Added ArrowLeft
 } from "lucide-react";
-import {
-  createHomeownerAppointment,
-  getHomeownerAppointments,
-  getHomeownerDoors
-} from "../../services/homeownerService";
+import { useApiQuery, useApiMutation } from "../../hooks/useApi";
+import { endpoints } from "../../services/endpoints";
+import { useAuth } from "../../state/AuthContext";
 import { useNotifications } from "../../state/NotificationsContext";
-import { showError, showSuccess } from "../../utils/flash";
 
 export default function ResidentAppointmentsPage() {
-  const navigate = useNavigate();
+  const navigate = useNavigate(); // For the back button logic
+  const { user } = useAuth(); // No change needed, but check for homeowner-specific logic below
   const { unreadCount } = useNotifications();
   const scrollContainerRef = useRef(null);
   const [selectedDate, setSelectedDate] = useState(() => toDateKey(new Date()));
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
-  const [appointments, setAppointments] = useState([]);
-  const [doors, setDoors] = useState([]);
-  const [form, setForm] = useState({
-    visitorName: "",
-    visitorPhone: "",
-    visitorEmail: "",
-    doorId: "",
-    startTime: "",
-    endTime: "",
-    latitude: "",
-    longitude: "",
-    purpose: ""
+
+  // Error Safeguard
+  const listUrl = endpoints?.appointments?.list || "/resident/appointments";
+  const createUrl = endpoints?.appointments?.create || "/resident/appointments";
+
+  const { data: appointments, isLoading, refetch } = useApiQuery({
+    queryKey: ["appointments", selectedDate],
+    url: `${listUrl}?date=${selectedDate}`,
+    enabled: !!selectedDate,
+  });
+
+  const createMutation = useApiMutation({
+    url: createUrl,
+    method: "POST",
+    onSuccess: () => {
+      refetch();
+      setIsModalOpen(false);
+    },
   });
 
   const dateTiles = useMemo(() => buildDateTiles(), []);
-  const selectedAppointments = useMemo(
-    () => appointments.filter((item) => toDateKey(item?.startsAt || item?.createdAt || new Date()) === selectedDate),
-    [appointments, selectedDate]
-  );
-  const doorNameById = useMemo(
-    () =>
-      new Map(
-        doors.map((door) => [
-          String(door?.id || ""),
-          door?.gateLabel || door?.name || door?.entryPoint || "Door"
-        ])
-      ),
-    [doors]
-  );
-
-  useEffect(() => {
-    let active = true;
-
-    async function loadData() {
-      setLoading(true);
-      try {
-        const [appointmentsResult, doorsResult] = await Promise.allSettled([
-          getHomeownerAppointments(),
-          getHomeownerDoors()
-        ]);
-        if (!active) return;
-
-        if (appointmentsResult.status === "fulfilled") {
-          setAppointments(Array.isArray(appointmentsResult.value) ? appointmentsResult.value : []);
-        } else {
-          setAppointments([]);
-          showError(appointmentsResult.reason?.message || "Unable to load appointments.");
-        }
-
-        if (doorsResult.status === "fulfilled") {
-          const nextDoors = Array.isArray(doorsResult.value?.doors) ? doorsResult.value.doors : [];
-          setDoors(nextDoors);
-          setForm((current) => ({
-            ...current,
-            doorId:
-              nextDoors.some((door) => String(door?.id) === String(current.doorId))
-                ? current.doorId
-                : nextDoors[0]?.id || ""
-          }));
-        } else {
-          setDoors([]);
-          showError(doorsResult.reason?.message || "Unable to load doors.");
-        }
-      } finally {
-        if (active) setLoading(false);
-      }
-    }
-
-    loadData();
-    return () => {
-      active = false;
-    };
-  }, []);
 
   const handleGetLocation = () => {
     setIsLocating(true);
-    if (!navigator.geolocation) {
-      showError("Location is not supported on this device.");
-      setIsLocating(false);
-      return;
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const latInput = document.getElementsByName('latitude')[0];
+          const lngInput = document.getElementsByName('longitude')[0];
+          if (latInput) latInput.value = position.coords.latitude.toFixed(6);
+          if (lngInput) lngInput.value = position.coords.longitude.toFixed(6);
+          setIsLocating(false);
+        },
+        () => {
+          alert("Location access denied.");
+          setIsLocating(false);
+        }
+      );
     }
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setForm((current) => ({
-          ...current,
-          latitude: position.coords.latitude.toFixed(6),
-          longitude: position.coords.longitude.toFixed(6)
-        }));
-        setIsLocating(false);
-        showSuccess("Location captured for geofence alerts.");
-      },
-      () => {
-        showError("Location access denied.");
-        setIsLocating(false);
-      }
-    );
   };
 
-  const handleCreateAppointment = async (event) => {
-    event.preventDefault();
-    if (!form.doorId) {
-      showError("Select a door first.");
-      return;
-    }
-
-    setCreating(true);
-    try {
-      const payload = {
-        doorId: form.doorId,
-        visitorName: form.visitorName.trim(),
-        visitorContact: form.visitorPhone.trim(),
-        visitorEmail: form.visitorEmail.trim().toLowerCase(),
-        purpose: form.purpose.trim(),
-        startsAt: toIsoLike(form.startTime),
-        endsAt: toIsoLike(form.endTime),
-        geofenceLat: form.latitude ? Number(form.latitude) : null,
-        geofenceLng: form.longitude ? Number(form.longitude) : null,
-        geofenceRadiusMeters: form.latitude && form.longitude ? 120 : null
-      };
-
-      const created = await createHomeownerAppointment(payload);
-      setAppointments((current) => [
-        {
-          ...created,
-          doorId: created?.doorId || payload.doorId,
-          doorName:
-            created?.doorName ||
-            created?.entryPoint ||
-            doorNameById.get(String(payload.doorId)) ||
-            "Door"
-        },
-        ...current
-      ]);
-      setIsModalOpen(false);
-      setForm((current) => ({
-        ...current,
-        visitorName: "",
-        visitorPhone: "",
-        visitorEmail: "",
-        startTime: "",
-        endTime: "",
-        latitude: "",
-        longitude: "",
-        purpose: ""
-      }));
-
-      const emailStatus = String(created?.inviteEmailStatus || "").toLowerCase();
-      if (emailStatus === "sent") {
-        showSuccess("Appointment created and guest email sent automatically.");
-      } else if (form.visitorEmail.trim()) {
-        showSuccess("Appointment created. Guest invite email was queued but not confirmed sent.");
-      } else {
-        showSuccess("Appointment created.");
-      }
-    } catch (error) {
-      showError(error?.message || "Unable to create appointment.");
-    } finally {
-      setCreating(false);
-    }
+  const handleCreateAppointment = async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const payload = Object.fromEntries(formData.entries());
+    payload.selectedDate = selectedDate;
+    createMutation.mutate(payload);
   };
 
   return (
     <div className="bg-[#f8f9fa] min-h-screen font-sans pb-32 overflow-x-hidden">
+      {/* Updated Header with Back Arrow */}
       <header className="fixed top-0 w-full z-[100] bg-white/90 backdrop-blur-md border-b border-slate-100 px-6 py-4">
         <div className="max-w-5xl mx-auto w-full flex justify-between items-center">
           <div className="flex items-center gap-4">
@@ -250,30 +125,24 @@ export default function ResidentAppointmentsPage() {
         <section className="space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="font-bold text-lg text-slate-800">Scheduled Visitors</h3>
-            <span className="text-[10px] font-bold text-slate-400 uppercase bg-slate-100 px-3 py-1 rounded-full">
-              {selectedAppointments.length || 0} Expected
-            </span>
+            <span className="text-[10px] font-bold text-slate-400 uppercase bg-slate-100 px-3 py-1 rounded-full">{appointments?.length || 0} Expected</span>
           </div>
-          {loading ? (
+          {isLoading ? (
             <div className="animate-pulse space-y-4">
-              {[1, 2].map((i) => <div key={i} className="h-20 bg-white rounded-[2rem] border border-slate-100" />)}
+              {[1, 2].map(i => <div key={i} className="h-20 bg-white rounded-[2rem] border border-slate-100" />)}
             </div>
-          ) : selectedAppointments.length > 0 ? (
+          ) : appointments?.length > 0 ? (
             <div className="space-y-3">
-              {selectedAppointments.map((appt) => (
-                <div key={appt.id} className="bg-white p-5 rounded-[2rem] border border-slate-100 flex items-center justify-between group shadow-sm">
+              {appointments.map((appt, idx) => (
+                <div key={idx} className="bg-white p-5 rounded-[2rem] border border-slate-100 flex items-center justify-between group shadow-sm">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center"><User size={22} /></div>
                     <div>
-                      <p className="font-bold text-sm text-slate-900">{appt.visitorName}</p>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">
-                        {appt.entryPoint || appt.doorName || doorNameById.get(String(appt.doorId || "")) || "Door"} - {appt.visitorContact || appt.visitorEmail || "No contact"}
-                      </p>
-                      <p className="text-[10px] font-bold text-slate-300 uppercase tracking-tight mt-1">
-                        {formatDateTime(appt.startsAt)} - {formatDateTime(appt.endsAt)}
-                      </p>
+                      <p className="font-bold text-sm text-slate-900">{appt.name || appt.visitorName}</p>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{appt.phone || appt.visitorPhone}</p>
                     </div>
                   </div>
+                  <button className="p-2 text-slate-300 hover:text-rose-500 transition-colors"><Trash2 size={18} /></button>
                 </div>
               ))}
             </div>
@@ -293,6 +162,7 @@ export default function ResidentAppointmentsPage() {
         <Plus size={28} />
       </button>
 
+      {/* MODAL SECTION */}
       <AnimatePresence>
         {isModalOpen && (
           <div className="fixed inset-0 z-[1000] flex items-end sm:items-center justify-center">
@@ -306,141 +176,65 @@ export default function ResidentAppointmentsPage() {
               initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
               className="relative bg-white w-full max-w-lg rounded-t-[2.5rem] sm:rounded-[2.5rem] flex flex-col h-[85vh] sm:h-auto sm:max-h-[90vh] shadow-2xl overflow-hidden"
             >
+              {/* Modal Header */}
               <div className="p-8 pb-4 bg-white shrink-0">
                 <div className="flex justify-between items-start mb-2">
                   <h3 className="font-black text-2xl text-slate-900 tracking-tight">Create Appointment</h3>
                   <button onClick={() => setIsModalOpen(false)} className="p-2 bg-slate-50 rounded-full text-slate-400"><X size={20} /></button>
                 </div>
-                <p className="text-slate-500 text-xs font-medium leading-relaxed">
-                  Schedule access, use one of your doors, and automatically email the guest invite link.
-                </p>
+                <p className="text-slate-500 text-xs font-medium leading-relaxed">Schedule access and share link with visitor.</p>
               </div>
 
+              {/* Scrollable Form Content */}
               <form onSubmit={handleCreateAppointment} className="flex-1 flex flex-col overflow-hidden">
                 <div className="flex-1 overflow-y-auto px-8 py-4 space-y-6 no-scrollbar">
-                  <InputField
-                    label="Visitor Name"
-                    name="visitorName"
-                    placeholder="Full Name"
-                    icon={<User size={18} />}
-                    required
-                    value={form.visitorName}
-                    onChange={(event) => setForm((current) => ({ ...current, visitorName: event.target.value }))}
-                  />
-                  <InputField
-                    label="Visitor Contact"
-                    name="visitorPhone"
-                    placeholder="+234..."
-                    icon={<Phone size={18} />}
-                    required
-                    value={form.visitorPhone}
-                    onChange={(event) => setForm((current) => ({ ...current, visitorPhone: event.target.value }))}
-                  />
-                  <InputField
-                    label="Visitor Email"
-                    name="visitorEmail"
-                    type="email"
-                    placeholder="guest@example.com"
-                    icon={<Mail size={18} />}
-                    required
-                    value={form.visitorEmail}
-                    onChange={(event) => setForm((current) => ({ ...current, visitorEmail: event.target.value }))}
-                  />
+                  <InputField label="Visitor Name" name="visitorName" placeholder="Full Name" icon={<User size={18}/>} required />
+                  <InputField label="Visitor Contact" name="visitorPhone" placeholder="+234..." icon={<Phone size={18}/>} required />
 
                   <div className="h-px bg-slate-100 w-full" />
 
-                  <SelectField
-                    label="Door / Point of Entry"
-                    value={form.doorId}
-                    icon={<DoorOpen size={18} />}
-                    onChange={(event) => setForm((current) => ({ ...current, doorId: event.target.value }))}
-                    options={doors.map((door) => ({
-                      value: door.id,
-                      label: door.gateLabel || door.name || "Untitled Door"
-                    }))}
-                    placeholder={doors.length === 0 ? "Create a door first in Doors & Access" : "Select entry point"}
-                    required
-                    disabled={doors.length === 0}
-                  />
+                  <InputField label="Door / Point of Entry" name="door" placeholder="Main Gate, Front Door..." icon={<DoorOpen size={18}/>} required />
 
                   <div className="grid grid-cols-2 gap-4">
-                    <InputField
-                      label="Start Time"
-                      name="startTime"
-                      type="datetime-local"
-                      icon={<Clock size={18} />}
-                      required
-                      value={form.startTime}
-                      onChange={(event) => setForm((current) => ({ ...current, startTime: event.target.value }))}
-                    />
-                    <InputField
-                      label="End Time"
-                      name="endTime"
-                      type="datetime-local"
-                      icon={<Clock size={18} />}
-                      required
-                      value={form.endTime}
-                      onChange={(event) => setForm((current) => ({ ...current, endTime: event.target.value }))}
-                    />
+                    <InputField label="Start Time" name="startTime" type="datetime-local" icon={<Clock size={18}/>} required />
+                    <InputField label="End Time" name="endTime" type="datetime-local" icon={<Clock size={18}/>} required />
                   </div>
 
                   <div className="h-px bg-slate-100 w-full" />
 
+                  {/* Geofencing Section */}
                   <div className="space-y-4 bg-slate-50 p-5 rounded-[2rem] border border-slate-100">
                     <div className="flex justify-between items-center px-1">
                       <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Location Security</label>
                       <button type="button" onClick={handleGetLocation} className="flex items-center gap-1.5 text-[10px] font-bold text-indigo-600 uppercase">
                         <Navigation size={12} className={isLocating ? "animate-pulse" : ""} />
-                        {isLocating ? "Locating..." : "Use My Location"}
+                        {isLocating ? "Locating..." : "Turn On Location"}
                       </button>
                     </div>
-                    <p className="text-[11px] text-slate-500 leading-relaxed">
-                      This geofence is what lets QRing alert the homeowner when the guest is close by.
-                    </p>
                     <div className="grid grid-cols-2 gap-4">
-                      <InputField
-                        label="Latitude"
-                        name="latitude"
-                        placeholder="Optional"
-                        icon={<MapPin size={16} />}
-                        value={form.latitude}
-                        onChange={(event) => setForm((current) => ({ ...current, latitude: event.target.value }))}
-                      />
-                      <InputField
-                        label="Longitude"
-                        name="longitude"
-                        placeholder="Optional"
-                        icon={<MapPin size={16} />}
-                        value={form.longitude}
-                        onChange={(event) => setForm((current) => ({ ...current, longitude: event.target.value }))}
-                      />
+                      <InputField label="Latitude" name="latitude" placeholder="Optional" icon={<MapPin size={16}/>} />
+                      <InputField label="Longitude" name="longitude" placeholder="Optional" icon={<MapPin size={16}/>} />
                     </div>
                   </div>
 
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Purpose</label>
                     <div className="relative">
-                      <textarea
-                        name="purpose"
-                        placeholder="Reason for visit..."
-                        rows="3"
-                        value={form.purpose}
-                        onChange={(event) => setForm((current) => ({ ...current, purpose: event.target.value }))}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-bold text-slate-900 focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 transition-all outline-none resize-none"
-                      />
+                      <textarea name="purpose" placeholder="Reason for visit..." rows="3" className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-bold text-slate-900 focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 transition-all outline-none resize-none" />
                       <div className="absolute right-5 top-4 text-slate-300"><AlignLeft size={18} /></div>
                     </div>
                   </div>
                   <div className="h-6" />
                 </div>
 
+                {/* Fixed Footer Action */}
                 <div className="p-8 pt-4 bg-white border-t border-slate-100 shrink-0">
                   <button
                     type="submit"
-                    disabled={creating || doors.length === 0}
+                    disabled={createMutation.isLoading}
                     className="w-full bg-indigo-600 text-white font-black text-xs uppercase tracking-widest py-5 rounded-2xl shadow-xl shadow-indigo-100 flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-50"
                   >
-                    {creating ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><ShieldCheck size={18} /> Invite Guest</>}
+                    {createMutation.isLoading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><ShieldCheck size={18} /> Invite Guest</>}
                   </button>
                 </div>
               </form>
@@ -448,16 +242,14 @@ export default function ResidentAppointmentsPage() {
           </div>
         )}
       </AnimatePresence>
-<<<<<<< HEAD
 
       {/* Bottom Nav */}
      
-=======
->>>>>>> 0fdd799755b08ac01a92e9d93143562b7cba3b19
     </div>
   );
 }
 
+// Sub-components
 function InputField({ label, icon, ...props }) {
   return (
     <div className="space-y-2">
@@ -475,56 +267,24 @@ function InputField({ label, icon, ...props }) {
   );
 }
 
-function SelectField({ label, icon, options, placeholder, ...props }) {
+function NavItem({ to, icon, label, active = false }) {
   return (
-    <div className="space-y-2">
-      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">{label}</label>
-      <div className="relative group">
-        <select
-          {...props}
-          className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-bold text-slate-900 focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 transition-all outline-none"
-        >
-          <option value="">{placeholder}</option>
-          {options.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-        <div className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-600 transition-colors pointer-events-none">
-          {icon}
-        </div>
-      </div>
-    </div>
+    <Link to={to} className={`flex flex-col items-center justify-center min-w-[64px] transition-all active:scale-90 ${active ? 'text-indigo-600' : 'text-slate-400'}`}>
+      <div className={`${active ? 'bg-indigo-50 p-2 rounded-xl' : ''}`}>{icon}</div>
+      <span className="text-[9px] font-black uppercase mt-1 tracking-tight">{label}</span>
+    </Link>
   );
 }
 
+// Utils
 function toDateKey(val) {
   const d = new Date(val);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 function formatDateHeader(key) {
   const d = new Date(`${key}T00:00:00`);
-  return d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
-}
-
-function formatDateTime(value) {
-  if (!value) return "--";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "--";
-  return date.toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit"
-  });
-}
-
-function toIsoLike(value) {
-  if (!value) return "";
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? value : parsed.toISOString();
+  return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 }
 
 function buildDateTiles() {
@@ -533,7 +293,7 @@ function buildDateTiles() {
   for (let i = -2; i <= 14; i++) {
     const d = new Date();
     d.setDate(now.getDate() + i);
-    days.push({ date: toDateKey(d), day: d.getDate(), weekday: d.toLocaleString("en-US", { weekday: "short" }) });
+    days.push({ date: toDateKey(d), day: d.getDate(), weekday: d.toLocaleString('en-US', { weekday: 'short' }) });
   }
   return days;
 }

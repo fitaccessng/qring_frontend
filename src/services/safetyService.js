@@ -34,34 +34,38 @@ export async function resolvePanicAlert(panicId) {
   return response?.data ?? null;
 }
 
-<<<<<<< HEAD
 export async function joinPanicAudio(panicId) {
   const response = await apiRequest("/panic/audio/join", {
-=======
+    method: "POST",
+    body: JSON.stringify({ panicId })
+  });
+  return response?.data ?? null;
+}
+
 export async function respondToPanicAlert(panicId) {
   const response = await apiRequest("/panic/respond", {
->>>>>>> 0fdd799755b08ac01a92e9d93143562b7cba3b19
     method: "POST",
     body: JSON.stringify({ panicId })
   });
   return response?.data ?? null;
 }
 
-<<<<<<< HEAD
 export async function endPanicAudio(panicId) {
   const response = await apiRequest("/panic/audio/end", {
-=======
-export async function ignorePanicAlert(panicId) {
-  const response = await apiRequest("/panic/ignore", {
->>>>>>> 0fdd799755b08ac01a92e9d93143562b7cba3b19
     method: "POST",
     body: JSON.stringify({ panicId })
   });
   return response?.data ?? null;
 }
 
-<<<<<<< HEAD
-=======
+export async function ignorePanicAlert(panicId) {
+  const response = await apiRequest("/panic/ignore", {
+    method: "POST",
+    body: JSON.stringify({ panicId })
+  });
+  return response?.data ?? null;
+}
+
 export async function reportFalsePanicAlert(panicId) {
   const response = await apiRequest("/panic/report-false", {
     method: "POST",
@@ -78,7 +82,6 @@ export async function updatePanicAlertNotes(panicId, notes) {
   return response?.data ?? null;
 }
 
->>>>>>> 0fdd799755b08ac01a92e9d93143562b7cba3b19
 export async function getSafetyAlerts(limit = 40) {
   const response = await apiRequest(`/safety/alerts?limit=${encodeURIComponent(limit)}`, { noCache: true });
   return Array.isArray(response?.data) ? response.data : [];

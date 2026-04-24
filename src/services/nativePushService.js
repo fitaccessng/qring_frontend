@@ -1,69 +1,14 @@
 import { registerPushSubscription } from "./notificationService";
-<<<<<<< HEAD
+import { ignorePanicAlert, reportFalsePanicAlert, respondToPanicAlert } from "./safetyService";
 import { isNativeApp } from "../utils/nativeRuntime";
-
-let listenersAttached = false;
-let listenersPromise = null;
-
-async function loadPlugin() {
-  if (!isNativeApp()) return null;
-  const mod = await import("@capacitor/push-notifications");
-  return mod?.PushNotifications || null;
-}
-
-export async function registerNativePushSubscription({ onNotification, onAction } = {}) {
-  const PushNotifications = await loadPlugin();
-  if (!PushNotifications) {
-    return { status: "unsupported" };
-  }
-
-  if (!listenersAttached) {
-    listenersPromise = (async () => {
-      await PushNotifications.addListener("registration", async (token) => {
-        const value = String(token?.value || "").trim();
-        if (!value) return;
-        await registerPushSubscription({
-          provider: "fcm",
-          endpoint: `native-fcm:${value}`,
-          token: value,
-          keys: {
-            token: value,
-            platform: globalThis?.Capacitor?.getPlatform?.() || "native",
-            runtime: "capacitor",
-          },
-        });
-      });
-      await PushNotifications.addListener("registrationError", (error) => {
-        console.error("Native push registration failed", error);
-      });
-      await PushNotifications.addListener("pushNotificationReceived", (notification) => {
-        onNotification?.(notification);
-      });
-      await PushNotifications.addListener("pushNotificationActionPerformed", (notification) => {
-        onAction?.(notification);
-      });
-      listenersAttached = true;
-    })();
-    await listenersPromise;
-  }
-
-  const permission = await PushNotifications.requestPermissions();
-  if (permission?.receive !== "granted") {
-    return { status: "permission_denied", permission: permission?.receive || "denied" };
-  }
-  await PushNotifications.register();
-  return { status: "registered", permission: "granted" };
-=======
-import {
-  ignorePanicAlert,
-  reportFalsePanicAlert,
-  respondToPanicAlert,
-} from "./safetyService";
 
 const PANIC_ACTION_TYPE_ID = "panic_response";
 const PANIC_ACTION_IDS = new Set(["respond", "ignore", "report_false"]);
+
 let initialized = false;
 let pluginsPromise = null;
+const notificationListeners = new Set();
+const actionListeners = new Set();
 
 function getNativePlatform() {
   try {
@@ -74,18 +19,39 @@ function getNativePlatform() {
 }
 
 async function loadPlugins() {
+  if (!isNativeApp()) return null;
   if (!pluginsPromise) {
     pluginsPromise = Promise.all([
       import("@capacitor/push-notifications"),
       import("@capacitor/local-notifications"),
-      import("@capacitor/app"),
+      import("@capacitor/app")
     ]).then(([pushMod, localMod, appMod]) => ({
       PushNotifications: pushMod?.PushNotifications,
       LocalNotifications: localMod?.LocalNotifications,
-      App: appMod?.App,
+      App: appMod?.App
     }));
   }
   return pluginsPromise;
+}
+
+function emitNotification(notification) {
+  notificationListeners.forEach((listener) => {
+    try {
+      listener(notification);
+    } catch {
+      // Keep push listeners isolated.
+    }
+  });
+}
+
+function emitAction(notification) {
+  actionListeners.forEach((listener) => {
+    try {
+      listener(notification);
+    } catch {
+      // Keep push listeners isolated.
+    }
+  });
 }
 
 function buildActionUrl({ action, panicId = "", route = "" }) {
@@ -106,16 +72,20 @@ function parseNotificationActionPayload(input) {
       safe?.notification?.actionId ||
       ""
     ).trim().toLowerCase();
-    const data = safe.data && typeof safe.data === "object"
-      ? safe.data
-      : safe.notification?.extra && typeof safe.notification.extra === "object"
-        ? safe.notification.extra
-        : safe.notification?.data && typeof safe.notification.data === "object"
-          ? safe.notification.data
-          : {};
-    const panicId = String(data.panicId || data.panic_id || "").trim();
-    const route = String(data.route || "").trim();
-    return { actionId, panicId, route };
+    const data =
+      safe.data && typeof safe.data === "object"
+        ? safe.data
+        : safe.notification?.extra && typeof safe.notification.extra === "object"
+          ? safe.notification.extra
+          : safe.notification?.data && typeof safe.notification.data === "object"
+            ? safe.notification.data
+            : {};
+
+    return {
+      actionId,
+      panicId: String(data.panicId || data.panic_id || "").trim(),
+      route: String(data.route || "").trim()
+    };
   } catch {
     return { actionId: "", panicId: "", route: "" };
   }
@@ -135,61 +105,65 @@ async function executeNotificationAction({ actionId, panicId, route }) {
   if (typeof window !== "undefined" && route.startsWith("/")) {
     window.location.assign(route);
   }
+
   return true;
 }
 
 async function handleLaunchUrl(url) {
   const safeUrl = String(url || "").trim();
   if (!safeUrl) return false;
+
   let parsed;
   try {
     parsed = new URL(safeUrl);
   } catch {
     return false;
   }
+
   if (parsed.protocol !== "qring:" || parsed.hostname !== "notification-action") {
     return false;
   }
-  const actionId = String(parsed.searchParams.get("action") || "").trim().toLowerCase();
-  const panicId = String(parsed.searchParams.get("panicId") || "").trim();
-  const route = String(parsed.searchParams.get("route") || "").trim();
-  return executeNotificationAction({ actionId, panicId, route });
+
+  return executeNotificationAction({
+    actionId: String(parsed.searchParams.get("action") || "").trim().toLowerCase(),
+    panicId: String(parsed.searchParams.get("panicId") || "").trim(),
+    route: String(parsed.searchParams.get("route") || "").trim()
+  });
 }
 
 function buildLocalNotification(notification) {
   const data = notification?.data && typeof notification.data === "object" ? notification.data : {};
   const notificationId = Number(notification?.id || Date.now() % 2147483000);
-  const title = String(notification?.title || data.title || "Qring Alert");
-  const body = String(notification?.body || notification?.message || data.body || "You have a new notification.");
-  const panicId = String(data.panicId || "").trim();
   const route = String(data.route || "/dashboard/notifications").trim();
-  const actionTypeId = String(data.actionSet || "") === PANIC_ACTION_TYPE_ID ? PANIC_ACTION_TYPE_ID : "";
+  const panicId = String(data.panicId || "").trim();
+  const wantsPanicActions = String(data.actionSet || "") === PANIC_ACTION_TYPE_ID;
 
   return {
     notifications: [
       {
         id: notificationId,
-        title,
-        body,
-        actionTypeId,
+        title: String(notification?.title || data.title || "Qring Alert"),
+        body: String(notification?.body || notification?.message || data.body || "You have a new notification."),
+        actionTypeId: wantsPanicActions ? PANIC_ACTION_TYPE_ID : "",
         extra: {
           ...data,
           panicId,
-          route,
-        },
-      },
-    ],
+          route
+        }
+      }
+    ]
   };
 }
 
-export async function registerNativePushNotifications() {
-  const { PushNotifications, LocalNotifications, App } = await loadPlugins();
-  if (!PushNotifications || !LocalNotifications || !App) {
-    return { ok: false, status: "unsupported", message: "Native notification plugins are unavailable." };
+async function ensureNativePushInitialized() {
+  const plugins = await loadPlugins();
+  if (!plugins?.PushNotifications || !plugins?.LocalNotifications || !plugins?.App) {
+    return null;
   }
 
   if (!initialized) {
     initialized = true;
+    const { PushNotifications, LocalNotifications, App } = plugins;
 
     await LocalNotifications.registerActionTypes({
       types: [
@@ -198,40 +172,48 @@ export async function registerNativePushNotifications() {
           actions: [
             { id: "respond", title: "I'm Responding", foreground: true },
             { id: "ignore", title: "Ignore", foreground: true },
-            { id: "report_false", title: "Report False", foreground: true, destructive: true },
-          ],
-        },
-      ],
+            { id: "report_false", title: "Report False", foreground: true, destructive: true, url: buildActionUrl({ action: "report_false" }) }
+          ]
+        }
+      ]
     });
 
-    PushNotifications.addListener("registration", async (token) => {
+    await PushNotifications.addListener("registration", async (token) => {
       const value = String(token?.value || "").trim();
       if (!value) return;
-      const platform = getNativePlatform() || "native";
       await registerPushSubscription({
         provider: "fcm",
-        endpoint: `fcm:${value}`,
+        endpoint: `native-fcm:${value}`,
         token: value,
         keys: {
           token: value,
-          platform,
-          native: true,
-        },
+          platform: getNativePlatform() || "native",
+          runtime: "capacitor",
+          native: true
+        }
       });
     });
 
-    PushNotifications.addListener("pushNotificationReceived", async (notification) => {
+    await PushNotifications.addListener("registrationError", (error) => {
+      console.error("Native push registration failed", error);
+    });
+
+    await PushNotifications.addListener("pushNotificationReceived", async (notification) => {
+      emitNotification(notification);
+
       const data = notification?.data && typeof notification.data === "object" ? notification.data : {};
       if (getNativePlatform() !== "ios") return;
       if (String(data.actionSet || "") !== PANIC_ACTION_TYPE_ID) return;
+
       try {
         await LocalNotifications.schedule(buildLocalNotification(notification));
       } catch {
-        // Keep push handling resilient if local notification mirroring fails.
+        // Keep notification delivery resilient.
       }
     });
 
-    PushNotifications.addListener("pushNotificationActionPerformed", async (event) => {
+    await PushNotifications.addListener("pushNotificationActionPerformed", async (event) => {
+      emitAction(event);
       try {
         await executeNotificationAction(parseNotificationActionPayload(event));
       } catch {
@@ -239,7 +221,8 @@ export async function registerNativePushNotifications() {
       }
     });
 
-    LocalNotifications.addListener("localNotificationActionPerformed", async (event) => {
+    await LocalNotifications.addListener("localNotificationActionPerformed", async (event) => {
+      emitAction(event);
       try {
         await executeNotificationAction(parseNotificationActionPayload(event));
       } catch {
@@ -247,7 +230,7 @@ export async function registerNativePushNotifications() {
       }
     });
 
-    App.addListener("appUrlOpen", async ({ url }) => {
+    await App.addListener("appUrlOpen", async ({ url }) => {
       try {
         await handleLaunchUrl(url);
       } catch {
@@ -265,23 +248,49 @@ export async function registerNativePushNotifications() {
     }
   }
 
+  return plugins;
+}
+
+export async function registerNativePushSubscription({ onNotification, onAction } = {}) {
+  const plugins = await ensureNativePushInitialized();
+  if (!plugins?.PushNotifications || !plugins?.LocalNotifications) {
+    return { status: "unsupported", permission: "unsupported" };
+  }
+
+  if (typeof onNotification === "function") {
+    notificationListeners.add(onNotification);
+  }
+  if (typeof onAction === "function") {
+    actionListeners.add(onAction);
+  }
+
+  const { PushNotifications, LocalNotifications } = plugins;
   const pushPermission = await PushNotifications.requestPermissions();
   const localPermission = await LocalNotifications.requestPermissions();
-  const pushGranted = ["granted", "prompt-with-rationale"].includes(String(pushPermission?.receive || "").toLowerCase());
-  const localGranted = String(localPermission?.display || "").toLowerCase() === "granted";
+  const pushReceive = String(pushPermission?.receive || "").toLowerCase();
+  const localDisplay = String(localPermission?.display || "").toLowerCase();
+  const pushGranted = pushReceive === "granted" || pushReceive === "prompt-with-rationale";
+  const localGranted = localDisplay === "granted";
+
   if (!pushGranted || !localGranted) {
     return {
-      ok: false,
       status: "permission_denied",
-      message: "Native notification permission was not granted.",
+      permission: pushGranted ? localDisplay || "denied" : pushReceive || "denied"
     };
   }
 
   await PushNotifications.register();
+  return { status: "registered", permission: "granted" };
+}
+
+export async function registerNativePushNotifications() {
+  const result = await registerNativePushSubscription();
   return {
-    ok: true,
-    status: "registered",
-    message: "Native push notifications are enabled on this device.",
+    ok: result?.status === "registered",
+    status: result?.status || "unsupported",
+    message:
+      result?.status === "registered"
+        ? "Native push notifications are enabled on this device."
+        : "Native notification registration failed on this device."
   };
->>>>>>> 0fdd799755b08ac01a92e9d93143562b7cba3b19
 }
