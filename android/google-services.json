@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "333641553431",
+    "project_id": "qring-d068a",
+    "storage_bucket": "qring-d068a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:333641553431:android:f990f38510a2bfada4ae52",
+        "android_client_info": {
+          "package_name": "com.kelvin.qringapp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "333641553431-dnpj0r2echhl0t3ccad573s17gn2qstn.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDdla3ICtjcMfLankrmwBDKTmjUBb0yiws"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "333641553431-dnpj0r2echhl0t3ccad573s17gn2qstn.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
