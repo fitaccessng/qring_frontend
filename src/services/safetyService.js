@@ -34,6 +34,22 @@ export async function resolvePanicAlert(panicId) {
   return response?.data ?? null;
 }
 
+export async function joinPanicAudio(panicId) {
+  const response = await apiRequest("/panic/audio/join", {
+    method: "POST",
+    body: JSON.stringify({ panicId })
+  });
+  return response?.data ?? null;
+}
+
+export async function endPanicAudio(panicId) {
+  const response = await apiRequest("/panic/audio/end", {
+    method: "POST",
+    body: JSON.stringify({ panicId })
+  });
+  return response?.data ?? null;
+}
+
 export async function getSafetyAlerts(limit = 40) {
   const response = await apiRequest(`/safety/alerts?limit=${encodeURIComponent(limit)}`, { noCache: true });
   return Array.isArray(response?.data) ? response.data : [];

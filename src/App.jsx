@@ -210,6 +210,7 @@ function AppRoutes() {
                 <Route path="/signup" element={<SignupPage />} />
                 <Route path="/google-role" element={<GoogleRolePage />} />
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                <Route path="/reset-password" element={<ForgotPasswordPage />} />
                 <Route path="/verify-email" element={<VerifyEmailPage />} />
               </Route>
               <Route path="/loader" element={<LoaderPage />} />

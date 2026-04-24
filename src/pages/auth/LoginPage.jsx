@@ -1,8 +1,9 @@
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useEffect, useState } from "react";
-import AuthCard from "../../components/AuthCard";
+import { Mail, Lock, ChevronRight, Eye, EyeOff, AlertCircle } from "lucide-react";
 import { useAuth } from "../../state/AuthContext";
 import { requestEmailVerification } from "../../services/authService";
+import quickdropLogo from "../../assets/qring_logo.jpeg";
 
 const rolePath = {
   homeowner: "/dashboard/homeowner/overview",
@@ -13,75 +14,41 @@ const rolePath = {
 
 function resolveTargetPath(data, fromPath) {
   const role = data?.user?.role;
-  if (!role) {
-    return null;
-  }
-
-  const fallback = rolePath[role];
-  if (!fallback) {
-    throw new Error(`Login succeeded but role '${role}' is not supported in this app.`);
-  }
-
-  return fromPath ?? fallback;
-}
-
-function resolveLoginErrorMessage(submitError, attemptedLogin = "") {
-  const status = Number(submitError?.status ?? 0);
-  const message = String(submitError?.message || "");
-  const normalizedLogin = String(attemptedLogin || "").trim().toLowerCase();
-  const looksLikeEmailLogin = normalizedLogin.includes("@");
-  if (status === 401 || message.toLowerCase().includes("invalid credential")) {
-    if (looksLikeEmailLogin) {
-      return "We could not sign you in with that email and password. If this is an invited estate resident account and you already used the latest invite details, ask the estate manager to resend the invite so your access details can be refreshed.";
-    }
-    return "We could not sign you in. If you were invited by an estate manager and already used the latest invite details, ask them to resend your invite and try again.";
-  }
-  return message || "Login failed";
+  if (!role) return null;
+  return fromPath ?? rolePath[role] ?? null;
 }
 
 export default function LoginPage() {
   const { login, googleSignIn, resumeGoogleRedirect, loading } = useAuth();
   const [searchParams] = useSearchParams();
   const initialLogin = searchParams.get("email") ?? searchParams.get("username") ?? "";
+  
   const [form, setForm] = useState({ email: initialLogin, password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [verificationState, setVerificationState] = useState({ needed: false, sending: false, status: "" });
+  
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
     let active = true;
-
     const resumeNativeGoogleAuth = async () => {
       try {
         const resumed = await resumeGoogleRedirect();
         if (!active || !resumed) return;
-
         if (resumed.intent === "signup") {
           navigate("/google-role", { replace: true, state: { intent: "signup" } });
           return;
         }
-
         const target = resolveTargetPath(resumed.data, location.state?.from?.pathname);
-        if (!target) {
-          navigate("/google-role", {
-            replace: true,
-            state: { from: location.state?.from?.pathname }
-          });
-          return;
-        }
-        navigate(target, { replace: true });
-      } catch (resumeError) {
-        if (!active) return;
-        setError(resumeError.message ?? "Google sign-in failed");
+        navigate(target || "/google-role", { replace: true });
+      } catch (err) {
+        if (active) setError(err.message ?? "Google sign-in failed");
       }
     };
-
     resumeNativeGoogleAuth();
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, [location.state?.from?.pathname, navigate, resumeGoogleRedirect]);
 
   const onSubmit = async (event) => {
@@ -91,203 +58,158 @@ export default function LoginPage() {
     try {
       const data = await login(form);
       const target = resolveTargetPath(data, location.state?.from?.pathname);
-      if (!target) {
-        throw new Error("Login succeeded but no user role was returned. Please contact support.");
-      }
+      if (!target) throw new Error("No user role returned. Contact support.");
       navigate(target, { replace: true });
-    } catch (submitError) {
-      const status = Number(submitError?.status ?? 0);
-      const message = String(submitError?.message || "");
-      if (status === 403 && message.toLowerCase().includes("not verified")) {
-        setError("Email is not verified. Please verify your email to sign in.");
-        setVerificationState((prev) => ({ ...prev, needed: true }));
-        return;
+    } catch (err) {
+      if (err?.status === 403) {
+        setError("Email not verified.");
+        setVerificationState(prev => ({ ...prev, needed: true }));
+      } else {
+        setError(err.message || "Invalid credentials");
       }
-      setError(resolveLoginErrorMessage(submitError, form.email));
-    }
-  };
-
-  const onGoogleSignIn = async () => {
-    setError("");
-    try {
-      const data = await googleSignIn();
-      const target = resolveTargetPath(data, location.state?.from?.pathname);
-      if (!target) {
-        navigate("/google-role", {
-          replace: true,
-          state: { from: location.state?.from?.pathname }
-        });
-        return;
-      }
-      navigate(target, { replace: true });
-    } catch (submitError) {
-      setError(submitError.message ?? "Google sign-in failed");
     }
   };
 
   return (
-    <div className="safe-content grid min-h-screen place-items-center bg-slate-50 p-4 dark:bg-slate-950">
-      <AuthCard title="Login" subtitle="Access your secure Qring workspace">
-        <form onSubmit={onSubmit} className="space-y-4">
-          <Input
-            label="Email or Username"
-            type="text"
-            value={form.email}
-            onChange={(value) => setForm((prev) => ({ ...prev, email: value }))}
-          />
-          <PasswordInput
-            label="Password"
-            value={form.password}
-            show={showPassword}
-            onToggle={() => setShowPassword((prev) => !prev)}
-            onChange={(value) => setForm((prev) => ({ ...prev, password: value }))}
-          />
-          {error ? (
-            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 dark:border-rose-900/30 dark:bg-rose-950/20">
-              <div className="flex items-start gap-3">
-                <svg className="h-5 w-5 flex-shrink-0 text-rose-600 dark:text-rose-400 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                </svg>
-                <div className="flex-1">
-                  <p className="font-semibold text-rose-900 dark:text-rose-200">Sign in failed</p>
-                  <p className="mt-1 text-sm text-rose-800 dark:text-rose-300 leading-relaxed">
-                    {error.includes("invited estate") ? (
-                      <>
-                        We couldn't sign you in with those credentials.
-                        <br />
-                        <span className="mt-2 block font-medium">If you're an invited estate resident:</span>
-                        <span className="block text-xs mt-1">Ask your estate manager to resend your invite so your access details can be refreshed.</span>
-                      </>
-                    ) : (
-                      error
-                    )}
-                  </p>
-                </div>
-              </div>
+    <div className="min-h-screen bg-slate-950 flex flex-col font-body antialiased">
+      {/* --- Branding Header --- */}
+      <div className="pt-12 pb-10 px-6 flex flex-col items-center text-center">
+        <img 
+          src={quickdropLogo} 
+          alt="QRing" 
+          className="h-16 w-16 rounded-2xl mb-4 shadow-2xl border border-white/10 object-cover" 
+        />
+        <h1 className="text-white font-headline text-3xl font-black tracking-tight">Welcome Back</h1>
+        <p className="text-slate-400 text-sm mt-1 font-medium tracking-wide">See, Talk, Approve Visitors </p>
+      </div>
+
+      {/* --- Bottom Sheet Container --- */}
+      <div className="flex-1 bg-white rounded-t-[3rem] shadow-[0_-10px_40px_rgba(0,0,0,0.4)] px-6 pt-10 pb-12 overflow-y-auto">
+        <div className="max-w-md mx-auto w-full">
+          <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-10 -mt-4" />
+
+          {error && (
+            <div className="mb-6 p-4 rounded-2xl text-xs font-bold bg-red-50 text-red-600 border border-red-100 animate-in fade-in slide-in-from-top-2 flex items-center gap-3">
+              <AlertCircle size={16} />
+              <span>{error}</span>
             </div>
-          ) : null}
-          {verificationState.needed ? (
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-semibold text-slate-800">Verify your email</p>
-              <p className="mt-1 text-xs text-slate-600">
-                Tap resend to get a new verification link, then try signing in again.
-              </p>
+          )}
+
+          <form onSubmit={onSubmit} className="flex flex-col gap-4 w-full">
+            <InputField 
+              icon={Mail} 
+              type="text"
+              placeholder="Email or Username" 
+              value={form.email} 
+              onChange={(v) => setForm({ ...form, email: v })} 
+            />
+
+            <div className="relative group w-full">
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 p-1.5 rounded-lg bg-white border border-slate-100 shadow-sm group-focus-within:border-brand-500/30 transition-colors z-10">
+                <Lock className="text-slate-400 w-4 h-4 group-focus-within:text-brand-500" />
+              </div>
+              <input
+                className="w-full bg-slate-50 border-2 border-transparent rounded-2xl py-4 pl-14 pr-12 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-brand-500/20 focus:ring-4 focus:ring-brand-500/5 outline-none transition-all font-medium"
+                placeholder="Password"
+                type={showPassword ? "text" : "password"}
+                required
+                value={form.password}
+                onChange={(e) => setForm({ ...form, password: e.target.value })}
+              />
               <button
                 type="button"
-                disabled={verificationState.sending}
-                onClick={async () => {
-                  const email = String(form.email || "").trim().toLowerCase();
-                  if (!email) {
-                    setVerificationState({ needed: true, sending: false, status: "Enter your email first." });
-                    return;
-                  }
-                  setVerificationState({ needed: true, sending: true, status: "" });
-                  try {
-                    const response = await requestEmailVerification({ email });
-                    const status = response?.data?.emailStatus ?? response?.emailStatus ?? "unknown";
-                    const reason = response?.data?.emailReason ?? response?.emailReason ?? "";
-                    if (String(status).toLowerCase() === "sent") {
-                      setVerificationState({ needed: true, sending: false, status: "Email sent" });
-                      navigate(`/verify-email?email=${encodeURIComponent(email)}`);
-                    } else {
-                      setVerificationState({
-                        needed: true,
-                        sending: false,
-                        status: `Verification email could not be sent (${status}${reason ? `: ${reason}` : ""}).`
-                      });
-                    }
-                  } catch (err) {
-                    setVerificationState({ needed: true, sending: false, status: err?.message || "Unable to resend verification email." });
-                  }
-                }}
-                className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 hover:bg-slate-100 disabled:opacity-60"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-brand-500 transition-colors z-10"
               >
-                {verificationState.sending ? "Sending..." : "Resend verification email"}
+                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
-              {verificationState.status ? <p className="mt-2 text-xs text-slate-600">{verificationState.status}</p> : null}
             </div>
-          ) : null}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-xl bg-brand-500 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"
-          >
-            {loading ? "Signing In..." : "Sign In"}
-          </button>
 
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-300 dark:border-slate-700"></div>
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-slate-50 px-2 text-slate-500 dark:bg-slate-950 dark:text-slate-400">Or</span>
-            </div>
+            {verificationState.needed && (
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Verification Required</p>
+                <button
+                  type="button"
+                  disabled={verificationState.sending}
+                  onClick={async () => {
+                    setVerificationState((p) => ({ ...p, sending: true, status: "" }));
+                    try {
+                      await requestEmailVerification({ email: form.email.trim().toLowerCase() });
+                      setVerificationState((p) => ({ ...p, sending: false, status: "Sent!" }));
+                    } catch (requestError) {
+                      setVerificationState((p) => ({ ...p, sending: false }));
+                      setError(requestError.message ?? "Could not send verification email.");
+                    }
+                  }}
+                  className="w-full py-3 rounded-xl border-2 border-slate-200 text-xs font-bold text-slate-700 active:bg-slate-100"
+                >
+                  {verificationState.sending ? "Sending..." : verificationState.status || "Resend Verification Email"}
+                </button>
+              </div>
+            )}
+
+            <button
+              disabled={loading}
+              className="w-full bg-brand-500 text-white font-black py-5 rounded-[2.5rem] shadow-xl shadow-brand-500/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2 mt-4 disabled:opacity-50"
+              type="submit"
+            >
+              {loading ? "Signing In..." : "Sign In"}
+              {!loading && <ChevronRight className="w-5 h-5 font-bold" />}
+            </button>
+          </form>
+
+          {/* Social Divider */}
+          <div className="relative flex py-8 items-center">
+            <div className="flex-grow border-t border-slate-100"></div>
+            <span className="mx-4 text-slate-400 text-[10px] font-black uppercase tracking-widest">Or continue with</span>
+            <div className="flex-grow border-t border-slate-100"></div>
           </div>
 
           <button
             type="button"
-            onClick={onGoogleSignIn}
-            disabled={loading}
-            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
+            onClick={() => googleSignIn()}
+            className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl bg-white border-2 border-slate-100 shadow-sm active:bg-slate-50 active:scale-[0.98] transition-all mb-10"
           >
-            <svg className="mb-0.5 mr-2 inline h-4 w-4" viewBox="0 0 24 24">
-              <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-              <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-              <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-              <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+            <svg className="h-5 w-5" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
             </svg>
-            {loading ? "Signing in..." : "Sign in with Google"}
+            <span className="text-slate-700 font-bold text-sm">Google Account</span>
           </button>
 
-          <div className="flex justify-between text-xs text-slate-500">
-            <Link to="/forgot-password" className="hover:text-brand-500">
-              Forgot password?
+          <div className="flex flex-col gap-4 items-center">
+            <Link to="/forgot-password" size="sm" className="text-slate-400 text-xs font-bold uppercase tracking-widest hover:text-brand-500 transition-colors">
+              Forgot Password?
             </Link>
-            <Link to="/signup" className="hover:text-brand-500">
-              Create account
-            </Link>
+            <p className="text-center text-sm font-bold text-slate-400">
+              New here?{" "}
+              <Link to="/signup" className="text-brand-500 font-black underline underline-offset-4 ml-1">
+                Create Account
+              </Link>
+            </p>
           </div>
-        </form>
-      </AuthCard>
+        </div>
+      </div>
     </div>
   );
 }
 
-function Input({ label, type, value, onChange }) {
+function InputField({ icon: Icon, placeholder, type = "text", value, onChange, required = true }) {
   return (
-    <label className="block text-sm">
-      <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">{label}</span>
-      <input
-        required
-        type={type}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-3 outline-none ring-brand-500 focus:ring-2 dark:border-slate-700 dark:bg-slate-900"
-      />
-    </label>
-  );
-}
-
-function PasswordInput({ label, value, onChange, show, onToggle }) {
-  return (
-    <label className="block text-sm">
-      <span className="mb-1 block font-medium text-slate-700 dark:text-slate-300">{label}</span>
-      <div className="relative">
-        <input
-          required
-          type={show ? "text" : "password"}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          className="w-full rounded-xl border border-slate-300 bg-white px-3 py-3 pr-16 outline-none ring-brand-500 focus:ring-2 dark:border-slate-700 dark:bg-slate-900"
-        />
-        <button
-          type="button"
-          onClick={onToggle}
-          className="absolute inset-y-0 right-2 my-1 rounded-lg px-3 text-xs font-semibold text-slate-600 dark:text-slate-300"
-        >
-          {show ? "Hide" : "Show"}
-        </button>
+    <div className="relative group w-full">
+      <div className="absolute left-4 top-1/2 -translate-y-1/2 p-1.5 rounded-lg bg-white border border-slate-100 shadow-sm group-focus-within:border-brand-500/30 transition-colors z-10">
+        <Icon className="text-slate-400 w-4 h-4 group-focus-within:text-brand-500" />
       </div>
-    </label>
+      <input
+        className="w-full bg-slate-50 border-2 border-transparent rounded-2xl py-4 pl-14 pr-4 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-brand-500/20 focus:ring-4 focus:ring-brand-500/5 outline-none transition-all font-medium"
+        placeholder={placeholder}
+        type={type}
+        required={required}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </div>
   );
 }

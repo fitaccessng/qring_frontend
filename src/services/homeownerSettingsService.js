@@ -20,3 +20,11 @@ export async function updateHomeownerProfile(payload) {
   });
   return response?.data ?? null;
 }
+
+export async function searchHomeownerEmergencyContactByEmail(email) {
+  const response = await apiRequest(`/homeowner/contact-users/search?email=${encodeURIComponent(String(email || "").trim().toLowerCase())}`, {
+    silent: true,
+    noCache: true
+  });
+  return response?.data ?? null;
+}

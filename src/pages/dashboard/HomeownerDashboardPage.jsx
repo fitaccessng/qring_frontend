@@ -235,7 +235,7 @@ export default function HomeownerDashboardPage() {
         <section className="space-y-6 pb-12">
           <div className="flex justify-between items-center">
             <h3 className="font-bold text-lg text-slate-800">Recent Activity</h3>
-            <Link to="/dashboard/homeowner/activity" className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">View All</Link>
+            <Link to="/dashboard/homeowner/visits" className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">View All</Link>
           </div>
           <div className="space-y-3">
             {overview.activity?.length > 0 ? (

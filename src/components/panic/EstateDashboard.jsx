@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, ShieldAlert } from "lucide-react";
 import { acknowledgePanicAlert, getActivePanicAlerts, resolvePanicAlert } from "../../services/safetyService";
 import { useSocketEvents } from "../../hooks/useSocketEvents";
+import PanicAudioPanel from "./PanicAudioPanel";
 
 export default function EstateDashboard({ roleLabel = "Emergency Response Dashboard" }) {
   const [alerts, setAlerts] = useState([]);
@@ -180,6 +181,9 @@ export default function EstateDashboard({ roleLabel = "Emergency Response Dashbo
                   {busyKey === `resolve:${alert.id}` ? "Working..." : "Mark Resolved"}
                 </button>
               </div>
+            </div>
+            <div className="mt-4">
+              <PanicAudioPanel alert={alert} canEnd={alert.acknowledged} />
             </div>
           </article>
         ))}

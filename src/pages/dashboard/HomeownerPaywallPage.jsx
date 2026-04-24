@@ -37,15 +37,16 @@ export default function ResidentSubscriptionCenter() {
 
   const firstName = user?.fullName?.split(" ")[0] || user?.email || "User";
   const isFetching = loading;
-  const audience = String(user?.role || "resident").toLowerCase() === "estate" ? "estate" : "resident";
+  const role = String(user?.role || "homeowner").toLowerCase();
+  const audience = role === "estate" ? "estate" : "homeowner";
   const isEstateAudience = audience === "estate";
 
   useEffect(() => {
     let active = true;
     async function loadContext() {
-      if (user?.role !== "resident") return;
+      if (role !== "homeowner") return;
       try {
-        const data = await getResidentContext();
+        const data = await getHomeownerContext();
         if (!active) return;
         setManagedContext(data ?? { managedByEstate: false, estateName: "" });
       } catch {
@@ -57,7 +58,7 @@ export default function ResidentSubscriptionCenter() {
     return () => {
       active = false;
     };
-  }, [user?.role]);
+  }, [role]);
 
   useEffect(() => {
     if (user?.role !== "homeowner") return;

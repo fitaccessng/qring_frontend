@@ -13,6 +13,7 @@ import { useAuth } from "./AuthContext";
 import { normalizeNotification, parseNotificationPayload } from "../utils/notificationMeta";
 import { resolveNotificationRoute } from "../utils/notificationRouting";
 import { notify } from "../utils/notifier";
+import { registerNativePushSubscription } from "../services/nativePushService";
 import { registerFcmPushSubscription, setupForegroundMessageListener } from "../services/pushMessagingService";
 import { isNativeApp } from "../utils/nativeRuntime";
 import { isFirebaseConfigured } from "../config/firebase";
@@ -199,6 +200,31 @@ export function NotificationsProvider({ children }) {
   }, [nativeApp, permission]);
 
   useEffect(() => {
+    if (!nativeApp || !user?.id) return;
+    registerNativePushSubscription({
+      onNotification: (notification) => {
+        const kind = notification?.data?.kind || notification?.notification?.data?.kind;
+        if (kind === "safety.panic") {
+          playPanicAlertSound();
+        }
+        refresh({ silent: true });
+      },
+      onAction: () => {
+        refresh({ silent: true });
+      },
+    })
+      .then((result) => {
+        if (!isMountedRef.current) return;
+        setPermission(result?.permission || "granted");
+        setPushStatus(result?.status || "registered");
+      })
+      .catch(() => {
+        if (!isMountedRef.current) return;
+        setPushStatus("registration_failed");
+      });
+  }, [nativeApp, user?.id]);
+
+  useEffect(() => {
     items
       .filter((item) => item.unread)
       .forEach((item) => {
@@ -300,14 +326,33 @@ export function NotificationsProvider({ children }) {
 
   async function enableBrowserAlerts() {
     if (nativeApp) {
-      setPermission("unsupported");
-      setPushStatus("native_not_implemented");
-      return {
-        ok: false,
-        permission: "unsupported",
-        pushStatus: "native_not_implemented",
-        message: "Native mobile push notifications are not wired up yet in this build."
-      };
+      try {
+        const result = await registerNativePushSubscription({
+          onNotification: () => refresh({ silent: true }),
+          onAction: () => refresh({ silent: true }),
+        });
+        const nextPermission = result?.permission || "granted";
+        const nextStatus = result?.status || "registered";
+        setPermission(nextPermission);
+        setPushStatus(nextStatus);
+        return {
+          ok: nextStatus === "registered",
+          permission: nextPermission,
+          pushStatus: nextStatus,
+          message:
+            nextStatus === "registered"
+              ? "Native push notifications are enabled on this device."
+              : "Native push notifications need permission on this device."
+        };
+      } catch {
+        setPushStatus("registration_failed");
+        return {
+          ok: false,
+          permission: "denied",
+          pushStatus: "registration_failed",
+          message: "Native push registration failed on this device."
+        };
+      }
     }
 
     const nextPermission = await requestBrowserNotificationPermission();

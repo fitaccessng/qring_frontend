@@ -155,28 +155,7 @@ export default function NotificationsPage() {
       </main>
 
       {/* Bottom Navigation Bar (Serene Sentinel Style) */}
-      <nav className="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-8 pt-4 bg-white/90 backdrop-blur-2xl rounded-t-[2rem] shadow-[0_-12px_32px_rgba(43,52,55,0.08)] border-t border-slate-50">
-        <Link to="/dashboard/homeowner/overview" className="flex flex-col items-center justify-center text-slate-400 px-5 py-2 hover:text-indigo-500 transition-all">
-          <Home className="h-6 w-6 mb-1" />
-          <span className="text-[10px] font-medium uppercase tracking-widest">Home</span>
-        </Link>
-        
-        <Link to="/dashboard/homeowner/security" className="flex flex-col items-center justify-center text-slate-400 px-5 py-2 hover:text-indigo-500 transition-all">
-          <ShieldCheck className="h-6 w-6 mb-1" />
-          <span className="text-[10px] font-medium uppercase tracking-widest">Security</span>
-        </Link>
-
-        {/* Active State */}
-        <div className="flex flex-col items-center justify-center bg-indigo-50 text-indigo-700 rounded-2xl px-5 py-2">
-          <Bell className="h-6 w-6 mb-1 fill-current" />
-          <span className="text-[10px] font-bold uppercase tracking-widest">Activity</span>
-        </div>
-
-        <Link to="/dashboard/homeowner/settings" className="flex flex-col items-center justify-center text-slate-400 px-5 py-2 hover:text-indigo-500 transition-all">
-          <Settings2 className="h-6 w-6 mb-1" />
-          <span className="text-[10px] font-medium uppercase tracking-widest">Settings</span>
-        </Link>
-      </nav>
+  
 
       {/* Profile Initials Floating Indicator */}
       <div className="fixed bottom-28 right-6 hidden sm:block">

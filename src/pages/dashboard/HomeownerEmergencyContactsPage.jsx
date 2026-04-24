@@ -16,13 +16,17 @@ import {
   UserPlus
 } from "lucide-react";
 import { useNotifications } from "../../state/NotificationsContext";
-import { getHomeownerSettings, updateHomeownerSettings } from "../../services/homeownerSettingsService";
+import {
+  getHomeownerSettings,
+  searchHomeownerEmergencyContactByEmail,
+  updateHomeownerSettings
+} from "../../services/homeownerSettingsService";
 import { showError, showSuccess } from "../../utils/flash";
 import { formatEmergencyContact, parseEmergencyContact } from "../../utils/emergencyContacts";
 
 const EMPTY_FORM = {
   name: "",
-  phone: "",
+  email: "",
   relationship: ""
 };
 
@@ -61,7 +65,7 @@ export default function HomeownerEmergencyContactsPage() {
   }, []);
 
   const isPanicActive = false;
-  const canAdd = form.name.trim() && form.phone.trim();
+  const canAdd = form.email.trim() && !saving;
   const autoEscalationLabel = useMemo(() => {
     if (!contacts.length) return "Add at least one contact so alerts have someone to reach.";
     return `QRing will notify ${contacts.length} configured contact${contacts.length === 1 ? "" : "s"} during escalation.`;
@@ -79,7 +83,19 @@ export default function HomeownerEmergencyContactsPage() {
         autoApproveKnownContacts: Boolean(settings.autoApproveKnownContacts),
         knownContacts: nextContacts.map((item) => formatEmergencyContact(item)),
         allowDeliveryDropAtGate: Boolean(settings.allowDeliveryDropAtGate),
-        smsFallbackEnabled: Boolean(settings.smsFallbackEnabled)
+        smsFallbackEnabled: Boolean(settings.smsFallbackEnabled),
+        nearbyPanicAlertsEnabled: Boolean(settings.nearbyPanicAlertsEnabled),
+        nearbyPanicAlertRadiusMeters: Number(settings.nearbyPanicAlertRadiusMeters || 500),
+        nearbyPanicAvailability: String(settings.nearbyPanicAvailability || "always"),
+        nearbyPanicCustomSchedule: Array.isArray(settings.nearbyPanicCustomSchedule) ? settings.nearbyPanicCustomSchedule : [],
+        nearbyPanicReceiveFrom: String(settings.nearbyPanicReceiveFrom || "everyone"),
+        nearbyPanicMutedUntil: settings.nearbyPanicMutedUntil || null,
+        nearbyPanicSameAreaLabel: String(settings.nearbyPanicSameAreaLabel || ""),
+        panicIdentityVisibility: String(settings.panicIdentityVisibility || "masked"),
+        safetyHomeLocation: {
+          lat: settings?.safetyHomeLocation?.lat ?? null,
+          lng: settings?.safetyHomeLocation?.lng ?? null
+        }
       };
       const updated = await updateHomeownerSettings(payload);
       setSettings((prev) => ({ ...(prev || {}), ...(updated || {}), knownContacts: payload.knownContacts }));
@@ -94,14 +110,26 @@ export default function HomeownerEmergencyContactsPage() {
 
   async function handleAddContact() {
     if (!canAdd || saving) return;
-    const nextContact = {
-      id: `contact_${Date.now()}`,
-      name: form.name.trim(),
-      phone: form.phone.trim(),
-      relationship: form.relationship.trim() || "Emergency Contact"
-    };
-    await persistContacts([...contacts, nextContact], "Emergency contact added.");
-    setForm(EMPTY_FORM);
+    try {
+      const matchedUser = await searchHomeownerEmergencyContactByEmail(form.email);
+      const exists = contacts.some(
+        (contact) => String(contact.email || "").trim().toLowerCase() === String(matchedUser?.email || "").trim().toLowerCase()
+      );
+      if (exists) {
+        throw new Error("This QRing user is already in your emergency contact list.");
+      }
+      const nextContact = {
+        id: `contact_${matchedUser?.id || Date.now()}`,
+        name: matchedUser?.fullName || form.name.trim() || "Emergency Contact",
+        email: matchedUser?.email || form.email.trim().toLowerCase(),
+        phone: matchedUser?.phone || "",
+        relationship: form.relationship.trim() || "Emergency Contact"
+      };
+      await persistContacts([...contacts, nextContact], "Emergency contact added.");
+      setForm(EMPTY_FORM);
+    } catch (error) {
+      showError(error?.message || "Could not add that QRing user as an emergency contact.");
+    }
   }
 
   async function handleRemoveContact(contactId) {
@@ -149,7 +177,7 @@ export default function HomeownerEmergencyContactsPage() {
       <main className="flex-grow pt-28 pb-32 px-6 max-w-2xl mx-auto w-full">
         <section className="mb-10">
           <h2 className="text-3xl font-black text-slate-900 tracking-tight mb-3">Emergency Contacts</h2>
-          <p className="text-slate-500 text-lg leading-relaxed">Manage the real contact list QRing will use during safety escalation.</p>
+          <p className="text-slate-500 text-lg leading-relaxed">Add verified QRing users by email so panic alerts reach real accounts.</p>
         </section>
 
         <section className="bg-white rounded-[2rem] p-6 border border-slate-100 shadow-sm mb-10">
@@ -159,15 +187,9 @@ export default function HomeownerEmergencyContactsPage() {
           </div>
           <div className="grid gap-3 md:grid-cols-3">
             <input
-              value={form.name}
-              onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
-              placeholder="Full name"
-              className="rounded-2xl bg-slate-50 border border-slate-100 px-4 py-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500/20"
-            />
-            <input
-              value={form.phone}
-              onChange={(event) => setForm((prev) => ({ ...prev, phone: event.target.value }))}
-              placeholder="Phone number"
+              value={form.email}
+              onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))}
+              placeholder="QRing user email"
               className="rounded-2xl bg-slate-50 border border-slate-100 px-4 py-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500/20"
             />
             <input
@@ -176,6 +198,9 @@ export default function HomeownerEmergencyContactsPage() {
               placeholder="Relationship"
               className="rounded-2xl bg-slate-50 border border-slate-100 px-4 py-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500/20"
             />
+            <div className="rounded-2xl bg-slate-50 border border-slate-100 px-4 py-3 text-xs font-semibold text-slate-500 flex items-center">
+              The user must already have a verified QRing account.
+            </div>
           </div>
           <button
             type="button"
@@ -217,7 +242,7 @@ export default function HomeownerEmergencyContactsPage() {
                       </button>
                     </div>
                     <h3 className="text-xl font-bold text-slate-900">{contact.name}</h3>
-                    <p className="text-slate-500 font-medium">{contact.phone || "No phone saved"}</p>
+                    <p className="text-slate-500 font-medium">{contact.email || contact.phone || "No contact saved"}</p>
                   </div>
                 </div>
               </div>
@@ -236,13 +261,7 @@ export default function HomeownerEmergencyContactsPage() {
         </div>
       </main>
 
-      <nav className="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-8 pt-4 bg-white border-t border-slate-100 z-[9999] shadow-[0_-10px_40px_rgba(0,0,0,0.08)]">
-        <NavItem to="/dashboard/homeowner/overview" icon={<LayoutGrid size={22} />} label="Home" />
-        <NavItem to="/dashboard/homeowner/visits" icon={<History size={22} />} label="Activity" />
-        <NavItem to="/dashboard/homeowner/safety" icon={<Shield size={22} />} label="Safety" active />
-        <NavItem to="/dashboard/homeowner/doors" icon={<KeyRound size={22} />} label="Access" />
-        <NavItem to="/dashboard/homeowner/settings" icon={<UserIcon size={22} />} label="Profile" />
-      </nav>
+     
 
       <div className="fixed top-0 right-0 -z-10 w-1/2 h-full opacity-40 pointer-events-none overflow-hidden">
         <div className="absolute top-0 right-0 w-full h-1/2 bg-gradient-to-bl from-indigo-100/50 via-transparent to-transparent blur-3xl" />

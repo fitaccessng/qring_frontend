@@ -244,13 +244,7 @@ export default function ResidentAppointmentsPage() {
       </AnimatePresence>
 
       {/* Bottom Nav */}
-      <nav className="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-8 pt-4 bg-white border-t border-slate-100 z-[999] shadow-[0_-10px_40px_rgba(0,0,0,0.08)]">
-        <NavItem to="/dashboard/homeowner/overview" icon={<LayoutGrid size={22} />} label="Home" />
-        <NavItem to="/dashboard/homeowner/visits" icon={<History size={22} />} label="Activity" />
-        <NavItem to="/dashboard/homeowner/appointments" icon={<CalendarDays size={22} />} label="Schedule" active />
-        <NavItem to="/dashboard/homeowner/messages" icon={<MessageSquare size={22} />} label="Inbox" />
-        <NavItem to="/dashboard/homeowner/settings" icon={<User size={22} />} label="Profile" />
-      </nav>
+     
     </div>
   );
 }

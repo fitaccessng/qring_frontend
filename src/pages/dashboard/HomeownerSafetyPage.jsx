@@ -14,6 +14,8 @@ import { showError, showSuccess } from "../../utils/flash";
 import { getHomeownerContext, getHomeownerVisits } from "../../services/homeownerService";
 import { getHomeownerSettings } from "../../services/homeownerSettingsService";
 import { getActivePanicAlerts, resolvePanicAlert, triggerPanicAlert } from "../../services/safetyService";
+import { getCurrentDeviceLocation } from "../../utils/locationService";
+import PanicAudioPanel from "../../components/panic/PanicAudioPanel";
 
 export default function ResidentSafetyPage() {
   const navigate = useNavigate();
@@ -158,10 +160,24 @@ export default function ResidentSafetyPage() {
     setTransmissionStatus("sending");
 
     try {
+      let location = null;
+      try {
+        const geo = await getCurrentDeviceLocation({ enableHighAccuracy: true });
+        if (geo?.ok && geo?.coords) {
+          location = {
+            lat: Number(geo.coords.latitude),
+            lng: Number(geo.coords.longitude),
+            source: "device_gps"
+          };
+        }
+      } catch {
+        // Best-effort location for emergency routing.
+      }
       navigator.vibrate?.(severity === 'critical' ? [200, 100, 200, 100, 500] : [100, 50, 100]);
       await triggerPanicAlert({
         userId: user?.id,
-        triggerMode: severity === "critical" ? "hold-critical" : "hold-security"
+        triggerMode: severity === "critical" ? "hold-critical" : "hold-security",
+        location
       });
       setTransmissionStatus("success");
       showSuccess(severity === "critical" ? "Critical SOS sent." : `${securityLabel} alert sent.`);
@@ -299,15 +315,18 @@ export default function ResidentSafetyPage() {
             </div>
 
             {isPanicActive ? (
-              <div className="mt-6 flex justify-center">
-                <button
-                  type="button"
-                  onClick={handleEndAlert}
-                  disabled={endingAlert}
-                  className="rounded-full bg-white px-5 py-3 text-[11px] font-black uppercase tracking-[0.2em] text-rose-600 shadow-lg disabled:opacity-60"
-                >
-                  {endingAlert ? "Ending..." : "End Alert"}
-                </button>
+              <div className="mt-6 space-y-4">
+                <PanicAudioPanel alert={activeAlert} canEnd compact />
+                <div className="flex justify-center">
+                  <button
+                    type="button"
+                    onClick={handleEndAlert}
+                    disabled={endingAlert}
+                    className="rounded-full bg-white px-5 py-3 text-[11px] font-black uppercase tracking-[0.2em] text-rose-600 shadow-lg disabled:opacity-60"
+                  >
+                    {endingAlert ? "Ending..." : "End Alert"}
+                  </button>
+                </div>
               </div>
             ) : null}
           </div>
@@ -321,13 +340,7 @@ export default function ResidentSafetyPage() {
       </main>
 
       {/* Navigation */}
-      <nav className="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-8 pt-4 bg-white border-t border-slate-100 z-[9999] shadow-[0_-10px_40px_rgba(0,0,0,0.08)]">
-        <NavItem to="/dashboard/homeowner/overview" icon={<LayoutGrid size={22} />} label="Home" />
-        <NavItem to="/dashboard/homeowner/visits" icon={<History size={22} />} label="Activity" />
-        <NavItem to="/dashboard/homeowner/safety" icon={<Shield size={22} />} label="Safety" active />
-        <NavItem to="/dashboard/homeowner/doors" icon={<KeyRound size={22} />} label="Access" />
-        <NavItem to="/dashboard/homeowner/settings" icon={<UserIcon size={22} />} label="Profile" />
-      </nav>
+     
     </div>
   );
 }
