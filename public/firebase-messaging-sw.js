@@ -53,8 +53,8 @@ importScripts("/firebase-messaging-compat.js");
           body,
           data,
           actions,
-          icon: "/icon-192.png",
-          badge: "/icon-192.png",
+          icon: "/qring_logo.png",
+          badge: "/qring_logo.png",
         });
       };
       show();

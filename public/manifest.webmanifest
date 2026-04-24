@@ -1,10 +1,17 @@
 {
-  "name": "Qring",
-  "short_name": "Qring",
+  "name": "useqring",
+  "short_name": "useqring",
   "description": "Modernizing Door Access Communication",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#020617",
   "theme_color": "#2456f5",
-  "icons": []
+  "icons": [
+    {
+      "src": "/qring_logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
 }

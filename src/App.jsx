@@ -115,7 +115,7 @@ const MARKETING_ROUTES = [
 ];
 
 export default function App() {
-  const Router = shouldUseHashRouter() ? HashRouter : BrowserRouter;
+  const Router = resolveRouterComponent();
   return (
     <ThemeProvider>
       <LanguageProvider>
@@ -133,14 +133,33 @@ export default function App() {
   );
 }
 
-function shouldUseHashRouter() {
-  if (typeof window === "undefined") return false;
+function resolveRouterComponent() {
+  if (typeof window === "undefined") return BrowserRouter;
+  if (prepareNativeHashRoute()) return HashRouter;
   const mode = String(env.routerMode || "auto").toLowerCase();
-  if (mode === "hash") return true;
-  if (mode === "browser") return false;
+  if (mode === "hash") return HashRouter;
+  if (mode === "browser") return BrowserRouter;
   // Auto: if a user arrives on a hash route (common on static hosts without rewrite rules),
   // keep using hash routing to avoid full-page reload loops.
-  return String(window.location.hash || "").startsWith("#/");
+  return String(window.location.hash || "").startsWith("#/") ? HashRouter : BrowserRouter;
+}
+
+function prepareNativeHashRoute() {
+  if (!isNativeCapacitorApp() || typeof window === "undefined") return false;
+
+  const hash = String(window.location.hash || "");
+  if (hash.startsWith("#/")) {
+    return true;
+  }
+
+  const pathname = String(window.location.pathname || "/");
+  const search = String(window.location.search || "");
+  if (pathname !== "/") {
+    const normalizedPath = pathname.startsWith("/") ? pathname : `/${pathname}`;
+    window.history.replaceState(window.history.state, "", `/#${normalizedPath}${search}`);
+  }
+
+  return true;
 }
 
 function AppRoutes() {

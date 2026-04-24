@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">qring</string>
-    <string name="title_activity_main">qring</string>
+    <string name="app_name">useqring</string>
+    <string name="title_activity_main">useqring</string>
     <string name="package_name">com.kelvin.qringapp</string>
     <string name="custom_url_scheme">com.kelvin.qringapp</string>
 </resources>
