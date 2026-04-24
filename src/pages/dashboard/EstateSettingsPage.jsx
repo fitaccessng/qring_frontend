@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { motion } from "framer-motion";
 import { 
   ArrowLeft, 
   Bell, 
@@ -26,15 +25,16 @@ import {
   Settings as SettingsIcon
 } from "lucide-react";
 import { useAuth } from "../../state/AuthContext";
-import { useApiQuery } from "../../hooks/useApi";
-import { endpoints } from "../../services/endpoints";
-import useEstateOverviewState from "../../hooks/useEstateOverviewState";
-import useResponsiveSheet from "../../hooks/useResponsiveSheet";
+import { getEstateSettingsSummary, getEstateSettingsSummarySnapshot } from "../../services/estateService";
 
 export default function EstateSettingsPage() {
+  const cachedSummary = getEstateSettingsSummarySnapshot();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const { overview, estateId } = useEstateOverviewState();
+  const [summary, setSummary] = useState(() => cachedSummary || { estates: [], doors: [], subscription: {} });
+  const [selectedEstateId, setSelectedEstateId] = useState(() => cachedSummary?.estates?.[0]?.id || "");
+  const [loading, setLoading] = useState(() => !cachedSummary);
+  const [loadError, setLoadError] = useState("");
   const [isDarkMode, setIsDarkMode] = useState(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("darkMode") === "true" || window.matchMedia("(prefers-color-scheme: dark)").matches;
@@ -60,30 +60,62 @@ export default function EstateSettingsPage() {
     }
   }, [isDarkMode]);
 
+  useEffect(() => {
+    let active = true;
+
+    async function loadSummary() {
+      if (!cachedSummary) {
+        setLoading(true);
+      }
+      try {
+        const data = await getEstateSettingsSummary();
+        if (!active) return;
+        setSummary(data || { estates: [], doors: [], subscription: {} });
+        setLoadError("");
+      } catch (error) {
+        if (!active) return;
+        setLoadError(error?.message || "Failed to load estate profile.");
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+
+    loadSummary();
+    return () => {
+      active = false;
+    };
+  }, [cachedSummary]);
+
+  useEffect(() => {
+    if (!selectedEstateId && summary?.estates?.length) {
+      setSelectedEstateId(summary.estates[0].id);
+    }
+  }, [selectedEstateId, summary?.estates]);
+
   // Get current estate
   const currentEstate = useMemo(() => {
-    if (!overview?.estates?.length) return null;
-    return overview.estates.find((e) => String(e.id) === String(estateId)) ?? overview.estates[0];
-  }, [estateId, overview?.estates]);
+    if (!summary?.estates?.length) return null;
+    return summary.estates.find((e) => String(e.id) === String(selectedEstateId)) ?? summary.estates[0];
+  }, [selectedEstateId, summary?.estates]);
 
   const currentEstateId = currentEstate?.id ?? "";
 
   // Count active estates
   const activeEstates = useMemo(() => {
-    return (overview?.estates ?? []).filter((e) => String(e.status || "").toLowerCase() === "active").length;
-  }, [overview?.estates]);
+    return (summary?.estates ?? []).filter((e) => String(e.status || "").toLowerCase() === "active").length;
+  }, [summary?.estates]);
 
   // Count estates
-  const totalEstates = overview?.estates?.length ?? 0;
+  const totalEstates = summary?.estates?.length ?? 0;
 
   // Count connected devices (gate terminals)
   const connectedDevices = useMemo(() => {
     if (!currentEstateId) return 0;
-    return (overview?.doors ?? []).filter((d) => String(d.estateId || d.homeId) === String(currentEstateId)).length;
-  }, [currentEstateId, overview?.doors]);
+    return (summary?.doors ?? []).filter((d) => String(d.estateId) === String(currentEstateId)).length;
+  }, [currentEstateId, summary?.doors]);
 
   // Get subscription info
-  const subscription = overview?.subscription ?? {};
+  const subscription = summary?.subscription ?? {};
 
   // Handle edit
   const handleEditField = (field, currentValue) => {
@@ -185,7 +217,7 @@ export default function EstateSettingsPage() {
             <SettingsRow 
               icon={<Building2 size={18} />} 
               label="My Estates" 
-              value={`${activeEstates} Active · ${totalEstates} Total`}
+              value={loading ? "Loading estates..." : `${activeEstates} Active · ${totalEstates} Total`}
               onEdit={() => setActiveModal("estates")}
             />
             <SettingsRow 
@@ -197,11 +229,17 @@ export default function EstateSettingsPage() {
             <SettingsRow 
               icon={<Smartphone size={18} />} 
               label="Connected Devices" 
-              value={`${connectedDevices} Gate Terminal${connectedDevices !== 1 ? "s" : ""}`}
+              value={loading ? "Loading devices..." : `${connectedDevices} Gate Terminal${connectedDevices !== 1 ? "s" : ""}`}
               onEdit={() => setActiveModal("devices")}
             />
           </div>
         </section>
+
+        {loadError && (
+          <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+            {loadError}
+          </div>
+        )}
 
         {/* Section: App Preferences */}
         <section className="space-y-2.5">
@@ -329,14 +367,22 @@ export default function EstateSettingsPage() {
           <BottomModal title="My Estates" onClose={() => setActiveModal(null)}>
             <div className="space-y-3.5">
               <div className="space-y-2">
-                {overview?.estates?.map((estate) => (
-                  <div key={estate.id} className="px-4 py-3.5 bg-slate-50 rounded-xl border border-slate-200 hover:border-indigo-300 transition-all cursor-pointer">
+                {summary?.estates?.map((estate) => (
+                  <button
+                    type="button"
+                    key={estate.id}
+                    onClick={() => {
+                      setSelectedEstateId(estate.id);
+                      setActiveModal(null);
+                    }}
+                    className="w-full px-4 py-3.5 bg-slate-50 rounded-xl border border-slate-200 hover:border-indigo-300 transition-all cursor-pointer text-left"
+                  >
                     <h3 className="font-black text-slate-900">{estate.name}</h3>
                     <p className="text-xs text-slate-500 mt-1">Status: <span className="uppercase font-black">{estate.status}</span></p>
-                    <p className="text-xs text-slate-500 mt-1">Doors: {(overview?.doors ?? []).filter(d => String(d.estateId || d.homeId) === String(estate.id)).length}</p>
-                  </div>
+                    <p className="text-xs text-slate-500 mt-1">Doors: {estate.doorCount ?? 0}</p>
+                  </button>
                 ))}
-                {!overview?.estates?.length && <p className="text-center text-slate-500 text-sm py-8">No estates found</p>}
+                {!summary?.estates?.length && <p className="text-center text-slate-500 text-sm py-8">No estates found</p>}
               </div>
             </div>
           </BottomModal>
@@ -370,7 +416,7 @@ export default function EstateSettingsPage() {
           <BottomModal title="Connected Devices" onClose={() => setActiveModal(null)}>
             <div className="space-y-3.5">
               <div className="space-y-2">
-                {overview?.doors?.filter(d => String(d.estateId || d.homeId) === String(currentEstateId)).map((door) => (
+                {summary?.doors?.filter((door) => String(door.estateId) === String(currentEstateId)).map((door) => (
                   <div key={door.id} className="px-4 py-3.5 bg-slate-50 rounded-xl border border-slate-200 flex justify-between items-center">
                     <div>
                       <h3 className="font-black text-slate-900">{door.name || door.doorName}</h3>
@@ -382,7 +428,7 @@ export default function EstateSettingsPage() {
                     </span>
                   </div>
                 ))}
-                {!overview?.doors?.filter(d => String(d.estateId || d.homeId) === String(currentEstateId)).length && <p className="text-center text-slate-500 text-sm py-8">No devices found</p>}
+                {!summary?.doors?.filter((door) => String(door.estateId) === String(currentEstateId)).length && <p className="text-center text-slate-500 text-sm py-8">No devices found</p>}
               </div>
             </div>
           </BottomModal>
@@ -566,5 +612,3 @@ function BottomModal({ children, onClose, title, footer = null }) {
     </div>
   );
 }
-
-

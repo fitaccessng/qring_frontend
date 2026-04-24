@@ -4,6 +4,7 @@ const ESTATE_SERVICE_CACHE_TTL_MS = 2 * 60 * 1000;
 
 const estateServiceCache = {
   overview: createCacheSlot(),
+  settingsSummary: createCacheSlot(),
   mappings: createCacheSlot(),
   accessLogs: createCacheSlot(),
   planRestrictions: createCacheSlot(),
@@ -57,6 +58,7 @@ function clearSlot(slot) {
 
 export function invalidateEstateServiceCache() {
   clearSlot(estateServiceCache.overview);
+  clearSlot(estateServiceCache.settingsSummary);
   clearSlot(estateServiceCache.mappings);
   clearSlot(estateServiceCache.accessLogs);
   clearSlot(estateServiceCache.planRestrictions);
@@ -68,6 +70,10 @@ export function invalidateEstateServiceCache() {
 
 export function getEstateOverviewSnapshot() {
   return estateServiceCache.overview.value;
+}
+
+export function getEstateSettingsSummarySnapshot() {
+  return estateServiceCache.settingsSummary.value;
 }
 
 export function getEstateMappingsSnapshot() {
@@ -94,6 +100,13 @@ export function getEstateSettingsSnapshot(estateId) {
 export async function getEstateOverview() {
   return resolveCached(estateServiceCache.overview, async () => {
     const response = await apiRequest("/estate/overview");
+    return response?.data ?? {};
+  });
+}
+
+export async function getEstateSettingsSummary() {
+  return resolveCached(estateServiceCache.settingsSummary, async () => {
+    const response = await apiRequest("/estate/settings-summary");
     return response?.data ?? {};
   });
 }

@@ -26,6 +26,7 @@ import {
 import { changePassword } from "../../services/authService";
 import {
   getHomeownerSettings,
+  getHomeownerSettingsSnapshot,
   updateHomeownerProfile,
   updateHomeownerSettings
 } from "../../services/homeownerSettingsService";
@@ -81,17 +82,18 @@ const EMPTY_PASSWORD_FORM = {
 const HELP_CENTER_URL = "https://www.useqring.online";
 
 export default function HomeownerSettingsPage() {
+  const cachedSettings = getHomeownerSettingsSnapshot();
   const navigate = useNavigate();
   const { user, logout, updateUser } = useAuth();
   const { unreadCount } = useNotifications();
   const { isDark, toggleTheme } = useTheme();
   const { language, selectedLanguage, languageOptions, setLanguage } = useLanguage();
-  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
-  const [stats, setStats] = useState({ plan: "...", referrals: "0", earnings: "₦0" });
-  const [profileForm, setProfileForm] = useState(EMPTY_PROFILE_FORM);
+  const [settings, setSettings] = useState(() => mergeSettings(cachedSettings));
+  const [stats, setStats] = useState(() => buildStats(mergeSettings(cachedSettings)));
+  const [profileForm, setProfileForm] = useState(() => buildProfileForm(user, mergeSettings(cachedSettings).profile));
   const [passwordForm, setPasswordForm] = useState(EMPTY_PASSWORD_FORM);
   const [activeModal, setActiveModal] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !cachedSettings);
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingSecurity, setSavingSecurity] = useState(false);
   const [savingPreference, setSavingPreference] = useState("");
@@ -102,22 +104,13 @@ export default function HomeownerSettingsPage() {
     let active = true;
 
     async function loadSettings() {
-      setLoading(true);
+      if (!cachedSettings) {
+        setLoading(true);
+      }
       try {
         const data = (await getHomeownerSettings()) || DEFAULT_SETTINGS;
         if (!active) return;
-        const merged = {
-          ...DEFAULT_SETTINGS,
-          ...data,
-          profile: {
-            ...(DEFAULT_SETTINGS.profile || {}),
-            ...(data?.profile || {})
-          },
-          home: {
-            ...(DEFAULT_SETTINGS.home || {}),
-            ...(data?.home || {})
-          }
-        };
+        const merged = mergeSettings(data);
         setSettings(merged);
         setProfileForm(buildProfileForm(user, merged.profile));
         setStats(buildStats(merged));
@@ -918,6 +911,21 @@ function buildProfileForm(user, profile) {
     email,
     phone: profile?.phone || user?.phone || "",
     bio: user?.bio || ""
+  };
+}
+
+function mergeSettings(settings) {
+  return {
+    ...DEFAULT_SETTINGS,
+    ...(settings || {}),
+    profile: {
+      ...(DEFAULT_SETTINGS.profile || {}),
+      ...(settings?.profile || {})
+    },
+    home: {
+      ...(DEFAULT_SETTINGS.home || {}),
+      ...(settings?.home || {})
+    }
   };
 }
 

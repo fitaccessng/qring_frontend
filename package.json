@@ -1,7 +1,7 @@
 {
   "name": "qring-control-who-enters-your-home-from-anywhere",
   "private": true,
-  "version": "1.0.2",
+  "version": "1.0.9",
   "type": "module",
   "scripts": {
     "dev": "vite",
