@@ -21,12 +21,21 @@ function ensureFirebaseReady() {
   }
 }
 
+function getGoogleAuthStorage() {
+  if (typeof window === "undefined") return null;
+  try {
+    return isNativeCapacitor() ? window.localStorage : window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
 function savePendingGoogleSignup(payload) {
-  sessionStorage.setItem(PENDING_GOOGLE_SIGNUP_KEY, JSON.stringify(payload));
+  getGoogleAuthStorage()?.setItem(PENDING_GOOGLE_SIGNUP_KEY, JSON.stringify(payload));
 }
 
 function readPendingGoogleSignup() {
-  const raw = sessionStorage.getItem(PENDING_GOOGLE_SIGNUP_KEY);
+  const raw = getGoogleAuthStorage()?.getItem(PENDING_GOOGLE_SIGNUP_KEY);
   if (!raw) return null;
   try {
     return JSON.parse(raw);
@@ -36,7 +45,7 @@ function readPendingGoogleSignup() {
 }
 
 export function clearPendingGoogleSignup() {
-  sessionStorage.removeItem(PENDING_GOOGLE_SIGNUP_KEY);
+  getGoogleAuthStorage()?.removeItem(PENDING_GOOGLE_SIGNUP_KEY);
 }
 
 export function getPendingGoogleSignup() {
@@ -52,15 +61,15 @@ function isNativeCapacitor() {
 }
 
 function setRedirectIntent(intent) {
-  sessionStorage.setItem(GOOGLE_REDIRECT_INTENT_KEY, intent);
+  getGoogleAuthStorage()?.setItem(GOOGLE_REDIRECT_INTENT_KEY, intent);
 }
 
 function clearRedirectIntent() {
-  sessionStorage.removeItem(GOOGLE_REDIRECT_INTENT_KEY);
+  getGoogleAuthStorage()?.removeItem(GOOGLE_REDIRECT_INTENT_KEY);
 }
 
 function getRedirectIntent() {
-  return sessionStorage.getItem(GOOGLE_REDIRECT_INTENT_KEY) ?? "";
+  return getGoogleAuthStorage()?.getItem(GOOGLE_REDIRECT_INTENT_KEY) ?? "";
 }
 
 async function getGoogleUserFromAuth(intent = "signin") {
@@ -73,7 +82,7 @@ async function getGoogleUserFromAuth(intent = "signin") {
     }
     setRedirectIntent(intent);
     await signInWithRedirect(auth, googleProvider);
-    throw new Error("Redirecting to Google...");
+    throw new Error("Redirecting to Google sign-in...");
   }
 
   const result = await signInWithPopup(auth, googleProvider);

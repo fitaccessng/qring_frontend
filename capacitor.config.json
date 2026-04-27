@@ -1,5 +1,10 @@
 {
   "appId": "com.kelvin.qringapp",
-  "appName": "useqring",
-  "webDir": "dist"
+  "appName": "Qring",
+  "webDir": "dist",
+  "server": {
+    "hostname": "www.useqring.online",
+    "androidScheme": "https",
+    "iosScheme": "https"
+  }
 }
