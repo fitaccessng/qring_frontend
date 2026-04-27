@@ -96,24 +96,6 @@ const SessionMessagePage = lazy(() => import("./pages/visitor/SessionMessagePage
 const SessionAudioPage = lazy(() => import("./pages/visitor/SessionAudioPage"));
 const SessionVideoPage = lazy(() => import("./pages/visitor/SessionVideoPage"));
 
-const MARKETING_ROUTES = [
-  "/",
-  "/about",
-  "/pricing",
-  "/contact",
-  "/platform",
-  "/security",
-  "/api-docs",
-  "/company",
-  "/blog",
-  "/careers",
-  "/legal",
-  "/privacy",
-  "/terms",
-  "/compliance",
-  "/request-demo"
-];
-
 export default function App() {
   const Router = resolveRouterComponent();
   return (
@@ -198,7 +180,6 @@ function AppRoutes() {
   return (
     <>
       <SpaRedirectRecovery />
-      {nativeApp ? <NativeRouteGuard currentPath={location.pathname} entryRoute={nativeEntryRoute} /> : null}
       {showPreloader ? (
         <AppPreloader />
       ) : (
@@ -206,21 +187,21 @@ function AppRoutes() {
           <GlobalNotifications />
           <div className="animate-screen-enter min-h-screen bg-slate-100 text-slate-900 transition-colors dark:bg-slate-950 dark:text-slate-100">
             <Routes location={location}>
-              <Route path="/" element={nativeApp ? <Navigate to={nativeEntryRoute} replace /> : <LandingPage />} />
-              {!nativeApp ? <Route path="/about" element={<AboutPage />} /> : null}
-              {!nativeApp ? <Route path="/pricing" element={<PricingPage />} /> : null}
-              {!nativeApp ? <Route path="/contact" element={<ContactPage />} /> : null}
-              {!nativeApp ? <Route path="/platform" element={<PlatformPage />} /> : null}
-              {!nativeApp ? <Route path="/security" element={<SecurityPage />} /> : null}
-              {!nativeApp ? <Route path="/api-docs" element={<ApiDocsPage />} /> : null}
-              {!nativeApp ? <Route path="/company" element={<CompanyPage />} /> : null}
-              {!nativeApp ? <Route path="/blog" element={<BlogPage />} /> : null}
-              {!nativeApp ? <Route path="/careers" element={<CareersPage />} /> : null}
-              {!nativeApp ? <Route path="/legal" element={<LegalPage />} /> : null}
-              {!nativeApp ? <Route path="/privacy" element={<PrivacyPage />} /> : null}
-              {!nativeApp ? <Route path="/terms" element={<TermsPage />} /> : null}
-              {!nativeApp ? <Route path="/compliance" element={<CompliancePage />} /> : null}
-              {!nativeApp ? <Route path="/request-demo" element={<RequestDemoPage />} /> : null}
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/about" element={<AboutPage />} />
+              <Route path="/pricing" element={<PricingPage />} />
+              <Route path="/contact" element={<ContactPage />} />
+              <Route path="/platform" element={<PlatformPage />} />
+              <Route path="/security" element={<SecurityPage />} />
+              <Route path="/api-docs" element={<ApiDocsPage />} />
+              <Route path="/company" element={<CompanyPage />} />
+              <Route path="/blog" element={<BlogPage />} />
+              <Route path="/careers" element={<CareersPage />} />
+              <Route path="/legal" element={<LegalPage />} />
+              <Route path="/privacy" element={<PrivacyPage />} />
+              <Route path="/terms" element={<TermsPage />} />
+              <Route path="/compliance" element={<CompliancePage />} />
+              <Route path="/request-demo" element={<RequestDemoPage />} />
               <Route element={<PublicOnlyRoute />}>
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/admin/login" element={<AdminLoginPage />} />
@@ -386,17 +367,6 @@ function GlobalNotifications() {
       <PanicAlertCenter />
     </>
   );
-}
-
-function NativeRouteGuard({ currentPath, entryRoute }) {
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (!MARKETING_ROUTES.includes(currentPath)) return;
-    navigate(entryRoute, { replace: true });
-  }, [currentPath, entryRoute, navigate]);
-
-  return null;
 }
 
 function isNativeCapacitorApp() {
