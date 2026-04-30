@@ -114,8 +114,13 @@ function filterAssignedResidentDoors(doors, options = {}) {
   return filterAssignedHomeownerDoors(doors, options);
 }
 
-export async function generateHomeownerDoorQr(doorId) {
-  return apiRequest(`/homeowner/doors/${doorId}/qr`, { method: "POST" });
+export async function generateHomeownerDoorQr(doorId, payload = {}) {
+  const response = await apiRequest(`/homeowner/doors/${doorId}/qr`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+    timeoutMs: 15000
+  });
+  return response?.data ?? null;
 }
 
 export async function getHomeownerVisits() {
@@ -144,7 +149,7 @@ export async function shareHomeownerAppointment(appointmentId) {
 }
 
 export async function getHomeownerContext() {
-  const response = await apiRequest("/homeowner/settings");
+  const response = await apiRequest("/homeowner/settings", { retryCount: 2, timeoutMs: 12000 });
   const data = response?.data ?? null;
   return {
     managedByEstate: Boolean(data?.managedByEstate),
@@ -195,7 +200,7 @@ export async function endHomeownerSession(sessionId) {
 }
 
 export async function getHomeownerDoors() {
-  const response = await apiRequest("/homeowner/doors", { noCache: true });
+  const response = await apiRequest("/homeowner/doors", { noCache: true, retryCount: 2, timeoutMs: 15000 });
   const data = response?.data ?? response;
   const managedByEstate = Boolean(data?.subscription?.managedByEstate);
   if (Array.isArray(data)) {
@@ -215,7 +220,8 @@ export async function getHomeownerDoors() {
 export async function generateDoorQr(doorId, payload = {}) {
   const response = await apiRequest(`/homeowner/doors/${doorId}/qr`, {
     method: "POST",
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
+    timeoutMs: 15000
   });
   return response?.data ?? null;
 }
@@ -243,7 +249,8 @@ export async function deactivateHomeownerAccessPass(accessPassId) {
 export async function createHomeownerDoor(payload) {
   const response = await apiRequest("/homeowner/doors", {
     method: "POST",
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
+    timeoutMs: 15000
   });
   return response?.data ?? null;
 }

@@ -122,7 +122,7 @@ function onboardingSeenForUser(user) {
   return keys.some((key) => localStorage.getItem(key) === "true");
 }
 
-export default function AppShell({ title, children, showTopBar = true, showMobileNav = true }) {
+export default function AppShell({ title, children, showTopBar = true, showMobileNav = false }) {
   const { user, logout } = useAuth();
   const { unreadCount } = useNotifications();
   const { hasFeature } = useSubscription();

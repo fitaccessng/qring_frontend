@@ -122,13 +122,16 @@ export default function HomeownerDoorsPage() {
     setGeneratingQrDoorId(String(door.id));
     try {
       const response = await generateHomeownerDoorQr(door.id, { mode: "direct", plan: "single" });
-      const createdQrId = response?.qr?.qr_id;
+      const createdQrId = response?.qr_id;
+      if (!createdQrId) {
+        throw new Error("QR generation failed.");
+      }
       
       setDoors(prev => prev.map(d => String(d.id) === String(door.id) ? { ...d, qr: [createdQrId] } : d));
       setSelectedQrId(createdQrId);
       showSuccess(`QR generated for ${door.name}.`);
     } catch (err) {
-      showError("Failed to generate QR.");
+      showError(err?.message || "Failed to generate QR.");
     } finally {
       setGeneratingQrDoorId("");
     }

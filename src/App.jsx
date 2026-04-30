@@ -23,6 +23,7 @@ import { ThemeProvider } from "./state/ThemeContext";
 import BlockingModal from "./components/BlockingModal";
 import AppPreloader from "./components/mobile/AppPreloader";
 import PanicAlertCenter from "./components/panic/PanicAlertCenter";
+import PersistentAppMobileNav from "./components/system/PersistentAppMobileNav";
 import ToastCenter from "./components/ToastCenter";
 import { env } from "./config/env";
 import { NotificationsProvider } from "./state/NotificationsContext";
@@ -411,6 +412,7 @@ function AppRoutes() {
               <Route path="/dashboard" element={<Navigate to="/dashboard/homeowner/overview" replace />} />
               <Route path="*" element={<NotFoundPage />} />
             </Routes>
+            <PersistentAppMobileNav />
           </div>
         </>
       )}

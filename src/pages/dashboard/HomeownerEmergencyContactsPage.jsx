@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import {
   Bell,
@@ -17,7 +17,9 @@ import {
 } from "lucide-react";
 import { useNotifications } from "../../state/NotificationsContext";
 import {
+  buildHomeownerSettingsPayload,
   getHomeownerSettings,
+  normalizeHomeownerSettings,
   searchHomeownerEmergencyContactByEmail,
   updateHomeownerSettings
 } from "../../services/homeownerSettingsService";
@@ -38,6 +40,13 @@ export default function HomeownerEmergencyContactsPage() {
   const [settings, setSettings] = useState(null);
   const [contacts, setContacts] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -47,8 +56,9 @@ export default function HomeownerEmergencyContactsPage() {
       try {
         const data = await getHomeownerSettings();
         if (!active) return;
-        const knownContacts = Array.isArray(data?.knownContacts) ? data.knownContacts : [];
-        setSettings(data || null);
+        const normalized = normalizeHomeownerSettings(data);
+        const knownContacts = Array.isArray(normalized.knownContacts) ? normalized.knownContacts : [];
+        setSettings(normalized);
         setContacts(knownContacts.map((item, index) => parseEmergencyContact(item, index)));
       } catch (error) {
         if (!active) return;
@@ -73,38 +83,21 @@ export default function HomeownerEmergencyContactsPage() {
 
   async function persistContacts(nextContacts, successMessage) {
     if (!settings) return;
-    setSaving(true);
+    if (isMountedRef.current) setSaving(true);
     try {
-      const payload = {
-        pushAlerts: Boolean(settings.pushAlerts),
-        soundAlerts: Boolean(settings.soundAlerts),
-        autoRejectUnknownVisitors: Boolean(settings.autoRejectUnknownVisitors),
-        autoApproveTrustedVisitors: Boolean(settings.autoApproveTrustedVisitors),
-        autoApproveKnownContacts: Boolean(settings.autoApproveKnownContacts),
-        knownContacts: nextContacts.map((item) => formatEmergencyContact(item)),
-        allowDeliveryDropAtGate: Boolean(settings.allowDeliveryDropAtGate),
-        smsFallbackEnabled: Boolean(settings.smsFallbackEnabled),
-        nearbyPanicAlertsEnabled: Boolean(settings.nearbyPanicAlertsEnabled),
-        nearbyPanicAlertRadiusMeters: Number(settings.nearbyPanicAlertRadiusMeters || 500),
-        nearbyPanicAvailability: String(settings.nearbyPanicAvailability || "always"),
-        nearbyPanicCustomSchedule: Array.isArray(settings.nearbyPanicCustomSchedule) ? settings.nearbyPanicCustomSchedule : [],
-        nearbyPanicReceiveFrom: String(settings.nearbyPanicReceiveFrom || "everyone"),
-        nearbyPanicMutedUntil: settings.nearbyPanicMutedUntil || null,
-        nearbyPanicSameAreaLabel: String(settings.nearbyPanicSameAreaLabel || ""),
-        panicIdentityVisibility: String(settings.panicIdentityVisibility || "masked"),
-        safetyHomeLocation: {
-          lat: settings?.safetyHomeLocation?.lat ?? null,
-          lng: settings?.safetyHomeLocation?.lng ?? null
-        }
-      };
-      const updated = await updateHomeownerSettings(payload);
-      setSettings((prev) => ({ ...(prev || {}), ...(updated || {}), knownContacts: payload.knownContacts }));
+      const nextSettings = normalizeHomeownerSettings({
+        ...settings,
+        knownContacts: nextContacts.map((item) => formatEmergencyContact(item))
+      });
+      const updated = await updateHomeownerSettings(buildHomeownerSettingsPayload(nextSettings), { retryCount: 1 });
+      if (!isMountedRef.current) return;
+      setSettings(normalizeHomeownerSettings({ ...nextSettings, ...(updated || {}) }));
       setContacts(nextContacts);
       showSuccess(successMessage);
     } catch (error) {
       showError(error?.message || "Failed to save emergency contacts.");
     } finally {
-      setSaving(false);
+      if (isMountedRef.current) setSaving(false);
     }
   }
 
