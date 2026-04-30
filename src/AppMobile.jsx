@@ -28,6 +28,8 @@ import { env } from "./config/env";
 import { NotificationsProvider } from "./state/NotificationsContext";
 import { queryClient } from "./lib/queryClient";
 import { apiPing } from "./services/apiClient";
+import { requestLocationPermission } from "./utils/locationService";
+import { requestNativeNotificationPermission } from "./services/nativePushService";
 
 const OnboardingPage = lazy(() => import("./pages/auth/OnboardingPage"));
 const HomeownerDashboardPage = lazy(() => import("./pages/dashboard/HomeownerDashboardPage"));
@@ -135,6 +137,43 @@ function AppRoutes() {
     if (typeof window === "undefined") return true;
     return sessionStorage.getItem("qring_preloader_seen") !== "true";
   });
+
+  useEffect(() => {
+    if (!isNativeCapacitorApp() || typeof window === "undefined") return () => {};
+    const promptKey = "qring_mobile_permissions_prompted_v1";
+    if (localStorage.getItem(promptKey) === "1") return () => {};
+
+    let active = true;
+    const promptPermissions = async () => {
+      try {
+        await requestNativeNotificationPermission();
+      } catch {
+        // Permission prompt failures should not block app boot.
+      }
+
+      try {
+        await requestLocationPermission();
+      } catch {
+        // Permission prompt failures should not block app boot.
+      }
+
+      if (!active) return;
+      try {
+        localStorage.setItem(promptKey, "1");
+      } catch {
+        // Ignore storage failures.
+      }
+    };
+
+    const timer = window.setTimeout(() => {
+      void promptPermissions();
+    }, 900);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return () => {};

@@ -295,3 +295,24 @@ export async function registerNativePushNotifications() {
         : "Native notification registration failed on this device."
   };
 }
+
+export async function requestNativeNotificationPermission() {
+  const plugins = await ensureNativePushInitialized();
+  if (!plugins?.PushNotifications || !plugins?.LocalNotifications) {
+    return { granted: false, state: "unsupported" };
+  }
+
+  const { PushNotifications, LocalNotifications } = plugins;
+  const pushPermission = await PushNotifications.requestPermissions();
+  const localPermission = await LocalNotifications.requestPermissions();
+  const pushReceive = String(pushPermission?.receive || "").toLowerCase();
+  const localDisplay = String(localPermission?.display || "").toLowerCase();
+  const granted =
+    (pushReceive === "granted" || pushReceive === "prompt-with-rationale") &&
+    localDisplay === "granted";
+
+  return {
+    granted,
+    state: granted ? "granted" : pushReceive || localDisplay || "denied",
+  };
+}
