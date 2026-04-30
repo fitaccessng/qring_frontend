@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { io } from "socket.io-client";
 import { ChevronLeft, Phone, Search, SendHorizontal, Trash2, Video, X, MessageSquare } from "lucide-react";
 import AppShell from "../../layouts/AppShell";
 import { env } from "../../config/env";
-import { realtimeTransportOptions } from "../../services/socketConfig";
 import { getAccessToken } from "../../services/authStorage";
+import { createRealtimeSocket } from "../../services/socketClient";
 import { playMessageNotificationSound } from "../../utils/notificationSound";
 import {
   deleteSecuritySessionMessage,
@@ -112,13 +111,11 @@ export default function SecurityMessagesPage() {
 
   useEffect(() => {
     if (!token) return;
-    const socket = io(`${env.socketUrl}${env.signalingNamespace ?? "/realtime/signaling"}`, {
-      path: env.socketPath,
-      ...realtimeTransportOptions,
-      reconnection: true, reconnectionAttempts: 10, reconnectionDelay: 400,
-      reconnectionDelayMax: 2000, timeout: 7000,
-      auth: cb => { const t = getAccessToken(); cb(t ? { token: t } : {}); },
-      withCredentials: true
+    const socket = createRealtimeSocket(env.signalingNamespace ?? "/realtime/signaling", {
+      authBuilder: () => {
+        const t = getAccessToken();
+        return t ? { token: t } : {};
+      }
     });
     socketRef.current = socket;
 

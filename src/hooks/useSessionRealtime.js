@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { io } from "socket.io-client";
 import { env } from "../config/env";
 import { apiRequest } from "../services/apiClient";
 import {
@@ -16,7 +15,7 @@ import {
   LIVEKIT_DEFAULT_CONNECT_TIMEOUT_MS,
   LIVEKIT_DEFAULT_RING_TIMEOUT_MS
 } from "../services/livekitConnection";
-import { realtimeTransportOptions } from "../services/socketConfig";
+import { createRealtimeSocket } from "../services/socketClient";
 import { getVisitorSessionMessages } from "../services/homeownerService";
 import { getVisitorSessionToken } from "../services/visitorSessionToken";
 import {
@@ -172,19 +171,11 @@ function acquireSignalingSocket(sessionId) {
   const key = String(sessionId || "");
   let entry = signalingSocketPool.get(key);
   if (!entry) {
-    const socket = io(`${env.socketUrl}${env.signalingNamespace ?? "/realtime/signaling"}`, {
-      path: env.socketPath,
-      ...realtimeTransportOptions,
-      reconnection: true,
-      reconnectionAttempts: 10,
-      reconnectionDelay: 400,
-      reconnectionDelayMax: 2000,
-      timeout: 7000,
-      auth: (cb) => {
+    const socket = createRealtimeSocket(env.signalingNamespace ?? "/realtime/signaling", {
+      authBuilder: () => {
         const latestToken = getAccessToken();
-        cb(latestToken ? { token: latestToken } : {});
+        return latestToken ? { token: latestToken } : {};
       },
-      withCredentials: true
     });
     entry = { socket, refs: 0, releaseTimer: null };
     signalingSocketPool.set(key, entry);

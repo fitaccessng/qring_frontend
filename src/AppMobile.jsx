@@ -27,6 +27,7 @@ import ToastCenter from "./components/ToastCenter";
 import { env } from "./config/env";
 import { NotificationsProvider } from "./state/NotificationsContext";
 import { queryClient } from "./lib/queryClient";
+import { apiPing } from "./services/apiClient";
 
 const OnboardingPage = lazy(() => import("./pages/auth/OnboardingPage"));
 const HomeownerDashboardPage = lazy(() => import("./pages/dashboard/HomeownerDashboardPage"));
@@ -138,8 +139,7 @@ function AppRoutes() {
   useEffect(() => {
     if (typeof window === "undefined") return () => {};
     const ping = () => {
-      if (typeof navigator !== "undefined" && navigator.onLine === false) return;
-      fetch(`${env.apiBaseUrl}/health`, { method: "GET", cache: "no-store" }).catch(() => {});
+      void apiPing("/health");
     };
     ping();
     const interval = window.setInterval(ping, 4 * 60 * 1000);

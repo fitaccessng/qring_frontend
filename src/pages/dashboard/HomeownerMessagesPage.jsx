@@ -1,14 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
-import { io } from "socket.io-client";
 import {
   Bell, ChevronLeft, LayoutGrid, History, CalendarDays,
   MessageSquare, User, Search, SendHorizontal, Trash2
 } from "lucide-react";
 import VoiceNoteRecorder from "../../components/VoiceNoteRecorder";
 import { env } from "../../config/env";
-import { realtimeTransportOptions } from "../../services/socketConfig";
 import { getAccessToken } from "../../services/authStorage";
+import { createRealtimeSocket } from "../../services/socketClient";
 import { resolveVoiceNoteUrl, uploadHomeownerVoiceNote } from "../../services/voiceNoteService";
 import { playMessageNotificationSound } from "../../utils/notificationSound";
 import {
@@ -79,12 +78,10 @@ export default function HomeownerMessagesPage() {
   // --- Socket Logic & Message Handlers ---
   useEffect(() => {
     if (!token) return;
-    const socket = io(`${env.socketUrl}${env.signalingNamespace ?? "/realtime/signaling"}`, {
-      path: env.socketPath,
-      ...realtimeTransportOptions,
-      auth: (cb) => {
+    const socket = createRealtimeSocket(env.signalingNamespace ?? "/realtime/signaling", {
+      authBuilder: () => {
         const latestToken = getAccessToken();
-        cb(latestToken ? { token: latestToken } : {});
+        return latestToken ? { token: latestToken } : {};
       }
     });
     socketRef.current = socket;

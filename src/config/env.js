@@ -1,6 +1,7 @@
 const trimTrailingSlash = (value) => value?.replace(/\/+$/, "") ?? "";
 const hasHttpProtocol = (value) => /^https?:\/\//i.test(value ?? "");
 const looksLikeDomain = (value) => /^[a-z0-9.-]+\.[a-z]{2,}(\/.*)?$/i.test(value ?? "");
+const isRelativePath = (value) => typeof value === "string" && value.trim().startsWith("/");
 const normalizeLocalBackendHost = (value) => (value ?? "").replace(/:\/\/0\.0\.0\.0(?=[:/]|$)/i, "://localhost");
 const toBoolean = (value, fallback = false) => {
   if (value === undefined || value === null || value === "") return fallback;
@@ -68,6 +69,30 @@ function originFromUrl(value) {
   } catch {
     return "";
   }
+}
+
+function resolveRuntimeApiBaseSource() {
+  const nativeCandidate = import.meta.env.VITE_NATIVE_API_BASE_URL;
+  const standardCandidate = import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL;
+
+  if (isNativeRuntime || isMobileAppBuild) {
+    return nativeCandidate ?? standardCandidate;
+  }
+
+  if (typeof window !== "undefined" && !isDev) {
+    const explicit = String(standardCandidate ?? "").trim();
+    if (!explicit) return "/api/v1";
+    if (isRelativePath(explicit)) return explicit;
+
+    const explicitOrigin = originFromUrl(resolveApiBaseUrl(explicit));
+    if (explicitOrigin && explicitOrigin === trimTrailingSlash(window.location.origin)) {
+      return explicit;
+    }
+
+    return "/api/v1";
+  }
+
+  return standardCandidate;
 }
 
 function resolvePublicAppUrl(rawValue) {
@@ -138,12 +163,7 @@ function parseIceServers(rawValue) {
   ];
 }
 
-const runtimeApiBaseSource =
-  (isNativeRuntime || isMobileAppBuild
-    ? import.meta.env.VITE_NATIVE_API_BASE_URL
-    : "") ??
-  import.meta.env.VITE_API_BASE_URL ??
-  import.meta.env.VITE_API_URL;
+const runtimeApiBaseSource = resolveRuntimeApiBaseSource();
 
 const resolvedApiBaseUrl = resolveApiBaseUrl(runtimeApiBaseSource);
 const resolvedSocketUrl = (() => {

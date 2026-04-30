@@ -19,10 +19,9 @@ function ConsentModal({ open, onAccept }) {
   );
 }
 import { useNavigate, useParams } from "react-router-dom";
-import { io } from "socket.io-client";
 import { apiRequest } from "../../services/apiClient";
 import { env } from "../../config/env";
-import { realtimeTransportOptions } from "../../services/socketConfig";
+import { createRealtimeSocket } from "../../services/socketClient";
 import { getVisitorSessionStatus } from "../../services/homeownerService";
 import { storeVisitorSessionToken, getVisitorSessionToken } from "../../services/visitorSessionToken";
 
@@ -272,15 +271,9 @@ export default function ScanPage() {
 
   useEffect(() => {
     if (!requestState.sent || !requestState.sessionId) return;
-    const socket = io(`${env.socketUrl}${env.signalingNamespace ?? "/realtime/signaling"}`, {
-      path: env.socketPath,
-      ...realtimeTransportOptions,
-      reconnection: true,
+    const socket = createRealtimeSocket(env.signalingNamespace ?? "/realtime/signaling", {
       reconnectionAttempts: 6,
-      reconnectionDelay: 400,
-      reconnectionDelayMax: 2000,
-      timeout: 7000,
-      auth: (cb) => cb({})
+      authBuilder: () => ({})
     });
     socketRef.current = socket;
 

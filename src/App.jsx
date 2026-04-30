@@ -28,6 +28,7 @@ import ToastCenter from "./components/ToastCenter";
 import { env } from "./config/env";
 import { NotificationsProvider } from "./state/NotificationsContext";
 import { queryClient } from "./lib/queryClient";
+import { apiPing } from "./services/apiClient";
 import { getNativeEntryRoute, navigateToAppPath } from "./utils/authRouting";
 import { isMobileAppRuntime, isNativeApp } from "./utils/nativeRuntime";
 import {
@@ -187,8 +188,7 @@ function AppRoutes() {
   useEffect(() => {
     if (typeof window === "undefined") return () => {};
     const ping = () => {
-      if (typeof navigator !== "undefined" && navigator.onLine === false) return;
-      fetch(`${env.apiBaseUrl}/health`, { method: "GET", cache: "no-store" }).catch(() => {});
+      void apiPing("/health");
     };
     ping();
     const interval = window.setInterval(ping, 4 * 60 * 1000);

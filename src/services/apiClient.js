@@ -66,6 +66,72 @@ function getHeader(headers, key) {
   return "";
 }
 
+function isJsonContentType(contentType) {
+  return String(contentType || "").toLowerCase().includes("application/json");
+}
+
+function isHtmlContentType(contentType) {
+  return String(contentType || "").toLowerCase().includes("text/html");
+}
+
+function looksLikeHtmlDocument(value) {
+  const text = String(value || "").trim().toLowerCase();
+  return text.startsWith("<!doctype html") || text.startsWith("<html");
+}
+
+function buildResponseHeadersObject(headers) {
+  if (!headers || typeof headers.entries !== "function") return {};
+  return Object.fromEntries(headers.entries());
+}
+
+function shouldRetryResponseStatus(status) {
+  return status === 408 || status === 425 || status === 429 || status >= 500;
+}
+
+function shouldEmitNetworkToast() {
+  const now = Date.now();
+  if (now - lastNetworkErrorAt < 2500) return false;
+  lastNetworkErrorAt = now;
+  return true;
+}
+
+function buildTransportErrorMessage(networkError) {
+  if (networkError?.name === "AbortError") {
+    return "This request timed out. Please try again.";
+  }
+  return "We couldn't connect right now. Please check your internet and try again in a moment.";
+}
+
+export function buildApiUrl(path = "") {
+  if (!path) return env.apiBaseUrl;
+  if (/^https?:\/\//i.test(path)) return path;
+  return `${env.apiBaseUrl}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
+export function buildAuthHeaders(extraHeaders = {}, tokenOverride) {
+  const token = tokenOverride ?? getAccessToken();
+  return {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...extraHeaders
+  };
+}
+
+function buildFormatErrorDetails({ path, status, contentType, raw, apiBaseUrl }) {
+  if (isHtmlContentType(contentType) || looksLikeHtmlDocument(raw)) {
+    return {
+      message:
+        "The app reached a web page instead of the API. The connection is fine, but API routing or VITE_API_BASE_URL is misconfigured.",
+      code: "API_HTML_RESPONSE"
+    };
+  }
+
+  return {
+    message:
+      "The server responded successfully, but not in JSON format. Please verify the backend route and response headers for this API request.",
+    code: "API_NON_JSON_SUCCESS"
+  };
+}
+
 function normalizeRequestData(body, headers) {
   if (body == null) return undefined;
   const contentType = String(getHeader(headers, "Content-Type") ?? "");
@@ -116,7 +182,14 @@ async function performHttpRequest(url, options) {
       }
     }
 
-    return { ok, status, payload, raw };
+    return {
+      ok,
+      status,
+      payload,
+      raw,
+      headers: response?.headers ?? {},
+      contentType: getHeader(response?.headers, "content-type")
+    };
   }
 
   const controller = new AbortController();
@@ -136,7 +209,77 @@ async function performHttpRequest(url, options) {
       payload = { raw };
     }
   }
-  return { ok: response.ok, status: response.status, payload, raw };
+  const headers = buildResponseHeadersObject(response.headers);
+  return {
+    ok: response.ok,
+    status: response.status,
+    payload,
+    raw,
+    headers,
+    contentType: getHeader(headers, "content-type")
+  };
+}
+
+export async function apiPing(path = "/health") {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return false;
+  try {
+    const response = await performHttpRequest(buildApiUrl(path), {
+      method: "GET",
+      headers: { "Cache-Control": "no-store" },
+      timeoutMs: 8000
+    });
+    return Boolean(response.ok);
+  } catch {
+    return false;
+  }
+}
+
+export async function apiRequestBinary(path, options = {}) {
+  const method = String(options.method ?? "GET").toUpperCase();
+  const timeoutMs = Number(options.timeoutMs ?? REQUEST_TIMEOUT_MS);
+  const retryCount = Math.max(0, Number(options.retryCount ?? 1));
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(buildApiUrl(path), {
+      method,
+      headers: buildAuthHeaders(options.headers ?? {}, options.token),
+      body: options.body,
+      cache: options.cache ?? "default",
+      signal: controller.signal
+    });
+    if (!response.ok) {
+      if (retryCount > 0 && shouldRetryResponseStatus(response.status)) {
+        return apiRequestBinary(path, { ...options, retryCount: retryCount - 1 });
+      }
+      const raw = await response.text().catch(() => "");
+      let payload = null;
+      try {
+        payload = raw ? JSON.parse(raw) : null;
+      } catch {
+        payload = raw ? { raw } : null;
+      }
+      throw new ApiError(
+        payload?.message ?? payload?.detail ?? `Request failed (${response.status})`,
+        response.status,
+        payload
+      );
+    }
+    return response;
+  } catch (error) {
+    if ((error?.name === "AbortError" || error?.status === 0) && retryCount > 0) {
+      return apiRequestBinary(path, { ...options, retryCount: retryCount - 1 });
+    }
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(buildTransportErrorMessage(error), 0, {
+      reason: error?.message ?? "fetch failed",
+      path,
+      apiBaseUrl: env.apiBaseUrl
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 function buildCacheKey(path, token) {
@@ -179,7 +322,7 @@ async function refreshAccessToken() {
   refreshPromise = (async () => {
     let response;
     try {
-      response = await performHttpRequest(`${env.apiBaseUrl}/auth/refresh-token`, {
+      response = await performHttpRequest(buildApiUrl("/auth/refresh-token"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -263,7 +406,7 @@ export async function apiRequest(path, options = {}, attempt = 0) {
   const requestRunner = async () => {
     let response;
     try {
-      response = await performHttpRequest(`${env.apiBaseUrl}${path}`, {
+      response = await performHttpRequest(buildApiUrl(path), {
         method: options.method ?? "GET",
         headers,
         body: options.body,
@@ -281,10 +424,10 @@ export async function apiRequest(path, options = {}, attempt = 0) {
         await new Promise((resolve) => setTimeout(resolve, 350));
         return apiRequest(path, options, attempt + 1);
       }
-      const message =
-        networkError?.name === "AbortError"
-          ? "This request timed out. Please try again."
-          : "We couldn't connect right now. Please check your internet and try again in a moment.";
+      const message = buildTransportErrorMessage(networkError);
+      if (!silent && shouldEmitNetworkToast()) {
+        emitFlash(message, "error");
+      }
       throw new ApiError(
         message,
         0,
@@ -298,18 +441,46 @@ export async function apiRequest(path, options = {}, attempt = 0) {
 
     const raw = response.raw;
     const payload = response.payload;
+    const contentType = response.contentType;
 
-    if (response.ok && !payload) {
-      const message = `API returned an empty/non-JSON success response. Check VITE_API_BASE_URL (${env.apiBaseUrl}) and backend routing.`;
-      if (!silent) emitFlash(message, "error");
-      throw new ApiError(
-        message,
-        response.status,
-        { raw }
-      );
+    if (response.ok && !payload && !raw) {
+      return {
+        data: null,
+        meta: {
+          empty: true,
+          statusCode: response.status
+        }
+      };
+    }
+
+    const isNonJsonSuccess =
+      response.ok &&
+      payload?.raw &&
+      !isJsonContentType(contentType);
+
+    if (isNonJsonSuccess) {
+      const detail = buildFormatErrorDetails({
+        path,
+        status: response.status,
+        contentType,
+        raw: payload.raw,
+        apiBaseUrl: env.apiBaseUrl
+      });
+      if (!silent) emitFlash(detail.message, "error");
+      throw new ApiError(detail.message, response.status, {
+        code: detail.code,
+        path,
+        raw: payload.raw,
+        contentType,
+        apiBaseUrl: env.apiBaseUrl
+      });
     }
 
     if (!response.ok) {
+      if (attempt < retryCount && shouldRetryResponseStatus(response.status)) {
+        await new Promise((resolve) => setTimeout(resolve, 350 * (attempt + 1)));
+        return apiRequest(path, options, attempt + 1);
+      }
       const shouldHandleSessionTimeout = response.status === 401 && (Boolean(token) || requiresAuthenticatedUser(path));
       if (shouldHandleSessionTimeout && attempt === 0) {
         const newToken = await refreshAccessToken();
@@ -335,7 +506,7 @@ export async function apiRequest(path, options = {}, attempt = 0) {
       const message = isServerError
         ? path === "/homeowner/settings"
           ? "We couldn't load your settings right now. Please try again."
-          : "Something went wrong. Please try again."
+          : "The server responded with an error even though the connection worked. Please try again."
         : baseMessage;
       if (isSubscriptionBlocked) {
         emitBlockingSubscription({
@@ -389,17 +560,14 @@ export async function apiUpload(path, formData) {
 
   let response;
   try {
-    response = await performHttpRequest(`${env.apiBaseUrl}${path}`, {
+    response = await performHttpRequest(buildApiUrl(path), {
       method: "POST",
       headers,
       body: formData,
       timeoutMs: REQUEST_TIMEOUT_MS
     });
   } catch (networkError) {
-    const message =
-      networkError?.name === "AbortError"
-        ? "This request timed out. Please try again."
-        : "We couldn't connect right now. Please check your internet and try again in a moment.";
+    const message = buildTransportErrorMessage(networkError);
     emitFlash(message, "error");
     throw new ApiError(
       message,
@@ -414,10 +582,23 @@ export async function apiUpload(path, formData) {
 
   const raw = response.raw;
   const payload = response.payload;
-  if (response.ok && !payload) {
-    const message = "API returned an empty/non-JSON success response for upload.";
-    emitFlash(message, "error");
-    throw new ApiError(message, response.status, { raw });
+  if (response.ok && !payload && !raw) {
+    return { data: null, meta: { empty: true, statusCode: response.status } };
+  }
+  if (response.ok && payload?.raw && !isJsonContentType(response.contentType)) {
+    const detail = buildFormatErrorDetails({
+      path,
+      status: response.status,
+      contentType: response.contentType,
+      raw: payload.raw,
+      apiBaseUrl: env.apiBaseUrl
+    });
+    emitFlash(detail.message, "error");
+    throw new ApiError(detail.message, response.status, {
+      code: detail.code,
+      raw: payload.raw,
+      contentType: response.contentType
+    });
   }
   if (!response.ok) {
     const message = payload?.message ?? payload?.detail ?? `Upload failed (${response.status})`;

@@ -1,6 +1,4 @@
-import { apiRequest } from "./apiClient";
-import { env } from "../config/env";
-import { getAccessToken } from "./authStorage";
+import { apiRequest, apiRequestBinary } from "./apiClient";
 
 export async function getLiveVisitorQueue(limit = 50) {
   const response = await apiRequest(`/advanced/visitor/queue?limit=${encodeURIComponent(limit)}`);
@@ -9,17 +7,10 @@ export async function getLiveVisitorQueue(limit = 50) {
 
 export async function fetchVisitorSnapshotFileUrl(snapshotId) {
   if (!snapshotId) return "";
-  const token = getAccessToken();
-  const response = await fetch(
-    `${env.apiBaseUrl}/advanced/visitor/snapshots/${encodeURIComponent(snapshotId)}/file`,
-    {
-      method: "GET",
-      headers: token ? { Authorization: `Bearer ${token}` } : {}
-    }
+  const response = await apiRequestBinary(
+    `/advanced/visitor/snapshots/${encodeURIComponent(snapshotId)}/file`,
+    { retryCount: 1, timeoutMs: 20000 }
   );
-  if (!response.ok) {
-    throw new Error(`Unable to load snapshot (${response.status})`);
-  }
   const blob = await response.blob();
   return URL.createObjectURL(blob);
 }
@@ -30,14 +21,10 @@ export async function listDigitalReceipts(limit = 50) {
 }
 
 export async function downloadDigitalReceiptPdf(receiptId) {
-  const token = getAccessToken();
-  const response = await fetch(`${env.apiBaseUrl}/advanced/receipts/${encodeURIComponent(receiptId)}/pdf`, {
-    method: "GET",
-    headers: token ? { Authorization: `Bearer ${token}` } : {}
-  });
-  if (!response.ok) {
-    throw new Error(`Unable to download receipt PDF (${response.status})`);
-  }
+  const response = await apiRequestBinary(
+    `/advanced/receipts/${encodeURIComponent(receiptId)}/pdf`,
+    { retryCount: 1, timeoutMs: 20000 }
+  );
   const blob = await response.blob();
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");

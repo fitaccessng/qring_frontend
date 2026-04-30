@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { getAccessToken } from "../../services/authStorage";
-import { io } from "socket.io-client";
 import { BellRing } from "lucide-react";
 import AppShell from "../../layouts/AppShell";
 import EstateManagerPageShell, {
@@ -9,7 +8,7 @@ import EstateManagerPageShell, {
   estateTextareaClassName
 } from "../../components/mobile/EstateManagerPageShell";
 import { env } from "../../config/env";
-import { realtimeTransportOptions } from "../../services/socketConfig";
+import { createRealtimeSocket } from "../../services/socketClient";
 import {
   createEstateAlert,
   getEstateOverview,
@@ -94,10 +93,8 @@ export default function EstateAlertsPage() {
 
   useEffect(() => {
     if (!token || !estateId) return () => {};
-    const socket = io(`${env.socketUrl}${env.dashboardNamespace}`, {
-      path: env.socketPath,
-      ...realtimeTransportOptions,
-      auth: { token }
+    const socket = createRealtimeSocket(env.dashboardNamespace, {
+      authBuilder: () => ({ token })
     });
     socket.on("connect", () => {
       socket.emit("dashboard.subscribe", { room: `estate:${estateId}:alerts` });
