@@ -81,15 +81,9 @@ function resolveRuntimeApiBaseSource() {
 
   if (typeof window !== "undefined" && !isDev) {
     const explicit = String(standardCandidate ?? "").trim();
-    if (!explicit) return "/api/v1";
+    if (!explicit) return productionBackendOrigin;
     if (isRelativePath(explicit)) return explicit;
-
-    const explicitOrigin = originFromUrl(resolveApiBaseUrl(explicit));
-    if (explicitOrigin && explicitOrigin === trimTrailingSlash(window.location.origin)) {
-      return explicit;
-    }
-
-    return "/api/v1";
+    return explicit;
   }
 
   return standardCandidate;
