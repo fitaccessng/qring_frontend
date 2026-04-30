@@ -29,6 +29,7 @@ import {
 } from "../utils/notificationSound";
 import { notify } from "../utils/notifier";
 import { getAccessToken, getStoredUser } from "../services/authStorage";
+import { navigateToAppPath } from "../utils/authRouting";
 
 const rtcConfig = {
   iceServers: env.webRtcIceServers,
@@ -1000,7 +1001,7 @@ export function useSessionRealtime(sessionId) {
     if (`${window.location.pathname}${window.location.search}` === nextRoute) return;
     window.setTimeout(() => {
       if (typeof window === "undefined") return;
-      window.location.assign(nextRoute);
+      navigateToAppPath(nextRoute);
     }, 250);
   }
 

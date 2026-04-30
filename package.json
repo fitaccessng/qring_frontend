@@ -3,6 +3,9 @@
   "private": true,
   "version": "1.0.21",
   "type": "module",
+  "engines": {
+    "node": "22.12.0"
+  },
   "scripts": {
     "dev": "vite",
     "prebuild": "node scripts/ensure-livekit-env.mjs",

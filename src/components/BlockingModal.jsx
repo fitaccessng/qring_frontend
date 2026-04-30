@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { navigateToAppPath } from "../utils/authRouting";
 
 export default function BlockingModal() {
   const [modal, setModal] = useState(null);
@@ -37,7 +38,7 @@ export default function BlockingModal() {
             <button
               type="button"
               onClick={() => {
-                window.location.assign(modal.actionRoute);
+                navigateToAppPath(modal.actionRoute);
                 setModal(null);
               }}
               className="mr-3 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"

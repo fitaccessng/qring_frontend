@@ -1,4 +1,4 @@
-import { isNativeApp } from "../utils/nativeRuntime";
+import { isMobileAppRuntime, isNativeApp } from "../utils/nativeRuntime";
 
 export const AUTH_STORAGE_KEYS = {
   accessToken: "qring_access_token",
@@ -37,15 +37,15 @@ function getSessionStorageSafe() {
 }
 
 function getPrimaryStorage() {
-  return isNativeApp() ? getLocalStorageSafe() : getSessionStorageSafe();
+  return isMobileAppRuntime() ? getLocalStorageSafe() : getSessionStorageSafe();
 }
 
 function getFallbackStorage() {
-  return isNativeApp() ? getSessionStorageSafe() : getLocalStorageSafe();
+  return isMobileAppRuntime() ? getSessionStorageSafe() : getLocalStorageSafe();
 }
 
 function getLegacyWebStorage() {
-  return isNativeApp() ? null : getLocalStorageSafe();
+  return isMobileAppRuntime() ? null : getLocalStorageSafe();
 }
 
 async function getNativePreferences() {
@@ -99,7 +99,7 @@ function writeToStores(key, value) {
     primary?.removeItem(key);
   }
 
-  if (!isNativeApp()) {
+  if (!isMobileAppRuntime()) {
     fallback?.removeItem(key);
   }
 }

@@ -51,7 +51,8 @@ export function navigateToAppPath(path, { replace = false } = {}) {
     return;
   }
 
-  window.location.assign(safePath);
+  window.history.pushState(window.history.state, "", safePath);
+  window.dispatchEvent(new Event("popstate"));
 }
 
 export function redirectToLogin(redirectPath = "") {

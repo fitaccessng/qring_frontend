@@ -236,11 +236,7 @@ export default function LoginPage() {
                 </span>
               </button>
             </>
-          ) : (
-            <p className="mb-10 text-center text-xs font-bold uppercase tracking-widest text-slate-400">
-              Google sign-in is available on the web app only.
-            </p>
-          )}
+          ) : null}
 
           <div className="flex flex-col gap-4 items-center">
             <Link to="/forgot-password" size="sm" className="text-slate-400 text-xs font-bold uppercase tracking-widest hover:text-brand-500 transition-colors">

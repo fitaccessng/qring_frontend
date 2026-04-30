@@ -1,4 +1,5 @@
 import { showFlash } from "./flash";
+import { navigateToAppPath } from "./authRouting";
 
 function canUseSystemNotifications() {
   if (typeof window === "undefined") return false;
@@ -23,7 +24,7 @@ function navigateToRoute(route) {
   const target = String(route || "").trim();
   if (!target || !target.startsWith("/")) return;
   try {
-    window.location.assign(`${window.location.origin}${target}`);
+    navigateToAppPath(target);
   } catch {
     // Ignore navigation failures.
   }
@@ -81,4 +82,3 @@ export function notify({
     // Keep notifications non-blocking.
   }
 }
-

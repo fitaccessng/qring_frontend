@@ -261,11 +261,7 @@ export default function SignupPage() {
                 </span>
               </button>
             </>
-          ) : (
-            <p className="mb-10 text-center text-xs font-bold uppercase tracking-widest text-slate-400">
-              Google signup is available on the web app only.
-            </p>
-          )}
+          ) : null}
 
           <p className="text-center text-sm font-bold text-slate-400">
             Already have an account?{" "}
