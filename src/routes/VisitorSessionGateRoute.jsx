@@ -1,14 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
+import { getStoredUser } from "../services/authStorage";
 import { getVisitorSessionStatus } from "../services/homeownerService";
-
-function getStoredUser() {
-  try {
-    return JSON.parse(localStorage.getItem("qring_user") || "null");
-  } catch {
-    return null;
-  }
-}
 
 function normalizeStatus(value) {
   return String(value || "").trim().toLowerCase();

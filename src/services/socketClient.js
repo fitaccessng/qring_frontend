@@ -1,6 +1,7 @@
 import { io } from "socket.io-client";
 import { env } from "../config/env";
 import { realtimeTransportOptions } from "./socketConfig";
+import { getAccessToken } from "./authStorage";
 
 let socket;
 
@@ -15,7 +16,7 @@ export function getDashboardSocket() {
       reconnectionDelayMax: 2000,
       timeout: 7000,
       auth: (cb) => {
-        const token = localStorage.getItem("qring_access_token");
+        const token = getAccessToken();
         cb(token ? { token } : {});
       },
       withCredentials: true,

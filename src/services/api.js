@@ -1,32 +1,12 @@
 import axios from "axios";
 import { env } from "../config/env";
-
-function getAccessToken() {
-  if (typeof window === "undefined") return "";
-  return localStorage.getItem("qring_access_token") ?? "";
-}
+import { clearAuthSession, getAccessToken } from "./authStorage";
+import { redirectToLogin } from "../utils/authRouting";
 
 function clearStoredSession() {
   if (typeof window === "undefined") return;
-  localStorage.removeItem("qring_access_token");
-  localStorage.removeItem("qring_refresh_token");
-  localStorage.removeItem("qring_user");
+  clearAuthSession();
   window.dispatchEvent(new Event("qring:session-timeout"));
-}
-
-function redirectToLogin() {
-  if (typeof window === "undefined") return;
-  const pathname = window.location.pathname || "";
-  const hash = window.location.hash || "";
-  const hashPath = hash.startsWith("#/") ? hash.slice(1).split("?")[0] : "";
-  const current = hashPath || pathname || "";
-  if (current === "/login") return;
-  const redirect = encodeURIComponent(`${current}${window.location.search || ""}`);
-  if (hashPath) {
-    window.location.hash = `/login?redirect=${redirect}`;
-    return;
-  }
-  window.location.assign(`/login?redirect=${redirect}`);
 }
 
 export const api = axios.create({

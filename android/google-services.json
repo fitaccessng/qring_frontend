@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "333641553431-oqu6bsr2m22ha6ccfbn5amcf5333mtmu.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.kelvin.qringapp",
+            "certificate_hash": "fd28ffcdf868b8cc1f36b0667f0290c6af3ad740"
+          }
+        },
+        {
           "client_id": "333641553431-dnpj0r2echhl0t3ccad573s17gn2qstn.apps.googleusercontent.com",
           "client_type": 3
         }

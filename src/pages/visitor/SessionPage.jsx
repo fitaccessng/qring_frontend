@@ -3,6 +3,7 @@ import { NavLink, useParams } from "react-router-dom";
 import { io } from "socket.io-client";
 import { env } from "../../config/env";
 import { realtimeTransportOptions } from "../../services/socketConfig";
+import { getAccessToken, getStoredUser } from "../../services/authStorage";
 import { getVisitorSessionMessages } from "../../services/homeownerService";
 import { getVisitorSessionToken } from "../../services/visitorSessionToken";
 import {
@@ -22,14 +23,8 @@ const sessionModes = [
 
 export default function SessionPage({ mode = "message" }) {
   const { sessionId } = useParams();
-  const token = localStorage.getItem("qring_access_token");
-  const user = useMemo(() => {
-    try {
-      return JSON.parse(localStorage.getItem("qring_user") || "null");
-    } catch {
-      return null;
-    }
-  }, []);
+  const token = getAccessToken();
+  const user = useMemo(() => getStoredUser(), []);
 
   const displayName = user?.fullName || "Visitor";
   const [connected, setConnected] = useState(false);
@@ -282,7 +277,7 @@ export default function SessionPage({ mode = "message" }) {
       reconnectionDelayMax: 2000,
       timeout: 7000,
       auth: (cb) => {
-        const latestToken = localStorage.getItem("qring_access_token");
+        const latestToken = getAccessToken();
         cb(latestToken ? { token: latestToken } : {});
       },
       withCredentials: true

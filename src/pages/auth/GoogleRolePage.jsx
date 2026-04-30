@@ -3,6 +3,8 @@ import { Building2, CheckCircle2, Home } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import AuthCard from "../../components/AuthCard";
 import { useAuth } from "../../state/AuthContext";
+import { getStoredUser } from "../../services/authStorage";
+import { resolvePostLoginPath } from "../../utils/authRouting";
 
 const rolePath = {
   homeowner: "/dashboard/homeowner/overview",
@@ -45,18 +47,12 @@ export default function GoogleRolePage() {
         return;
       }
 
-      const storedUser = (() => {
-        try {
-          return JSON.parse(localStorage.getItem("qring_user") ?? "null");
-        } catch {
-          return null;
-        }
-      })();
+      const storedUser = getStoredUser();
       const userRole = data?.user?.role ?? storedUser?.role;
       if (!userRole) throw new Error("Account setup completed but role was not returned.");
       const fallback = rolePath[userRole];
       if (!fallback) throw new Error(`Account setup completed but role '${userRole}' is not supported.`);
-      navigate(location.state?.from ?? fallback, { replace: true });
+      navigate(resolvePostLoginPath({ role: userRole }, location.state?.from?.pathname ?? fallback), { replace: true });
     } catch (submitError) {
       setError(submitError.message ?? "Unable to finish Google account setup");
     }

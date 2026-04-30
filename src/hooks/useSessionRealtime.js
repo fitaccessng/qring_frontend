@@ -28,6 +28,7 @@ import {
   playMessageNotificationSound
 } from "../utils/notificationSound";
 import { notify } from "../utils/notifier";
+import { getAccessToken, getStoredUser } from "../services/authStorage";
 
 const rtcConfig = {
   iceServers: env.webRtcIceServers,
@@ -179,7 +180,7 @@ function acquireSignalingSocket(sessionId) {
       reconnectionDelayMax: 2000,
       timeout: 7000,
       auth: (cb) => {
-        const latestToken = localStorage.getItem("qring_access_token");
+        const latestToken = getAccessToken();
         cb(latestToken ? { token: latestToken } : {});
       },
       withCredentials: true
@@ -210,14 +211,8 @@ function releaseSignalingSocket(sessionId) {
 }
 
 export function useSessionRealtime(sessionId) {
-  const token = localStorage.getItem("qring_access_token");
-  const user = useMemo(() => {
-    try {
-      return JSON.parse(localStorage.getItem("qring_user") || "null");
-    } catch {
-      return null;
-    }
-  }, []);
+  const token = getAccessToken();
+  const user = useMemo(() => getStoredUser(), []);
   const userRole = String(user?.role || "").toLowerCase();
   const displayName = user?.fullName || (userRole === "security" ? "Security" : userRole === "homeowner" ? "Homeowner" : "Visitor");
   const isHomeowner = userRole === "homeowner";

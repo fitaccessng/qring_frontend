@@ -140,7 +140,8 @@ export function getNotificationDetailRoute(item) {
   const role = (() => {
     if (typeof window === "undefined") return "";
     try {
-      const user = JSON.parse(window.localStorage.getItem("qring_user") || "null");
+      const raw = window.sessionStorage.getItem("qring_user") || window.localStorage.getItem("qring_user") || "null";
+      const user = JSON.parse(raw);
       return String(user?.role || "").toLowerCase();
     } catch {
       return "";

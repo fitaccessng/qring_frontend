@@ -4,22 +4,16 @@ import { Mail, Lock, ChevronRight, Eye, EyeOff, AlertCircle } from "lucide-react
 import { useAuth } from "../../state/AuthContext";
 import { requestEmailVerification } from "../../services/authService";
 import quickdropLogo from "../../assets/qring_logo.jpeg";
-
-const rolePath = {
-  homeowner: "/dashboard/homeowner/overview",
-  admin: "/dashboard/admin",
-  estate: "/dashboard/estate",
-  security: "/dashboard/security"
-};
+import { resolvePostLoginPath } from "../../utils/authRouting";
+import { shouldUseGoogleAuth } from "../../utils/nativeRuntime";
+import { useAsyncAction } from "../../hooks/useAsyncAction";
 
 function resolveTargetPath(data, fromPath) {
-  const role = data?.user?.role;
-  if (!role) return null;
-  return fromPath ?? rolePath[role] ?? null;
+  return resolvePostLoginPath(data?.user, fromPath);
 }
 
 export default function LoginPage() {
-  const { login, googleSignIn, resumeGoogleRedirect, loading } = useAuth();
+  const { login, googleSignIn, resumeGoogleRedirect } = useAuth();
   const [searchParams] = useSearchParams();
   const initialLogin = searchParams.get("email") ?? searchParams.get("username") ?? "";
   
@@ -27,11 +21,25 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [verificationState, setVerificationState] = useState({ needed: false, sending: false, status: "" });
+  const [submitting, setSubmitting] = useState(false);
+  const [googleSubmitting, setGoogleSubmitting] = useState(false);
   
   const navigate = useNavigate();
   const location = useLocation();
+  const googleAuthEnabled = shouldUseGoogleAuth();
+  const formAction = useAsyncAction({
+    debounceMs: 500,
+    timeoutMs: 15000,
+    timeoutMessage: "Login is taking too long. Please try again.",
+  });
+  const googleAction = useAsyncAction({
+    debounceMs: 800,
+    timeoutMs: 20000,
+    timeoutMessage: "Google sign-in is taking too long. Please try again.",
+  });
 
   useEffect(() => {
+    if (!googleAuthEnabled) return () => {};
     let active = true;
     const resumeNativeGoogleAuth = async () => {
       try {
@@ -49,24 +57,68 @@ export default function LoginPage() {
     };
     resumeNativeGoogleAuth();
     return () => { active = false; };
-  }, [location.state?.from?.pathname, navigate, resumeGoogleRedirect]);
+  }, [googleAuthEnabled, location.state?.from?.pathname, navigate, resumeGoogleRedirect]);
 
   const onSubmit = async (event) => {
     event.preventDefault();
-    setError("");
-    setVerificationState({ needed: false, sending: false, status: "" });
     try {
-      const data = await login(form);
-      const target = resolveTargetPath(data, location.state?.from?.pathname);
-      if (!target) throw new Error("No user role returned. Contact support.");
-      navigate(target, { replace: true });
+      const result = await formAction.run(async () => {
+        setError("");
+        setVerificationState({ needed: false, sending: false, status: "" });
+        setSubmitting(true);
+        try {
+          const data = await login(form);
+          const target = resolveTargetPath(data, location.state?.from?.pathname);
+          if (!target) throw new Error("No user role returned. Contact support.");
+          navigate(target, { replace: true });
+        } catch (err) {
+          if (err?.status === 403) {
+            setError("Email not verified.");
+            setVerificationState((prev) => ({ ...prev, needed: true }));
+          } else {
+            setError(err?.message || "Invalid credentials");
+          }
+        } finally {
+          setSubmitting(false);
+        }
+      });
+      return result;
     } catch (err) {
-      if (err?.status === 403) {
-        setError("Email not verified.");
-        setVerificationState(prev => ({ ...prev, needed: true }));
+      setSubmitting(false);
+      if (err?.message) {
+        setError(err.message);
       } else {
-        setError(err.message || "Invalid credentials");
+        setError("Login failed. Please try again.");
       }
+      return undefined;
+    }
+  };
+
+  const onGoogleSignIn = async () => {
+    try {
+      return await googleAction.run(async () => {
+        setError("");
+        setVerificationState({ needed: false, sending: false, status: "" });
+        setGoogleSubmitting(true);
+        try {
+          const data = await googleSignIn();
+          const target = resolveTargetPath(data, location.state?.from?.pathname);
+          if (!target) throw new Error("No user role returned. Contact support.");
+          navigate(target, { replace: true });
+        } catch (err) {
+          if (err?.message !== "Redirecting to Google...") {
+            setError(err?.message || "Google sign-in failed");
+          }
+        } finally {
+          setGoogleSubmitting(false);
+        }
+      });
+    } catch (err) {
+      setGoogleSubmitting(false);
+      if (err?.message) {
+        setError(err.message);
+      }
+      return undefined;
     }
   };
 
@@ -128,9 +180,9 @@ export default function LoginPage() {
             {verificationState.needed && (
               <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Verification Required</p>
-                <button
-                  type="button"
-                  disabled={verificationState.sending}
+              <button
+                type="button"
+                disabled={verificationState.sending}
                   onClick={async () => {
                     setVerificationState((p) => ({ ...p, sending: true, status: "" }));
                     try {
@@ -149,35 +201,46 @@ export default function LoginPage() {
             )}
 
             <button
-              disabled={loading}
+              disabled={submitting || googleSubmitting || formAction.pending}
               className="w-full bg-brand-500 text-white font-black py-5 rounded-[2.5rem] shadow-xl shadow-brand-500/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2 mt-4 disabled:opacity-50"
               type="submit"
             >
-              {loading ? "Signing In..." : "Sign In"}
-              {!loading && <ChevronRight className="w-5 h-5 font-bold" />}
+              {submitting ? "Signing In..." : "Sign In"}
+              {!submitting && <ChevronRight className="w-5 h-5 font-bold" />}
             </button>
           </form>
 
           {/* Social Divider */}
-          <div className="relative flex py-8 items-center">
-            <div className="flex-grow border-t border-slate-100"></div>
-            <span className="mx-4 text-slate-400 text-[10px] font-black uppercase tracking-widest">Or continue with</span>
-            <div className="flex-grow border-t border-slate-100"></div>
-          </div>
+          {googleAuthEnabled ? (
+            <>
+              <div className="relative flex py-8 items-center">
+                <div className="flex-grow border-t border-slate-100"></div>
+                <span className="mx-4 text-slate-400 text-[10px] font-black uppercase tracking-widest">Or continue with</span>
+                <div className="flex-grow border-t border-slate-100"></div>
+              </div>
 
-          <button
-            type="button"
-            onClick={() => googleSignIn()}
-            className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl bg-white border-2 border-slate-100 shadow-sm active:bg-slate-50 active:scale-[0.98] transition-all mb-10"
-          >
-            <svg className="h-5 w-5" viewBox="0 0 24 24">
-              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-            </svg>
-            <span className="text-slate-700 font-bold text-sm">Google Account</span>
-          </button>
+              <button
+                type="button"
+                onClick={onGoogleSignIn}
+                disabled={submitting || googleSubmitting || googleAction.pending}
+                className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl bg-white border-2 border-slate-100 shadow-sm active:bg-slate-50 active:scale-[0.98] transition-all mb-10 disabled:opacity-50"
+              >
+                <svg className="h-5 w-5" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                </svg>
+                <span className="text-slate-700 font-bold text-sm">
+                  {googleSubmitting ? "Opening Google..." : "Google Account"}
+                </span>
+              </button>
+            </>
+          ) : (
+            <p className="mb-10 text-center text-xs font-bold uppercase tracking-widest text-slate-400">
+              Google sign-in is available on the web app only.
+            </p>
+          )}
 
           <div className="flex flex-col gap-4 items-center">
             <Link to="/forgot-password" size="sm" className="text-slate-400 text-xs font-bold uppercase tracking-widest hover:text-brand-500 transition-colors">

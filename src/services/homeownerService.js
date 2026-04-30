@@ -1,10 +1,10 @@
 import { apiRequest, apiUpload } from "./apiClient";
+import { getStoredUser } from "./authStorage";
 import { getVisitorSessionToken } from "./visitorSessionToken";
 
 function getStoredHomeownerIdentity() {
-  if (typeof localStorage === "undefined") return {};
   try {
-    const user = JSON.parse(localStorage.getItem("qring_user") || "null");
+    const user = getStoredUser();
     return {
       id: user?.id != null ? String(user.id) : "",
       email: typeof user?.email === "string" ? user.email.trim().toLowerCase() : "",

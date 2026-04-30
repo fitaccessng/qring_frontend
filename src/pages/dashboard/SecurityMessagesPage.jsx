@@ -5,6 +5,7 @@ import { ChevronLeft, Phone, Search, SendHorizontal, Trash2, Video, X, MessageSq
 import AppShell from "../../layouts/AppShell";
 import { env } from "../../config/env";
 import { realtimeTransportOptions } from "../../services/socketConfig";
+import { getAccessToken } from "../../services/authStorage";
 import { playMessageNotificationSound } from "../../utils/notificationSound";
 import {
   deleteSecuritySessionMessage,
@@ -35,7 +36,7 @@ export default function SecurityMessagesPage() {
   const selectedIdRef = useRef("");
   const socketRef = useRef(null);
   const inputRef = useRef(null);
-  const token = localStorage.getItem("qring_access_token");
+  const token = getAccessToken();
 
   useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
 
@@ -116,7 +117,7 @@ export default function SecurityMessagesPage() {
       ...realtimeTransportOptions,
       reconnection: true, reconnectionAttempts: 10, reconnectionDelay: 400,
       reconnectionDelayMax: 2000, timeout: 7000,
-      auth: cb => { const t = localStorage.getItem("qring_access_token"); cb(t ? { token: t } : {}); },
+      auth: cb => { const t = getAccessToken(); cb(t ? { token: t } : {}); },
       withCredentials: true
     });
     socketRef.current = socket;

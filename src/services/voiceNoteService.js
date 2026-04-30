@@ -1,4 +1,5 @@
 import { env } from "../config/env";
+import { getAccessToken } from "./authStorage";
 import { getVisitorSessionToken } from "./visitorSessionToken";
 
 function buildUrl(path) {
@@ -40,7 +41,7 @@ export async function uploadVisitorVoiceNote(sessionId, file) {
 }
 
 export async function uploadHomeownerVoiceNote(sessionId, file) {
-  const token = localStorage.getItem("qring_access_token");
+  const token = getAccessToken();
   return uploadVoiceNote({
     url: `/homeowner/messages/${encodeURIComponent(sessionId)}/voice-notes`,
     token,

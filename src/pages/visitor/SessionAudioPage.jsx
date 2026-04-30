@@ -182,7 +182,8 @@ function NavItem({ to, icon, label, active = false }) {
 
 function getExitRoute(sessionId) {
   try {
-    const user = JSON.parse(localStorage.getItem("qring_user") || "null");
+    const raw = window.sessionStorage.getItem("qring_user") || window.localStorage.getItem("qring_user") || "null";
+    const user = JSON.parse(raw);
     if (!user?.role || user.role === "visitor") return `/session/${sessionId}/message`;
     if (user.role === "admin") return "/dashboard/admin";
     if (user.role === "estate") return "/dashboard/estate";

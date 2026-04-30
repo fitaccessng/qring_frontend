@@ -1,6 +1,7 @@
 import { registerPushSubscription } from "./notificationService";
 import { ignorePanicAlert, reportFalsePanicAlert, respondToPanicAlert } from "./safetyService";
 import { isNativeApp } from "../utils/nativeRuntime";
+import { navigateToAppPath } from "../utils/authRouting";
 
 const PANIC_ACTION_TYPE_ID = "panic_response";
 const PANIC_ACTION_IDS = new Set(["respond", "ignore", "report_false"]);
@@ -103,7 +104,7 @@ async function executeNotificationAction({ actionId, panicId, route }) {
   }
 
   if (typeof window !== "undefined" && route.startsWith("/")) {
-    window.location.assign(route);
+    navigateToAppPath(route);
   }
 
   return true;

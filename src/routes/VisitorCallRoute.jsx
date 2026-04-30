@@ -1,13 +1,6 @@
 import { Navigate, useParams } from "react-router-dom";
+import { getStoredUser } from "../services/authStorage";
 import { hasSessionCallAccess } from "../services/sessionCallAccess";
-
-function getStoredUser() {
-  try {
-    return JSON.parse(localStorage.getItem("qring_user") || "null");
-  } catch {
-    return null;
-  }
-}
 
 export default function VisitorCallRoute({ children }) {
   const { sessionId } = useParams();

@@ -4,4 +4,5 @@
     <string name="title_activity_main">Qring</string>
     <string name="package_name">com.kelvin.qringapp</string>
     <string name="custom_url_scheme">qring</string>
+    <string name="server_client_id">333641553431-dnpj0r2echhl0t3ccad573s17gn2qstn.apps.googleusercontent.com</string>
 </resources>

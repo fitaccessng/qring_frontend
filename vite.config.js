@@ -3,9 +3,17 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
+  const appBuildTarget = String(process.env.VITE_APP_BUILD_TARGET ?? env.VITE_APP_BUILD_TARGET ?? "").trim().toLowerCase();
 
   return {
     plugins: [react()],
+    resolve: {
+      alias: appBuildTarget === "mobile"
+        ? {
+            "./App": "./AppMobile"
+          }
+        : undefined
+    },
     server: {
       host: "0.0.0.0"
     },

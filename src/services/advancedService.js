@@ -1,5 +1,6 @@
 import { apiRequest } from "./apiClient";
 import { env } from "../config/env";
+import { getAccessToken } from "./authStorage";
 
 export async function getLiveVisitorQueue(limit = 50) {
   const response = await apiRequest(`/advanced/visitor/queue?limit=${encodeURIComponent(limit)}`);
@@ -8,7 +9,7 @@ export async function getLiveVisitorQueue(limit = 50) {
 
 export async function fetchVisitorSnapshotFileUrl(snapshotId) {
   if (!snapshotId) return "";
-  const token = localStorage.getItem("qring_access_token");
+  const token = getAccessToken();
   const response = await fetch(
     `${env.apiBaseUrl}/advanced/visitor/snapshots/${encodeURIComponent(snapshotId)}/file`,
     {
@@ -29,7 +30,7 @@ export async function listDigitalReceipts(limit = 50) {
 }
 
 export async function downloadDigitalReceiptPdf(receiptId) {
-  const token = localStorage.getItem("qring_access_token");
+  const token = getAccessToken();
   const response = await fetch(`${env.apiBaseUrl}/advanced/receipts/${encodeURIComponent(receiptId)}/pdf`, {
     method: "GET",
     headers: token ? { Authorization: `Bearer ${token}` } : {}

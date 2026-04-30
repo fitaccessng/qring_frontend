@@ -12,7 +12,16 @@ const toInteger = (value, fallback) => {
 };
 
 const productionBackendOrigin = "https://qring-backend-1.onrender.com";
+const productionFrontendOrigin = "https://www.useqring.online";
 const isDev = Boolean(import.meta.env.DEV);
+const isMobileAppBuild = String(import.meta.env.VITE_APP_BUILD_TARGET ?? "").trim().toLowerCase() === "mobile";
+const isNativeRuntime = (() => {
+  try {
+    return Boolean(globalThis?.Capacitor?.isNativePlatform?.());
+  } catch {
+    return false;
+  }
+})();
 
 const defaultApiBase =
   typeof window !== "undefined" && isDev
@@ -24,9 +33,9 @@ const defaultSocketUrl =
     : productionBackendOrigin;
 const defaultLivekitUrl = "";
 const defaultPublicAppUrl =
-  typeof window !== "undefined"
+  typeof window !== "undefined" && !isNativeRuntime && !isMobileAppBuild
     ? window.location.origin
-    : "https://www.useqring.online";
+    : productionFrontendOrigin;
 
 function resolveApiBaseUrl(rawValue) {
   const value = normalizeLocalBackendHost((rawValue ?? "").trim());
@@ -127,7 +136,14 @@ function parseIceServers(rawValue) {
   ];
 }
 
-const resolvedApiBaseUrl = resolveApiBaseUrl(import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL);
+const runtimeApiBaseSource =
+  (isNativeRuntime || isMobileAppBuild
+    ? import.meta.env.VITE_NATIVE_API_BASE_URL
+    : "") ??
+  import.meta.env.VITE_API_BASE_URL ??
+  import.meta.env.VITE_API_URL;
+
+const resolvedApiBaseUrl = resolveApiBaseUrl(runtimeApiBaseSource);
 const resolvedSocketUrl = (() => {
   if (isDev && typeof window !== "undefined" && !(import.meta.env.VITE_SOCKET_URL ?? "").trim()) {
     // Keep Socket.IO same-origin in local dev so Vite proxy handles upstream CORS safely.

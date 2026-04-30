@@ -8,6 +8,7 @@ import {
 import VoiceNoteRecorder from "../../components/VoiceNoteRecorder";
 import { env } from "../../config/env";
 import { realtimeTransportOptions } from "../../services/socketConfig";
+import { getAccessToken } from "../../services/authStorage";
 import { resolveVoiceNoteUrl, uploadHomeownerVoiceNote } from "../../services/voiceNoteService";
 import { playMessageNotificationSound } from "../../utils/notificationSound";
 import {
@@ -42,7 +43,7 @@ export default function HomeownerMessagesPage() {
   const threadsRef = useRef([]);
   const socketRef = useRef(null);
   const joinedSessionIdsRef = useRef(new Set());
-  const token = localStorage.getItem("qring_access_token");
+  const token = getAccessToken();
 
   useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
   useEffect(() => { threadsRef.current = threads; }, [threads]);
@@ -82,7 +83,7 @@ export default function HomeownerMessagesPage() {
       path: env.socketPath,
       ...realtimeTransportOptions,
       auth: (cb) => {
-        const latestToken = localStorage.getItem("qring_access_token");
+        const latestToken = getAccessToken();
         cb(latestToken ? { token: latestToken } : {});
       }
     });

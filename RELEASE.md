@@ -17,9 +17,8 @@ Prerequisites:
 
 Steps:
 
-1. Build the web app:
-   `npm run build`
-2. Sync Capacitor assets into native projects:
+1. Build the mobile-only app bundle and sync Capacitor assets:
+   `npm run build:mobile`
    `npx cap sync ios`
 3. Open the iOS project:
    `npx cap open ios`
@@ -65,14 +64,15 @@ keyPassword=your-key-password
 
 Do not commit the real `keystore.properties` or the keystore file.
 
-### 3. Build the web app and sync Capacitor
+### 3. Build the mobile-only app bundle and sync Capacitor
 
 From `qring_frontend`:
 
 ```bash
-npm run build
-npx cap sync android
+npm run sync:android:mobile
 ```
+
+This command now rebuilds the frontend with `VITE_APP_BUILD_TARGET=mobile` before syncing Android, so public marketing pages are not copied into the AAB by mistake.
 
 ### 4. Build signed release artifacts
 

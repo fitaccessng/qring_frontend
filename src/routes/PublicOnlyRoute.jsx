@@ -1,17 +1,16 @@
 import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "../state/AuthContext";
-
-function roleHome(user) {
-  if (user?.role === "estate") return "/dashboard/estate";
-  if (user?.role === "admin") return "/dashboard/admin";
-  return "/dashboard/homeowner/overview";
-}
+import { hasStoredSession } from "../services/authStorage";
+import { getRoleHomePath } from "../utils/authRouting";
 
 export default function PublicOnlyRoute() {
-  const { user, isAuthenticated } = useAuth();
-  const hasToken = Boolean(localStorage.getItem("qring_access_token"));
+  const { user, isAuthenticated, ready } = useAuth();
+  const hasToken = hasStoredSession();
+  if (!ready) {
+    return null;
+  }
   if (isAuthenticated && hasToken) {
-    return <Navigate to={roleHome(user)} replace />;
+    return <Navigate to={getRoleHomePath(user?.role)} replace />;
   }
   return <Outlet />;
 }

@@ -200,7 +200,8 @@ export default function SessionMessagePage() {
 
 function getStoredUserRole() {
   try {
-    return (JSON.parse(localStorage.getItem("qring_user") || "null")?.role || "").toLowerCase();
+    const raw = window.sessionStorage.getItem("qring_user") || window.localStorage.getItem("qring_user") || "null";
+    return (JSON.parse(raw)?.role || "").toLowerCase();
   } catch {
     return "";
   }

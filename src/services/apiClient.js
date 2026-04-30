@@ -1,4 +1,12 @@
 import { env } from "../config/env";
+import {
+  clearAuthSession,
+  getAccessToken,
+  getRefreshToken,
+  getStoredUser,
+  persistAuthSession,
+} from "./authStorage";
+import { getCurrentAppPath, redirectToLogin } from "../utils/authRouting";
 
 export class ApiError extends Error {
   constructor(message, status, payload) {
@@ -72,6 +80,7 @@ function normalizeRequestData(body, headers) {
 }
 
 async function performHttpRequest(url, options) {
+  const timeoutMs = Number(options?.timeoutMs ?? REQUEST_TIMEOUT_MS);
   const runtime = await getCapacitorRuntime();
   if (runtime.isNative && runtime.http) {
     const response = await runtime.http.request({
@@ -79,8 +88,8 @@ async function performHttpRequest(url, options) {
       method: options.method ?? "GET",
       headers: options.headers ?? {},
       data: normalizeRequestData(options.body, options.headers),
-      connectTimeout: REQUEST_TIMEOUT_MS,
-      readTimeout: REQUEST_TIMEOUT_MS
+      connectTimeout: timeoutMs,
+      readTimeout: timeoutMs
     });
 
     const status = Number(response?.status ?? 0);
@@ -111,9 +120,13 @@ async function performHttpRequest(url, options) {
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-  const response = await fetch(url, { ...options, signal: controller.signal });
-  clearTimeout(timeoutId);
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  let response;
+  try {
+    response = await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
   const raw = await response.text();
   let payload = null;
   if (raw) {
@@ -160,7 +173,7 @@ function emitBlockingSubscription(detail = {}) {
 
 async function refreshAccessToken() {
   if (refreshPromise) return refreshPromise;
-  const refreshToken = localStorage.getItem("qring_refresh_token");
+  const refreshToken = getRefreshToken();
   if (!refreshToken) return null;
 
   refreshPromise = (async () => {
@@ -181,10 +194,7 @@ async function refreshAccessToken() {
     const payload = response.payload;
     const data = payload?.data ?? payload;
     if (!data?.accessToken) return null;
-    localStorage.setItem("qring_access_token", data.accessToken);
-    if (data?.refreshToken) {
-      localStorage.setItem("qring_refresh_token", data.refreshToken);
-    }
+    persistAuthSession({ accessToken: data.accessToken, refreshToken: data.refreshToken, user: getStoredUserSnapshot() });
     return data.accessToken;
   })();
 
@@ -195,37 +205,30 @@ async function refreshAccessToken() {
   }
 }
 
+function getStoredUserSnapshot() {
+  try {
+    const user = getStoredUser();
+    return user ? JSON.parse(JSON.stringify(user)) : null;
+  } catch {
+    return null;
+  }
+}
+
 function clearAuthStorage() {
-  localStorage.removeItem("qring_access_token");
-  localStorage.removeItem("qring_refresh_token");
-  localStorage.removeItem("qring_user");
+  clearAuthSession();
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event("qring:session-timeout"));
   }
 }
 
-function redirectToLogin() {
-  if (typeof window === "undefined") return;
-  const pathname = window.location.pathname || "";
-  const hash = window.location.hash || "";
-  const hashPath = hash.startsWith("#/") ? hash.slice(1).split("?")[0] : "";
-  const current = hashPath || pathname || "";
-  if (current === "/login") return;
-  const redirect = encodeURIComponent(`${current}${window.location.search || ""}`);
-  if (hashPath) {
-    window.location.hash = `/login?redirect=${redirect}`;
-    return;
-  }
-  window.location.assign(`/login?redirect=${redirect}`);
-}
-
 export async function apiRequest(path, options = {}, attempt = 0) {
   const silent = Boolean(options?.silent);
   const noCache = Boolean(options?.noCache);
-  const token = localStorage.getItem("qring_access_token");
+  const retryCount = Math.max(0, Number(options?.retryCount ?? 1));
+  const token = getAccessToken();
   if (requiresAuthenticatedUser(path) && !token) {
     clearAuthStorage();
-    redirectToLogin();
+    redirectToLogin(getCurrentAppPath());
     throw new ApiError("Session timeout. Please login again.", 401, { path });
   }
   const method = String(options.method ?? "GET").toUpperCase();
@@ -263,7 +266,8 @@ export async function apiRequest(path, options = {}, attempt = 0) {
       response = await performHttpRequest(`${env.apiBaseUrl}${path}`, {
         method: options.method ?? "GET",
         headers,
-        body: options.body
+        body: options.body,
+        timeoutMs: options.timeoutMs
       });
     } catch (networkError) {
       if (isGet) {
@@ -273,12 +277,14 @@ export async function apiRequest(path, options = {}, attempt = 0) {
           return cached.row.payload;
         }
       }
-      if (attempt < 1) {
+      if (attempt < retryCount) {
         await new Promise((resolve) => setTimeout(resolve, 350));
         return apiRequest(path, options, attempt + 1);
       }
       const message =
-        "We couldn't connect right now. Please check your internet and try again in a moment.";
+        networkError?.name === "AbortError"
+          ? "This request timed out. Please try again."
+          : "We couldn't connect right now. Please check your internet and try again in a moment.";
       throw new ApiError(
         message,
         0,
@@ -312,7 +318,7 @@ export async function apiRequest(path, options = {}, attempt = 0) {
         }
         clearAuthStorage();
         emitFlash("Session timeout. Please login again.", "warning");
-        redirectToLogin();
+        redirectToLogin(getCurrentAppPath());
       }
       const isSubscriptionBlocked = response.status === 403 && payload?.code === "SUBSCRIPTION_ACTION_BLOCKED";
       const baseMessage = shouldHandleSessionTimeout
@@ -367,10 +373,10 @@ export async function apiRequest(path, options = {}, attempt = 0) {
 }
 
 export async function apiUpload(path, formData) {
-  const token = localStorage.getItem("qring_access_token");
+  const token = getAccessToken();
   if (requiresAuthenticatedUser(path) && !token) {
     clearAuthStorage();
-    redirectToLogin();
+    redirectToLogin(getCurrentAppPath());
     throw new ApiError("Session timeout. Please login again.", 401, { path });
   }
 
@@ -386,11 +392,14 @@ export async function apiUpload(path, formData) {
     response = await performHttpRequest(`${env.apiBaseUrl}${path}`, {
       method: "POST",
       headers,
-      body: formData
+      body: formData,
+      timeoutMs: REQUEST_TIMEOUT_MS
     });
   } catch (networkError) {
     const message =
-      "We couldn't connect right now. Please check your internet and try again in a moment.";
+      networkError?.name === "AbortError"
+        ? "This request timed out. Please try again."
+        : "We couldn't connect right now. Please check your internet and try again in a moment.";
     emitFlash(message, "error");
     throw new ApiError(
       message,

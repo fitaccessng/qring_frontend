@@ -1,5 +1,17 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import * as authService from "../services/authService";
+import {
+  clearAuthSession,
+  getAccessToken,
+  getRefreshToken,
+  getStoredUser,
+  persistAuthSession,
+  restoreAuthSession,
+  storeUser,
+} from "../services/authStorage";
+import { getCurrentAppPath } from "../utils/authRouting";
+import { addNativeAppStateListener, addNativeNetworkListener } from "../services/nativeAppService";
+import { isNativeApp } from "../utils/nativeRuntime";
 
 const AuthContext = createContext(null);
 const protectedUiPrefixes = ["/dashboard"];
@@ -8,13 +20,8 @@ const TOKEN_REFRESH_LEEWAY_MS = 60 * 1000;
 const MIN_REFRESH_DELAY_MS = 15 * 1000;
 
 function loadJson(key, fallback) {
-  const raw = localStorage.getItem(key);
-  if (!raw) return fallback;
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return fallback;
-  }
+  void key;
+  return getStoredUser() ?? fallback;
 }
 
 function decodeJwtPayload(token) {
@@ -77,46 +84,31 @@ function getTokenExpiryMs(token) {
 }
 
 export function AuthProvider({ children }) {
-  const [accessToken, setAccessToken] = useState(() => localStorage.getItem("qring_access_token") ?? "");
+  const [accessToken, setAccessToken] = useState(() => getAccessToken() ?? "");
   const [user, setUser] = useState(() => {
-    const storedToken = localStorage.getItem("qring_access_token");
+    const storedToken = getAccessToken();
     if (!storedToken) return null;
     return loadJson("qring_user", null);
   });
   const [loading, setLoading] = useState(false);
+  const [ready, setReady] = useState(false);
 
   function clearLocalAuthState() {
-    localStorage.removeItem("qring_access_token");
-    localStorage.removeItem("qring_refresh_token");
-    localStorage.removeItem("qring_user");
+    clearAuthSession();
     setAccessToken("");
     setUser(null);
   }
 
   function persistAuth(data) {
-    if (!data?.accessToken) {
-      throw new Error("Authentication succeeded but no access token was returned.");
-    }
-    localStorage.setItem("qring_access_token", data.accessToken);
+    persistAuthSession(data);
     setAccessToken(data.accessToken);
-    if (data.refreshToken) {
-      localStorage.setItem("qring_refresh_token", data.refreshToken);
-    }
-    if (data.user) {
-      localStorage.setItem("qring_user", JSON.stringify(data.user));
-      setUser(data.user);
-    }
+    setUser(data.user ?? null);
   }
 
   function updateUser(nextUser) {
     setUser((prev) => {
       const resolved = typeof nextUser === "function" ? nextUser(prev) : nextUser;
-      if (!resolved) {
-        localStorage.removeItem("qring_user");
-        return null;
-      }
-      localStorage.setItem("qring_user", JSON.stringify(resolved));
-      return resolved;
+      return storeUser(resolved);
     });
   }
 
@@ -202,7 +194,7 @@ export function AuthProvider({ children }) {
 
   const logout = async () => {
     try {
-      const refresh = localStorage.getItem("qring_refresh_token");
+      const refresh = getRefreshToken();
       if (refresh) {
         await authService.logout({ refreshToken: refresh });
       }
@@ -213,11 +205,43 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     let active = true;
+
+    const restore = async () => {
+      try {
+        const restored = await restoreAuthSession();
+        if (!active) return;
+        const restoredToken = String(restored?.accessToken || "");
+        const restoredUser = restored?.user ? JSON.parse(restored.user) : getStoredUser();
+        setAccessToken(restoredToken);
+        setUser(restoredToken ? restoredUser ?? null : null);
+      } catch {
+        if (!active) return;
+        clearLocalAuthState();
+      } finally {
+        if (active) {
+          setReady(true);
+        }
+      }
+    };
+
+    restore();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!ready) return () => {};
+    let active = true;
     let timeoutId = null;
+    let cleanupAppState = () => {};
+    let cleanupNativeNetwork = () => {};
+    let refreshInFlightPromise = null;
 
     const refreshSession = async (reason = "timer") => {
+      if (refreshInFlightPromise) return refreshInFlightPromise;
       if (!accessToken) return;
-      const refresh = localStorage.getItem("qring_refresh_token");
+      const refresh = getRefreshToken();
       if (!refresh) {
         if (reason === "timer") {
           clearLocalAuthState();
@@ -225,31 +249,36 @@ export function AuthProvider({ children }) {
         }
         return;
       }
-      try {
-        const response = await authService.refreshToken({ refreshToken: refresh });
-        if (!active) return;
-        const data = normalizeAuthData(response);
-        if (!data?.accessToken) return;
-        localStorage.setItem("qring_access_token", data.accessToken);
-        setAccessToken(data.accessToken);
-        if (data?.refreshToken) {
-          localStorage.setItem("qring_refresh_token", data.refreshToken);
+
+      refreshInFlightPromise = (async () => {
+        try {
+          const response = await authService.refreshToken({ refreshToken: refresh });
+          if (!active) return;
+          const data = normalizeAuthData(response);
+          if (!data?.accessToken) return;
+          persistAuthSession({
+            accessToken: data.accessToken,
+            refreshToken: data.refreshToken || refresh,
+            user: data.user ?? getStoredUser(),
+          });
+          setAccessToken(data.accessToken);
+          if (data?.user) setUser(data.user);
+        } catch {
+          const tokenExpiryMs = getTokenExpiryMs(accessToken) ?? 0;
+          if (Date.now() >= tokenExpiryMs) {
+            clearLocalAuthState();
+            window.dispatchEvent(new Event(SESSION_TIMEOUT_EVENT));
+          }
+        } finally {
+          refreshInFlightPromise = null;
         }
-        if (data?.user) {
-          localStorage.setItem("qring_user", JSON.stringify(data.user));
-          setUser(data.user);
-        }
-      } catch {
-        const tokenExpiryMs = getTokenExpiryMs(accessToken) ?? 0;
-        if (Date.now() >= tokenExpiryMs) {
-          clearLocalAuthState();
-          window.dispatchEvent(new Event(SESSION_TIMEOUT_EVENT));
-        }
-      }
+      })();
+
+      return refreshInFlightPromise;
     };
 
     const onVisibilityChange = () => {
-      if (document.visibilityState === "visible" && isProtectedUiRoute(getCurrentRoutePath())) {
+      if (document.visibilityState === "visible" && isProtectedUiRoute(getCurrentRoutePath() || getCurrentAppPath())) {
         refreshSession("visibility");
       }
     };
@@ -264,14 +293,37 @@ export function AuthProvider({ children }) {
 
     scheduleRefresh();
     document.addEventListener("visibilitychange", onVisibilityChange);
+
+    if (isNativeApp()) {
+      void addNativeAppStateListener(({ isActive }) => {
+        if (!isActive || !active) return;
+        if (isProtectedUiRoute(getCurrentRoutePath() || getCurrentAppPath())) {
+          void refreshSession("resume");
+        }
+      }).then((cleanup) => {
+        cleanupAppState = cleanup;
+      });
+
+      void addNativeNetworkListener(({ connected }) => {
+        if (!connected || !active) return;
+        if (isProtectedUiRoute(getCurrentRoutePath() || getCurrentAppPath())) {
+          void refreshSession("network");
+        }
+      }).then((cleanup) => {
+        cleanupNativeNetwork = cleanup;
+      });
+    }
+
     return () => {
       active = false;
       if (timeoutId) {
         window.clearTimeout(timeoutId);
       }
       document.removeEventListener("visibilitychange", onVisibilityChange);
+      cleanupAppState();
+      cleanupNativeNetwork();
     };
-  }, [accessToken]);
+  }, [accessToken, ready]);
 
   useEffect(() => {
     const onSessionTimeout = () => {
@@ -287,6 +339,7 @@ export function AuthProvider({ children }) {
       token: accessToken,
       accessToken,
       loading,
+      ready,
       isAuthenticated: Boolean(user && accessToken),
       login,
       signup,
@@ -298,7 +351,7 @@ export function AuthProvider({ children }) {
       logout,
       updateUser
     }),
-    [user, accessToken, loading]
+    [user, accessToken, loading, ready]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -27,49 +27,6 @@ import ToastCenter from "./components/ToastCenter";
 import { env } from "./config/env";
 import { NotificationsProvider } from "./state/NotificationsContext";
 import { queryClient } from "./lib/queryClient";
-import { getNativeEntryRoute, navigateToAppPath } from "./utils/authRouting";
-import { isMobileAppRuntime, isNativeApp } from "./utils/nativeRuntime";
-import {
-  addNativeAppUrlListener,
-  addNativeNetworkListener,
-  getNativeLaunchRoute,
-  getRouteFromAppUrl,
-} from "./services/nativeAppService";
-
-const IS_MOBILE_APP_BUILD = isMobileAppRuntime();
-const MARKETING_ROUTE_PATHS = [
-  "/",
-  "/about",
-  "/pricing",
-  "/contact",
-  "/platform",
-  "/security",
-  "/api-docs",
-  "/company",
-  "/blog",
-  "/careers",
-  "/legal",
-  "/privacy",
-  "/terms",
-  "/compliance",
-  "/request-demo"
-];
-
-const LandingPage = IS_MOBILE_APP_BUILD ? null : lazy(() => import("./pages/landing/LandingPage"));
-const AboutPage = IS_MOBILE_APP_BUILD ? null : lazy(() => import("./pages/landing/AboutPage"));
-const PricingPage = IS_MOBILE_APP_BUILD ? null : lazy(() => import("./pages/landing/PricingPage"));
-const ContactPage = IS_MOBILE_APP_BUILD ? null : lazy(() => import("./pages/landing/ContactPage"));
-const PlatformPage = IS_MOBILE_APP_BUILD ? null : lazy(() => import("./pages/landing/PlatformPage"));
-const SecurityPage = IS_MOBILE_APP_BUILD ? null : lazy(() => import("./pages/landing/SecurityPage"));
-const ApiDocsPage = IS_MOBILE_APP_BUILD ? null : lazy(() => import("./pages/landing/ApiDocsPage"));
-const CompanyPage = IS_MOBILE_APP_BUILD ? null : lazy(() => import("./pages/landing/CompanyPage"));
-const BlogPage = IS_MOBILE_APP_BUILD ? null : lazy(() => import("./pages/landing/BlogPage"));
-const CareersPage = IS_MOBILE_APP_BUILD ? null : lazy(() => import("./pages/landing/CareersPage"));
-const LegalPage = IS_MOBILE_APP_BUILD ? null : lazy(() => import("./pages/landing/LegalPage"));
-const PrivacyPage = IS_MOBILE_APP_BUILD ? null : lazy(() => import("./pages/landing/PrivacyPage"));
-const TermsPage = IS_MOBILE_APP_BUILD ? null : lazy(() => import("./pages/landing/TermsPage"));
-const CompliancePage = IS_MOBILE_APP_BUILD ? null : lazy(() => import("./pages/landing/CompliancePage"));
-const RequestDemoPage = IS_MOBILE_APP_BUILD ? null : lazy(() => import("./pages/landing/RequestDemoPage"));
 
 const OnboardingPage = lazy(() => import("./pages/auth/OnboardingPage"));
 const HomeownerDashboardPage = lazy(() => import("./pages/dashboard/HomeownerDashboardPage"));
@@ -124,7 +81,7 @@ const SessionMessagePage = lazy(() => import("./pages/visitor/SessionMessagePage
 const SessionAudioPage = lazy(() => import("./pages/visitor/SessionAudioPage"));
 const SessionVideoPage = lazy(() => import("./pages/visitor/SessionVideoPage"));
 
-export default function App() {
+export default function AppMobile() {
   const Router = resolveRouterComponent();
   return (
     <ThemeProvider>
@@ -149,13 +106,11 @@ function resolveRouterComponent() {
   const mode = String(env.routerMode || "auto").toLowerCase();
   if (mode === "hash") return HashRouter;
   if (mode === "browser") return BrowserRouter;
-  // Auto: if a user arrives on a hash route (common on static hosts without rewrite rules),
-  // keep using hash routing to avoid full-page reload loops.
   return String(window.location.hash || "").startsWith("#/") ? HashRouter : BrowserRouter;
 }
 
 function prepareNativeHashRoute() {
-  if (!isNativeApp() || typeof window === "undefined") return false;
+  if (!isNativeCapacitorApp() || typeof window === "undefined") return false;
 
   const hash = String(window.location.hash || "");
   if (hash.startsWith("#/")) {
@@ -174,10 +129,7 @@ function prepareNativeHashRoute() {
 
 function AppRoutes() {
   const location = useLocation();
-  const navigate = useNavigate();
-  const nativeApp = isNativeApp();
   const nativeEntryRoute = getNativeEntryRoute();
-  const shouldHideMarketingRoutes = nativeApp || IS_MOBILE_APP_BUILD;
   const [showPreloader, setShowPreloader] = useState(() => {
     if (typeof window === "undefined") return true;
     return sessionStorage.getItem("qring_preloader_seen") !== "true";
@@ -207,43 +159,6 @@ function AppRoutes() {
     return () => window.clearTimeout(timer);
   }, [showPreloader]);
 
-  useEffect(() => {
-    if (!nativeApp) return () => {};
-
-    let cleanupUrl = () => {};
-    let cleanupNetwork = () => {};
-    let active = true;
-
-    void getNativeLaunchRoute().then((route) => {
-      if (!active || !route || route === location.pathname) return;
-      navigate(route, { replace: true });
-    });
-
-    void addNativeAppUrlListener(({ url }) => {
-      const route = getRouteFromAppUrl(url);
-      if (!route || !active) return;
-      navigate(route, { replace: false });
-    }).then((cleanup) => {
-      cleanupUrl = cleanup;
-    });
-
-    void addNativeNetworkListener(({ connected }) => {
-      if (!connected || !active) return;
-      queryClient.invalidateQueries().catch(() => {});
-      if (location.pathname.startsWith("/login") || location.pathname.startsWith("/signup")) {
-        navigateToAppPath(location.pathname, { replace: true });
-      }
-    }).then((cleanup) => {
-      cleanupNetwork = cleanup;
-    });
-
-    return () => {
-      active = false;
-      cleanupUrl();
-      cleanupNetwork();
-    };
-  }, [location.pathname, nativeApp, navigate]);
-
   return (
     <>
       <SpaRedirectRecovery />
@@ -254,29 +169,7 @@ function AppRoutes() {
           <GlobalNotifications />
           <div className="animate-screen-enter min-h-screen bg-slate-100 text-slate-900 transition-colors dark:bg-slate-950 dark:text-slate-100">
             <Routes location={location}>
-              {shouldHideMarketingRoutes ? (
-                MARKETING_ROUTE_PATHS.map((path) => (
-                  <Route key={path} path={path} element={<Navigate to={nativeEntryRoute} replace />} />
-                ))
-              ) : (
-                <>
-                  <Route path="/" element={<LazyRoute><LandingPage /></LazyRoute>} />
-                  <Route path="/about" element={<LazyRoute><AboutPage /></LazyRoute>} />
-                  <Route path="/pricing" element={<LazyRoute><PricingPage /></LazyRoute>} />
-                  <Route path="/contact" element={<LazyRoute><ContactPage /></LazyRoute>} />
-                  <Route path="/platform" element={<LazyRoute><PlatformPage /></LazyRoute>} />
-                  <Route path="/security" element={<LazyRoute><SecurityPage /></LazyRoute>} />
-                  <Route path="/api-docs" element={<LazyRoute><ApiDocsPage /></LazyRoute>} />
-                  <Route path="/company" element={<LazyRoute><CompanyPage /></LazyRoute>} />
-                  <Route path="/blog" element={<LazyRoute><BlogPage /></LazyRoute>} />
-                  <Route path="/careers" element={<LazyRoute><CareersPage /></LazyRoute>} />
-                  <Route path="/legal" element={<LazyRoute><LegalPage /></LazyRoute>} />
-                  <Route path="/privacy" element={<LazyRoute><PrivacyPage /></LazyRoute>} />
-                  <Route path="/terms" element={<LazyRoute><TermsPage /></LazyRoute>} />
-                  <Route path="/compliance" element={<LazyRoute><CompliancePage /></LazyRoute>} />
-                  <Route path="/request-demo" element={<LazyRoute><RequestDemoPage /></LazyRoute>} />
-                </>
-              )}
+              <Route path="/" element={<Navigate to={nativeEntryRoute} replace />} />
               <Route element={<PublicOnlyRoute />}>
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/admin/login" element={<AdminLoginPage />} />
@@ -409,7 +302,7 @@ function AppRoutes() {
 
               <Route path="/unauthorized" element={<UnauthorizedPage />} />
               <Route path="/dashboard" element={<Navigate to="/dashboard/homeowner/overview" replace />} />
-              <Route path="*" element={<NotFoundPage />} />
+              <Route path="*" element={<Navigate to={nativeEntryRoute} replace />} />
             </Routes>
           </div>
         </>
@@ -442,6 +335,32 @@ function GlobalNotifications() {
       <PanicAlertCenter />
     </>
   );
+}
+
+function isNativeCapacitorApp() {
+  try {
+    return Boolean(window?.Capacitor?.isNativePlatform?.());
+  } catch {
+    return false;
+  }
+}
+
+function getNativeEntryRoute() {
+  if (typeof window === "undefined") return "/login";
+  try {
+    const token = localStorage.getItem("qring_access_token");
+    const rawUser = localStorage.getItem("qring_user");
+    const user = rawUser ? JSON.parse(rawUser) : null;
+    if (!token || !user?.role) return "/login";
+    const role = String(user.role).toLowerCase();
+    if (role === "homeowner") return "/dashboard/homeowner/overview";
+    if (role === "estate") return "/dashboard/estate";
+    if (role === "security") return "/dashboard/security";
+    if (role === "admin") return "/dashboard/admin";
+  } catch {
+    // Fall back to auth entry route below.
+  }
+  return "/login";
 }
 
 function SpaRedirectRecovery() {

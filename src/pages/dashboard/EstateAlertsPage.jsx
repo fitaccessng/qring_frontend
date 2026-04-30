@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { getAccessToken } from "../../services/authStorage";
 import { io } from "socket.io-client";
 import { BellRing } from "lucide-react";
 import AppShell from "../../layouts/AppShell";
@@ -39,7 +40,7 @@ export default function EstateAlertsPage() {
     amountDue: "",
     dueDate: ""
   });
-  const token = localStorage.getItem("qring_access_token");
+  const token = getAccessToken();
 
   useEffect(() => {
     let active = true;

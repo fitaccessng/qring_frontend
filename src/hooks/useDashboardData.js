@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   getDashboardOverview,
   normalizeDashboard
@@ -8,6 +9,7 @@ import {
   getDashboardSocket
 } from "../services/socketClient";
 import { env } from "../config/env";
+import { queryClient } from "../lib/queryClient";
 
 const initialData = normalizeDashboard({});
 
@@ -26,28 +28,24 @@ function hasDashboardPayload(payload) {
 
 export function useDashboardData() {
   const realtimeEnabled = !import.meta.env.DEV || env.enableRealtimeInDev;
-  const [dashboard, setDashboard] = useState(initialData);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [connected, setConnected] = useState(false);
   const [incomingCall, setIncomingCall] = useState(null);
-
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const data = await getDashboardOverview();
-      setDashboard(data);
-    } catch (fetchError) {
-      setError(fetchError.message ?? "Unable to load dashboard");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const [realtimeError, setRealtimeError] = useState("");
+  const {
+    data: dashboard = initialData,
+    isFetching,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ["dashboard", "overview"],
+    queryFn: getDashboardOverview,
+    placeholderData: initialData,
+    staleTime: 45 * 1000,
+  });
 
   useEffect(() => {
     if (!realtimeEnabled) {
-      refresh();
       return () => {};
     }
 
@@ -60,20 +58,20 @@ export function useDashboardData() {
       if (!mounted) return;
       const data = payload?.data ?? payload;
       if (!hasDashboardPayload(data)) return;
-      setDashboard(normalizeDashboard(data));
+      queryClient.setQueryData(["dashboard", "overview"], normalizeDashboard(data));
     };
     const onPatch = (payload) => {
       if (!mounted) return;
-      setDashboard((prev) =>
+      queryClient.setQueryData(["dashboard", "overview"], (prev) =>
         normalizeDashboard({
-          ...prev,
+          ...(prev ?? initialData),
           ...(payload?.data ?? payload)
         })
       );
     };
     const onError = (payload) => {
       if (!mounted) return;
-      setError(payload?.message ?? "Realtime error");
+      setRealtimeError(payload?.message ?? "Realtime error");
     };
     const onConnectError = () => {
       if (!mounted) return;
@@ -92,8 +90,6 @@ export function useDashboardData() {
     socket.on("dashboard.error", onError);
     socket.on("incoming-call", onIncomingCall);
 
-    refresh();
-
     return () => {
       mounted = false;
       socket.off("connect", onConnect);
@@ -105,19 +101,20 @@ export function useDashboardData() {
       socket.off("incoming-call", onIncomingCall);
       closeDashboardSocket();
     };
-  }, [refresh, realtimeEnabled]);
+  }, [realtimeEnabled]);
 
   return useMemo(
     () => ({
       ...dashboard,
-      loading,
-      error,
+      loading: isLoading,
+      refreshing: isFetching,
+      error: realtimeError || error?.message || "",
       connected,
       incomingCall,
       clearIncomingCall: () => setIncomingCall(null),
       realtimeEnabled,
-      refresh
+      refresh: refetch
     }),
-    [dashboard, loading, error, connected, incomingCall, realtimeEnabled, refresh]
+    [dashboard, isLoading, isFetching, realtimeError, error, connected, incomingCall, realtimeEnabled, refetch]
   );
 }
