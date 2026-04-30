@@ -238,7 +238,7 @@ export default function LoginPage() {
             </>
           ) : null}
 
-          <div className="flex flex-col gap-4 items-center">
+          <div className="flex top-2 flex-col gap-4 items-center">
             <Link to="/forgot-password" size="sm" className="text-slate-400 text-xs font-bold uppercase tracking-widest hover:text-brand-500 transition-colors">
               Forgot Password?
             </Link>

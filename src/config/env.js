@@ -26,7 +26,9 @@ const isNativeRuntime = (() => {
 const defaultApiBase =
   typeof window !== "undefined" && isDev
     ? `http://localhost:8000/api/v1`
-    : `${productionBackendOrigin}/api/v1`;
+    : typeof window !== "undefined" && !isNativeRuntime && !isMobileAppBuild
+      ? `/api/v1`
+      : `${productionBackendOrigin}/api/v1`;
 const defaultSocketUrl =
   typeof window !== "undefined" && isDev
     ? `http://localhost:8000`
