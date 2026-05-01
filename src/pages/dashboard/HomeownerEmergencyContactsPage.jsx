@@ -25,7 +25,6 @@ import {
 } from "../../services/homeownerSettingsService";
 import { showError, showSuccess } from "../../utils/flash";
 import { formatEmergencyContact, parseEmergencyContact } from "../../utils/emergencyContacts";
-import NavItem from "../../components/system/NavItem";
 
 const EMPTY_FORM = {
   name: "",

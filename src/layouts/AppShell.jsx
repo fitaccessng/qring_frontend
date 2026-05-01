@@ -221,21 +221,23 @@ export default function AppShell({ title, children, showTopBar = true, showMobil
     return navItems.filter((item) => !item.to.endsWith("/settings")).slice(0, 4);
   }, [isEstateManagedHomeowner, navItems, routeRole]);
   const filteredNavItems = useMemo(() => {
+    if (routeRole === "homeowner") return [];
     return navItems.filter((item) => {
       if (isEstateManagedHomeowner && item.to === "/billing/paywall") return false;
       const requiredFeature = featureRequirementByRoute[item.to];
       if (!requiredFeature) return true;
       return hasFeature(requiredFeature);
     });
-  }, [hasFeature, isEstateManagedHomeowner, navItems]);
+  }, [hasFeature, isEstateManagedHomeowner, navItems, routeRole]);
   const filteredMobileNavItems = useMemo(() => {
+    if (routeRole === "homeowner") return [];
     return mobileNavItems.filter((item) => {
       if (isEstateManagedHomeowner && item.to === "/billing/paywall") return false;
       const requiredFeature = featureRequirementByRoute[item.to];
       if (!requiredFeature) return true;
       return hasFeature(requiredFeature);
     });
-  }, [hasFeature, isEstateManagedHomeowner, mobileNavItems]);
+  }, [hasFeature, isEstateManagedHomeowner, mobileNavItems, routeRole]);
   const isEstateMobileNav = routeRole === "estate";
   const showHelpButton = routeRole === "estate" || routeRole === "security";
   const mobileContentBottomPaddingClass = !showMobileNav

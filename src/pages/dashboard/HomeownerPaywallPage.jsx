@@ -18,7 +18,6 @@ import {
 import { initializePaystackPayment, getBillingPlans, getMySubscription, getReferralSummary, requestSubscription } from "../../services/paymentService";
 import { getHomeownerContext } from "../../services/homeownerService";
 import { useAuth } from "../../state/AuthContext";
-import NavItem from "../../components/system/NavItem";
 import { useNotifications } from "../../state/NotificationsContext";
 import { env } from "../../config/env";
 import { showError, showSuccess } from "../../utils/flash";

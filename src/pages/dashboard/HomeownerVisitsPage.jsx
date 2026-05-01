@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, Link, useLocation } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import {
-  LayoutGrid, History, CalendarDays, MessageSquare, User,
   ChevronLeft, Bell, Clock3, UserCircle2, CalendarOff,
   ShieldCheck, Phone, Video, MessageCircle, LogOut,
   Search
@@ -9,11 +8,9 @@ import {
 
 import { decideVisit, endHomeownerSession, getHomeownerAppointments, getHomeownerVisits } from "../../services/homeownerService";
 import { useNotifications } from "../../state/NotificationsContext";
-import NavItem from "../../components/system/NavItem";
 
 export default function HomeownerVisitsPage() {
   const navigate = useNavigate();
-  const location = useLocation();
   const { refresh, syncVisitRequestNotifications, unreadCount } = useNotifications();
 
   // --- Refs & State ---
@@ -211,14 +208,7 @@ export default function HomeownerVisitsPage() {
           )}
         </section>
       </main>
-      {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-8 pt-4 bg-white border-t border-slate-100 z-[9999] shadow-[0_-10px_40px_rgba(0,0,0,0.08)]">
-        <NavItem to="/dashboard/homeowner/overview" icon={<LayoutGrid size={22} />} label="Home" />
-        <NavItem to="/dashboard/homeowner/visits" icon={<History size={22} />} label="Activity" active />
-        <NavItem to="/dashboard/homeowner/appointments" icon={<CalendarDays size={22} />} label="Schedule" />
-        <NavItem to="/dashboard/homeowner/messages" icon={<MessageSquare size={22} />} label="Inbox" />
-        <NavItem to="/dashboard/homeowner/settings" icon={<User size={22} />} label="Profile" />
-      </nav>    </div>
+    </div>
   );
 }
 

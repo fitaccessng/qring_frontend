@@ -1,10 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import {
-  Bell, ChevronLeft, LayoutGrid, History, CalendarDays,
-  MessageSquare, User, Search, SendHorizontal, Trash2
+  Bell, ChevronLeft, Search, SendHorizontal
 } from "lucide-react";
-import NavItem from "../../components/system/NavItem";
 import VoiceNoteRecorder from "../../components/VoiceNoteRecorder";
 import { env } from "../../config/env";
 import { getAccessToken } from "../../services/authStorage";
@@ -12,7 +10,6 @@ import { createRealtimeSocket } from "../../services/socketClient";
 import { resolveVoiceNoteUrl, uploadHomeownerVoiceNote } from "../../services/voiceNoteService";
 import { playMessageNotificationSound } from "../../utils/notificationSound";
 import {
-  deleteHomeownerSessionMessage,
   getHomeownerMessages,
   getHomeownerSessionMessages,
   sendHomeownerSessionMessage
@@ -290,14 +287,6 @@ export default function HomeownerMessagesPage() {
         </section>
       </main>
 
-      {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-8 pt-4 bg-white border-t border-slate-100 z-[9999] shadow-[0_-10px_40px_rgba(0,0,0,0.08)]">
-        <NavItem to="/dashboard/homeowner/overview" icon={<LayoutGrid size={22} />} label="Home" />
-        <NavItem to="/dashboard/homeowner/visits" icon={<History size={22} />} label="Activity" />
-        <NavItem to="/dashboard/homeowner/appointments" icon={<CalendarDays size={22} />} label="Schedule" />
-        <NavItem to="/dashboard/homeowner/messages" icon={<MessageSquare size={22} />} label="Inbox" active />
-        <NavItem to="/dashboard/homeowner/settings" icon={<User size={22} />} label="Profile" />
-      </nav>
     </div>
   );
 }

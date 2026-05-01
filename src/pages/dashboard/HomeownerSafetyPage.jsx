@@ -16,7 +16,6 @@ import { getHomeownerSettings } from "../../services/homeownerSettingsService";
 import { getActivePanicAlerts, resolvePanicAlert, triggerPanicAlert } from "../../services/safetyService";
 import { getCurrentDeviceLocation } from "../../utils/locationService";
 import PanicAudioPanel from "../../components/panic/PanicAudioPanel";
-import NavItem from "../../components/system/NavItem";
 
 export default function ResidentSafetyPage() {
   const navigate = useNavigate();
