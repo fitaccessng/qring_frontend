@@ -25,6 +25,7 @@ import {
 } from "../../services/homeownerSettingsService";
 import { showError, showSuccess } from "../../utils/flash";
 import { formatEmergencyContact, parseEmergencyContact } from "../../utils/emergencyContacts";
+import NavItem from "../../components/system/NavItem";
 
 const EMPTY_FORM = {
   name: "",
@@ -260,14 +261,5 @@ export default function HomeownerEmergencyContactsPage() {
         <div className="absolute top-0 right-0 w-full h-1/2 bg-gradient-to-bl from-indigo-100/50 via-transparent to-transparent blur-3xl" />
       </div>
     </div>
-  );
-}
-
-function NavItem({ to, icon, label, active = false }) {
-  return (
-    <Link to={to} className={`flex flex-col items-center gap-1 transition-all ${active ? "text-indigo-600" : "text-slate-400 hover:text-slate-500"}`}>
-      <div className={`${active ? "bg-indigo-50 p-2 rounded-xl" : "p-2"}`}>{icon}</div>
-      <span className="text-[9px] font-black uppercase mt-0.5 tracking-tight">{label}</span>
-    </Link>
   );
 }

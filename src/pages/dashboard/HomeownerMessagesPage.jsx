@@ -4,6 +4,7 @@ import {
   Bell, ChevronLeft, LayoutGrid, History, CalendarDays,
   MessageSquare, User, Search, SendHorizontal, Trash2
 } from "lucide-react";
+import NavItem from "../../components/system/NavItem";
 import VoiceNoteRecorder from "../../components/VoiceNoteRecorder";
 import { env } from "../../config/env";
 import { getAccessToken } from "../../services/authStorage";
@@ -290,19 +291,14 @@ export default function HomeownerMessagesPage() {
       </main>
 
       {/* Bottom Navigation */}
-     
+      <nav className="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-8 pt-4 bg-white border-t border-slate-100 z-[9999] shadow-[0_-10px_40px_rgba(0,0,0,0.08)] hidden lg:flex">
+        <NavItem to="/dashboard/homeowner/overview" icon={<LayoutGrid size={22} />} label="Home" />
+        <NavItem to="/dashboard/homeowner/visits" icon={<History size={22} />} label="Activity" />
+        <NavItem to="/dashboard/homeowner/appointments" icon={<CalendarDays size={22} />} label="Schedule" />
+        <NavItem to="/dashboard/homeowner/messages" icon={<MessageSquare size={22} />} label="Inbox" active />
+        <NavItem to="/dashboard/homeowner/settings" icon={<User size={22} />} label="Profile" />
+      </nav>
     </div>
-  );
-}
-
-function NavItem({ to, icon, label, active = false }) {
-  return (
-    <Link to={to} className={`flex flex-col items-center justify-center min-w-[64px] transition-all active:scale-90 ${active ? 'text-indigo-600' : 'text-slate-400'}`}>
-      <div className={`${active ? 'bg-indigo-50 p-2 rounded-xl' : ''}`}>
-        {icon}
-      </div>
-      <span className="text-[9px] font-black uppercase mt-1 tracking-tight">{label}</span>
-    </Link>
   );
 }
 

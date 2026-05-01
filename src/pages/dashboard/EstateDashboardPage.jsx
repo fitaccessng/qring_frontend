@@ -217,7 +217,7 @@ export default function EstateManagerDashboard() {
               to="/dashboard/estate/invites"
               className="flex-1 md:flex-none bg-indigo-600 text-white px-4 md:px-5 py-3 rounded-2xl text-xs md:text-sm font-bold shadow-lg shadow-indigo-100 flex items-center justify-center gap-2 active:scale-95 transition-all"
             >
-              <UserPlus size={16} /> <span className="whitespace-nowrap">Homeowner</span>
+              <UserPlus size={16} /> <span className="whitespace-nowrap">Resident</span>
             </Link>
           </div>
         </div>

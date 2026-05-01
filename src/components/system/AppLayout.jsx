@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import Header from "./Header";
-import BottomNav from "./BottomNav";
+// import BottomNav from "./BottomNav";
 import StickyCTA from "./StickyCTA";
 
 export default function AppLayout({
@@ -29,7 +29,7 @@ export default function AppLayout({
       </motion.div>
 
       {stickyCta ? <StickyCTA>{stickyCta}</StickyCTA> : null}
-      <BottomNav items={navItems} />
+      {/* <BottomNav items={navItems} /> */}
     </div>
   );
 }

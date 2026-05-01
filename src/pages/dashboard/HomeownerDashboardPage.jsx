@@ -29,6 +29,7 @@ import { getHomeownerContext } from "../../services/homeownerService";
 import { useAuth } from "../../state/AuthContext";
 import { useNotifications } from "../../state/NotificationsContext";
 import useSubscription from "../../hooks/useSubscription";
+import NavItem from "../../components/system/NavItem";
 
 const QUERY_KEY = ["homeowner", "overview"];
 const quickActionFeatureByRoute = {
@@ -265,7 +266,7 @@ export default function HomeownerDashboardPage() {
       </main>
 
       {/* Bottom Navigation Fix: Using fixed background and z-index to stay visible */}
-      <nav className="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-8 pt-4 bg-white border-t border-slate-100 z-[9999] shadow-[0_-10px_40px_rgba(0,0,0,0.08)]">
+      <nav className="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-8 pt-4 bg-white border-t border-slate-100 z-[9999] shadow-[0_-10px_40px_rgba(0,0,0,0.08)] hidden lg:flex">
         <NavItem to="/dashboard/homeowner/overview" icon={<LayoutGrid size={22} />} label="Home" active />
         <NavItem to="/dashboard/homeowner/visits" icon={<History size={22} />} label="Activity" />
         <NavItem to="/dashboard/homeowner/appointments" icon={<CalendarDays size={22} />} label="Schedule" />
@@ -284,17 +285,6 @@ function ActionIcon({ to, icon, label, color = "text-indigo-600", bg = "bg-white
                 {icon}
             </div>
             <span className="text-[10px] font-bold text-slate-500 uppercase text-center truncate w-full tracking-tighter">{label}</span>
-        </Link>
-    );
-}
-
-function NavItem({ to, icon, label, active = false }) {
-    return (
-        <Link to={to} className={`flex flex-col items-center justify-center min-w-[64px] transition-all active:scale-90 ${active ? 'text-indigo-600' : 'text-slate-400'}`}>
-            <div className={`${active ? 'bg-indigo-50 p-2 rounded-xl' : ''}`}>
-              {icon}
-            </div>
-            <span className="text-[9px] font-black uppercase mt-1 tracking-tight">{label}</span>
         </Link>
     );
 }

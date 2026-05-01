@@ -16,6 +16,7 @@ import { getHomeownerSettings } from "../../services/homeownerSettingsService";
 import { getActivePanicAlerts, resolvePanicAlert, triggerPanicAlert } from "../../services/safetyService";
 import { getCurrentDeviceLocation } from "../../utils/locationService";
 import PanicAudioPanel from "../../components/panic/PanicAudioPanel";
+import NavItem from "../../components/system/NavItem";
 
 export default function ResidentSafetyPage() {
   const navigate = useNavigate();
@@ -363,14 +364,5 @@ function BentoSmall({ icon, label, value, onClick }) {
       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">{label}</p>
       <p className="text-xs font-bold text-slate-900">{value}</p>
     </button>
-  );
-}
-
-function NavItem({ to, icon, label, active = false }) {
-  return (
-    <Link to={to} className={`flex flex-col items-center gap-1 ${active ? 'text-indigo-600' : 'text-slate-400'}`}>
-      <div className={`${active ? 'bg-indigo-50 p-2 rounded-xl' : 'p-2'}`}>{icon}</div>
-      <span className="text-[9px] font-black uppercase mt-0.5 tracking-tight">{label}</span>
-    </Link>
   );
 }

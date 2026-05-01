@@ -23,8 +23,8 @@ export default function ResidentAppointmentsPage() {
   const [isLocating, setIsLocating] = useState(false);
 
   // Error Safeguard
-  const listUrl = endpoints?.appointments?.list || "/resident/appointments";
-  const createUrl = endpoints?.appointments?.create || "/resident/appointments";
+  const listUrl = endpoints?.homeowner?.appointments || "/homeowner/appointments";
+  const createUrl = endpoints?.homeowner?.appointments || "/homeowner/appointments";
 
   const { data: appointments, isLoading, refetch } = useApiQuery({
     queryKey: ["appointments", selectedDate],
@@ -264,15 +264,6 @@ function InputField({ label, icon, ...props }) {
         </div>
       </div>
     </div>
-  );
-}
-
-function NavItem({ to, icon, label, active = false }) {
-  return (
-    <Link to={to} className={`flex flex-col items-center justify-center min-w-[64px] transition-all active:scale-90 ${active ? 'text-indigo-600' : 'text-slate-400'}`}>
-      <div className={`${active ? 'bg-indigo-50 p-2 rounded-xl' : ''}`}>{icon}</div>
-      <span className="text-[9px] font-black uppercase mt-1 tracking-tight">{label}</span>
-    </Link>
   );
 }
 

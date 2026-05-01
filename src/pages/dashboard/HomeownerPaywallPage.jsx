@@ -18,6 +18,7 @@ import {
 import { initializePaystackPayment, getBillingPlans, getMySubscription, getReferralSummary, requestSubscription } from "../../services/paymentService";
 import { getHomeownerContext } from "../../services/homeownerService";
 import { useAuth } from "../../state/AuthContext";
+import NavItem from "../../components/system/NavItem";
 import { useNotifications } from "../../state/NotificationsContext";
 import { env } from "../../config/env";
 import { showError, showSuccess } from "../../utils/flash";
@@ -465,13 +466,4 @@ function getPlanCtaLabel(planId) {
     home_premium: "Choose Home Premium",
   };
   return labels[String(planId || "")] || "Choose Plan";
-}
-
-function NavItem({ to, icon, label, active = false }) {
-  return (
-    <Link to={to} className={`flex flex-col items-center gap-1 transition-all ${active ? "text-indigo-600" : "text-slate-400 hover:text-slate-500"}`}>
-      <div className={`${active ? "bg-indigo-50 p-2 rounded-xl" : "p-2"}`}>{icon}</div>
-      <span className="text-[9px] font-black uppercase mt-0.5 tracking-tight">{label}</span>
-    </Link>
-  );
 }
