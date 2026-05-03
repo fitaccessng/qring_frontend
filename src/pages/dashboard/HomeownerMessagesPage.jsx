@@ -83,10 +83,7 @@ export default function HomeownerMessagesPage() {
       }
     });
     socketRef.current = socket;
-<<<<<<< HEAD
     joinedSessionIdsRef.current = new Set();
-=======
->>>>>>> 6849d3d3464740aa434cb384338d4425a1f2bcb7
 
     socket.on("chat.message", (payload) => {
       const incomingSessionId = payload?.sessionId;
@@ -112,7 +109,6 @@ export default function HomeownerMessagesPage() {
   }, [token]);
 
   useEffect(() => {
-<<<<<<< HEAD
     const socket = socketRef.current;
     if (!socket) return;
     const joinSession = (sessionId) => {
@@ -128,10 +124,7 @@ export default function HomeownerMessagesPage() {
     threads.forEach((thread) => joinSession(thread.id));
     joinSession(selectedId);
   }, [selectedId, threads, user?.fullName]);
-
   useEffect(() => {
-=======
->>>>>>> 6849d3d3464740aa434cb384338d4425a1f2bcb7
     if (!selectedId) return;
     async function loadConv() {
         setConversationLoading(true);
@@ -162,7 +155,6 @@ export default function HomeownerMessagesPage() {
     setSending(true);
     try {
       const saved = await sendHomeownerSessionMessage(selectedId, text);
-<<<<<<< HEAD
       if (saved) {
         setMessagesByThread((prev) => {
           const current = prev[selectedId] || [];
@@ -171,16 +163,11 @@ export default function HomeownerMessagesPage() {
         });
         upsertThreadPreview(saved, setThreads, selectedId);
       }
-=======
-      const outbound = { id: saved?.id || Date.now(), sessionId: selectedId, text, senderType: "homeowner", at: new Date().toISOString() };
-      setMessagesByThread(prev => ({ ...prev, [selectedId]: [...(prev[selectedId] || []), outbound] }));
->>>>>>> 6849d3d3464740aa434cb384338d4425a1f2bcb7
       setDraft("");
     } catch (err) { setError(err.message); }
     finally { setSending(false); }
   }
 
-<<<<<<< HEAD
   async function handleQuickReply(text) {
     const normalized = String(text || "").trim();
     if (!normalized || sending) return;
@@ -203,9 +190,6 @@ export default function HomeownerMessagesPage() {
       setSending(false);
     }
   }
-
-=======
->>>>>>> 6849d3d3464740aa434cb384338d4425a1f2bcb7
   async function handleSendVoiceNote(file) {
     if (!selectedId) return;
     setSending(true);
@@ -327,13 +311,8 @@ export default function HomeownerMessagesPage() {
           {/* Input Area */}
           <div className="p-6 bg-white border-t border-slate-50">
             <div className="flex gap-2 mb-4">
-<<<<<<< HEAD
                  <button type="button" onClick={() => handleQuickReply("Please wait, checking.")} className="flex-1 py-2 bg-slate-50 rounded-xl text-[9px] font-black uppercase text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 transition-all">Wait</button>
                  <button type="button" onClick={() => handleQuickReply("Access granted.")} className="flex-1 py-2 bg-emerald-50 rounded-xl text-[9px] font-black uppercase text-emerald-600">Grant</button>
-=======
-                 <button onClick={() => handleSend({ preventDefault: () => {}, target: { value: "Please wait, checking." } })} className="flex-1 py-2 bg-slate-50 rounded-xl text-[9px] font-black uppercase text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 transition-all">Wait</button>
-                 <button onClick={() => handleSend({ preventDefault: () => {}, target: { value: "Access Granted." } })} className="flex-1 py-2 bg-emerald-50 rounded-xl text-[9px] font-black uppercase text-emerald-600">Grant</button>
->>>>>>> 6849d3d3464740aa434cb384338d4425a1f2bcb7
             </div>
             <form onSubmit={handleSend} className="relative">
               <input

@@ -83,13 +83,7 @@ export default function PersistentAppMobileNav() {
 
   const isManagedHomeowner = Boolean(homeownerContext?.managedByEstate);
   const items = useMemo(() => {
-<<<<<<< HEAD
     if (routeRole === "homeowner") return [];
-=======
-    if (routeRole === "homeowner") {
-      return isManagedHomeowner ? estateManagedHomeownerNav : homeownerNav;
-    }
->>>>>>> 6849d3d3464740aa434cb384338d4425a1f2bcb7
     if (routeRole === "estate") return estateNav;
     if (routeRole === "security") return securityNav;
     if (routeRole === "admin") return adminNav;

@@ -46,8 +46,10 @@ const missing = required.filter((name) => {
 
 if (missing.length > 0) {
   console.error(
-    `[prebuild] Missing required environment variable(s): ${missing.join(", ")}. ` +
-      "Set them before building."
+    `[prebuild] Missing required environment variable(s): ${missing.join(", ")}.\n` +
+      "[prebuild] Set them in your deploy provider environment settings or in .env.production/.env before building.\n" +
+      "[prebuild] Example:\n" +
+      "[prebuild] VITE_LIVEKIT_URL=wss://livekit.useqring.online"
   );
   process.exit(1);
 }

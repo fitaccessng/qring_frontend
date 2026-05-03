@@ -12,10 +12,7 @@ import { useApiQuery, useApiMutation } from "../../hooks/useApi";
 import { endpoints } from "../../services/endpoints";
 import { useAuth } from "../../state/AuthContext";
 import { useNotifications } from "../../state/NotificationsContext";
-<<<<<<< HEAD
 import { createHomeownerAppointment } from "../../services/homeownerService";
-=======
->>>>>>> 6849d3d3464740aa434cb384338d4425a1f2bcb7
 
 export default function ResidentAppointmentsPage() {
   const navigate = useNavigate(); // For the back button logic
@@ -25,10 +22,7 @@ export default function ResidentAppointmentsPage() {
   const [selectedDate, setSelectedDate] = useState(() => toDateKey(new Date()));
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
-<<<<<<< HEAD
   const [inviteResult, setInviteResult] = useState(null);
-=======
->>>>>>> 6849d3d3464740aa434cb384338d4425a1f2bcb7
 
   // Error Safeguard
   const listUrl = endpoints?.homeowner?.appointments || "/homeowner/appointments";
@@ -39,7 +33,6 @@ export default function ResidentAppointmentsPage() {
     url: `${listUrl}?date=${selectedDate}`,
     enabled: !!selectedDate,
   });
-<<<<<<< HEAD
   const { data: doorsResponse } = useApiQuery({
     queryKey: ["homeowner-doors-for-appointments"],
     url: endpoints?.homeowner?.doors || "/homeowner/doors"
@@ -54,15 +47,6 @@ export default function ResidentAppointmentsPage() {
     onSuccess: (data) => {
       setInviteResult(data || null);
       refetch();
-=======
-
-  const createMutation = useApiMutation({
-    url: createUrl,
-    method: "POST",
-    onSuccess: () => {
-      refetch();
-      setIsModalOpen(false);
->>>>>>> 6849d3d3464740aa434cb384338d4425a1f2bcb7
     },
   });
 
@@ -90,7 +74,6 @@ export default function ResidentAppointmentsPage() {
   const handleCreateAppointment = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
-<<<<<<< HEAD
     const payload = {
       doorId: String(formData.get("doorId") || "").trim(),
       visitorName: String(formData.get("visitorName") || "").trim(),
@@ -114,14 +97,6 @@ export default function ResidentAppointmentsPage() {
       window.prompt("Copy this invite:", raw);
     }
   }
-
-=======
-    const payload = Object.fromEntries(formData.entries());
-    payload.selectedDate = selectedDate;
-    createMutation.mutate(payload);
-  };
-
->>>>>>> 6849d3d3464740aa434cb384338d4425a1f2bcb7
   return (
     <div className="bg-[#f8f9fa] min-h-screen font-sans pb-32 overflow-x-hidden">
       {/* Updated Header with Back Arrow */}
@@ -241,7 +216,6 @@ export default function ResidentAppointmentsPage() {
               <form onSubmit={handleCreateAppointment} className="flex-1 flex flex-col overflow-hidden">
                 <div className="flex-1 overflow-y-auto px-8 py-4 space-y-6 no-scrollbar">
                   <InputField label="Visitor Name" name="visitorName" placeholder="Full Name" icon={<User size={18}/>} required />
-<<<<<<< HEAD
                   <InputField label="Visitor Contact" name="visitorContact" placeholder="+234..." icon={<Phone size={18}/>} required />
                   <InputField label="Visitor Email" name="visitorEmail" placeholder="visitor@email.com" icon={<MessageSquare size={18}/>} />
 
@@ -266,14 +240,6 @@ export default function ResidentAppointmentsPage() {
                       <div className="absolute right-5 top-4 text-slate-300"><DoorOpen size={18}/></div>
                     </div>
                   </div>
-=======
-                  <InputField label="Visitor Contact" name="visitorPhone" placeholder="+234..." icon={<Phone size={18}/>} required />
-
-                  <div className="h-px bg-slate-100 w-full" />
-
-                  <InputField label="Door / Point of Entry" name="door" placeholder="Main Gate, Front Door..." icon={<DoorOpen size={18}/>} required />
->>>>>>> 6849d3d3464740aa434cb384338d4425a1f2bcb7
-
                   <div className="grid grid-cols-2 gap-4">
                     <InputField label="Start Time" name="startTime" type="datetime-local" icon={<Clock size={18}/>} required />
                     <InputField label="End Time" name="endTime" type="datetime-local" icon={<Clock size={18}/>} required />
@@ -304,8 +270,6 @@ export default function ResidentAppointmentsPage() {
                     </div>
                   </div>
                   <div className="h-6" />
-<<<<<<< HEAD
-
                   {inviteResult ? (
                     <div className="rounded-[2rem] border border-emerald-100 bg-emerald-50 p-5 space-y-3">
                       <p className="text-[10px] font-black uppercase tracking-widest text-emerald-700">
@@ -323,25 +287,16 @@ export default function ResidentAppointmentsPage() {
                       ) : null}
                     </div>
                   ) : null}
-=======
->>>>>>> 6849d3d3464740aa434cb384338d4425a1f2bcb7
                 </div>
 
                 {/* Fixed Footer Action */}
                 <div className="p-8 pt-4 bg-white border-t border-slate-100 shrink-0">
                   <button
                     type="submit"
-<<<<<<< HEAD
                     disabled={createMutation.isPending}
                     className="w-full bg-indigo-600 text-white font-black text-xs uppercase tracking-widest py-5 rounded-2xl shadow-xl shadow-indigo-100 flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-50"
                   >
                     {createMutation.isPending ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><ShieldCheck size={18} /> Invite Guest</>}
-=======
-                    disabled={createMutation.isLoading}
-                    className="w-full bg-indigo-600 text-white font-black text-xs uppercase tracking-widest py-5 rounded-2xl shadow-xl shadow-indigo-100 flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-50"
-                  >
-                    {createMutation.isLoading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><ShieldCheck size={18} /> Invite Guest</>}
->>>>>>> 6849d3d3464740aa434cb384338d4425a1f2bcb7
                   </button>
                 </div>
               </form>
@@ -356,16 +311,12 @@ export default function ResidentAppointmentsPage() {
   );
 }
 
-<<<<<<< HEAD
 function parseOptionalNumber(value) {
   const normalized = String(value || "").trim();
   if (!normalized) return undefined;
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : undefined;
 }
-
-=======
->>>>>>> 6849d3d3464740aa434cb384338d4425a1f2bcb7
 // Sub-components
 function InputField({ label, icon, ...props }) {
   return (
@@ -404,8 +355,4 @@ function buildDateTiles() {
     days.push({ date: toDateKey(d), day: d.getDate(), weekday: d.toLocaleString('en-US', { weekday: 'short' }) });
   }
   return days;
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> 6849d3d3464740aa434cb384338d4425a1f2bcb7
