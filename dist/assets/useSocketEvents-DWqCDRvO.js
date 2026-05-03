@@ -1,0 +1,1 @@
+import{a as e}from"./rolldown-runtime-COnpUsM8.js";import{m as t}from"./router-DQmgWTMr.js";import{r as n}from"./socketClient-HOblpGgp.js";var r=e(t(),1);function i(e){(0,r.useEffect)(()=>{let t=n(),r=Object.entries(e??{});return r.forEach(([e,n])=>t.on(e,n)),()=>{r.forEach(([e,n])=>t.off(e,n))}},[e])}export{i as t};

@@ -1,0 +1,1 @@
+import{t as e}from"./jsx-runtime-K3eVDbSK.js";var t=e();function n({className:e=``,alt:n=`Qring`}){return(0,t.jsx)(`img`,{src:`/qring_logo.png`,alt:n,className:e,draggable:!1})}export{n as t};

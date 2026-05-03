@@ -1,0 +1,366 @@
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import * as authService from "../services/authService";
+import {
+  clearAuthSession,
+  getAccessToken,
+  getRefreshToken,
+  getStoredUser,
+  persistAuthSession,
+  restoreAuthSession,
+  storeUser,
+} from "../services/authStorage";
+import { getCurrentAppPath } from "../utils/authRouting";
+import { addNativeAppStateListener, addNativeNetworkListener } from "../services/nativeAppService";
+import { isNativeApp } from "../utils/nativeRuntime";
+
+const AuthContext = createContext(null);
+const protectedUiPrefixes = ["/dashboard"];
+const SESSION_TIMEOUT_EVENT = "qring:session-timeout";
+const TOKEN_REFRESH_LEEWAY_MS = 60 * 1000;
+const MIN_REFRESH_DELAY_MS = 15 * 1000;
+
+function loadJson(key, fallback) {
+  void key;
+  return getStoredUser() ?? fallback;
+}
+
+function decodeJwtPayload(token) {
+  if (!token || typeof token !== "string" || !token.includes(".")) return null;
+  try {
+    const base64Url = token.split(".")[1];
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), "=");
+    return JSON.parse(atob(padded));
+  } catch {
+    return null;
+  }
+}
+
+function normalizeAuthData(response) {
+  const first = response?.data ?? response;
+  const data = first?.data ?? first;
+
+  const accessToken = data?.accessToken ?? first?.accessToken ?? "";
+  const refreshToken = data?.refreshToken ?? first?.refreshToken ?? "";
+  const jwtPayload = decodeJwtPayload(accessToken);
+  const roleFromToken = jwtPayload?.role ?? null;
+
+  const userCandidate = data?.user ?? first?.user ?? null;
+  const normalizedUser = userCandidate
+    ? {
+        ...userCandidate,
+        role: userCandidate.role ?? userCandidate.userRole ?? roleFromToken ?? null
+      }
+    : roleFromToken
+      ? { role: roleFromToken }
+      : null;
+
+  return {
+    accessToken,
+    refreshToken,
+    user: normalizedUser
+  };
+}
+
+function getCurrentRoutePath() {
+  if (typeof window === "undefined") return "/";
+  const hash = window.location.hash || "";
+  if (hash.startsWith("#/")) {
+    const hashPath = hash.slice(1).split("?")[0];
+    return hashPath || "/";
+  }
+  return window.location.pathname || "/";
+}
+
+function isProtectedUiRoute(pathname) {
+  return protectedUiPrefixes.some((prefix) => String(pathname || "").startsWith(prefix));
+}
+
+function getTokenExpiryMs(token) {
+  const payload = decodeJwtPayload(token);
+  const expSeconds = Number(payload?.exp ?? 0);
+  if (!Number.isFinite(expSeconds) || expSeconds <= 0) return null;
+  return expSeconds * 1000;
+}
+
+export function AuthProvider({ children }) {
+  const [accessToken, setAccessToken] = useState(() => getAccessToken() ?? "");
+  const [user, setUser] = useState(() => {
+    const storedToken = getAccessToken();
+    if (!storedToken) return null;
+    return loadJson("qring_user", null);
+  });
+  const [loading, setLoading] = useState(false);
+  const [ready, setReady] = useState(false);
+
+  function clearLocalAuthState() {
+    clearAuthSession();
+    setAccessToken("");
+    setUser(null);
+  }
+
+  function persistAuth(data) {
+    persistAuthSession(data);
+    setAccessToken(data.accessToken);
+    setUser(data.user ?? null);
+  }
+
+  function updateUser(nextUser) {
+    setUser((prev) => {
+      const resolved = typeof nextUser === "function" ? nextUser(prev) : nextUser;
+      return storeUser(resolved);
+    });
+  }
+
+  const login = async (credentials) => {
+    setLoading(true);
+    try {
+      const response = await authService.login(credentials);
+      const data = normalizeAuthData(response);
+      persistAuth(data);
+      return data;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const signup = async (payload) => {
+    setLoading(true);
+    try {
+      return await authService.signup(payload);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const googleSignIn = async () => {
+    setLoading(true);
+    try {
+      const response = await authService.googleSignIn();
+      const data = normalizeAuthData(response);
+      persistAuth(data);
+      return data;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const googleSignUp = async (role) => {
+    setLoading(true);
+    try {
+      const response = await authService.googleSignUp(role);
+      const data = normalizeAuthData(response);
+      if (!data.user?.role && data.accessToken) {
+        data.user = { ...(data.user ?? {}), role };
+      }
+      persistAuth(data);
+      return data;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const beginGoogleSignUp = async (referralCode = "") => {
+    setLoading(true);
+    try {
+      return await authService.beginGoogleSignUp(referralCode);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const forgotPassword = async (email) =>
+    authService.forgotPassword({
+      email
+    });
+
+  const resumeGoogleRedirect = async () => {
+    // Don't set loading state - this is just a check for previous redirect result
+    // and shouldn't block user interaction with the form
+    try {
+      const result = await authService.resumeGoogleRedirectAuth();
+      if (!result) return null;
+      if (result.intent === "signin") {
+        const data = normalizeAuthData(result.response);
+        persistAuth(data);
+        return { intent: "signin", data };
+      }
+      return result;
+    } catch (error) {
+      // Silently fail - it's just a redirect check, not a user action
+      return null;
+    }
+  };
+
+  const logout = async () => {
+    try {
+      const refresh = getRefreshToken();
+      if (refresh) {
+        await authService.logout({ refreshToken: refresh });
+      }
+    } finally {
+      clearLocalAuthState();
+    }
+  };
+
+  useEffect(() => {
+    let active = true;
+
+    const restore = async () => {
+      try {
+        const restored = await restoreAuthSession();
+        if (!active) return;
+        const restoredToken = String(restored?.accessToken || "");
+        const restoredUser = restored?.user ? JSON.parse(restored.user) : getStoredUser();
+        setAccessToken(restoredToken);
+        setUser(restoredToken ? restoredUser ?? null : null);
+      } catch {
+        if (!active) return;
+        clearLocalAuthState();
+      } finally {
+        if (active) {
+          setReady(true);
+        }
+      }
+    };
+
+    restore();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!ready) return () => {};
+    let active = true;
+    let timeoutId = null;
+    let cleanupAppState = () => {};
+    let cleanupNativeNetwork = () => {};
+    let refreshInFlightPromise = null;
+
+    const refreshSession = async (reason = "timer") => {
+      if (refreshInFlightPromise) return refreshInFlightPromise;
+      if (!accessToken) return;
+      const refresh = getRefreshToken();
+      if (!refresh) {
+        if (reason === "timer") {
+          clearLocalAuthState();
+          window.dispatchEvent(new Event(SESSION_TIMEOUT_EVENT));
+        }
+        return;
+      }
+
+      refreshInFlightPromise = (async () => {
+        try {
+          const response = await authService.refreshToken({ refreshToken: refresh });
+          if (!active) return;
+          const data = normalizeAuthData(response);
+          if (!data?.accessToken) return;
+          persistAuthSession({
+            accessToken: data.accessToken,
+            refreshToken: data.refreshToken || refresh,
+            user: data.user ?? getStoredUser(),
+          });
+          setAccessToken(data.accessToken);
+          if (data?.user) setUser(data.user);
+        } catch {
+          const tokenExpiryMs = getTokenExpiryMs(accessToken) ?? 0;
+          if (Date.now() >= tokenExpiryMs) {
+            clearLocalAuthState();
+            window.dispatchEvent(new Event(SESSION_TIMEOUT_EVENT));
+          }
+        } finally {
+          refreshInFlightPromise = null;
+        }
+      })();
+
+      return refreshInFlightPromise;
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible" && isProtectedUiRoute(getCurrentRoutePath() || getCurrentAppPath())) {
+        refreshSession("visibility");
+      }
+    };
+
+    const scheduleRefresh = () => {
+      if (!accessToken) return;
+      const tokenExpiryMs = getTokenExpiryMs(accessToken);
+      if (!tokenExpiryMs) return;
+      const delay = Math.max(tokenExpiryMs - Date.now() - TOKEN_REFRESH_LEEWAY_MS, MIN_REFRESH_DELAY_MS);
+      timeoutId = window.setTimeout(() => refreshSession("timer"), delay);
+    };
+
+    scheduleRefresh();
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    if (isNativeApp()) {
+      void addNativeAppStateListener(({ isActive }) => {
+        if (!isActive || !active) return;
+        if (isProtectedUiRoute(getCurrentRoutePath() || getCurrentAppPath())) {
+          void refreshSession("resume");
+        }
+      }).then((cleanup) => {
+        cleanupAppState = cleanup;
+      });
+
+      void addNativeNetworkListener(({ connected }) => {
+        if (!connected || !active) return;
+        if (isProtectedUiRoute(getCurrentRoutePath() || getCurrentAppPath())) {
+          void refreshSession("network");
+        }
+      }).then((cleanup) => {
+        cleanupNativeNetwork = cleanup;
+      });
+    }
+
+    return () => {
+      active = false;
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      cleanupAppState();
+      cleanupNativeNetwork();
+    };
+  }, [accessToken, ready]);
+
+  useEffect(() => {
+    const onSessionTimeout = () => {
+      clearLocalAuthState();
+    };
+    window.addEventListener(SESSION_TIMEOUT_EVENT, onSessionTimeout);
+    return () => window.removeEventListener(SESSION_TIMEOUT_EVENT, onSessionTimeout);
+  }, []);
+
+  const value = useMemo(
+    () => ({
+      user,
+      token: accessToken,
+      accessToken,
+      loading,
+      ready,
+      isAuthenticated: Boolean(user && accessToken),
+      login,
+      signup,
+      googleSignIn,
+      googleSignUp,
+      beginGoogleSignUp,
+      resumeGoogleRedirect,
+      forgotPassword,
+      logout,
+      updateUser
+    }),
+    [user, accessToken, loading, ready]
+  );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error("useAuth must be used inside AuthProvider");
+  }
+  return context;
+}
