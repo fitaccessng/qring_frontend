@@ -16,7 +16,11 @@ import {
   LIVEKIT_DEFAULT_RING_TIMEOUT_MS
 } from "../services/livekitConnection";
 import { createRealtimeSocket } from "../services/socketClient";
+<<<<<<< HEAD
 import { getVisitorSessionMessages, sendVisitorSessionMessage } from "../services/homeownerService";
+=======
+import { getVisitorSessionMessages } from "../services/homeownerService";
+>>>>>>> 6849d3d3464740aa434cb384338d4425a1f2bcb7
 import { getVisitorSessionToken } from "../services/visitorSessionToken";
 import {
   clearSessionCallAccess,
@@ -2026,6 +2030,7 @@ export function useSessionRealtime(sessionId) {
 
   function sendMessage(text, options = {}) {
     const body = (text || "").trim();
+<<<<<<< HEAD
     if (!body) return false;
     const clientId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     const createdAt = new Date().toISOString();
@@ -2040,11 +2045,27 @@ export function useSessionRealtime(sessionId) {
     });
     pendingLocalMessageIdsRef.current.add(clientId);
     setMessages((prev) => {
+=======
+    if (!body || !socketRef.current || !joined) return false;
+    const clientId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    pendingLocalMessageIdsRef.current.add(clientId);
+    setMessages((prev) => {
+      const nextMessage = normalizeMessage({
+        id: clientId,
+        clientId,
+        text: body,
+        displayName,
+        senderType: user?.role || "visitor",
+        at: new Date().toISOString(),
+        persisted: false
+      });
+>>>>>>> 6849d3d3464740aa434cb384338d4425a1f2bcb7
       if (options.replaceMessageId) {
         return prev.map((item) => (item.id === options.replaceMessageId ? nextMessage : item));
       }
       return [...prev, nextMessage];
     });
+<<<<<<< HEAD
 
     if (participantType === "visitor" && (!socketRef.current || !joined)) {
       sendVisitorSessionMessage(sessionId, body, clientId)
@@ -2094,6 +2115,8 @@ export function useSessionRealtime(sessionId) {
       return false;
     }
 
+=======
+>>>>>>> 6849d3d3464740aa434cb384338d4425a1f2bcb7
     socketRef.current.emit("chat.message", {
       sessionId,
       text: body,

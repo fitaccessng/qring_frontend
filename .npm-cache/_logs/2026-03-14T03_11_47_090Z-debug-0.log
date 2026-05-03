@@ -1,0 +1,775 @@
+0 verbose cli C:\Program Files\nodejs\node.exe C:\Users\Nwakanma\AppData\Roaming\npm\node_modules\npm\bin\npm-cli.js
+1 info using npm@10.2.0
+2 info using node@v24.14.0
+3 timing npm:load:whichnode Completed in 2ms
+4 timing config:load:defaults Completed in 1ms
+5 timing config:load:file:C:\Users\Nwakanma\AppData\Roaming\npm\node_modules\npm\npmrc Completed in 4ms
+6 timing config:load:builtin Completed in 4ms
+7 timing config:load:cli Completed in 1ms
+8 timing config:load:env Completed in 0ms
+9 timing config:load:file:C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\.npmrc Completed in 0ms
+10 timing config:load:project Completed in 2ms
+11 timing config:load:file:C:\Users\Nwakanma\.npmrc Completed in 1ms
+12 timing config:load:user Completed in 1ms
+13 timing config:load:file:C:\Users\Nwakanma\AppData\Roaming\npm\etc\npmrc Completed in 0ms
+14 timing config:load:global Completed in 0ms
+15 timing config:load:setEnvs Completed in 1ms
+16 timing config:load Completed in 11ms
+17 timing npm:load:configload Completed in 12ms
+18 timing config:load:flatten Completed in 2ms
+19 timing npm:load:mkdirpcache Completed in 1ms
+20 timing npm:load:mkdirplogs Completed in 1ms
+21 verbose title npm install framer-motion
+22 verbose argv "install" "framer-motion"
+23 timing npm:load:setTitle Completed in 0ms
+24 timing npm:load:display Completed in 1ms
+25 verbose logfile logs-max:10 dir:C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\.npm-cache\_logs\2026-03-14T03_11_47_090Z-
+26 verbose logfile C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\.npm-cache\_logs\2026-03-14T03_11_47_090Z-debug-0.log
+27 timing npm:load:logFile Completed in 28ms
+28 timing npm:load:timers Completed in 0ms
+29 timing npm:load:configScope Completed in 0ms
+30 timing npm:load Completed in 60ms
+31 timing arborist:ctor Completed in 1ms
+32 silly logfile done cleaning log files
+33 timing idealTree:init Completed in 141ms
+34 timing idealTree:userRequests Completed in 2ms
+35 silly idealTree buildDeps
+36 silly fetch manifest framer-motion@*
+37 verbose shrinkwrap failed to load node_modules/.package-lock.json out of date, updated: node_modules
+38 http fetch GET 200 https://registry.npmjs.org/npm 1332ms (cache miss)
+39 http fetch GET 200 https://registry.npmjs.org/framer-motion 1745ms (cache miss)
+40 silly fetch manifest @emotion/is-prop-valid@*
+41 http fetch GET 200 https://registry.npmjs.org/@emotion%2fis-prop-valid 233ms (cache miss)
+42 silly fetch manifest react@^18.3.1
+43 http fetch GET 200 https://registry.npmjs.org/react 873ms (cache miss)
+44 silly fetch manifest react-dom@^18.3.1
+45 http fetch GET 200 https://registry.npmjs.org/react-dom 1125ms (cache miss)
+46 silly placeDep ROOT framer-motion@12.36.0 OK for: qring-dashboard-ui@1.0.0 want: *
+47 silly fetch manifest motion-dom@^12.36.0
+48 silly fetch manifest motion-utils@^12.36.0
+49 http fetch GET 200 https://registry.npmjs.org/motion-utils 211ms (cache miss)
+50 http fetch GET 200 https://registry.npmjs.org/motion-dom 380ms (cache miss)
+51 timing idealTree:#root Completed in 4463ms
+52 silly placeDep ROOT motion-dom@12.36.0 OK for: framer-motion@12.36.0 want: ^12.36.0
+53 silly placeDep ROOT motion-utils@12.36.0 OK for: framer-motion@12.36.0 want: ^12.36.0
+54 timing idealTree:node_modules/framer-motion Completed in 5ms
+55 timing idealTree:node_modules/motion-dom Completed in 0ms
+56 timing idealTree:node_modules/motion-utils Completed in 0ms
+57 timing idealTree:buildDeps Completed in 4471ms
+58 timing idealTree:fixDepFlags Completed in 2ms
+59 timing idealTree Completed in 4621ms
+60 timing reify:loadTrees Completed in 4622ms
+61 timing reify:diffTrees Completed in 31ms
+62 silly reify moves {}
+63 timing reify:retireShallow Completed in 0ms
+64 timing reify:createSparse Completed in 26ms
+65 timing reify:loadBundles Completed in 0ms
+66 silly audit bulk request {
+66 silly audit   '@alloc/quick-lru': [ '5.2.0' ],
+66 silly audit   '@babel/code-frame': [ '7.29.0' ],
+66 silly audit   '@babel/compat-data': [ '7.29.0' ],
+66 silly audit   '@babel/core': [ '7.29.0' ],
+66 silly audit   '@babel/generator': [ '7.29.1' ],
+66 silly audit   '@babel/helper-compilation-targets': [ '7.28.6' ],
+66 silly audit   '@babel/helper-globals': [ '7.28.0' ],
+66 silly audit   '@babel/helper-module-imports': [ '7.28.6' ],
+66 silly audit   '@babel/helper-module-transforms': [ '7.28.6' ],
+66 silly audit   '@babel/helper-plugin-utils': [ '7.28.6' ],
+66 silly audit   '@babel/helper-string-parser': [ '7.27.1' ],
+66 silly audit   '@babel/helper-validator-identifier': [ '7.28.5' ],
+66 silly audit   '@babel/helper-validator-option': [ '7.27.1' ],
+66 silly audit   '@babel/helpers': [ '7.28.6' ],
+66 silly audit   '@babel/parser': [ '7.29.0' ],
+66 silly audit   '@babel/plugin-transform-react-jsx-self': [ '7.27.1' ],
+66 silly audit   '@babel/plugin-transform-react-jsx-source': [ '7.27.1' ],
+66 silly audit   '@babel/runtime': [ '7.28.6' ],
+66 silly audit   '@babel/template': [ '7.28.6' ],
+66 silly audit   '@babel/traverse': [ '7.29.0' ],
+66 silly audit   '@babel/types': [ '7.29.0' ],
+66 silly audit   '@bufbuild/protobuf': [ '1.10.1' ],
+66 silly audit   '@esbuild/aix-ppc64': [ '0.21.5' ],
+66 silly audit   '@esbuild/android-arm': [ '0.21.5' ],
+66 silly audit   '@esbuild/android-arm64': [ '0.21.5' ],
+66 silly audit   '@esbuild/android-x64': [ '0.21.5' ],
+66 silly audit   '@esbuild/darwin-arm64': [ '0.21.5' ],
+66 silly audit   '@esbuild/darwin-x64': [ '0.21.5' ],
+66 silly audit   '@esbuild/freebsd-arm64': [ '0.21.5' ],
+66 silly audit   '@esbuild/freebsd-x64': [ '0.21.5' ],
+66 silly audit   '@esbuild/linux-arm': [ '0.21.5' ],
+66 silly audit   '@esbuild/linux-arm64': [ '0.21.5' ],
+66 silly audit   '@esbuild/linux-ia32': [ '0.21.5' ],
+66 silly audit   '@esbuild/linux-loong64': [ '0.21.5' ],
+66 silly audit   '@esbuild/linux-mips64el': [ '0.21.5' ],
+66 silly audit   '@esbuild/linux-ppc64': [ '0.21.5' ],
+66 silly audit   '@esbuild/linux-riscv64': [ '0.21.5' ],
+66 silly audit   '@esbuild/linux-s390x': [ '0.21.5' ],
+66 silly audit   '@esbuild/linux-x64': [ '0.21.5' ],
+66 silly audit   '@esbuild/netbsd-x64': [ '0.21.5' ],
+66 silly audit   '@esbuild/openbsd-x64': [ '0.21.5' ],
+66 silly audit   '@esbuild/sunos-x64': [ '0.21.5' ],
+66 silly audit   '@esbuild/win32-arm64': [ '0.21.5' ],
+66 silly audit   '@esbuild/win32-ia32': [ '0.21.5' ],
+66 silly audit   '@esbuild/win32-x64': [ '0.21.5' ],
+66 silly audit   '@firebase/ai': [ '2.8.0' ],
+66 silly audit   '@firebase/analytics': [ '0.10.19' ],
+66 silly audit   '@firebase/analytics-compat': [ '0.2.25' ],
+66 silly audit   '@firebase/analytics-types': [ '0.8.3' ],
+66 silly audit   '@firebase/app': [ '0.14.8' ],
+66 silly audit   '@firebase/app-check': [ '0.11.0' ],
+66 silly audit   '@firebase/app-check-compat': [ '0.4.0' ],
+66 silly audit   '@firebase/app-check-interop-types': [ '0.3.3' ],
+66 silly audit   '@firebase/app-check-types': [ '0.5.3' ],
+66 silly audit   '@firebase/app-compat': [ '0.5.8' ],
+66 silly audit   '@firebase/app-types': [ '0.9.3' ],
+66 silly audit   '@firebase/auth-compat': [ '0.6.2' ],
+66 silly audit   '@firebase/auth': [ '1.12.0' ],
+66 silly audit   '@firebase/auth-interop-types': [ '0.2.4' ],
+66 silly audit   '@firebase/auth-types': [ '0.13.0' ],
+66 silly audit   '@firebase/component': [ '0.7.0' ],
+66 silly audit   '@firebase/data-connect': [ '0.3.12' ],
+66 silly audit   '@firebase/database': [ '1.1.0' ],
+66 silly audit   '@firebase/database-compat': [ '2.1.0' ],
+66 silly audit   '@firebase/database-types': [ '1.0.16' ],
+66 silly audit   '@firebase/firestore': [ '4.11.0' ],
+66 silly audit   '@firebase/firestore-compat': [ '0.4.5' ],
+66 silly audit   '@firebase/firestore-types': [ '3.0.3' ],
+66 silly audit   '@firebase/functions': [ '0.13.1' ],
+66 silly audit   '@firebase/functions-compat': [ '0.4.1' ],
+66 silly audit   '@firebase/functions-types': [ '0.6.3' ],
+66 silly audit   '@firebase/installations': [ '0.6.19' ],
+66 silly audit   '@firebase/installations-compat': [ '0.2.19' ],
+66 silly audit   '@firebase/installations-types': [ '0.5.3' ],
+66 silly audit   '@firebase/logger': [ '0.5.0' ],
+66 silly audit   '@firebase/messaging': [ '0.12.23' ],
+66 silly audit   '@firebase/messaging-compat': [ '0.2.23' ],
+66 silly audit   '@firebase/messaging-interop-types': [ '0.2.3' ],
+66 silly audit   '@firebase/performance': [ '0.7.9' ],
+66 silly audit   '@firebase/performance-compat': [ '0.2.22' ],
+66 silly audit   '@firebase/performance-types': [ '0.2.3' ],
+66 silly audit   '@firebase/remote-config': [ '0.8.0' ],
+66 silly audit   '@firebase/remote-config-compat': [ '0.2.21' ],
+66 silly audit   '@firebase/remote-config-types': [ '0.5.0' ],
+66 silly audit   '@firebase/storage': [ '0.14.0' ],
+66 silly audit   '@firebase/storage-compat': [ '0.4.0' ],
+66 silly audit   '@firebase/storage-types': [ '0.8.3' ],
+66 silly audit   '@firebase/util': [ '1.13.0' ],
+66 silly audit   '@firebase/webchannel-wrapper': [ '1.0.5' ],
+66 silly audit   '@grpc/grpc-js': [ '1.9.15' ],
+66 silly audit   '@grpc/proto-loader': [ '0.7.15' ],
+66 silly audit   '@jridgewell/gen-mapping': [ '0.3.13' ],
+66 silly audit   '@jridgewell/remapping': [ '2.3.5' ],
+66 silly audit   '@jridgewell/resolve-uri': [ '3.1.2' ],
+66 silly audit   '@jridgewell/sourcemap-codec': [ '1.5.5' ],
+66 silly audit   '@jridgewell/trace-mapping': [ '0.3.31' ],
+66 silly audit   '@livekit/mutex': [ '1.1.1' ],
+66 silly audit   '@livekit/protocol': [ '1.44.0' ],
+66 silly audit   '@nodelib/fs.scandir': [ '2.1.5' ],
+66 silly audit   '@nodelib/fs.stat': [ '2.0.5' ],
+66 silly audit   '@nodelib/fs.walk': [ '1.2.8' ],
+66 silly audit   '@protobufjs/aspromise': [ '1.1.2' ],
+66 silly audit   '@protobufjs/base64': [ '1.1.2' ],
+66 silly audit   '@protobufjs/codegen': [ '2.0.4' ],
+66 silly audit   '@protobufjs/eventemitter': [ '1.1.0' ],
+66 silly audit   '@protobufjs/fetch': [ '1.1.0' ],
+66 silly audit   '@protobufjs/float': [ '1.0.2' ],
+66 silly audit   '@protobufjs/inquire': [ '1.1.0' ],
+66 silly audit   '@protobufjs/path': [ '1.1.2' ],
+66 silly audit   '@protobufjs/pool': [ '1.1.0' ],
+66 silly audit   '@protobufjs/utf8': [ '1.1.0' ],
+66 silly audit   '@remix-run/router': [ '1.23.2' ],
+66 silly audit   '@rolldown/pluginutils': [ '1.0.0-beta.27' ],
+66 silly audit   '@rollup/rollup-android-arm-eabi': [ '4.57.1' ],
+66 silly audit   '@rollup/rollup-android-arm64': [ '4.57.1' ],
+66 silly audit   '@rollup/rollup-darwin-arm64': [ '4.57.1' ],
+66 silly audit   '@rollup/rollup-darwin-x64': [ '4.57.1' ],
+66 silly audit   '@rollup/rollup-freebsd-arm64': [ '4.57.1' ],
+66 silly audit   '@rollup/rollup-freebsd-x64': [ '4.57.1' ],
+66 silly audit   '@rollup/rollup-linux-arm-gnueabihf': [ '4.57.1' ],
+66 silly audit   '@rollup/rollup-linux-arm-musleabihf': [ '4.57.1' ],
+66 silly audit   '@rollup/rollup-linux-arm64-gnu': [ '4.57.1' ],
+66 silly audit   '@rollup/rollup-linux-arm64-musl': [ '4.57.1' ],
+66 silly audit   '@rollup/rollup-linux-loong64-gnu': [ '4.57.1' ],
+66 silly audit   '@rollup/rollup-linux-loong64-musl': [ '4.57.1' ],
+66 silly audit   '@rollup/rollup-linux-ppc64-gnu': [ '4.57.1' ],
+66 silly audit   '@rollup/rollup-linux-ppc64-musl': [ '4.57.1' ],
+66 silly audit   '@rollup/rollup-linux-riscv64-gnu': [ '4.57.1' ],
+66 silly audit   '@rollup/rollup-linux-riscv64-musl': [ '4.57.1' ],
+66 silly audit   '@rollup/rollup-linux-s390x-gnu': [ '4.57.1' ],
+66 silly audit   '@rollup/rollup-linux-x64-gnu': [ '4.57.1' ],
+66 silly audit   '@rollup/rollup-linux-x64-musl': [ '4.57.1' ],
+66 silly audit   '@rollup/rollup-openbsd-x64': [ '4.57.1' ],
+66 silly audit   '@rollup/rollup-openharmony-arm64': [ '4.57.1' ],
+66 silly audit   '@rollup/rollup-win32-arm64-msvc': [ '4.57.1' ],
+66 silly audit   '@rollup/rollup-win32-ia32-msvc': [ '4.57.1' ],
+66 silly audit   '@rollup/rollup-win32-x64-gnu': [ '4.57.1' ],
+66 silly audit   '@rollup/rollup-win32-x64-msvc': [ '4.57.1' ],
+66 silly audit   '@socket.io/component-emitter': [ '3.1.2' ],
+66 silly audit   '@types/babel__core': [ '7.20.5' ],
+66 silly audit   '@types/babel__generator': [ '7.27.0' ],
+66 silly audit   '@types/babel__template': [ '7.4.4' ],
+66 silly audit   '@types/babel__traverse': [ '7.28.0' ],
+66 silly audit   '@types/dom-mediacapture-record': [ '1.0.22' ],
+66 silly audit   '@types/estree': [ '1.0.8' ],
+66 silly audit   '@types/node': [ '25.2.3' ],
+66 silly audit   '@types/pako': [ '2.0.4' ],
+66 silly audit   '@types/raf': [ '3.4.3' ],
+66 silly audit   '@types/trusted-types': [ '2.0.7' ],
+66 silly audit   '@vitejs/plugin-react': [ '4.7.0' ],
+66 silly audit   'ansi-regex': [ '5.0.1' ],
+66 silly audit   'ansi-styles': [ '4.3.0' ],
+66 silly audit   'any-promise': [ '1.3.0' ],
+66 silly audit   anymatch: [ '3.1.3' ],
+66 silly audit   arg: [ '5.0.2' ],
+66 silly audit   autoprefixer: [ '10.4.24' ],
+66 silly audit   'base64-arraybuffer': [ '1.0.2' ],
+66 silly audit   'baseline-browser-mapping': [ '2.9.19' ],
+66 silly audit   'binary-extensions': [ '2.3.0' ],
+66 silly audit   braces: [ '3.0.3' ],
+66 silly audit   browserslist: [ '4.28.1' ],
+66 silly audit   camelcase: [ '5.3.1' ],
+66 silly audit   'camelcase-css': [ '2.0.1' ],
+66 silly audit   'caniuse-lite': [ '1.0.30001769' ],
+66 silly audit   canvg: [ '3.0.11' ],
+66 silly audit   chokidar: [ '3.6.0' ],
+66 silly audit   'glob-parent': [ '5.1.2', '6.0.2' ],
+66 silly audit   cliui: [ '8.0.1', '6.0.0' ],
+66 silly audit   'color-convert': [ '2.0.1' ],
+66 silly audit   'color-name': [ '1.1.4' ],
+66 silly audit   commander: [ '4.1.1' ],
+66 silly audit   'convert-source-map': [ '2.0.0' ],
+66 silly audit   'core-js': [ '3.48.0' ],
+66 silly audit   'css-line-break': [ '2.1.0' ],
+66 silly audit   cssesc: [ '3.0.0' ],
+66 silly audit   debug: [ '4.4.3' ],
+66 silly audit   decamelize: [ '1.2.0' ],
+66 silly audit   didyoumean: [ '1.2.2' ],
+66 silly audit   dijkstrajs: [ '1.0.3' ],
+66 silly audit   dlv: [ '1.1.3' ],
+66 silly audit   dompurify: [ '3.3.1' ],
+66 silly audit   'electron-to-chromium': [ '1.5.286' ],
+66 silly audit   'emoji-regex': [ '8.0.0' ],
+66 silly audit   'engine.io-client': [ '6.6.4' ],
+66 silly audit   'engine.io-parser': [ '5.2.3' ],
+66 silly audit   esbuild: [ '0.21.5' ],
+66 silly audit   escalade: [ '3.2.0' ],
+66 silly audit   events: [ '3.3.0' ],
+66 silly audit   'fast-glob': [ '3.3.3' ],
+66 silly audit   'fast-png': [ '6.4.0' ],
+66 silly audit   fastq: [ '1.20.1' ],
+66 silly audit   'faye-websocket': [ '0.11.4' ],
+66 silly audit   fflate: [ '0.8.2' ],
+66 silly audit   'fill-range': [ '7.1.1' ],
+66 silly audit   'find-up': [ '4.1.0' ],
+66 silly audit   firebase: [ '12.9.0' ],
+66 silly audit   'fraction.js': [ '5.3.4' ],
+66 silly audit   fsevents: [ '2.3.3' ],
+66 silly audit   'function-bind': [ '1.1.2' ],
+66 silly audit   gensync: [ '1.0.0-beta.2' ],
+66 silly audit   'get-caller-file': [ '2.0.5' ],
+66 silly audit   hasown: [ '2.0.2' ],
+66 silly audit   html2canvas: [ '1.4.1' ],
+66 silly audit   'http-parser-js': [ '0.5.10' ],
+66 silly audit   idb: [ '7.1.1' ],
+66 silly audit   iobuffer: [ '5.4.0' ],
+66 silly audit   'is-binary-path': [ '2.1.0' ],
+66 silly audit   'is-core-module': [ '2.16.1' ],
+66 silly audit   'is-extglob': [ '2.1.1' ],
+66 silly audit   'is-fullwidth-code-point': [ '3.0.0' ],
+66 silly audit   'is-glob': [ '4.0.3' ],
+66 silly audit   'is-number': [ '7.0.0' ],
+66 silly audit   jiti: [ '1.21.7' ],
+66 silly audit   jose: [ '6.1.3' ],
+66 silly audit   'js-tokens': [ '4.0.0' ],
+66 silly audit   jsesc: [ '3.1.0' ],
+66 silly audit   json5: [ '2.2.3' ],
+66 silly audit   jspdf: [ '4.2.0' ],
+66 silly audit   lilconfig: [ '3.1.3' ],
+66 silly audit   'lines-and-columns': [ '1.2.4' ],
+66 silly audit   'livekit-client': [ '2.17.2' ],
+66 silly audit   'locate-path': [ '5.0.0' ],
+66 silly audit   'lodash.camelcase': [ '4.3.0' ],
+66 silly audit   loglevel: [ '1.9.2' ],
+66 silly audit   long: [ '5.3.2' ],
+66 silly audit   'loose-envify': [ '1.4.0' ],
+66 silly audit   'lru-cache': [ '5.1.1' ],
+66 silly audit   'lucide-react': [ '0.575.0' ],
+66 silly audit   merge2: [ '1.4.1' ],
+66 silly audit   micromatch: [ '4.0.8' ],
+66 silly audit   ms: [ '2.1.3' ],
+66 silly audit   mz: [ '2.7.0' ],
+66 silly audit   nanoid: [ '3.3.11' ],
+66 silly audit   'node-releases': [ '2.0.27' ],
+66 silly audit   'normalize-path': [ '3.0.0' ],
+66 silly audit   'object-assign': [ '4.1.1' ],
+66 silly audit   'object-hash': [ '3.0.0' ],
+66 silly audit   'p-limit': [ '2.3.0' ],
+66 silly audit   'p-locate': [ '4.1.0' ],
+66 silly audit   'p-try': [ '2.2.0' ],
+66 silly audit   pako: [ '2.1.0' ],
+66 silly audit   'path-exists': [ '4.0.0' ],
+66 silly audit   'path-parse': [ '1.0.7' ],
+66 silly audit   'performance-now': [ '2.1.0' ],
+66 silly audit   picocolors: [ '1.1.1' ],
+66 silly audit   picomatch: [ '2.3.1', '4.0.3' ],
+66 silly audit   pify: [ '2.3.0' ],
+66 silly audit   pirates: [ '4.0.7' ],
+66 silly audit   pngjs: [ '5.0.0' ],
+66 silly audit   postcss: [ '8.5.6' ],
+66 silly audit   'postcss-import': [ '15.1.0' ],
+66 silly audit   'postcss-js': [ '4.1.0' ],
+66 silly audit   'postcss-load-config': [ '6.0.1' ],
+66 silly audit   'postcss-nested': [ '6.2.0' ],
+66 silly audit   'postcss-selector-parser': [ '6.1.2' ],
+66 silly audit   'postcss-value-parser': [ '4.2.0' ],
+66 silly audit   protobufjs: [ '7.5.4' ],
+66 silly audit   qrcode: [ '1.5.4' ],
+66 silly audit   'wrap-ansi': [ '6.2.0', '7.0.0' ],
+66 silly audit   y18n: [ '4.0.3', '5.0.8' ],
+66 silly audit   yargs: [ '15.4.1', '17.7.2' ],
+66 silly audit   'yargs-parser': [ '18.1.3', '21.1.1' ],
+66 silly audit   'queue-microtask': [ '1.2.3' ],
+66 silly audit   raf: [ '3.4.1' ],
+66 silly audit   react: [ '18.3.1' ],
+66 silly audit   'react-dom': [ '18.3.1' ],
+66 silly audit   'react-refresh': [ '0.17.0' ],
+66 silly audit   'react-router': [ '6.30.3' ],
+66 silly audit   'react-router-dom': [ '6.30.3' ],
+66 silly audit   'read-cache': [ '1.0.0' ],
+66 silly audit   readdirp: [ '3.6.0' ],
+66 silly audit   'regenerator-runtime': [ '0.13.11' ],
+66 silly audit   'require-directory': [ '2.1.1' ],
+66 silly audit   'require-main-filename': [ '2.0.0' ],
+66 silly audit   resolve: [ '1.22.11' ],
+66 silly audit   reusify: [ '1.1.0' ],
+66 silly audit   rgbcolor: [ '1.0.1' ],
+66 silly audit   rollup: [ '4.57.1' ],
+66 silly audit   'run-parallel': [ '1.2.0' ],
+66 silly audit   rxjs: [ '7.8.2' ],
+66 silly audit   'safe-buffer': [ '5.2.1' ],
+66 silly audit   scheduler: [ '0.23.2' ],
+66 silly audit   sdp: [ '3.2.1' ],
+66 silly audit   'sdp-transform': [ '2.15.0' ],
+66 silly audit   semver: [ '6.3.1' ],
+66 silly audit   'set-blocking': [ '2.0.0' ],
+66 silly audit   'socket.io-client': [ '4.8.3' ],
+66 silly audit   'socket.io-parser': [ '4.2.5' ],
+66 silly audit   'source-map-js': [ '1.2.1' ],
+66 silly audit   'stackblur-canvas': [ '2.7.0' ],
+66 silly audit   'string-width': [ '4.2.3' ],
+66 silly audit   'strip-ansi': [ '6.0.1' ],
+66 silly audit   sucrase: [ '3.35.1' ],
+66 silly audit   'supports-preserve-symlinks-flag': [ '1.0.0' ],
+66 silly audit   'svg-pathdata': [ '6.0.3' ],
+66 silly audit   tailwindcss: [ '3.4.19' ],
+66 silly audit   'text-segmentation': [ '1.0.3' ],
+66 silly audit   thenify: [ '3.3.1' ],
+66 silly audit   'thenify-all': [ '1.6.0' ],
+66 silly audit   tinyglobby: [ '0.2.15' ],
+66 silly audit   fdir: [ '6.5.0' ],
+66 silly audit   'to-regex-range': [ '5.0.1' ],
+66 silly audit   'ts-debounce': [ '4.0.0' ],
+66 silly audit   'ts-interface-checker': [ '0.1.13' ],
+66 silly audit   tslib: [ '2.8.1' ],
+66 silly audit   'typed-emitter': [ '2.1.0' ],
+66 silly audit   'undici-types': [ '7.16.0' ],
+66 silly audit   'update-browserslist-db': [ '1.2.3' ],
+66 silly audit   'util-deprecate': [ '1.0.2' ],
+66 silly audit   utrie: [ '1.0.2' ],
+66 silly audit   vite: [ '5.4.21' ],
+66 silly audit   'web-vitals': [ '4.2.4' ],
+66 silly audit   'webrtc-adapter': [ '9.0.4' ],
+66 silly audit   'websocket-driver': [ '0.7.4' ],
+66 silly audit   'websocket-extensions': [ '0.1.4' ],
+66 silly audit   'which-module': [ '2.0.1' ],
+66 silly audit   ws: [ '8.18.3' ],
+66 silly audit   'xmlhttprequest-ssl': [ '2.1.2' ],
+66 silly audit   yallist: [ '3.1.1' ],
+66 silly audit   'framer-motion': [ '12.36.0' ],
+66 silly audit   'motion-dom': [ '12.36.0' ],
+66 silly audit   'motion-utils': [ '12.36.0' ]
+66 silly audit }
+67 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\fsevents
+68 silly reify mark deleted [
+68 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\fsevents'
+68 silly reify ]
+69 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@rollup\rollup-win32-ia32-msvc
+70 silly reify mark deleted [
+70 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@rollup\\rollup-win32-ia32-msvc'
+70 silly reify ]
+71 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@rollup\rollup-win32-arm64-msvc
+72 silly reify mark deleted [
+72 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@rollup\\rollup-win32-arm64-msvc'
+72 silly reify ]
+73 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@rollup\rollup-openharmony-arm64
+74 silly reify mark deleted [
+74 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@rollup\\rollup-openharmony-arm64'
+74 silly reify ]
+75 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@rollup\rollup-openbsd-x64
+76 silly reify mark deleted [
+76 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@rollup\\rollup-openbsd-x64'
+76 silly reify ]
+77 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@rollup\rollup-linux-x64-musl
+78 silly reify mark deleted [
+78 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@rollup\\rollup-linux-x64-musl'
+78 silly reify ]
+79 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@rollup\rollup-linux-x64-gnu
+80 silly reify mark deleted [
+80 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@rollup\\rollup-linux-x64-gnu'
+80 silly reify ]
+81 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@rollup\rollup-linux-s390x-gnu
+82 silly reify mark deleted [
+82 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@rollup\\rollup-linux-s390x-gnu'
+82 silly reify ]
+83 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@rollup\rollup-linux-riscv64-musl
+84 silly reify mark deleted [
+84 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@rollup\\rollup-linux-riscv64-musl'
+84 silly reify ]
+85 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@rollup\rollup-linux-riscv64-gnu
+86 silly reify mark deleted [
+86 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@rollup\\rollup-linux-riscv64-gnu'
+86 silly reify ]
+87 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@rollup\rollup-linux-ppc64-musl
+88 silly reify mark deleted [
+88 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@rollup\\rollup-linux-ppc64-musl'
+88 silly reify ]
+89 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@rollup\rollup-linux-ppc64-gnu
+90 silly reify mark deleted [
+90 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@rollup\\rollup-linux-ppc64-gnu'
+90 silly reify ]
+91 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@rollup\rollup-linux-loong64-musl
+92 silly reify mark deleted [
+92 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@rollup\\rollup-linux-loong64-musl'
+92 silly reify ]
+93 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@rollup\rollup-linux-loong64-gnu
+94 silly reify mark deleted [
+94 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@rollup\\rollup-linux-loong64-gnu'
+94 silly reify ]
+95 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@rollup\rollup-linux-arm64-musl
+96 silly reify mark deleted [
+96 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@rollup\\rollup-linux-arm64-musl'
+96 silly reify ]
+97 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@rollup\rollup-linux-arm64-gnu
+98 silly reify mark deleted [
+98 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@rollup\\rollup-linux-arm64-gnu'
+98 silly reify ]
+99 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@rollup\rollup-linux-arm-musleabihf
+100 silly reify mark deleted [
+100 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@rollup\\rollup-linux-arm-musleabihf'
+100 silly reify ]
+101 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@rollup\rollup-linux-arm-gnueabihf
+102 silly reify mark deleted [
+102 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@rollup\\rollup-linux-arm-gnueabihf'
+102 silly reify ]
+103 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@rollup\rollup-freebsd-x64
+104 silly reify mark deleted [
+104 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@rollup\\rollup-freebsd-x64'
+104 silly reify ]
+105 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@rollup\rollup-freebsd-arm64
+106 silly reify mark deleted [
+106 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@rollup\\rollup-freebsd-arm64'
+106 silly reify ]
+107 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@rollup\rollup-darwin-x64
+108 silly reify mark deleted [
+108 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@rollup\\rollup-darwin-x64'
+108 silly reify ]
+109 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@rollup\rollup-darwin-arm64
+110 silly reify mark deleted [
+110 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@rollup\\rollup-darwin-arm64'
+110 silly reify ]
+111 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@rollup\rollup-android-arm64
+112 silly reify mark deleted [
+112 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@rollup\\rollup-android-arm64'
+112 silly reify ]
+113 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@rollup\rollup-android-arm-eabi
+114 silly reify mark deleted [
+114 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@rollup\\rollup-android-arm-eabi'
+114 silly reify ]
+115 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@esbuild\win32-ia32
+116 silly reify mark deleted [
+116 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@esbuild\\win32-ia32'
+116 silly reify ]
+117 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@esbuild\win32-arm64
+118 silly reify mark deleted [
+118 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@esbuild\\win32-arm64'
+118 silly reify ]
+119 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@esbuild\sunos-x64
+120 silly reify mark deleted [
+120 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@esbuild\\sunos-x64'
+120 silly reify ]
+121 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@esbuild\openbsd-x64
+122 silly reify mark deleted [
+122 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@esbuild\\openbsd-x64'
+122 silly reify ]
+123 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@esbuild\netbsd-x64
+124 silly reify mark deleted [
+124 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@esbuild\\netbsd-x64'
+124 silly reify ]
+125 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@esbuild\linux-x64
+126 silly reify mark deleted [
+126 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@esbuild\\linux-x64'
+126 silly reify ]
+127 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@esbuild\linux-s390x
+128 silly reify mark deleted [
+128 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@esbuild\\linux-s390x'
+128 silly reify ]
+129 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@esbuild\linux-riscv64
+130 silly reify mark deleted [
+130 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@esbuild\\linux-riscv64'
+130 silly reify ]
+131 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@esbuild\linux-ppc64
+132 silly reify mark deleted [
+132 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@esbuild\\linux-ppc64'
+132 silly reify ]
+133 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@esbuild\linux-mips64el
+134 silly reify mark deleted [
+134 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@esbuild\\linux-mips64el'
+134 silly reify ]
+135 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@esbuild\linux-loong64
+136 silly reify mark deleted [
+136 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@esbuild\\linux-loong64'
+136 silly reify ]
+137 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@esbuild\linux-ia32
+138 silly reify mark deleted [
+138 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@esbuild\\linux-ia32'
+138 silly reify ]
+139 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@esbuild\linux-arm64
+140 silly reify mark deleted [
+140 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@esbuild\\linux-arm64'
+140 silly reify ]
+141 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@esbuild\linux-arm
+142 silly reify mark deleted [
+142 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@esbuild\\linux-arm'
+142 silly reify ]
+143 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@esbuild\freebsd-x64
+144 silly reify mark deleted [
+144 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@esbuild\\freebsd-x64'
+144 silly reify ]
+145 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@esbuild\freebsd-arm64
+146 silly reify mark deleted [
+146 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@esbuild\\freebsd-arm64'
+146 silly reify ]
+147 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@esbuild\darwin-x64
+148 silly reify mark deleted [
+148 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@esbuild\\darwin-x64'
+148 silly reify ]
+149 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@esbuild\darwin-arm64
+150 silly reify mark deleted [
+150 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@esbuild\\darwin-arm64'
+150 silly reify ]
+151 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@esbuild\android-x64
+152 silly reify mark deleted [
+152 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@esbuild\\android-x64'
+152 silly reify ]
+153 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@esbuild\android-arm64
+154 silly reify mark deleted [
+154 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@esbuild\\android-arm64'
+154 silly reify ]
+155 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@esbuild\android-arm
+156 silly reify mark deleted [
+156 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@esbuild\\android-arm'
+156 silly reify ]
+157 verbose reify failed optional dependency C:\Users\Nwakanma\Desktop\Project-2026\qring.io\frontend\node_modules\@esbuild\aix-ppc64
+158 silly reify mark deleted [
+158 silly reify   'C:\\Users\\Nwakanma\\Desktop\\Project-2026\\qring.io\\frontend\\node_modules\\@esbuild\\aix-ppc64'
+158 silly reify ]
+159 timing reifyNode:node_modules/fsevents Completed in 11ms
+160 timing reifyNode:node_modules/@rollup/rollup-win32-ia32-msvc Completed in 11ms
+161 timing reifyNode:node_modules/@rollup/rollup-win32-arm64-msvc Completed in 11ms
+162 timing reifyNode:node_modules/@rollup/rollup-openharmony-arm64 Completed in 10ms
+163 timing reifyNode:node_modules/@rollup/rollup-openbsd-x64 Completed in 10ms
+164 timing reifyNode:node_modules/@rollup/rollup-linux-x64-musl Completed in 10ms
+165 timing reifyNode:node_modules/@rollup/rollup-linux-x64-gnu Completed in 10ms
+166 timing reifyNode:node_modules/@rollup/rollup-linux-s390x-gnu Completed in 10ms
+167 timing reifyNode:node_modules/@rollup/rollup-linux-riscv64-musl Completed in 10ms
+168 timing reifyNode:node_modules/@rollup/rollup-linux-riscv64-gnu Completed in 10ms
+169 timing reifyNode:node_modules/@rollup/rollup-linux-ppc64-musl Completed in 10ms
+170 timing reifyNode:node_modules/@rollup/rollup-linux-ppc64-gnu Completed in 10ms
+171 timing reifyNode:node_modules/@rollup/rollup-linux-loong64-musl Completed in 10ms
+172 timing reifyNode:node_modules/@rollup/rollup-linux-loong64-gnu Completed in 11ms
+173 timing reifyNode:node_modules/@rollup/rollup-linux-arm64-musl Completed in 11ms
+174 timing reifyNode:node_modules/@rollup/rollup-linux-arm64-gnu Completed in 11ms
+175 timing reifyNode:node_modules/@rollup/rollup-linux-arm-musleabihf Completed in 11ms
+176 timing reifyNode:node_modules/@rollup/rollup-linux-arm-gnueabihf Completed in 11ms
+177 timing reifyNode:node_modules/@rollup/rollup-freebsd-x64 Completed in 11ms
+178 timing reifyNode:node_modules/@rollup/rollup-freebsd-arm64 Completed in 11ms
+179 timing reifyNode:node_modules/@rollup/rollup-darwin-x64 Completed in 11ms
+180 timing reifyNode:node_modules/@rollup/rollup-darwin-arm64 Completed in 11ms
+181 timing reifyNode:node_modules/@rollup/rollup-android-arm64 Completed in 11ms
+182 timing reifyNode:node_modules/@rollup/rollup-android-arm-eabi Completed in 11ms
+183 timing reifyNode:node_modules/@esbuild/win32-ia32 Completed in 11ms
+184 timing reifyNode:node_modules/@esbuild/win32-arm64 Completed in 11ms
+185 timing reifyNode:node_modules/@esbuild/sunos-x64 Completed in 11ms
+186 timing reifyNode:node_modules/@esbuild/openbsd-x64 Completed in 11ms
+187 timing reifyNode:node_modules/@esbuild/netbsd-x64 Completed in 11ms
+188 timing reifyNode:node_modules/@esbuild/linux-x64 Completed in 11ms
+189 timing reifyNode:node_modules/@esbuild/linux-s390x Completed in 11ms
+190 timing reifyNode:node_modules/@esbuild/linux-riscv64 Completed in 11ms
+191 timing reifyNode:node_modules/@esbuild/linux-ppc64 Completed in 11ms
+192 timing reifyNode:node_modules/@esbuild/linux-mips64el Completed in 11ms
+193 timing reifyNode:node_modules/@esbuild/linux-loong64 Completed in 11ms
+194 timing reifyNode:node_modules/@esbuild/linux-ia32 Completed in 10ms
+195 timing reifyNode:node_modules/@esbuild/linux-arm64 Completed in 10ms
+196 timing reifyNode:node_modules/@esbuild/linux-arm Completed in 11ms
+197 timing reifyNode:node_modules/@esbuild/freebsd-x64 Completed in 11ms
+198 timing reifyNode:node_modules/@esbuild/freebsd-arm64 Completed in 11ms
+199 timing reifyNode:node_modules/@esbuild/darwin-x64 Completed in 11ms
+200 timing reifyNode:node_modules/@esbuild/darwin-arm64 Completed in 11ms
+201 timing reifyNode:node_modules/@esbuild/android-x64 Completed in 11ms
+202 timing reifyNode:node_modules/@esbuild/android-arm64 Completed in 11ms
+203 timing reifyNode:node_modules/@esbuild/android-arm Completed in 11ms
+204 timing reifyNode:node_modules/@esbuild/aix-ppc64 Completed in 11ms
+205 silly tarball no local data for motion-dom@https://registry.npmjs.org/motion-dom/-/motion-dom-12.36.0.tgz. Extracting by manifest.
+206 silly tarball no local data for motion-utils@https://registry.npmjs.org/motion-utils/-/motion-utils-12.36.0.tgz. Extracting by manifest.
+207 silly tarball no local data for framer-motion@https://registry.npmjs.org/framer-motion/-/framer-motion-12.36.0.tgz. Extracting by manifest.
+208 http fetch POST 200 https://registry.npmjs.org/-/npm/v1/security/advisories/bulk 592ms
+209 timing auditReport:getReport Completed in 595ms
+210 silly audit report {
+210 silly audit report   dompurify: [
+210 silly audit report     {
+210 silly audit report       id: 1114017,
+210 silly audit report       url: 'https://github.com/advisories/GHSA-v2wj-7wpq-c8vv',
+210 silly audit report       title: 'DOMPurify contains a Cross-site Scripting vulnerability',
+210 silly audit report       severity: 'moderate',
+210 silly audit report       vulnerable_versions: '>=3.1.3 <=3.3.1',
+210 silly audit report       cwe: [Array],
+210 silly audit report       cvss: [Object]
+210 silly audit report     }
+210 silly audit report   ],
+210 silly audit report   esbuild: [
+210 silly audit report     {
+210 silly audit report       id: 1102341,
+210 silly audit report       url: 'https://github.com/advisories/GHSA-67mh-4wv8-2f99',
+210 silly audit report       title: 'esbuild enables any website to send any requests to the development server and read the response',
+210 silly audit report       severity: 'moderate',
+210 silly audit report       vulnerable_versions: '<=0.24.2',
+210 silly audit report       cwe: [Array],
+210 silly audit report       cvss: [Object]
+210 silly audit report     }
+210 silly audit report   ],
+210 silly audit report   rollup: [
+210 silly audit report     {
+210 silly audit report       id: 1113515,
+210 silly audit report       url: 'https://github.com/advisories/GHSA-mw96-cpmx-2vgc',
+210 silly audit report       title: 'Rollup 4 has Arbitrary File Write via Path Traversal',
+210 silly audit report       severity: 'high',
+210 silly audit report       vulnerable_versions: '>=4.0.0 <4.59.0',
+210 silly audit report       cwe: [Array],
+210 silly audit report       cvss: [Object]
+210 silly audit report     }
+210 silly audit report   ]
+210 silly audit report }
+211 timing metavuln:cache:get:security-advisory:dompurify:z72bU6G8d8Dqb2Fl/22PIYEOGfcG+4wkuSxQ1Za70rzYWxz1NZzB8UXHoQOvWGnikhD3GzlLCoaDDBflG9WwUw== Completed in 2ms
+212 timing metavuln:cache:get:security-advisory:esbuild:jKdCIzePj7J1488qgRXvF8Srh9wutSuR1exB8YooNX62hT+qhtrUXYbArLNoIhgwbaCqKpmduh18syZU7BR9SA== Completed in 2ms
+213 timing metavuln:cache:get:security-advisory:rollup:j57+QiunRUdD0cUD+SOC+z9ahAKAX/ORqNrS8xn5EMmMoVNjDT6jDQ8+1zJZRvVKgeAjbBSmjAgyimjwq9Hhfg== Completed in 1ms
+214 http fetch GET 200 https://registry.npmjs.org/dompurify 260ms (cache miss)
+215 timing metavuln:packument:dompurify Completed in 264ms
+216 timing metavuln:load:security-advisory:dompurify:1114017 Completed in 4ms
+217 timing metavuln:cache:put:security-advisory:dompurify:z72bU6G8d8Dqb2Fl/22PIYEOGfcG+4wkuSxQ1Za70rzYWxz1NZzB8UXHoQOvWGnikhD3GzlLCoaDDBflG9WwUw== Completed in 18ms
+218 timing metavuln:calculate:security-advisory:dompurify:1114017 Completed in 287ms
+219 http fetch GET 200 https://registry.npmjs.org/motion-utils/-/motion-utils-12.36.0.tgz 2080ms (cache miss)
+220 timing reifyNode:node_modules/motion-utils Completed in 2107ms
+221 http fetch GET 200 https://registry.npmjs.org/esbuild 1749ms (cache miss)
+222 timing metavuln:packument:esbuild Completed in 1757ms
+223 timing metavuln:load:security-advisory:esbuild:1102341 Completed in 11ms
+224 http fetch GET 200 https://registry.npmjs.org/rollup 1773ms (cache miss)
+225 timing metavuln:packument:rollup Completed in 1804ms
+226 timing metavuln:load:security-advisory:rollup:1113515 Completed in 20ms
+227 timing metavuln:cache:put:security-advisory:esbuild:jKdCIzePj7J1488qgRXvF8Srh9wutSuR1exB8YooNX62hT+qhtrUXYbArLNoIhgwbaCqKpmduh18syZU7BR9SA== Completed in 101ms
+228 timing metavuln:calculate:security-advisory:esbuild:1102341 Completed in 1870ms
+229 timing metavuln:cache:put:security-advisory:rollup:j57+QiunRUdD0cUD+SOC+z9ahAKAX/ORqNrS8xn5EMmMoVNjDT6jDQ8+1zJZRvVKgeAjbBSmjAgyimjwq9Hhfg== Completed in 57ms
+230 timing metavuln:calculate:security-advisory:rollup:1113515 Completed in 1881ms
+231 timing metavuln:cache:get:security-advisory:jspdf:y9KB5KB41SzgZBU+lM2BUaHZq+MIiYS5z7uqn4O2v5NtTNQ5ZcH1PNNh1LxYPfTSNtNj7Ses+B+SCDXuLJnWgg== Completed in 1ms
+232 http fetch GET 200 https://registry.npmjs.org/jspdf 234ms (cache miss)
+233 timing metavuln:packument:jspdf Completed in 235ms
+234 timing metavuln:load:security-advisory:jspdf:z72bU6G8d8Dqb2Fl/22PIYEOGfcG+4wkuSxQ1Za70rzYWxz1NZzB8UXHoQOvWGnikhD3GzlLCoaDDBflG9WwUw== Completed in 5ms
+235 timing metavuln:cache:put:security-advisory:jspdf:y9KB5KB41SzgZBU+lM2BUaHZq+MIiYS5z7uqn4O2v5NtTNQ5ZcH1PNNh1LxYPfTSNtNj7Ses+B+SCDXuLJnWgg== Completed in 32ms
+236 timing metavuln:calculate:security-advisory:jspdf:z72bU6G8d8Dqb2Fl/22PIYEOGfcG+4wkuSxQ1Za70rzYWxz1NZzB8UXHoQOvWGnikhD3GzlLCoaDDBflG9WwUw== Completed in 272ms
+237 timing metavuln:cache:get:security-advisory:vite:tMBsdAS7JBTyRORp0YaJR984WAAsOxgmReSLBN0Nd41GhzEakjROICqAJ31iOdYG5Ijo/MlJ01p3ig1iN88+Tw== Completed in 1ms
+238 http fetch GET 200 https://registry.npmjs.org/vite 419ms (cache miss)
+239 timing metavuln:packument:vite Completed in 442ms
+240 timing metavuln:load:security-advisory:vite:jKdCIzePj7J1488qgRXvF8Srh9wutSuR1exB8YooNX62hT+qhtrUXYbArLNoIhgwbaCqKpmduh18syZU7BR9SA== Completed in 106ms
+241 timing metavuln:cache:put:security-advisory:vite:tMBsdAS7JBTyRORp0YaJR984WAAsOxgmReSLBN0Nd41GhzEakjROICqAJ31iOdYG5Ijo/MlJ01p3ig1iN88+Tw== Completed in 26ms
+242 timing metavuln:calculate:security-advisory:vite:jKdCIzePj7J1488qgRXvF8Srh9wutSuR1exB8YooNX62hT+qhtrUXYbArLNoIhgwbaCqKpmduh18syZU7BR9SA== Completed in 574ms
+243 timing metavuln:cache:get:security-advisory:vite:SaJWDd5gEEZd3lHg31QWzLWgMkCzYHn5RvntQLmOGssdx9DgqFp1CHRkx1q//bJjITqFeBtPANooZCY8TRvk8g== Completed in 1ms
+244 timing metavuln:load:security-advisory:vite:j57+QiunRUdD0cUD+SOC+z9ahAKAX/ORqNrS8xn5EMmMoVNjDT6jDQ8+1zJZRvVKgeAjbBSmjAgyimjwq9Hhfg== Completed in 109ms
+245 timing metavuln:cache:put:security-advisory:vite:SaJWDd5gEEZd3lHg31QWzLWgMkCzYHn5RvntQLmOGssdx9DgqFp1CHRkx1q//bJjITqFeBtPANooZCY8TRvk8g== Completed in 24ms
+246 timing metavuln:calculate:security-advisory:vite:j57+QiunRUdD0cUD+SOC+z9ahAKAX/ORqNrS8xn5EMmMoVNjDT6jDQ8+1zJZRvVKgeAjbBSmjAgyimjwq9Hhfg== Completed in 135ms
+247 timing metavuln:cache:get:security-advisory:@vitejs/plugin-react:P4XDBxCt1M9jhU3wPSnbYo14hU9TEKKi3dRjV6pE6SGkUMgEqrUpLUvU/o4utnW6O2m8Mrkk3y+AtxEbBn/p0A== Completed in 8ms
+248 http fetch GET 200 https://registry.npmjs.org/@vitejs%2fplugin-react 270ms (cache miss)
+249 timing metavuln:packument:@vitejs/plugin-react Completed in 272ms
+250 timing metavuln:load:security-advisory:@vitejs/plugin-react:tMBsdAS7JBTyRORp0YaJR984WAAsOxgmReSLBN0Nd41GhzEakjROICqAJ31iOdYG5Ijo/MlJ01p3ig1iN88+Tw== Completed in 51ms
+251 timing metavuln:cache:put:security-advisory:@vitejs/plugin-react:P4XDBxCt1M9jhU3wPSnbYo14hU9TEKKi3dRjV6pE6SGkUMgEqrUpLUvU/o4utnW6O2m8Mrkk3y+AtxEbBn/p0A== Completed in 25ms
+252 timing metavuln:calculate:security-advisory:@vitejs/plugin-react:tMBsdAS7JBTyRORp0YaJR984WAAsOxgmReSLBN0Nd41GhzEakjROICqAJ31iOdYG5Ijo/MlJ01p3ig1iN88+Tw== Completed in 351ms
+253 timing auditReport:init Completed in 3217ms
+254 timing reify:audit Completed in 3813ms
+255 http fetch GET 200 https://registry.npmjs.org/motion-dom/-/motion-dom-12.36.0.tgz 4026ms (cache miss)
+256 timing reifyNode:node_modules/motion-dom Completed in 4044ms
+257 http fetch GET 200 https://registry.npmjs.org/framer-motion/-/framer-motion-12.36.0.tgz 4525ms (cache miss)
+258 timing reifyNode:node_modules/framer-motion Completed in 4552ms
+259 timing reify:unpack Completed in 4552ms
+260 timing reify:unretire Completed in 1ms
+261 timing build:queue Completed in 3ms
+262 timing build:deps Completed in 3ms
+263 timing build Completed in 3ms
+264 timing reify:build Completed in 3ms
+265 timing reify:trash Completed in 23ms
+266 timing reify:save Completed in 142ms
+267 timing reify Completed in 9544ms
+268 silly ADD node_modules/motion-utils
+269 silly ADD node_modules/motion-dom
+270 silly ADD node_modules/framer-motion
+271 silly ADD
+272 silly ADD
+273 silly ADD
+274 silly ADD
+275 silly ADD
+276 silly ADD
+277 silly ADD
+278 silly ADD
+279 silly ADD
+280 silly ADD
+281 silly ADD
+282 silly ADD
+283 silly ADD
+284 silly ADD
+285 silly ADD
+286 silly ADD
+287 silly ADD
+288 silly ADD
+289 silly ADD
+290 silly ADD
+291 silly ADD
+292 silly ADD
+293 silly ADD
+294 silly ADD
+295 silly ADD
+296 silly ADD
+297 silly ADD
+298 silly ADD
+299 silly ADD
+300 silly ADD
+301 silly ADD
+302 silly ADD
+303 silly ADD
+304 silly ADD
+305 silly ADD
+306 silly ADD
+307 silly ADD
+308 silly ADD
+309 silly ADD
+310 silly ADD
+311 silly ADD
+312 silly ADD
+313 silly ADD
+314 silly ADD
+315 silly ADD
+316 silly ADD
+317 timing command:install Completed in 9567ms
+318 notice
+318 notice New major version of npm available! 10.2.0 -> 11.11.1
+318 notice Changelog: <https://github.com/npm/cli/releases/tag/v11.11.1>
+318 notice Run `npm install -g npm@11.11.1` to update!
+318 notice
+319 verbose exit 0
+320 timing npm Completed in 10150ms
+321 info ok

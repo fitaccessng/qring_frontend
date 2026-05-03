@@ -306,6 +306,7 @@ export async function getVisitorSessionMessages(sessionId) {
   return Array.isArray(response?.data) ? response.data : [];
 }
 
+<<<<<<< HEAD
 export async function sendVisitorSessionMessage(sessionId, text, clientId) {
   const token = getVisitorSessionToken(sessionId);
   const response = await apiRequest(`/visitor/sessions/${sessionId}/messages`, {
@@ -319,6 +320,8 @@ export async function sendVisitorSessionMessage(sessionId, text, clientId) {
   return response?.data ?? null;
 }
 
+=======
+>>>>>>> 6849d3d3464740aa434cb384338d4425a1f2bcb7
 export async function resolveVisitorAppointment(shareToken) {
   const response = await apiRequest(`/visitor/appointments/resolve/${encodeURIComponent(shareToken)}`);
   return response?.data ?? null;
