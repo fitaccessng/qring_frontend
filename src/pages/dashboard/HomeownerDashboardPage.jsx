@@ -16,7 +16,10 @@ import {
   Zap,
   AlertTriangle,
   ShieldCheck,
-  Activity
+  Activity,
+  Home,
+  Calendar,
+  User
 } from "lucide-react";
 
 import { useApiQuery, useSocketQueryInvalidation } from "../../hooks/useApi";
@@ -156,56 +159,45 @@ export default function HomeownerDashboardPage() {
             </p>
           </div>
 
-        {/* --- ADD THIS SECTION ABOVE THE HERO/BENTO SECTION --- */}
+          <section className="space-y-4">
+            {/* Top Tier Action */}
+            <Link
+              to="/dashboard/homeowner/appointments"
+              className="group w-full bg-indigo-600 hover:bg-indigo-700 p-4 rounded-[1.5rem] flex items-center justify-between transition-all shadow-xl shadow-indigo-100"
+            >
+              <div className="flex items-center gap-3">
+                <div className="bg-white/20 p-2 rounded-xl text-white">
+                  <Users size={20} />
+                </div>
+                <span className="text-white font-bold text-sm tracking-tight">Invite New Guest</span>
+              </div>
+              <div className="bg-white/10 group-hover:bg-white/20 p-2 rounded-full transition-colors">
+                <Unlock size={16} className="text-white" />
+              </div>
+            </Link>
 
-<section className="space-y-4">
-  {/* Top Tier Action */}
-  <Link
-    to="/dashboard/homeowner/appointments"
-    className="group w-full bg-indigo-600 hover:bg-indigo-700 p-4 rounded-[1.5rem] flex items-center justify-between transition-all shadow-xl shadow-indigo-100"
-  >
-    <div className="flex items-center gap-3">
-      <div className="bg-white/20 p-2 rounded-xl text-white">
-        <Users size={20} />
-      </div>
-      <span className="text-white font-bold text-sm tracking-tight">Invite New Guest</span>
-    </div>
-    <div className="bg-white/10 group-hover:bg-white/20 p-2 rounded-full transition-colors">
-      <Unlock size={16} className="text-white" />
-    </div>
-  </Link>
-
-  {/* Resident QR Card */}
-  <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
-    <div className="flex flex-col sm:flex-row">
-      
-      {/* Visual Side */}
-      <div className="bg-slate-900 p-8 sm:w-1/2 flex flex-col justify-between relative overflow-hidden">
-        {/* Decorative Grid Pattern */}
-        <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', size: '20px 20px' }}></div>
-        
-        <div className="relative z-10">
-          <h3 className="text-white text-2xl font-extrabold leading-tight">Your Resident<br/>QR Code</h3>
-        </div>
-        
-        <div className="mt-8 relative z-10">
-          <p className="text-slate-400 text-xs font-medium mb-4">Use this code for quick entry and identity verification at all estate checkpoints.</p>
-          <Link
-            to="/dashboard/homeowner/doors"
-            className="inline-flex bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold uppercase tracking-widest px-6 py-3 rounded-xl transition-all active:scale-95 shadow-lg shadow-indigo-900/50"
-          >
-            Show My Code
-          </Link>
-        </div>
-      </div>
-
-    
-
-    </div>
-  </div>
-</section>
-
-{/* --- THEN FOLLOWS YOUR PREVIOUS BENTO/STATS SECTION --- */}
+            {/* Resident QR Card */}
+            <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
+              <div className="flex flex-col sm:flex-row">
+                {/* Visual Side */}
+                <div className="bg-slate-900 p-8 sm:w-1/2 flex flex-col justify-between relative overflow-hidden">
+                  <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', size: '20px 20px' }}></div>
+                  <div className="relative z-10">
+                    <h3 className="text-white text-2xl font-extrabold leading-tight">Your Resident<br/>QR Code</h3>
+                  </div>
+                  <div className="mt-8 relative z-10">
+                    <p className="text-slate-400 text-xs font-medium mb-4">Use this code for quick entry and identity verification at all estate checkpoints.</p>
+                    <Link
+                      to="/dashboard/homeowner/doors"
+                      className="inline-flex bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold uppercase tracking-widest px-6 py-3 rounded-xl transition-all active:scale-95 shadow-lg shadow-indigo-900/50"
+                    >
+                      Show My Code
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
         </section>
 
         {/* Quick Actions Grid */}
@@ -261,6 +253,27 @@ export default function HomeownerDashboardPage() {
         </section>
       </main>
 
+      {/* Static Bottom Navigation */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 py-3 px-6 z-[100] shadow-lg md:hidden">
+        <div className="max-w-4xl mx-auto flex justify-between items-center text-slate-400 font-bold">
+          <Link to="/dashboard/homeowner" className="flex flex-col items-center gap-1 text-indigo-600 hover:text-indigo-600 transition">
+            <Home size={20} />
+            <span className="text-[9px] uppercase tracking-wider">Home</span>
+          </Link>
+          <Link to="/dashboard/homeowner/appointments" className="flex flex-col items-center gap-1 hover:text-indigo-600 transition">
+            <Calendar size={20} />
+            <span className="text-[9px] uppercase tracking-wider">Appointment</span>
+          </Link>
+          <Link to="/dashboard/homeowner/messages" className="flex flex-col items-center gap-1 hover:text-indigo-600 transition">
+            <MessageSquare size={20} />
+            <span className="text-[9px] uppercase tracking-wider">Message</span>
+          </Link>
+          <Link to="/dashboard/homeowner/settings" className="flex flex-col items-center gap-1 hover:text-indigo-600 transition">
+            <User size={20} />
+            <span className="text-[9px] uppercase tracking-wider">Profile</span>
+          </Link>
+        </div>
+      </nav>
     </div>
   );
 }
