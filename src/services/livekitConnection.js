@@ -1,5 +1,5 @@
-export const LIVEKIT_DEFAULT_CONNECT_TIMEOUT_MS = 8000;
-export const LIVEKIT_DEFAULT_RING_TIMEOUT_MS = 30000;
+export const LIVEKIT_DEFAULT_CONNECT_TIMEOUT_MS = 6500;
+export const LIVEKIT_DEFAULT_RING_TIMEOUT_MS = 20000;
 
 export function buildLivekitRtcConfig({ iceServers = [], forceRelay = false } = {}) {
   return {
@@ -38,9 +38,9 @@ export function buildLivekitConnectOptions({
   peerConnectionTimeoutMs,
 } = {}) {
   return {
-    maxRetries: 6,
-    websocketTimeout: websocketTimeoutMs ?? 15000,
-    peerConnectionTimeout: peerConnectionTimeoutMs ?? 30000,
+    maxRetries: 4,
+    websocketTimeout: websocketTimeoutMs ?? 10000,
+    peerConnectionTimeout: peerConnectionTimeoutMs ?? 20000,
   };
 }
 

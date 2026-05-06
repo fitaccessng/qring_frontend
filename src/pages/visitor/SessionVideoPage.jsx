@@ -3,17 +3,12 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   Bell,
   ChevronLeft,
-  History,
-  KeyRound,
-  LayoutGrid,
   LockOpen,
   Mic,
   MicOff,
   PhoneOff,
   Radio,
   RotateCcw,
-  Shield,
-  User as UserIcon
 } from "lucide-react";
 import VisitorIncomingCallModal from "../../components/VisitorIncomingCallModal";
 import { useSessionRealtime } from "../../hooks/useSessionRealtime";
@@ -167,14 +162,6 @@ export default function SessionVideoPage() {
         </div>
       </main>
 
-      <nav className="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-8 pt-4 bg-white border-t border-slate-100 z-[9999] shadow-[0_-10px_40px_rgba(0,0,0,0.08)]">
-        <NavItem to="/dashboard/homeowner/overview" icon={<LayoutGrid size={22} />} label="Home" />
-        <NavItem to="/dashboard/homeowner/visits" icon={<History size={22} />} label="Activity" />
-        <NavItem to="/dashboard/homeowner/safety" icon={<Shield size={22} />} label="Safety" active />
-        <NavItem to="/dashboard/homeowner/doors" icon={<KeyRound size={22} />} label="Access" />
-        <NavItem to="/dashboard/homeowner/settings" icon={<UserIcon size={22} />} label="Profile" />
-      </nav>
-
       <VisitorIncomingCallModal
         open={incomingCall.pending}
         hasVideo={incomingCall.hasVideo}
@@ -182,15 +169,6 @@ export default function SessionVideoPage() {
         onReject={rejectIncomingCall}
       />
     </div>
-  );
-}
-
-function NavItem({ to, icon, label, active = false }) {
-  return (
-    <Link to={to} className={`flex flex-col items-center gap-1 transition-all ${active ? "text-indigo-600" : "text-slate-400"}`}>
-      <div className={`${active ? "bg-indigo-50 p-2 rounded-xl" : "p-2"}`}>{icon}</div>
-      <span className="text-[9px] font-black uppercase mt-0.5 tracking-tight">{label}</span>
-    </Link>
   );
 }
 

@@ -232,6 +232,22 @@ export default function AppointmentPage() {
       await sendArrivalSignal(currentLat, currentLng);
     };
 
+    const currentPosition = await getCurrentDeviceLocation({
+      enableHighAccuracy: true,
+      timeout: 20000,
+      maximumAge: 30000,
+      maxCachedAgeMs: 2 * 60 * 1000
+    });
+    if (currentPosition?.ok && currentPosition?.coords) {
+      await onPosition({
+        latitude: currentPosition.coords.latitude,
+        longitude: currentPosition.coords.longitude
+      });
+      if (arrivedRef.current) {
+        return true;
+      }
+    }
+
     watchRef.current = (await watchDeviceLocation(
       (coords) => onPosition(coords),
       (watchError) => {

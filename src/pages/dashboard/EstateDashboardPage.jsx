@@ -294,13 +294,6 @@ export default function EstateManagerDashboard() {
           </div>
         </section>
       </main>
-
-      <nav className="fixed bottom-0 left-0 w-full flex justify-around items-center px-2 py-3 pb-8 bg-white/95 backdrop-blur-md border-t border-slate-100 z-50 shadow-[0_-10px_40px_rgba(0,0,0,0.04)]">
-        <BottomNavLink to="/dashboard/estate" icon={<LayoutDashboard size={20} />} label="Overview" active />
-        <BottomNavLink to="/dashboard/estate/invites" icon={<Users size={20} />} label="Residents" />
-        <BottomNavLink to="/dashboard/estate/broadcasts" icon={<MessageSquare size={20} />} label="Chat" />
-        <BottomNavLink to="/dashboard/estate/settings" icon={<Wrench size={20} />} label="Tools" />
-      </nav>
     </div>
   );
 }

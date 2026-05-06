@@ -2,6 +2,13 @@ import { useEffect, useRef, useState } from "react";
 
 const MAX_RECORD_MS = 20000;
 const MAX_BYTES = 1.6 * 1024 * 1024;
+const PREFERRED_MIME_TYPES = [
+  "audio/webm;codecs=opus",
+  "audio/webm",
+  "audio/mp4",
+  "audio/ogg;codecs=opus",
+  "audio/ogg"
+];
 
 export default function VoiceNoteRecorder({ onSend, disabled = false }) {
   const [recording, setRecording] = useState(false);
@@ -22,12 +29,18 @@ export default function VoiceNoteRecorder({ onSend, disabled = false }) {
   async function startRecording() {
     if (disabled || recording) return;
     setStatus("");
+    if (typeof window === "undefined" || typeof window.MediaRecorder === "undefined") {
+      setStatus("Voice notes are not supported on this device.");
+      return;
+    }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setStatus("Microphone access is unavailable on this device.");
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const preferredType = "audio/webm";
-      const recorder = MediaRecorder.isTypeSupported(preferredType)
-        ? new MediaRecorder(stream, { mimeType: preferredType })
-        : new MediaRecorder(stream);
+      const preferredType = PREFERRED_MIME_TYPES.find((type) => MediaRecorder.isTypeSupported?.(type));
+      const recorder = preferredType ? new MediaRecorder(stream, { mimeType: preferredType }) : new MediaRecorder(stream);
       recorderRef.current = recorder;
       chunksRef.current = [];
 
@@ -39,24 +52,32 @@ export default function VoiceNoteRecorder({ onSend, disabled = false }) {
 
       recorder.onstop = async () => {
         stream.getTracks().forEach((track) => track.stop());
-        const mime = recorder.mimeType || "audio/webm";
-        const blob = new Blob(chunksRef.current, { type: mime });
-        if (!blob.size) {
-          setStatus("No audio captured.");
-          return;
+        recorderRef.current = null;
+        try {
+          const mime = recorder.mimeType || preferredType || "audio/webm";
+          const blob = new Blob(chunksRef.current, { type: mime });
+          if (!blob.size) {
+            setStatus("No audio captured.");
+            return;
+          }
+          if (blob.size > MAX_BYTES) {
+            setStatus("Voice note too large. Keep it under 20 seconds.");
+            return;
+          }
+          const file = new File([blob], `voice-note${extensionForMime(mime)}`, { type: mime });
+          const result = await onSend?.(file);
+          if (result === true) {
+            setStatus("");
+            return;
+          }
+          if (typeof result === "string" && result.trim()) {
+            setStatus(result.trim());
+            return;
+          }
+          setStatus("Unable to send voice note. Try again.");
+        } catch (error) {
+          setStatus(error?.message || "Unable to process voice note.");
         }
-        if (blob.size > MAX_BYTES) {
-          setStatus("Voice note too large. Keep it under 20 seconds.");
-          return;
-        }
-        const file = new File([blob], `voice-note${extensionForMime(mime)}`, { type: mime });
-        const result = await onSend?.(file);
-        if (result === true) return;
-        if (typeof result === "string" && result.trim()) {
-          setStatus(result.trim());
-          return;
-        }
-        setStatus("Unable to send voice note. Try again.");
       };
 
       recorder.start();
@@ -71,7 +92,10 @@ export default function VoiceNoteRecorder({ onSend, disabled = false }) {
     if (!recorderRef.current || recorderRef.current.state === "inactive") return;
     recorderRef.current.stop();
     setRecording(false);
-    if (timerRef.current) clearTimeout(timerRef.current);
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
   }
 
   return (

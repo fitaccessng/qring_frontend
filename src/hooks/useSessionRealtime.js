@@ -42,13 +42,13 @@ const SOCKET_RELEASE_GRACE_MS = 2 * 60 * 1000;
 const signalingSocketPool = new Map();
 const DIAGNOSTICS_POLL_MS = 3000;
 const CONNECTION_RECOVERY_LIMIT = 2;
-const CALL_INVITE_RETRY_MS = 1800;
+const CALL_INVITE_RETRY_MS = 1200;
 const DEVICE_STORAGE_KEY = "qring_visitor_device_id";
 const CALL_ACCEPT_INTENT_KEY = "qring_call_accept_intent";
 const CALL_START_INTENT_KEY = "qring_call_start_intent";
-const LIVEKIT_PEER_CONNECT_TIMEOUT_MS = 30000;
-const LIVEKIT_WEBSOCKET_TIMEOUT_MS = 15000;
-const LIVEKIT_MANUAL_RECONNECT_DELAY_MS = 1500;
+const LIVEKIT_PEER_CONNECT_TIMEOUT_MS = 20000;
+const LIVEKIT_WEBSOCKET_TIMEOUT_MS = 10000;
+const LIVEKIT_MANUAL_RECONNECT_DELAY_MS = 1000;
 const LIVEKIT_MANUAL_RECONNECT_MAX_ATTEMPTS = 3;
 
 function getMessageRoute({ sessionId, participantType }) {
@@ -1893,13 +1893,18 @@ export function useSessionRealtime(sessionId) {
         throw new Error("Call session was not provided.");
       }
       callSessionRef.current = callSessionId;
+      callVisitorIdRef.current =
+        participantType === "visitor"
+          ? incomingSnapshot.visitorId || getVisitorIdentity()
+          : callVisitorIdRef.current;
       const joinedAt = Date.now();
       const auth = await apiRequest("/calls/join", {
         method: "POST",
         body: JSON.stringify({
           callSessionId,
           participantType,
-          visitorId: participantType === "visitor" ? incomingSnapshot.visitorId || getVisitorIdentity() : undefined
+          visitorId: participantType === "visitor" ? callVisitorIdRef.current : undefined,
+          visitorToken: participantType === "visitor" ? (getVisitorSessionToken(sessionId) || undefined) : undefined
         })
       });
       socketRef.current?.emit("call.accepted", {
@@ -1931,7 +1936,7 @@ export function useSessionRealtime(sessionId) {
         sessionId,
         hasVideo: allowVideo,
         callSessionId,
-        visitorId: participantType === "visitor" ? incomingSnapshot.visitorId || getVisitorIdentity() : "",
+        visitorId: participantType === "visitor" ? callVisitorIdRef.current : "",
       });
       pendingOfferRef.current = null;
       acceptingCallRef.current = false;
@@ -1987,7 +1992,7 @@ export function useSessionRealtime(sessionId) {
           body: JSON.stringify({
             callSessionId: incomingCall.callSessionId,
             participantType,
-            visitorId: participantType === "visitor" ? incomingCall.visitorId || getVisitorIdentity() : undefined,
+            visitorId: participantType === "visitor" ? (incomingCall.visitorId || callVisitorIdRef.current || getVisitorIdentity()) : undefined,
             visitorToken: participantType === "visitor" ? (getVisitorSessionToken(sessionId) || undefined) : undefined
           })
         });
@@ -2197,7 +2202,7 @@ export function useSessionRealtime(sessionId) {
             body: JSON.stringify({
               callSessionId: callSessionRef.current,
               participantType,
-              visitorId: participantType === "visitor" ? incomingCall.visitorId || getVisitorIdentity() : undefined,
+              visitorId: participantType === "visitor" ? (callVisitorIdRef.current || incomingCall.visitorId || getVisitorIdentity()) : undefined,
               visitorToken: participantType === "visitor" ? (getVisitorSessionToken(sessionId) || undefined) : undefined
             })
           });
@@ -2407,7 +2412,7 @@ export function useSessionRealtime(sessionId) {
           sessionId,
           hasVideo: Boolean(lastInviteHasVideoRef.current),
           callSessionId: callSessionRef.current || undefined,
-          visitorId: incomingCall.visitorId || undefined
+          visitorId: callVisitorIdRef.current || incomingCall.visitorId || undefined
         });
       }
       if (!legacyWebrtcEnabled) return;

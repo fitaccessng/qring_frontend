@@ -48,23 +48,6 @@ const Header = () => (
 /**
  * 3. NATIVE BOTTOM NAVIGATION
  */
-const BottomNav = () => (
-  <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] h-16 bg-slate-900/95 backdrop-blur-lg rounded-[2rem] flex items-center justify-around px-6 shadow-2xl z-50">
-    <NavItem icon={<Users size={22} />} active />
-    <NavItem icon={<MessageSquare size={22} />} />
-    <NavItem icon={<MoreHorizontal size={22} />} />
-  </nav>
-);
-
-const NavItem = ({ icon, active = false }) => (
-  <motion.button
-    whileTap={{ scale: 0.8 }}
-    className={`p-2 rounded-xl transition-colors ${active ? 'text-white' : 'text-slate-500'}`}
-  >
-    {icon}
-  </motion.button>
-);
-
 /**
  * 4. INTERACTIVE CARD COMPONENT
  */
@@ -159,8 +142,6 @@ export default function EstateCommunityBoardPage() {
       >
         <Plus size={32} strokeWidth={3} />
       </motion.button>
-
-      <BottomNav />
 
       {/* NATIVE BOTTOM SHEET COMPOSER */}
       <AnimatePresence>

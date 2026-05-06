@@ -3,7 +3,12 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../state/AuthContext";
 import { getHomeownerContext } from "../../services/homeownerService";
 
-const APP_ROUTE_PREFIXES = ["/dashboard", "/billing", "/onboarding"];
+const ROOT_DASHBOARD_ROUTES = new Set([
+  "/dashboard/homeowner/overview",
+  "/dashboard/estate",
+  "/dashboard/security",
+  "/dashboard/admin"
+]);
 
 const homeownerNav = [
   { to: "/dashboard/homeowner/overview", label: "Home", icon: "overview" },
@@ -83,60 +88,42 @@ export default function PersistentAppMobileNav() {
 
   const isManagedHomeowner = Boolean(homeownerContext?.managedByEstate);
   const items = useMemo(() => {
-    if (routeRole === "homeowner") return [];
+    if (routeRole === "homeowner") return isManagedHomeowner ? estateManagedHomeownerNav : homeownerNav;
     if (routeRole === "estate") return estateNav;
     if (routeRole === "security") return securityNav;
     if (routeRole === "admin") return adminNav;
     return [];
   }, [isManagedHomeowner, routeRole]);
 
-  const shouldShow = ready && isAuthenticated && items.length > 0 && APP_ROUTE_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+  const shouldShow = ready && isAuthenticated && items.length > 0 && ROOT_DASHBOARD_ROUTES.has(pathname);
   if (!shouldShow) return null;
 
   return (
     <>
       <div className="h-24 lg:hidden" aria-hidden="true" />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed inset-x-0 bottom-0 z-[9998] h-[calc(6.8rem+env(safe-area-inset-bottom))] bg-gradient-to-t from-slate-100/95 via-slate-100/75 to-transparent backdrop-blur-md dark:from-slate-950/95 dark:via-slate-950/75 lg:hidden"
-      />
-      <nav className="fixed inset-x-0 bottom-0 z-[9999] px-3 pb-[max(0.2rem,env(safe-area-inset-bottom))] lg:hidden">
-        <div className="relative mx-auto max-w-md rounded-[1.35rem] border border-slate-200/60 bg-[#ebe8f8]/95 px-3 py-2 shadow-[0_12px_32px_rgba(76,29,149,0.16)] backdrop-blur-md dark:border-slate-700 dark:bg-slate-900/90">
-          <div className="flex h-12 items-stretch gap-1 sm:h-12">
+      <nav className="fixed inset-x-0 bottom-0 z-[9999] border-t border-slate-100 bg-white px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-[0_-10px_30px_rgba(15,23,42,0.06)] lg:hidden">
+        <div className="mx-auto flex max-w-4xl items-center justify-between text-slate-400">
             {items.map((item) => (
               <NavLink
                 key={`persistent-mobile-${item.to}`}
                 to={item.to}
                 end={item.to === "/dashboard/homeowner/overview" || item.to === "/dashboard/estate" || item.to === "/dashboard/admin"}
                 className={({ isActive }) =>
-                  `flex min-w-0 flex-1 items-center justify-center rounded-xl px-1 py-1 text-[10px] font-semibold transition-all duration-200 active:scale-95 sm:text-[11px] ${
-                    isActive ? "text-white" : "text-violet-700 dark:text-slate-300"
+                  `flex min-w-0 flex-1 flex-col items-center gap-1 rounded-xl px-1 py-1 text-[9px] font-bold uppercase tracking-wider transition-all duration-200 active:scale-95 ${
+                    isActive ? "text-indigo-600" : "text-slate-400"
                   }`
                 }
               >
                 {({ isActive }) => (
-                  <div className="group relative flex items-center justify-center">
-                    <span
-                      className={`grid place-items-center rounded-full transition-all duration-200 ${
-                        isActive
-                          ? "h-10 w-10 bg-violet-600 text-white shadow-[0_10px_24px_rgba(124,58,237,0.45)]"
-                          : "h-8 w-8 text-violet-700 opacity-90 dark:text-slate-300"
-                      }`}
-                    >
+                  <>
+                    <span className={`grid place-items-center rounded-xl p-2 transition-all duration-200 ${isActive ? "bg-indigo-50 text-indigo-600" : "text-slate-400"}`}>
                       <NavIcon name={item.icon} />
                     </span>
-                    <span
-                      className={`pointer-events-none absolute -top-7 whitespace-nowrap rounded-full bg-violet-600 px-2 py-0.5 text-[10px] font-semibold text-white transition-all ${
-                        isActive ? "opacity-100" : "opacity-0"
-                      } group-hover:opacity-100`}
-                    >
-                      {item.label}
-                    </span>
-                  </div>
+                    <span>{item.label}</span>
+                  </>
                 )}
               </NavLink>
             ))}
-          </div>
         </div>
       </nav>
     </>

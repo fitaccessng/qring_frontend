@@ -17,9 +17,7 @@ import {
   AlertTriangle,
   ShieldCheck,
   Activity,
-  Home,
-  Calendar,
-  User
+  Home
 } from "lucide-react";
 
 import { useApiQuery, useSocketQueryInvalidation } from "../../hooks/useApi";
@@ -252,28 +250,6 @@ export default function HomeownerDashboardPage() {
           </div>
         </section>
       </main>
-
-      {/* Static Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 py-3 px-6 z-[100] shadow-lg md:hidden">
-        <div className="max-w-4xl mx-auto flex justify-between items-center text-slate-400 font-bold">
-          <Link to="/dashboard/homeowner" className="flex flex-col items-center gap-1 text-indigo-600 hover:text-indigo-600 transition">
-            <Home size={20} />
-            <span className="text-[9px] uppercase tracking-wider">Home</span>
-          </Link>
-          <Link to="/dashboard/homeowner/appointments" className="flex flex-col items-center gap-1 hover:text-indigo-600 transition">
-            <Calendar size={20} />
-            <span className="text-[9px] uppercase tracking-wider">Appointment</span>
-          </Link>
-          <Link to="/dashboard/homeowner/messages" className="flex flex-col items-center gap-1 hover:text-indigo-600 transition">
-            <MessageSquare size={20} />
-            <span className="text-[9px] uppercase tracking-wider">Message</span>
-          </Link>
-          <Link to="/dashboard/homeowner/settings" className="flex flex-col items-center gap-1 hover:text-indigo-600 transition">
-            <User size={20} />
-            <span className="text-[9px] uppercase tracking-wider">Profile</span>
-          </Link>
-        </div>
-      </nav>
     </div>
   );
 }

@@ -37,6 +37,10 @@ export default function ResidentAppointmentsPage() {
     queryKey: ["homeowner-doors-for-appointments"],
     url: endpoints?.homeowner?.doors || "/homeowner/doors"
   });
+  const filteredAppointments = useMemo(() => {
+    const rows = Array.isArray(appointments) ? appointments : [];
+    return rows.filter((item) => toDateKey(item?.startsAt || item?.createdAt) === selectedDate);
+  }, [appointments, selectedDate]);
   const availableDoors = useMemo(() => {
     if (Array.isArray(doorsResponse)) return doorsResponse;
     return Array.isArray(doorsResponse?.doors) ? doorsResponse.doors : [];
@@ -74,16 +78,29 @@ export default function ResidentAppointmentsPage() {
   const handleCreateAppointment = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
+    const startTime = String(formData.get("startTime") || "").trim();
+    const endTime = String(formData.get("endTime") || "").trim();
+    const startsAt = startTime ? new Date(startTime) : null;
+    const endsAt = endTime ? new Date(endTime) : null;
+    if (!startsAt || Number.isNaN(startsAt.getTime()) || !endsAt || Number.isNaN(endsAt.getTime())) {
+      window.alert("Enter a valid start and end time.");
+      return;
+    }
+    if (endsAt <= startsAt) {
+      window.alert("End time must be after start time.");
+      return;
+    }
     const payload = {
       doorId: String(formData.get("doorId") || "").trim(),
       visitorName: String(formData.get("visitorName") || "").trim(),
       visitorContact: String(formData.get("visitorContact") || "").trim(),
       visitorEmail: String(formData.get("visitorEmail") || "").trim() || undefined,
       purpose: String(formData.get("purpose") || "").trim(),
-      startsAt: new Date(String(formData.get("startTime") || "")).toISOString(),
-      endsAt: new Date(String(formData.get("endTime") || "")).toISOString(),
+      startsAt: startsAt.toISOString(),
+      endsAt: endsAt.toISOString(),
       geofenceLat: parseOptionalNumber(formData.get("latitude")),
-      geofenceLng: parseOptionalNumber(formData.get("longitude"))
+      geofenceLng: parseOptionalNumber(formData.get("longitude")),
+      geofenceRadiusMeters: parseOptionalNumber(formData.get("geofenceRadiusMeters"))
     };
     createMutation.mutate(payload);
   };
@@ -152,15 +169,15 @@ export default function ResidentAppointmentsPage() {
         <section className="space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="font-bold text-lg text-slate-800">Scheduled Visitors</h3>
-            <span className="text-[10px] font-bold text-slate-400 uppercase bg-slate-100 px-3 py-1 rounded-full">{appointments?.length || 0} Expected</span>
+            <span className="text-[10px] font-bold text-slate-400 uppercase bg-slate-100 px-3 py-1 rounded-full">{filteredAppointments.length || 0} Expected</span>
           </div>
           {isLoading ? (
             <div className="animate-pulse space-y-4">
               {[1, 2].map(i => <div key={i} className="h-20 bg-white rounded-[2rem] border border-slate-100" />)}
             </div>
-          ) : appointments?.length > 0 ? (
+          ) : filteredAppointments.length > 0 ? (
             <div className="space-y-3">
-              {appointments.map((appt, idx) => (
+              {filteredAppointments.map((appt, idx) => (
                 <div key={idx} className="bg-white p-5 rounded-[2rem] border border-slate-100 flex items-center justify-between group shadow-sm">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center"><User size={22} /></div>
@@ -260,6 +277,7 @@ export default function ResidentAppointmentsPage() {
                       <InputField label="Latitude" name="latitude" placeholder="Optional" icon={<MapPin size={16}/>} />
                       <InputField label="Longitude" name="longitude" placeholder="Optional" icon={<MapPin size={16}/>} />
                     </div>
+                    <InputField label="Radius (meters)" name="geofenceRadiusMeters" type="number" min="30" max="2000" placeholder="120" icon={<Navigation size={16}/>} />
                   </div>
 
                   <div className="space-y-2">

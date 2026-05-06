@@ -6,6 +6,7 @@ import {
   Search
 } from "lucide-react";
 
+import { apiRequest } from "../../services/apiClient";
 import { decideVisit, endHomeownerSession, getHomeownerAppointments, getHomeownerVisits } from "../../services/homeownerService";
 import { useNotifications } from "../../state/NotificationsContext";
 
@@ -23,6 +24,7 @@ export default function HomeownerVisitsPage() {
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState("");
   const [endingId, setEndingId] = useState("");
+  const [callBusyId, setCallBusyId] = useState("");
   const [activeTab, setActiveTab] = useState("all");
   const [selectedDate, setSelectedDate] = useState(() => toDateKey(new Date()));
 
@@ -93,6 +95,27 @@ export default function HomeownerVisitsPage() {
       await endHomeownerSession(sessionId);
       loadVisits({ background: true });
     } catch (err) { setError(err.message); } finally { setEndingId(""); }
+  }
+
+  async function handleStartCall(sessionId, type) {
+    const nextType = type === "video" ? "video" : "audio";
+    const busyKey = `${sessionId}:${nextType}`;
+    setCallBusyId(busyKey);
+    try {
+      window.sessionStorage.setItem(
+        "qring_call_start_intent",
+        JSON.stringify({ pending: true, sessionId, mode: nextType })
+      );
+      await apiRequest("/calls/start", {
+        method: "POST",
+        body: JSON.stringify({ sessionId, type: nextType, hasVideo: nextType === "video" })
+      });
+      navigate(`/session/${sessionId}/${nextType}`);
+    } catch (err) {
+      setError(err?.message || `Unable to start ${nextType} call.`);
+    } finally {
+      setCallBusyId("");
+    }
   }
 
   return (
@@ -203,6 +226,9 @@ export default function HomeownerVisitsPage() {
                 onReject={() => handleDecision(item.id, "reject")}
                 onEnd={() => handleEndSession(item.id)}
                 onChat={() => navigate(`/dashboard/homeowner/messages?sessionId=${item.id}`)}
+                onAudioCall={() => handleStartCall(item.id, "audio")}
+                onVideoCall={() => handleStartCall(item.id, "video")}
+                callBusyId={callBusyId}
               />
             ))
           )}
@@ -223,9 +249,11 @@ function StatBox({ label, value, color, bg }) {
     );
 }
 
-function ActivityCard({ item, isAppt, busyId, endingId, onApprove, onReject, onEnd, onChat }) {
+function ActivityCard({ item, isAppt, busyId, endingId, callBusyId, onApprove, onReject, onEnd, onChat, onAudioCall, onVideoCall }) {
     const status = normalizeVisitState(item);
     const isBusy = busyId === item.id || endingId === item.id;
+    const audioBusy = callBusyId === `${item.id}:audio`;
+    const videoBusy = callBusyId === `${item.id}:video`;
 
     return (
       <div className="bg-white rounded-[2.5rem] p-6 border border-slate-100 shadow-sm relative overflow-hidden group">
@@ -275,8 +303,8 @@ function ActivityCard({ item, isAppt, busyId, endingId, onApprove, onReject, onE
           {status === 'accepted' && (
             <>
               <button onClick={onChat} className="p-3 bg-slate-900 text-white rounded-xl active:scale-95 transition-all"><MessageCircle size={18}/></button>
-              <button className="p-3 bg-indigo-50 text-indigo-600 rounded-xl active:scale-95 transition-all"><Phone size={18}/></button>
-              <button className="p-3 bg-indigo-50 text-indigo-600 rounded-xl active:scale-95 transition-all"><Video size={18}/></button>
+              <button onClick={onAudioCall} disabled={audioBusy || videoBusy} className="p-3 bg-indigo-50 text-indigo-600 rounded-xl active:scale-95 transition-all disabled:opacity-60"><Phone size={18}/></button>
+              <button onClick={onVideoCall} disabled={audioBusy || videoBusy} className="p-3 bg-indigo-50 text-indigo-600 rounded-xl active:scale-95 transition-all disabled:opacity-60"><Video size={18}/></button>
               <button onClick={onEnd} disabled={isBusy} className="flex-1 bg-rose-50 text-rose-600 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2">
                 <LogOut size={14}/> {endingId === item.id ? "Closing..." : "End Session"}
               </button>

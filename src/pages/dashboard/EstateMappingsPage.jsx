@@ -169,14 +169,6 @@ const EstateMappingsPage = () => {
           )}
         </div>
       </main>
-
-      {/* Navigation Bar */}
-      <nav className="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-8 pt-4 bg-white/90 backdrop-blur-2xl rounded-t-[2.5rem] z-50 border-t border-slate-100 shadow-[0_-10px_30px_rgba(0,0,0,0.03)]">
-        <NavItem icon={<DoorOpen size={22} />} label="Doors" />
-        <NavItem icon={<GitBranch size={22} />} label="Mappings" active />
-        <NavItem icon={<ShieldCheck size={22} />} label="Security" />
-        <NavItem icon={<Settings size={22} />} label="Settings" />
-      </nav>
     </div>
   );
 };
@@ -193,13 +185,6 @@ const DoorCard = ({ title, status, statusColor, icon, active = false }) => (
     </div>
     <MoreVertical className="text-slate-300" size={18} />
   </div>
-);
-
-const NavItem = ({ icon, label, active = false }) => (
-  <button className={`flex flex-col items-center gap-1.5 px-5 py-2 rounded-2xl transition-all active:scale-90 ${active ? 'bg-indigo-50/50 text-[#4955b3]' : 'text-slate-300'}`}>
-    {icon}
-    <span className="text-[9px] font-black uppercase tracking-tighter">{label}</span>
-  </button>
 );
 
 export default EstateMappingsPage;

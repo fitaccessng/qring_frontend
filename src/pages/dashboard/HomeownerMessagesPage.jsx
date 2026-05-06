@@ -6,10 +6,12 @@ import {
 import VoiceNoteRecorder from "../../components/VoiceNoteRecorder";
 import { env } from "../../config/env";
 import { getAccessToken } from "../../services/authStorage";
+import { apiRequest } from "../../services/apiClient";
 import { createRealtimeSocket } from "../../services/socketClient";
 import { resolveVoiceNoteUrl, uploadHomeownerVoiceNote } from "../../services/voiceNoteService";
 import { playMessageNotificationSound } from "../../utils/notificationSound";
 import {
+  decideVisit,
   getHomeownerMessages,
   getHomeownerSessionMessages,
   sendHomeownerSessionMessage
@@ -34,6 +36,8 @@ export default function HomeownerMessagesPage() {
   const [deletingMessageId, setDeletingMessageId] = useState("");
   const [query, setQuery] = useState("");
   const [error, setError] = useState("");
+  const [decisionBusy, setDecisionBusy] = useState(false);
+  const [callBusy, setCallBusy] = useState("");
 
   const messagesRef = useRef(null);
   const selectedIdRef = useRef("");
@@ -147,6 +151,13 @@ export default function HomeownerMessagesPage() {
 
   const heroThread = useMemo(() => threads.find(t => t.id === selectedId) || filteredThreads[0], [threads, selectedId, filteredThreads]);
   const selectedMessages = useMemo(() => messagesByThread[selectedId] || [], [messagesByThread, selectedId]);
+  const heroThreadState = String(heroThread?.sessionStatus || "").trim().toLowerCase();
+  const accessAlreadyGranted = useMemo(() => {
+    if (["approved", "accepted", "gate_confirmed", "completed", "closed"].includes(heroThreadState)) {
+      return true;
+    }
+    return selectedMessages.some((msg) => String(msg?.text || "").trim().toLowerCase() === "access granted.");
+  }, [heroThreadState, selectedMessages]);
 
   async function handleSend(e) {
     if (e) e.preventDefault();
@@ -190,6 +201,58 @@ export default function HomeownerMessagesPage() {
       setSending(false);
     }
   }
+
+  async function handleGrantAccess() {
+    if (!selectedId || decisionBusy || accessAlreadyGranted) return;
+    setDecisionBusy(true);
+    setError("");
+    try {
+      await decideVisit(selectedId, "approve");
+      const saved = await sendHomeownerSessionMessage(selectedId, "Access granted.");
+      if (saved) {
+        setMessagesByThread((prev) => {
+          const current = prev[selectedId] || [];
+          if (current.some((item) => item.id === saved.id)) return prev;
+          return { ...prev, [selectedId]: [...current, saved] };
+        });
+        upsertThreadPreview(saved, setThreads, selectedId, { sessionStatus: "approved" });
+      } else {
+        setThreads((prev) =>
+          prev.map((thread) =>
+            thread.id === selectedId ? { ...thread, sessionStatus: "approved" } : thread
+          )
+        );
+      }
+    } catch (err) {
+      setError(err?.message || "Unable to grant access.");
+    } finally {
+      setDecisionBusy(false);
+    }
+  }
+
+  async function handleStartCall(type) {
+    if (!selectedId || callBusy || !accessAlreadyGranted) return;
+    const nextMode = type === "video" ? "video" : "audio";
+    const busyKey = `${selectedId}:${nextMode}`;
+    setCallBusy(busyKey);
+    setError("");
+    try {
+      window.sessionStorage.setItem(
+        "qring_call_start_intent",
+        JSON.stringify({ pending: true, sessionId: selectedId, mode: nextMode })
+      );
+      await apiRequest("/calls/start", {
+        method: "POST",
+        body: JSON.stringify({ sessionId: selectedId, type: nextMode, hasVideo: nextMode === "video" })
+      });
+      navigate(`/session/${selectedId}/${nextMode}`);
+    } catch (err) {
+      setError(err?.message || `Unable to start ${nextMode} call.`);
+    } finally {
+      setCallBusy("");
+    }
+  }
+
   async function handleSendVoiceNote(file) {
     if (!selectedId) return;
     setSending(true);
@@ -197,8 +260,11 @@ export default function HomeownerMessagesPage() {
       const upload = await uploadHomeownerVoiceNote(selectedId, file);
       const url = resolveVoiceNoteUrl(upload?.url);
       const text = `voice_note_url:${url}`;
-      await sendHomeownerSessionMessage(selectedId, text);
-      setMessagesByThread(prev => ({ ...prev, [selectedId]: [...(prev[selectedId] || []), { text, senderType: "homeowner", at: new Date() }] }));
+      const saved = await sendHomeownerSessionMessage(selectedId, text);
+      if (saved) {
+        setMessagesByThread((prev) => ({ ...prev, [selectedId]: [...(prev[selectedId] || []), saved] }));
+        upsertThreadPreview(saved, setThreads, selectedId);
+      }
     } catch (err) { setError(err.message); }
     finally { setSending(false); }
   }
@@ -310,10 +376,31 @@ export default function HomeownerMessagesPage() {
 
           {/* Input Area */}
           <div className="p-6 bg-white border-t border-slate-50">
-            <div className="flex gap-2 mb-4">
-                 <button type="button" onClick={() => handleQuickReply("Please wait, checking.")} className="flex-1 py-2 bg-slate-50 rounded-xl text-[9px] font-black uppercase text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 transition-all">Wait</button>
-                 <button type="button" onClick={() => handleQuickReply("Access granted.")} className="flex-1 py-2 bg-emerald-50 rounded-xl text-[9px] font-black uppercase text-emerald-600">Grant</button>
-            </div>
+            {accessAlreadyGranted ? (
+              <div className="mb-4 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleStartCall("audio")}
+                  disabled={callBusy === `${selectedId}:audio`}
+                  className="flex-1 rounded-xl bg-indigo-50 py-2 text-[9px] font-black uppercase text-indigo-600 transition-all disabled:opacity-60"
+                >
+                  {callBusy === `${selectedId}:audio` ? "Calling..." : "Audio Call"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleStartCall("video")}
+                  disabled={callBusy === `${selectedId}:video`}
+                  className="flex-1 rounded-xl bg-slate-900 py-2 text-[9px] font-black uppercase text-white transition-all disabled:opacity-60"
+                >
+                  {callBusy === `${selectedId}:video` ? "Calling..." : "Video Call"}
+                </button>
+              </div>
+            ) : (
+              <div className="mb-4 flex gap-2">
+                <button type="button" onClick={() => handleQuickReply("Please wait, checking.")} disabled={sending || decisionBusy} className="flex-1 py-2 bg-slate-50 rounded-xl text-[9px] font-black uppercase text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 transition-all disabled:opacity-60">Wait</button>
+                <button type="button" onClick={handleGrantAccess} disabled={sending || decisionBusy} className="flex-1 py-2 bg-emerald-50 rounded-xl text-[9px] font-black uppercase text-emerald-600 disabled:opacity-60">{decisionBusy ? "Granting..." : "Grant"}</button>
+              </div>
+            )}
             <form onSubmit={handleSend} className="relative">
               <input
                 value={draft}
@@ -343,8 +430,12 @@ function formatClockTime(v) {
 }
 
 function renderMessageBody(text) {
-  if (text?.startsWith("voice_note")) {
-    const src = text.split(":")[1];
+  if (text?.startsWith("voice_note_url:")) {
+    const src = text.replace("voice_note_url:", "");
+    return <audio src={src} controls className="h-8 w-40" />;
+  }
+  if (text?.startsWith("voice_note:")) {
+    const src = text.replace("voice_note:", "");
     return <audio src={src} controls className="h-8 w-40" />;
   }
   return <p>{text}</p>;
@@ -359,8 +450,8 @@ function isLikelyDuplicateMessage(a, b) {
   return a.text === b.text && Math.abs(new Date(a.at) - new Date(b.at)) < 2000;
 }
 
-function upsertThreadPreview(msg, setThreads, selectedId) {
-    setThreads(prev => prev.map(t => t.id === msg.sessionId ? { ...t, last: previewMessageText(msg.text), time: msg.at } : t));
+function upsertThreadPreview(msg, setThreads, selectedId, extra = {}) {
+    setThreads(prev => prev.map(t => t.id === msg.sessionId ? { ...t, last: previewMessageText(msg.text), time: msg.at, ...extra } : t));
 }
 
 function sortThreadsForInbox(threads) {
