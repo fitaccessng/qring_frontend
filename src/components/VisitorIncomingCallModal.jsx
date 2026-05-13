@@ -2,9 +2,13 @@ import { Phone, PhoneOff, Video } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { getNotificationAudioContextState, unlockNotificationAudio } from "../utils/notificationSound";
 
-export default function VisitorIncomingCallModal({ open, hasVideo, onAccept, onReject }) {
-  if (!open) return null;
-
+export default function VisitorIncomingCallModal({
+  open,
+  hasVideo,
+  onAccept,
+  onReject,
+  callerLabel = "Homeowner"
+}) {
   const [audioState, setAudioState] = useState(() => getNotificationAudioContextState());
   const showSoundUnlock = audioState !== "running";
 
@@ -28,12 +32,14 @@ export default function VisitorIncomingCallModal({ open, hasVideo, onAccept, onR
     onReject?.();
   }, [onReject]);
 
+  if (!open) return null;
+
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/82 px-5 py-6 backdrop-blur-md">
       <section className="w-full max-w-sm rounded-[28px] border border-white/15 bg-[#0f1720] p-6 text-white shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-300">Incoming call</p>
         <h2 className="mt-2 text-[28px] font-semibold leading-tight tracking-tight">
-          {hasVideo ? "Homeowner Video Call" : "Homeowner Audio Call"}
+          {hasVideo ? `${callerLabel} Video Call` : `${callerLabel} Audio Call`}
         </h2>
         <p className="mt-1.5 text-[13px] text-white/70">Tap to answer quickly or decline to stay in chat.</p>
 

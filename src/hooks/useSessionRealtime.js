@@ -50,6 +50,7 @@ const LIVEKIT_PEER_CONNECT_TIMEOUT_MS = 20000;
 const LIVEKIT_WEBSOCKET_TIMEOUT_MS = 10000;
 const LIVEKIT_MANUAL_RECONNECT_DELAY_MS = 1000;
 const LIVEKIT_MANUAL_RECONNECT_MAX_ATTEMPTS = 3;
+const LIVEKIT_CONNECTED_STATUSES = new Set(["active", "connected", "ongoing"]);
 
 function getMessageRoute({ sessionId, participantType }) {
   if (participantType === "homeowner") {
@@ -515,6 +516,10 @@ export function useSessionRealtime(sessionId) {
       }
       emitCallInvite(hasVideo);
     }, CALL_INVITE_RETRY_MS);
+  }
+
+  function isLivekitCallAlreadyConnected(status) {
+    return LIVEKIT_CONNECTED_STATUSES.has(String(status || "").trim().toLowerCase());
   }
 
   useEffect(() => {
@@ -1689,20 +1694,33 @@ export function useSessionRealtime(sessionId) {
         });
         const startedCall = startResponse?.data ?? startResponse;
         const callSessionId = startedCall?.callSessionId;
-          if (!callSessionId) {
-            throw new Error("Unable to initialize call session.");
-          }
-          callSessionRef.current = callSessionId;
-          pendingHomeownerVideoRef.current = Boolean(requestVideo);
-          startInviteRetryLoop(Boolean(requestVideo));
-          setStatus("Call request sent. Waiting for participant to accept.");
-          try {
-            await startLocalPreview({ video: Boolean(requestVideo) });
-          } catch {
-            setStatus("Unable to open camera preview. Waiting for participant to accept.");
-          }
-          setCallLaunchStage("ringing");
-        } catch (error) {
+        if (!callSessionId) {
+          throw new Error("Unable to initialize call session.");
+        }
+        callSessionRef.current = callSessionId;
+        pendingHomeownerVideoRef.current = Boolean(requestVideo);
+
+        if (isLivekitCallAlreadyConnected(startedCall?.status)) {
+          clearInviteRetryTimer();
+          setStatus("Participant already joined. Connecting call...");
+          setCallLaunchStage("connecting");
+          const connected = await connectLivekitRoom({
+            video: Boolean(requestVideo),
+            source: "start-resume"
+          });
+          if (connected === false) return;
+          return;
+        }
+
+        startInviteRetryLoop(Boolean(requestVideo));
+        setStatus("Call request sent. Waiting for participant to accept.");
+        try {
+          await startLocalPreview({ video: Boolean(requestVideo) });
+        } catch {
+          setStatus("Unable to open camera preview. Waiting for participant to accept.");
+        }
+        setCallLaunchStage("ringing");
+      } catch (error) {
         setStatus(error?.message || "Unable to start LiveKit call");
         setCallState("failed");
         setCallLaunchStage("idle");
@@ -2809,7 +2827,6 @@ export function useSessionRealtime(sessionId) {
   }, [sessionId, displayName, token, canStartCall, lowBandwidthMode]);
 
   useEffect(() => {
-    if (canStartCall) return;
     const intent = consumeCallAcceptIntent();
     if (!intent) return;
     setIncomingCall(intent);

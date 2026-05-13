@@ -6,6 +6,7 @@ import {
   MicOff,
   PhoneOff,
   Radio,
+  RotateCcw,
   Volume2
 } from "lucide-react";
 import VisitorIncomingCallModal from "../../components/VisitorIncomingCallModal";
@@ -60,7 +61,7 @@ export default function SessionAudioPage() {
           <div className="flex items-center gap-4">
             <button
               type="button"
-              onClick={() => navigate(-1)}
+              onClick={() => navigate(exitRoute)}
               className="p-2.5 bg-slate-50 text-slate-600 rounded-full hover:bg-slate-100 transition-colors"
             >
               <ChevronLeft size={20} />
@@ -106,7 +107,7 @@ export default function SessionAudioPage() {
         <div className="z-10 w-full max-w-md">
           <div className="grid grid-cols-3 gap-4 mb-16">
             <ControlBtn icon={<MicOff size={24} />} label={muted ? "Unmute" : "Mute"} active={muted} onClick={toggleMute} />
-            <ControlBtn icon={<Grid3X3 size={24} />} label="Retry" onClick={retryCallConnection} disabled={!canStartCall} />
+            <ControlBtn icon={<RotateCcw size={24} />} label="Retry" onClick={retryCallConnection} disabled={!canStartCall} />
             <ControlBtn icon={<Volume2 size={24} />} label="Speaker" active={speakerOn} onClick={toggleSpeaker} disabled={callState !== "connected"} />
           </div>
 

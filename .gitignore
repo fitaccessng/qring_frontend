@@ -4,9 +4,11 @@ dist
 tmp-visual-pass
 .gradle/
 .gradle-user-home/
+.gradle-home/
 .android-user-home/
 .npm-cache/
 .build/
+.android-build.env
 android/.gradle-user-home/
 android/.gradle/
 android/build/

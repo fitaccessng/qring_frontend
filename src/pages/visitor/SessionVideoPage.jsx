@@ -81,7 +81,7 @@ export default function SessionVideoPage() {
           <div className="flex items-center gap-4">
             <button
               type="button"
-              onClick={() => navigate(-1)}
+              onClick={() => navigate(exitRoute)}
               className="p-2.5 bg-slate-50 text-slate-600 rounded-full hover:bg-slate-100 transition-colors"
             >
               <ChevronLeft size={20} />

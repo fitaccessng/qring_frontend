@@ -74,14 +74,28 @@ npm run sync:android:mobile
 
 This command now rebuilds the frontend with `VITE_APP_BUILD_TARGET=mobile` before syncing Android, so public marketing pages are not copied into the AAB by mistake.
 
-### 4. Build signed release artifacts
+### 4. Configure local Java and Android SDK paths
+
+From `qring_frontend`:
+
+1. Copy `.android-build.env.example` to `.android-build.env`
+2. Set both values to absolute paths on your machine:
+
+```bash
+JAVA_HOME=/absolute/path/to/jdk-21
+ANDROID_SDK_ROOT=/absolute/path/to/android-sdk
+```
+
+The release helper will export these values for Gradle and regenerate `android/local.properties` automatically before each build. Keep `.android-build.env` and `android/local.properties` uncommitted.
+
+### 5. Build signed release artifacts
 
 From `qring_frontend/android`:
 
 Signed APK:
 
 ```bash
-./gradlew assembleRelease
+npm run android:apk
 ```
 
 Output:
@@ -90,13 +104,20 @@ Output:
 Signed App Bundle for Play Store:
 
 ```bash
-./gradlew bundleRelease
+npm run android:aab
 ```
 
 Output:
 `app/build/outputs/bundle/release/app-release.aab`
 
-### 5. Upload to Play Console
+If you prefer to call Gradle directly, the helper script is equivalent to:
+
+```bash
+zsh scripts/android-release-build.sh assembleRelease
+zsh scripts/android-release-build.sh bundleRelease
+```
+
+### 6. Upload to Play Console
 
 1. Create the app in Google Play Console with package name `com.kelvin.qringapp`.
 2. Go to `Release` -> `Production` or `Testing`.
@@ -109,3 +130,4 @@ Output:
 - Keep `versionCode` increasing on every Play Store upload.
 - Keep `versionName`, `MARKETING_VERSION`, and `CURRENT_PROJECT_VERSION` aligned with each public release.
 - If signing fails on Android, verify the `storeFile` path in `android/keystore.properties` is correct relative to `qring_frontend/android`.
+- If Gradle reports `SDK location not found`, confirm `.android-build.env` points to a real SDK directory and rerun `npm run android:apk` or `npm run android:aab`.

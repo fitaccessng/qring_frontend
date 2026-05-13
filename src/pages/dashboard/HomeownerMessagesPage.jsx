@@ -3,6 +3,7 @@ import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import {
   Bell, ChevronLeft, Search, SendHorizontal
 } from "lucide-react";
+import VisitorIncomingCallModal from "../../components/VisitorIncomingCallModal";
 import VoiceNoteRecorder from "../../components/VoiceNoteRecorder";
 import { env } from "../../config/env";
 import { getAccessToken } from "../../services/authStorage";
@@ -38,16 +39,25 @@ export default function HomeownerMessagesPage() {
   const [error, setError] = useState("");
   const [decisionBusy, setDecisionBusy] = useState(false);
   const [callBusy, setCallBusy] = useState("");
+  const [incomingCall, setIncomingCall] = useState({
+    pending: false,
+    hasVideo: false,
+    callSessionId: "",
+    visitorId: "",
+    sessionId: ""
+  });
 
   const messagesRef = useRef(null);
   const selectedIdRef = useRef("");
   const threadsRef = useRef([]);
   const socketRef = useRef(null);
   const joinedSessionIdsRef = useRef(new Set());
+  const callBusyRef = useRef("");
   const token = getAccessToken();
 
   useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
   useEffect(() => { threadsRef.current = threads; }, [threads]);
+  useEffect(() => { callBusyRef.current = callBusy; }, [callBusy]);
 
   // --- Initial Data Load ---
   useEffect(() => {
@@ -107,6 +117,23 @@ export default function HomeownerMessagesPage() {
       });
       if (normalized.senderType !== "homeowner") playMessageNotificationSound();
       upsertThreadPreview(normalized, setThreads, selectedIdRef.current);
+    });
+
+    socket.on("call.invite", (payload) => {
+      const incomingSessionId = String(payload?.sessionId || "").trim();
+      const callSessionId = String(payload?.callSessionId || "").trim();
+      if (!incomingSessionId || !callSessionId) return;
+      if (callBusyRef.current.startsWith(`${incomingSessionId}:`)) return;
+      setIncomingCall({
+        pending: true,
+        hasVideo: Boolean(payload?.hasVideo),
+        callSessionId,
+        visitorId: String(payload?.visitorId || incomingSessionId),
+        sessionId: incomingSessionId
+      });
+      if (!selectedIdRef.current) {
+        setSelectedId(incomingSessionId);
+      }
     });
 
     return () => socket.disconnect();
@@ -254,19 +281,71 @@ export default function HomeownerMessagesPage() {
   }
 
   async function handleSendVoiceNote(file) {
-    if (!selectedId) return;
+    if (!selectedId) return "Select a conversation first.";
     setSending(true);
     try {
       const upload = await uploadHomeownerVoiceNote(selectedId, file);
       const url = resolveVoiceNoteUrl(upload?.url);
+      if (!url) return "Voice note uploaded but no URL was returned.";
       const text = `voice_note_url:${url}`;
       const saved = await sendHomeownerSessionMessage(selectedId, text);
       if (saved) {
         setMessagesByThread((prev) => ({ ...prev, [selectedId]: [...(prev[selectedId] || []), saved] }));
         upsertThreadPreview(saved, setThreads, selectedId);
       }
+      return true;
     } catch (err) { setError(err.message); }
     finally { setSending(false); }
+    return "Unable to send voice note. Try again.";
+  }
+
+  function handleAcceptIncomingCall() {
+    if (!incomingCall.pending || !incomingCall.sessionId || !incomingCall.callSessionId) return;
+    try {
+      window.sessionStorage.setItem(
+        "qring_call_accept_intent",
+        JSON.stringify({
+          sessionId: incomingCall.sessionId,
+          hasVideo: incomingCall.hasVideo,
+          callSessionId: incomingCall.callSessionId,
+          visitorId: incomingCall.visitorId
+        })
+      );
+    } catch {
+      // Keep storage failure non-blocking and continue to route.
+    }
+    const mode = incomingCall.hasVideo ? "video" : "audio";
+    setIncomingCall({
+      pending: false,
+      hasVideo: false,
+      callSessionId: "",
+      visitorId: "",
+      sessionId: ""
+    });
+    navigate(`/session/${incomingCall.sessionId}/${mode}`);
+  }
+
+  async function handleRejectIncomingCall() {
+    const activeIncoming = incomingCall;
+    setIncomingCall({
+      pending: false,
+      hasVideo: false,
+      callSessionId: "",
+      visitorId: "",
+      sessionId: ""
+    });
+    if (!activeIncoming.callSessionId) return;
+    try {
+      await apiRequest("/calls/end", {
+        method: "POST",
+        body: JSON.stringify({
+          callSessionId: activeIncoming.callSessionId,
+          participantType: "homeowner"
+        })
+      });
+    } catch (err) {
+      setError(err?.message || "Unable to reject call.");
+    }
   }
 
   return (
@@ -418,7 +497,13 @@ export default function HomeownerMessagesPage() {
           </div>
         </section>
       </main>
-
+      <VisitorIncomingCallModal
+        open={incomingCall.pending}
+        hasVideo={incomingCall.hasVideo}
+        callerLabel="Visitor"
+        onAccept={handleAcceptIncomingCall}
+        onReject={handleRejectIncomingCall}
+      />
     </div>
   );
 }

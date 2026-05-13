@@ -2,13 +2,21 @@ import { buildApiUrl } from "./apiClient";
 import { getAccessToken } from "./authStorage";
 import { getVisitorSessionToken } from "./visitorSessionToken";
 
-const VOICE_NOTE_TIMEOUT_MS = 20000;
-const VOICE_NOTE_RETRY_COUNT = 1;
+const VOICE_NOTE_TIMEOUT_MS = 45000;
+const VOICE_NOTE_RETRY_COUNT = 2;
 
 function buildUrl(path) {
   if (!path) return "";
   if (/^https?:\/\//i.test(path)) return path;
   return buildApiUrl(path);
+}
+
+function parseJsonSafely(value) {
+  try {
+    return value ? JSON.parse(value) : {};
+  } catch {
+    return {};
+  }
 }
 
 async function uploadVoiceNote({ url, token, file, headers: extraHeaders }, attempt = 0) {
@@ -20,16 +28,41 @@ async function uploadVoiceNote({ url, token, file, headers: extraHeaders }, atte
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), VOICE_NOTE_TIMEOUT_MS);
-  let response;
   try {
-    response = await fetch(buildUrl(url), {
-      method: "POST",
-      headers,
-      body: form,
-      signal: controller.signal
+    const response = await new Promise((resolve, reject) => {
+      const request = new XMLHttpRequest();
+      request.open("POST", buildUrl(url), true);
+      request.timeout = VOICE_NOTE_TIMEOUT_MS;
+      Object.entries(headers).forEach(([key, value]) => {
+        if (value != null && value !== "") {
+          request.setRequestHeader(key, value);
+        }
+      });
+      request.onload = () => {
+        resolve({
+          ok: request.status >= 200 && request.status < 300,
+          status: request.status,
+          payload: parseJsonSafely(request.responseText),
+        });
+      };
+      request.onerror = () => reject(new Error("NetworkError"));
+      request.ontimeout = () => {
+        const timeoutError = new Error("AbortError");
+        timeoutError.name = "AbortError";
+        reject(timeoutError);
+      };
+      request.send(form);
     });
+
+    if (!response.ok) {
+      if (response.status >= 500 && attempt < VOICE_NOTE_RETRY_COUNT) {
+        return uploadVoiceNote({ url, token, file, headers: extraHeaders }, attempt + 1);
+      }
+      const message = response.payload?.message ?? response.payload?.detail ?? "Unable to upload voice note";
+      throw new Error(message);
+    }
+
+    return response.payload?.data ?? null;
   } catch (error) {
     if (attempt < VOICE_NOTE_RETRY_COUNT) {
       return uploadVoiceNote({ url, token, file, headers: extraHeaders }, attempt + 1);
@@ -38,18 +71,7 @@ async function uploadVoiceNote({ url, token, file, headers: extraHeaders }, atte
       throw new Error("Voice note upload timed out. Please try again.");
     }
     throw new Error("Voice note upload failed. Please check your connection and try again.");
-  } finally {
-    clearTimeout(timeoutId);
   }
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    if (response.status >= 500 && attempt < VOICE_NOTE_RETRY_COUNT) {
-      return uploadVoiceNote({ url, token, file, headers: extraHeaders }, attempt + 1);
-    }
-    const message = payload?.message ?? payload?.detail ?? "Unable to upload voice note";
-    throw new Error(message);
-  }
-  return payload?.data ?? null;
 }
 
 export async function uploadVisitorVoiceNote(sessionId, file) {
