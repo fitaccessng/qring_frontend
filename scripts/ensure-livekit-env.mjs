@@ -46,20 +46,31 @@ const missing = required.filter((name) => {
 
 if (missing.length > 0) {
   console.error(
-    `[prebuild] Missing required environment variable(s): ${missing.join(", ")}.\n` +
+      `[prebuild] Missing required environment variable(s): ${missing.join(", ")}.\n` +
       "[prebuild] Set them in your deploy provider environment settings or in .env.production/.env before building.\n" +
       "[prebuild] Example:\n" +
-      "[prebuild] VITE_LIVEKIT_URL=wss://livekit.useqring.online"
+      "[prebuild] VITE_LIVEKIT_URL=wss://qring-yovnizqn.livekit.cloud"
   );
   process.exit(1);
 }
 
 const url = String(process.env.VITE_LIVEKIT_URL || "").trim();
 const looksValid = /^wss?:\/\//i.test(url) || /^https?:\/\//i.test(url);
+const isLocalhostLike = /:\/\/(localhost|127\.0\.0\.1)(?=[:/]|$)/i.test(url);
+const isProductionBuild =
+  String(process.env.NODE_ENV || "").trim().toLowerCase() === "production" ||
+  String(process.env.RENDER || "").trim() === "true";
 
 if (!looksValid) {
   console.error(
     `[prebuild] VITE_LIVEKIT_URL must start with wss://, ws://, https://, or http://. Received: ${url}`
+  );
+  process.exit(1);
+}
+
+if (isProductionBuild && !isLocalhostLike && !/^wss:\/\//i.test(url)) {
+  console.error(
+    `[prebuild] Production LiveKit URL must use wss://. Received: ${url}`
   );
   process.exit(1);
 }

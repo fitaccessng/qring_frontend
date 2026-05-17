@@ -35,6 +35,10 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Qring uses your camera for visitor and homeowner video calls.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Qring uses your microphone for calls and voice notes.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>

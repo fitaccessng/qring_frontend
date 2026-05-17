@@ -11,11 +11,12 @@ VITE_PUBLIC_APP_URL=https://www.useqring.online
 VITE_SOCKET_PATH=/socket.io
 VITE_DASHBOARD_NAMESPACE=/realtime/dashboard
 VITE_SIGNALING_NAMESPACE=/realtime/signaling
-VITE_LIVEKIT_URL=wss://livekit.useqring.online
-VITE_WEBRTC_ICE_SERVERS=[{"urls":["stun:stun.l.google.com:19302","stun:stun1.l.google.com:19302"]},{"urls":["turn:turn.useqring.online:3478?transport=udp"],"username":"TURN_USERNAME","credential":"TURN_PASSWORD"},{"urls":["turns:turn.useqring.online:443?transport=tcp"],"username":"TURN_USERNAME","credential":"TURN_PASSWORD"}]
+VITE_LIVEKIT_CLOUD=true
+VITE_LIVEKIT_URL=wss://qring-yovnizqn.livekit.cloud
 VITE_CALL_CONNECT_TIMEOUT_MS=8000
 VITE_CALL_RING_TIMEOUT_MS=30000
 VITE_PREFER_VOICE_NOTE_FALLBACK=true
+VITE_RTC_MONITORING_URL=https://YOUR_BACKEND_OR_MONITORING_ENDPOINT/rtc
 VITE_FIREBASE_API_KEY=YOUR_FIREBASE_API_KEY
 VITE_FIREBASE_AUTH_DOMAIN=qring-7ced9.firebaseapp.com
 VITE_FIREBASE_PROJECT_ID=qring-7ced9
@@ -25,8 +26,8 @@ VITE_FIREBASE_VAPID_KEY=YOUR_FIREBASE_VAPID_KEY
 
 Notes
 
-- Do not wrap `VITE_WEBRTC_ICE_SERVERS` in outer single quotes on Render.
-- Replace `TURN_USERNAME` and `TURN_PASSWORD` with real TURN credentials.
+- For LiveKit Cloud, leave `VITE_WEBRTC_ICE_SERVERS` unset unless LiveKit support specifically instructs otherwise.
+- `VITE_LIVEKIT_URL` must remain `wss://qring-yovnizqn.livekit.cloud` unless the LiveKit Cloud project changes.
 - Add any extra Firebase values your deployment needs, such as `VITE_FIREBASE_STORAGE_BUCKET`, `VITE_FIREBASE_MESSAGING_SENDER_ID`, or `VITE_FIREBASE_MEASUREMENT_ID`.
 
 Recommended Render settings

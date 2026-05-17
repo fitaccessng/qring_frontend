@@ -15,6 +15,7 @@ const toInteger = (value, fallback) => {
 const productionBackendOrigin = "https://qring-backend-1.onrender.com";
 const productionFrontendOrigin = "https://www.useqring.online";
 const isDev = Boolean(import.meta.env.DEV);
+const livekitCloudEnabled = toBoolean(import.meta.env.VITE_LIVEKIT_CLOUD, true);
 const isMobileAppBuild = String(import.meta.env.VITE_APP_BUILD_TARGET ?? "").trim().toLowerCase() === "mobile";
 const isNativeRuntime = (() => {
   try {
@@ -120,10 +121,12 @@ function resolveLivekitUrl(rawValue) {
 function parseIceServers(rawValue) {
   const value = (rawValue ?? "").trim();
   if (!value) {
-    return [
-      { urls: "stun:stun.l.google.com:19302" },
-      { urls: "stun:stun1.l.google.com:19302" }
-    ];
+    return livekitCloudEnabled
+      ? []
+      : [
+          { urls: "stun:stun.l.google.com:19302" },
+          { urls: "stun:stun1.l.google.com:19302" }
+        ];
   }
 
   try {
@@ -151,10 +154,12 @@ function parseIceServers(rawValue) {
 
   if (list.length > 0) return list;
 
-  return [
-    { urls: "stun:stun.l.google.com:19302" },
-    { urls: "stun:stun1.l.google.com:19302" }
-  ];
+  return livekitCloudEnabled
+    ? []
+    : [
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:stun1.l.google.com:19302" }
+      ];
 }
 
 const runtimeApiBaseSource = resolveRuntimeApiBaseSource();
@@ -185,7 +190,9 @@ export const env = {
     import.meta.env.VITE_SIGNALING_NAMESPACE ?? "/realtime/signaling",
   webRtcIceServers: parseIceServers(import.meta.env.VITE_WEBRTC_ICE_SERVERS),
   livekitUrl: resolveLivekitUrl(import.meta.env.VITE_LIVEKIT_URL),
+  livekitCloud: livekitCloudEnabled,
   livekitForceRelayOnFailure: toBoolean(import.meta.env.VITE_LIVEKIT_FORCE_RELAY_ON_FAILURE, true),
+  rtcMonitoringUrl: String(import.meta.env.VITE_RTC_MONITORING_URL ?? "").trim(),
   callConnectTimeoutMs: toInteger(import.meta.env.VITE_CALL_CONNECT_TIMEOUT_MS, 8000),
   callRingTimeoutMs: toInteger(import.meta.env.VITE_CALL_RING_TIMEOUT_MS, 30000),
   preferVoiceNoteFallback: toBoolean(import.meta.env.VITE_PREFER_VOICE_NOTE_FALLBACK, true),

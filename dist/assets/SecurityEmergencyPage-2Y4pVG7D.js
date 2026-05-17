@@ -1,1 +1,0 @@
-import{t as e}from"./jsx-runtime-K3eVDbSK.js";import{t}from"./AppShell-CPgh1b5s.js";import{t as n}from"./EstateDashboard-gboVL6qn.js";var r=e();function i(){return(0,r.jsx)(t,{title:`Emergency Console`,children:(0,r.jsx)(n,{roleLabel:`Guard Response Console`})})}export{i as default};

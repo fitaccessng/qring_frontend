@@ -50,9 +50,15 @@ export default function VoiceNoteRecorder({ onSend, disabled = false }) {
         }
       };
 
+      recorder.onerror = () => {
+        setRecording(false);
+        setStatus("Voice note recording failed. Try again.");
+      };
+
       recorder.onstop = async () => {
         stream.getTracks().forEach((track) => track.stop());
         recorderRef.current = null;
+        setRecording(false);
         try {
           const mime = recorder.mimeType || preferredType || "audio/webm";
           const blob = new Blob(chunksRef.current, { type: mime });
@@ -80,7 +86,7 @@ export default function VoiceNoteRecorder({ onSend, disabled = false }) {
         }
       };
 
-      recorder.start();
+      recorder.start(250);
       setRecording(true);
       timerRef.current = setTimeout(() => stopRecording(), MAX_RECORD_MS);
     } catch {
@@ -90,8 +96,12 @@ export default function VoiceNoteRecorder({ onSend, disabled = false }) {
 
   function stopRecording() {
     if (!recorderRef.current || recorderRef.current.state === "inactive") return;
+    try {
+      recorderRef.current.requestData?.();
+    } catch {
+      // Some browsers flush automatically on stop.
+    }
     recorderRef.current.stop();
-    setRecording(false);
     if (timerRef.current) {
       clearTimeout(timerRef.current);
       timerRef.current = null;

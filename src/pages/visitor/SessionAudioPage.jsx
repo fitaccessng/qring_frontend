@@ -32,6 +32,7 @@ export default function SessionAudioPage() {
     callConnectedAt,
     incomingCall,
     canStartCall,
+    remoteAudioRef,
     startAudioCall,
     toggleMute,
     toggleSpeaker,
@@ -56,6 +57,7 @@ export default function SessionAudioPage() {
 
   return (
     <div className="min-h-screen bg-[#fcfcfd] font-sans text-slate-900 antialiased flex flex-col">
+      <audio ref={remoteAudioRef} autoPlay playsInline />
       <header className="fixed top-0 w-full z-[100] bg-white/80 backdrop-blur-md border-b border-slate-100 px-6 py-4">
         <div className="max-w-4xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-4">

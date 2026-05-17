@@ -67,6 +67,9 @@ async function uploadVoiceNote({ url, token, file, headers: extraHeaders }, atte
     if (attempt < VOICE_NOTE_RETRY_COUNT) {
       return uploadVoiceNote({ url, token, file, headers: extraHeaders }, attempt + 1);
     }
+    if (error?.message && error.message !== "NetworkError") {
+      throw error;
+    }
     if (error?.name === "AbortError") {
       throw new Error("Voice note upload timed out. Please try again.");
     }
