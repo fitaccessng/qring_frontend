@@ -4,12 +4,10 @@ import {
   Bell, ChevronLeft, Search, SendHorizontal
 } from "lucide-react";
 import VisitorIncomingCallModal from "../../components/VisitorIncomingCallModal";
-import VoiceNoteRecorder from "../../components/VoiceNoteRecorder";
 import { env } from "../../config/env";
 import { getAccessToken } from "../../services/authStorage";
 import { apiRequest } from "../../services/apiClient";
 import { createRealtimeSocket } from "../../services/socketClient";
-import { resolveVoiceNoteUrl, uploadHomeownerVoiceNote } from "../../services/voiceNoteService";
 import { playMessageNotificationSound } from "../../utils/notificationSound";
 import {
   decideVisit,
@@ -280,25 +278,6 @@ export default function HomeownerMessagesPage() {
     }
   }
 
-  async function handleSendVoiceNote(file) {
-    if (!selectedId) return "Select a conversation first.";
-    setSending(true);
-    try {
-      const upload = await uploadHomeownerVoiceNote(selectedId, file);
-      const url = resolveVoiceNoteUrl(upload?.url);
-      if (!url) return "Voice note uploaded but no URL was returned.";
-      const text = `voice_note_url:${url}`;
-      const saved = await sendHomeownerSessionMessage(selectedId, text);
-      if (saved) {
-        setMessagesByThread((prev) => ({ ...prev, [selectedId]: [...(prev[selectedId] || []), saved] }));
-        upsertThreadPreview(saved, setThreads, selectedId);
-      }
-      return true;
-    } catch (err) { setError(err.message); }
-    finally { setSending(false); }
-    return "Unable to send voice note. Try again.";
-  }
-
   function handleAcceptIncomingCall() {
     if (!incomingCall.pending || !incomingCall.sessionId || !incomingCall.callSessionId) return;
     try {
@@ -488,7 +467,6 @@ export default function HomeownerMessagesPage() {
                 className="w-full bg-slate-50 border-none rounded-2xl py-4 pl-5 pr-24 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-600/10"
               />
               <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                <VoiceNoteRecorder onSend={handleSendVoiceNote} />
                 <button type="submit" disabled={!draft.trim() || sending} className="p-3 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-100 disabled:opacity-50">
                   <SendHorizontal size={18} />
                 </button>
@@ -515,19 +493,10 @@ function formatClockTime(v) {
 }
 
 function renderMessageBody(text) {
-  if (text?.startsWith("voice_note_url:")) {
-    const src = text.replace("voice_note_url:", "");
-    return <audio src={src} controls className="h-8 w-40" />;
-  }
-  if (text?.startsWith("voice_note:")) {
-    const src = text.replace("voice_note:", "");
-    return <audio src={src} controls className="h-8 w-40" />;
-  }
   return <p>{text}</p>;
 }
 
 function previewMessageText(text) {
-  if (text?.startsWith("voice_note")) return "Voice note";
   return text;
 }
 

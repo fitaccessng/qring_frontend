@@ -3,9 +3,7 @@ import { Navigate, useNavigate, useParams } from "react-router-dom";
 import SessionNetworkBadge from "../../components/SessionNetworkBadge";
 import SessionModeNav from "../../components/SessionModeNav";
 import VisitorIncomingCallModal from "../../components/VisitorIncomingCallModal";
-import VoiceNoteRecorder from "../../components/VoiceNoteRecorder";
 import { useSessionRealtime } from "../../hooks/useSessionRealtime";
-import { resolveVoiceNoteUrl, uploadVisitorVoiceNote } from "../../services/voiceNoteService";
 
 export default function SessionMessagePage() {
   const { sessionId } = useParams();
@@ -89,20 +87,6 @@ export default function SessionMessagePage() {
             ? "Server call session state: failed. Check network/permissions and retry."
       : "Server call session state: pending. Audio and video unlock once homeowner starts a call.";
 
-  async function handleVoiceNoteSend(file) {
-    if (!sessionId || !file) return "Missing session. Refresh and try again.";
-    try {
-      const data = await uploadVisitorVoiceNote(sessionId, file);
-      const url = resolveVoiceNoteUrl(data?.url);
-      if (!url) return "Voice note uploaded but no URL was returned.";
-      const ok = Boolean(sendMessage(`voice_note_url:${url}`));
-      if (!ok) return "Unable to send message right now. Check connection and try again.";
-      return true;
-    } catch (error) {
-      return error?.message || "Unable to upload voice note";
-    }
-  }
-
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_#f8fafc_0,_#eef2ff_42%,_#e0f2fe_78%,_#dbeafe_100%)] p-4 text-slate-900">
       <div className="mx-auto w-full max-w-7xl py-6">
@@ -171,10 +155,6 @@ export default function SessionMessagePage() {
                     className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm"
                     placeholder="Type your message..."
                   />
-                  <VoiceNoteRecorder
-                    onSend={handleVoiceNoteSend}
-                    disabled={!joined}
-                  />
                   <button
                     type="submit"
                     className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white"
@@ -209,15 +189,5 @@ function getStoredUserRole() {
 
 function renderMessageBody(text) {
   if (typeof text !== "string") return <p>{String(text || "")}</p>;
-  if (text.startsWith("voice_note_url:")) {
-    const src = text.replace("voice_note_url:", "");
-    return <audio controls className="mt-2 w-full" src={src} />;
-  }
-  if (text.startsWith("voice_note:")) {
-    const src = text.replace("voice_note:", "");
-    return (
-      <audio controls className="mt-2 w-full" src={src} />
-    );
-  }
   return <p>{text}</p>;
 }

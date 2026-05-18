@@ -236,7 +236,8 @@ export function useSessionRealtime(sessionId) {
     pending: false,
     hasVideo: false,
     callSessionId: "",
-    visitorId: ""
+    visitorId: "",
+    sessionId: ""
   });
   const [acceptedCallMode, setAcceptedCallMode] = useState("");
   const [remoteVideoActive, setRemoteVideoActive] = useState(false);
@@ -411,7 +412,8 @@ export function useSessionRealtime(sessionId) {
       pending: false,
       hasVideo: false,
       callSessionId: "",
-      visitorId: ""
+      visitorId: "",
+      sessionId: ""
     });
   }
 
@@ -484,6 +486,7 @@ export function useSessionRealtime(sessionId) {
         hasVideo: Boolean(parsed?.hasVideo),
         callSessionId: String(parsed?.callSessionId || ""),
         visitorId: String(parsed?.visitorId || ""),
+        sessionId: String(parsed?.sessionId || sessionId),
       };
     } catch {
       return null;
@@ -1080,8 +1083,7 @@ export function useSessionRealtime(sessionId) {
   async function handleLivekitFallback(error, { currentMode, forceRelay, phase }) {
     const nextAction = getNextFallbackAction({
       currentMode,
-      forceRelay,
-      preferVoiceNote: env.preferVoiceNoteFallback
+      forceRelay
     });
 
     logCall("warn", "LiveKit fallback triggered", {
@@ -1126,11 +1128,7 @@ export function useSessionRealtime(sessionId) {
       type: "warning",
       route: getMessageRoute({ sessionId, participantType })
     });
-    sendAutomatedFallbackMessage(
-      nextAction.kind === "voice-note"
-        ? "voice note fallback activated"
-        : "switched to text chat"
-    );
+    sendAutomatedFallbackMessage("switched to text chat");
     routeToAsyncFallback(nextAction.kind);
     return false;
   }
@@ -1994,6 +1992,7 @@ export function useSessionRealtime(sessionId) {
         socketRef.current?.emit("webrtc.answer", { sessionId, sdp: answer });
         socketRef.current?.emit("call.accepted", {
           sessionId,
+          callSessionId: incomingSnapshot.callSessionId || undefined,
           hasVideo: allowVideo,
           joinedAt
         });
@@ -2018,7 +2017,8 @@ export function useSessionRealtime(sessionId) {
           pending: true,
           hasVideo: incomingSnapshot.hasVideo,
           callSessionId: incomingSnapshot.callSessionId || "",
-          visitorId: incomingSnapshot.visitorId || ""
+          visitorId: incomingSnapshot.visitorId || "",
+          sessionId
         });
       }
       acceptingCallRef.current = false;
@@ -2063,6 +2063,7 @@ export function useSessionRealtime(sessionId) {
       });
       socketRef.current?.emit("call.accepted", {
         sessionId,
+        callSessionId,
         hasVideo: allowVideo,
         joinedAt
       });
@@ -2103,7 +2104,8 @@ export function useSessionRealtime(sessionId) {
         pending: true,
         hasVideo: incomingSnapshot.hasVideo,
         callSessionId: incomingSnapshot.callSessionId || "",
-        visitorId: incomingSnapshot.visitorId || ""
+        visitorId: incomingSnapshot.visitorId || "",
+        sessionId
       });
       acceptingCallRef.current = false;
     }
@@ -2154,7 +2156,8 @@ export function useSessionRealtime(sessionId) {
       }
     }
     socketRef.current?.emit("call.rejected", {
-      sessionId
+      sessionId,
+      callSessionId: incomingCall.callSessionId || undefined
     });
     setStatus("Incoming call rejected");
     setCallState("idle");
@@ -2267,6 +2270,40 @@ export function useSessionRealtime(sessionId) {
     return sendMessage(target.text, { replaceMessageId: messageId });
   }
 
+  async function sendQuickResponse(action) {
+    const normalizedAction = String(action || "").trim().toLowerCase();
+    if (!normalizedAction) return false;
+
+    if (normalizedAction === "on_my_way") {
+      return sendMessage("I'm on my way.");
+    }
+
+    if (normalizedAction === "leave_at_door") {
+      const sent = sendMessage("Please leave it at the door.");
+      if (participantType === "homeowner") {
+        try {
+          await apiRequest(`/homeowner/visits/${encodeURIComponent(sessionId)}/decision`, {
+            method: "POST",
+            body: JSON.stringify({ action: "approve" })
+          });
+          setStatus("Visitor approved for leave-at-door delivery.");
+        } catch (error) {
+          setStatus(error?.message || "Unable to update delivery decision.");
+          return false;
+        }
+      }
+      return sent;
+    }
+
+    if (normalizedAction === "unlock_door") {
+      const sent = sendMessage("Door unlocked.");
+      setStatus("Unlock request sent.");
+      return sent;
+    }
+
+    return false;
+  }
+
   function toggleMute() {
     if (livekitEnabled && localAudioTrackRef.current) {
       const nextMuted = !muted;
@@ -2364,7 +2401,8 @@ export function useSessionRealtime(sessionId) {
         }
       } else if (broadcast) {
         socketRef.current?.emit("call.ended", {
-          sessionId
+          sessionId,
+          callSessionId: callSessionRef.current || undefined
         });
       }
       disconnectLivekitRoom();
@@ -2605,7 +2643,8 @@ export function useSessionRealtime(sessionId) {
         pending: true,
         hasVideo,
         callSessionId: payload?.callSessionId || "",
-        visitorId: payload?.visitorId || getVisitorIdentity()
+        visitorId: payload?.visitorId || getVisitorIdentity(),
+        sessionId
       });
       setCallState("incoming");
       setStatus(hasVideo ? "Incoming video call" : "Incoming audio call");
@@ -2693,7 +2732,8 @@ export function useSessionRealtime(sessionId) {
             pending: true,
             hasVideo: wantsVideo,
             callSessionId: "",
-            visitorId: getVisitorIdentity()
+            visitorId: getVisitorIdentity(),
+            sessionId
           });
           setCallState("incoming");
           setStatus(wantsVideo ? "Incoming video call" : "Incoming audio call");
@@ -2906,6 +2946,16 @@ export function useSessionRealtime(sessionId) {
       }
     });
 
+    socket.on("session.status", (payload) => {
+      if (payload?.sessionId !== sessionId) return;
+      const statusText = String(payload?.status || "").trim();
+      if (!statusText) return;
+      setStatus(`Session ${statusText}`);
+      if (statusText === "approved") {
+        markNetworkGood("Session approved.");
+      }
+    });
+
     const manager = socket.io;
     const onReconnectAttempt = () => {
       markNetworkReconnecting("Reconnecting to signaling...");
@@ -2952,6 +3002,7 @@ export function useSessionRealtime(sessionId) {
       socket.off("webrtc.ice");
       socket.off("chat.message");
       socket.off("session.control");
+      socket.off("session.status");
       socket.off("chat.persisted");
       socket.off("chat.persist_failed");
       releaseSignalingSocket(sessionId);
@@ -3017,6 +3068,7 @@ export function useSessionRealtime(sessionId) {
     canStartCall,
     callLogs,
     sendMessage,
+    sendQuickResponse,
     retryFailedMessage,
     toggleMute,
     toggleSpeaker,
@@ -3034,7 +3086,5 @@ export function useSessionRealtime(sessionId) {
 
 function previewMessageText(text) {
   if (typeof text !== "string") return "";
-  if (text.startsWith("voice_note_url:")) return "Voice note";
-  if (text.startsWith("voice_note:")) return "Voice note";
   return text;
 }

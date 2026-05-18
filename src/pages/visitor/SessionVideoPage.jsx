@@ -37,6 +37,7 @@ export default function SessionVideoPage() {
     remoteAudioRef,
     remoteVideoActive,
     cameraFacing,
+    sendQuickResponse,
     startVideoCall,
     toggleMute,
     switchCamera,
@@ -48,7 +49,11 @@ export default function SessionVideoPage() {
   const [seconds, setSeconds] = useState(0);
   const [isPanicActive] = useState(false);
   const showRemoteAsPrimary = callState === "connected" && remoteVideoActive;
-  const quickResponses = ["I'm on my way", "Leave at door", { label: "Unlock Door", icon: <LockOpen size={14} /> }];
+  const quickResponses = [
+    { key: "on_my_way", label: "I'm on my way" },
+    { key: "leave_at_door", label: "Leave at Door" },
+    { key: "unlock_door", label: "Unlock Door", icon: <LockOpen size={14} /> }
+  ];
 
   useEffect(() => {
     if (callState !== "connected" || !callConnectedAt) {
@@ -67,11 +72,11 @@ export default function SessionVideoPage() {
 
       <div className="fixed inset-0 z-0">
         <video
-          ref={showRemoteAsPrimary ? remoteVideoRef : localVideoRef}
+          ref={remoteVideoRef}
           autoPlay
           playsInline
-          muted={!showRemoteAsPrimary}
-          className="w-full h-full object-cover"
+          muted
+          className={`w-full h-full object-cover transition-opacity duration-300 ${showRemoteAsPrimary ? "opacity-100" : "opacity-0"}`}
         />
         <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/60" />
       </div>
@@ -102,12 +107,18 @@ export default function SessionVideoPage() {
         </div>
       </header>
 
-      <div className="fixed top-28 right-6 w-28 md:w-32 aspect-[3/4] rounded-2xl overflow-hidden border-2 border-white/20 shadow-2xl z-40 bg-slate-800">
+      <div
+        className={`fixed overflow-hidden border-white/20 shadow-2xl z-40 bg-slate-800 transition-all duration-300 ${
+          showRemoteAsPrimary
+            ? "top-28 right-6 w-28 md:w-32 aspect-[3/4] rounded-2xl border-2"
+            : "inset-0 w-full h-full border-0 rounded-none"
+        }`}
+      >
         <video
-          ref={showRemoteAsPrimary ? localVideoRef : remoteVideoRef}
+          ref={localVideoRef}
           autoPlay
           playsInline
-          muted={showRemoteAsPrimary}
+          muted
           className="w-full h-full object-cover"
         />
       </div>
@@ -127,9 +138,10 @@ export default function SessionVideoPage() {
             <button
               key={i}
               type="button"
+              onClick={() => sendQuickResponse(res.key)}
               className="px-4 py-2 bg-white/10 backdrop-blur-xl border border-white/10 rounded-full text-white font-bold text-[11px] uppercase tracking-wider hover:bg-white/20 transition-all active:scale-95"
             >
-              {typeof res === "string" ? `"${res}"` : <span className="flex items-center gap-2">{res.icon} {res.label}</span>}
+              {res.icon ? <span className="flex items-center gap-2">{res.icon} {res.label}</span> : `"${res.label}"`}
             </button>
           ))}
         </div>

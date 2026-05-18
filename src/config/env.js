@@ -195,7 +195,6 @@ export const env = {
   rtcMonitoringUrl: String(import.meta.env.VITE_RTC_MONITORING_URL ?? "").trim(),
   callConnectTimeoutMs: toInteger(import.meta.env.VITE_CALL_CONNECT_TIMEOUT_MS, 8000),
   callRingTimeoutMs: toInteger(import.meta.env.VITE_CALL_RING_TIMEOUT_MS, 30000),
-  preferVoiceNoteFallback: toBoolean(import.meta.env.VITE_PREFER_VOICE_NOTE_FALLBACK, true),
   enableRealtimeInDev: String(import.meta.env.VITE_ENABLE_REALTIME_IN_DEV ?? "true").toLowerCase() !== "false",
   enableLegacyWebrtc: String(import.meta.env.VITE_ENABLE_LEGACY_WEBRTC ?? "false").toLowerCase() === "true",
   routerMode: String(import.meta.env.VITE_ROUTER_MODE ?? "auto").trim().toLowerCase()

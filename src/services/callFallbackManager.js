@@ -1,7 +1,6 @@
 export const CALL_MEDIA_MODE = {
   VIDEO: "video",
   AUDIO: "audio",
-  VOICE_NOTE: "voice-note",
   TEXT: "text",
 };
 
@@ -20,7 +19,6 @@ export function getRingTimeoutMs(rawValue, fallbackMs = 30000) {
 export function getNextFallbackAction({
   currentMode = CALL_MEDIA_MODE.AUDIO,
   forceRelay = false,
-  preferVoiceNote = true,
 } = {}) {
   if (currentMode === CALL_MEDIA_MODE.VIDEO && !forceRelay) {
     return {
@@ -49,15 +47,6 @@ export function getNextFallbackAction({
       forceRelay: true,
       status: "Reconnecting...",
       detail: "Direct audio path failed. Retrying through TURN relay.",
-    };
-  }
-
-  if (preferVoiceNote) {
-    return {
-      kind: "voice-note",
-      nextMode: CALL_MEDIA_MODE.VOICE_NOTE,
-      status: "Network issue, sending voice message...",
-      detail: "Audio could not stabilize. Falling back to asynchronous voice messaging.",
     };
   }
 
