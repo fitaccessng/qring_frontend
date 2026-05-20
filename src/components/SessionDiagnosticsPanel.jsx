@@ -4,6 +4,8 @@ export default function SessionDiagnosticsPanel({ diagnostics, networkQuality = 
   const rtt = diagnostics.roundTripTimeMs != null ? `${diagnostics.roundTripTimeMs} ms` : "-";
   const jitter = diagnostics.jitterMs != null ? `${diagnostics.jitterMs} ms` : "-";
   const loss = diagnostics.packetLoss != null ? String(diagnostics.packetLoss) : "-";
+  const audioBitrate = diagnostics.audioBitrateKbps != null ? `${diagnostics.audioBitrateKbps} kbps` : "-";
+  const videoBitrate = diagnostics.videoBitrateKbps != null ? `${diagnostics.videoBitrateKbps} kbps` : "-";
   const rttRisk = riskByThreshold(diagnostics.roundTripTimeMs, 300, 500);
   const jitterRisk = riskByThreshold(diagnostics.jitterMs, 30, 60);
   const lossRisk = riskByThreshold(diagnostics.packetLoss, 10, 30);
@@ -36,9 +38,14 @@ export default function SessionDiagnosticsPanel({ diagnostics, networkQuality = 
         <DiagItem label="Signal" value={diagnostics.signalingState} />
         <DiagItem label="Local Cand" value={diagnostics.localCandidateType} risk={candidateRisk} />
         <DiagItem label="Remote Cand" value={diagnostics.remoteCandidateType} risk={candidateRisk} />
+        <DiagItem label="Pair" value={diagnostics.selectedCandidatePair || "-"} risk={candidateRisk} />
         <DiagItem label="RTT" value={rtt} risk={rttRisk} />
         <DiagItem label="Jitter" value={jitter} risk={jitterRisk} />
         <DiagItem label="Packets Lost" value={loss} risk={lossRisk} />
+        <DiagItem label="Audio Rate" value={audioBitrate} risk={rttRisk} />
+        <DiagItem label="Video Rate" value={videoBitrate} risk={candidateRisk} />
+        <DiagItem label="Route" value={diagnostics.audioRoute || "unknown"} />
+        <DiagItem label="Link" value={diagnostics.networkType || "unknown"} />
       </div>
       {hints.length > 0 ? (
         <div className="mt-3 space-y-1">

@@ -10,6 +10,7 @@ import {
   Volume2
 } from "lucide-react";
 import VisitorIncomingCallModal from "../../components/VisitorIncomingCallModal";
+import SessionDebugOverlay from "../../components/SessionDebugOverlay";
 import { useSessionRealtime } from "../../hooks/useSessionRealtime";
 import { useNotifications } from "../../state/NotificationsContext";
 
@@ -33,13 +34,22 @@ export default function SessionAudioPage() {
     incomingCall,
     canStartCall,
     remoteAudioRef,
+    networkQuality,
+    callDiagnostics,
+    callLogs,
+    lowBandwidthMode,
+    audioRoute,
+    networkType,
+    videoQualityProfile,
+    debugOverlayOpen,
     startAudioCall,
     toggleMute,
     toggleSpeaker,
     endCall,
     retryCallConnection,
     acceptIncomingCall,
-    rejectIncomingCall
+    rejectIncomingCall,
+    setDebugOverlayOpen
   } = useSessionRealtime(sessionId);
 
   const [connectedSeconds, setConnectedSeconds] = useState(0);
@@ -137,6 +147,17 @@ export default function SessionAudioPage() {
         hasVideo={incomingCall.hasVideo}
         onAccept={acceptIncomingCall}
         onReject={rejectIncomingCall}
+      />
+      <SessionDebugOverlay
+        open={debugOverlayOpen}
+        onToggle={() => setDebugOverlayOpen((current) => !current)}
+        diagnostics={callDiagnostics}
+        logs={callLogs}
+        networkQuality={networkQuality}
+        lowBandwidthMode={lowBandwidthMode}
+        audioRoute={audioRoute}
+        networkType={networkType}
+        videoQualityProfile={videoQualityProfile}
       />
     </div>
   );

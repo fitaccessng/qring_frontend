@@ -11,6 +11,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import VisitorIncomingCallModal from "../../components/VisitorIncomingCallModal";
+import SessionDebugOverlay from "../../components/SessionDebugOverlay";
 import { useSessionRealtime } from "../../hooks/useSessionRealtime";
 import { useNotifications } from "../../state/NotificationsContext";
 
@@ -37,13 +38,22 @@ export default function SessionVideoPage() {
     remoteAudioRef,
     remoteVideoActive,
     cameraFacing,
+    networkQuality,
+    callDiagnostics,
+    callLogs,
+    lowBandwidthMode,
+    audioRoute,
+    networkType,
+    videoQualityProfile,
+    debugOverlayOpen,
     sendQuickResponse,
     startVideoCall,
     toggleMute,
     switchCamera,
     endCall,
     acceptIncomingCall,
-    rejectIncomingCall
+    rejectIncomingCall,
+    setDebugOverlayOpen
   } = useSessionRealtime(sessionId);
 
   const [seconds, setSeconds] = useState(0);
@@ -179,6 +189,17 @@ export default function SessionVideoPage() {
         hasVideo={incomingCall.hasVideo}
         onAccept={acceptIncomingCall}
         onReject={rejectIncomingCall}
+      />
+      <SessionDebugOverlay
+        open={debugOverlayOpen}
+        onToggle={() => setDebugOverlayOpen((current) => !current)}
+        diagnostics={callDiagnostics}
+        logs={callLogs}
+        networkQuality={networkQuality}
+        lowBandwidthMode={lowBandwidthMode}
+        audioRoute={audioRoute}
+        networkType={networkType}
+        videoQualityProfile={videoQualityProfile}
       />
     </div>
   );

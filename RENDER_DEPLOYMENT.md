@@ -1,5 +1,12 @@
 Render frontend deploy checklist
 
+Active call architecture
+
+- App UI and signaling bootstrap are hosted on Render.
+- Socket.IO signaling runs through the backend on Render.
+- Media stays peer-to-peer over native WebRTC.
+- TURN must stay on an external VPS, not on Render.
+
 Backend prerequisites
 
 - The backend `REDIS_URL` must be the exact internal Key Value URL copied from the Render dashboard `Connect` menu for your Key Value instance.
@@ -18,8 +25,7 @@ VITE_PUBLIC_APP_URL=https://www.useqring.online
 VITE_SOCKET_PATH=/socket.io
 VITE_DASHBOARD_NAMESPACE=/realtime/dashboard
 VITE_SIGNALING_NAMESPACE=/realtime/signaling
-VITE_LIVEKIT_CLOUD=true
-VITE_LIVEKIT_URL=wss://qring-yovnizqn.livekit.cloud
+VITE_WEBRTC_ICE_SERVERS=[{"urls":"stun:stun.l.google.com:19302"},{"urls":["turn:YOUR_TURN_HOST:3478?transport=udp","turn:YOUR_TURN_HOST:3478?transport=tcp"],"username":"YOUR_TURN_USERNAME","credential":"YOUR_TURN_PASSWORD"},{"urls":"turns:YOUR_TURN_HOST:5349?transport=tcp","username":"YOUR_TURN_USERNAME","credential":"YOUR_TURN_PASSWORD"}]
 VITE_CALL_CONNECT_TIMEOUT_MS=8000
 VITE_CALL_RING_TIMEOUT_MS=30000
 VITE_RTC_MONITORING_URL=https://YOUR_BACKEND_OR_MONITORING_ENDPOINT/rtc
@@ -32,8 +38,12 @@ VITE_FIREBASE_VAPID_KEY=YOUR_FIREBASE_VAPID_KEY
 
 Notes
 
-- For LiveKit Cloud, leave `VITE_WEBRTC_ICE_SERVERS` unset unless LiveKit support specifically instructs otherwise.
-- `VITE_LIVEKIT_URL` must remain `wss://qring-yovnizqn.livekit.cloud` unless the LiveKit Cloud project changes.
+- `VITE_WEBRTC_ICE_SERVERS` must include at least one TURN server for production mobile calls.
+- Keep the TURN host off Render. Use your VPS hostname or public IP.
+- Prefer both `turn:` on `3478` and `turns:` on `5349`.
+- Include both UDP and TCP transport variants for `turn:` where possible.
+- Keep video defaults conservative for mobile networks: `640x360` and `24fps`.
+- Audio quality should be prioritized above video quality when debugging bad-network behavior.
 - Add any extra Firebase values your deployment needs, such as `VITE_FIREBASE_STORAGE_BUCKET`, `VITE_FIREBASE_MESSAGING_SENDER_ID`, or `VITE_FIREBASE_MEASUREMENT_ID`.
 
 Recommended Render settings
@@ -55,4 +65,8 @@ What to do after setting env vars
 1. Save the environment variables in Render.
 2. Trigger a manual redeploy.
 3. Verify login against `https://qring-backend-1.onrender.com/api/v1/health` and confirm the backend no longer errors while contacting Redis.
-4. If the build still fails, copy the log lines after `npm run build`.
+4. Start a real homeowner-to-visitor call and confirm ICE reaches either direct or relay candidates within a few seconds.
+5. Confirm a `turns:` relay path still works when UDP is blocked.
+6. Switch one device between WiFi and cellular and confirm the call recovers.
+7. Lock and unlock an Android device during a live call and confirm media recovers.
+8. If the build still fails, copy the log lines after `npm run build`.
