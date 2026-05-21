@@ -37,6 +37,7 @@ export default function HomeownerMessagesPage() {
   const [error, setError] = useState("");
   const [decisionBusy, setDecisionBusy] = useState(false);
   const [callBusy, setCallBusy] = useState("");
+  const [typingByThread, setTypingByThread] = useState({});
   const [incomingCall, setIncomingCall] = useState({
     pending: false,
     hasVideo: false,
@@ -141,9 +142,45 @@ export default function HomeownerMessagesPage() {
       if (!incomingSessionId || !nextStatus) return;
       setThreads((prev) =>
         prev.map((thread) =>
-          thread.id === incomingSessionId ? { ...thread, sessionStatus: nextStatus } : thread
+          thread.id === incomingSessionId
+            ? {
+                ...thread,
+                sessionStatus: nextStatus,
+                last: payload?.sessionActivated ? "Access approved. Visitor can now enter the session." : thread.last,
+                time: new Date().toISOString()
+              }
+            : thread
         )
       );
+    });
+
+    socket.on("session.activated", (payload) => {
+      const incomingSessionId = String(payload?.sessionId || payload?.data?.id || "").trim();
+      if (!incomingSessionId) return;
+      setThreads((prev) =>
+        prev.map((thread) =>
+          thread.id === incomingSessionId
+            ? {
+                ...thread,
+                sessionStatus: payload?.status || "approved",
+                last: "Access approved. Session is now active.",
+                time: new Date().toISOString()
+              }
+            : thread
+        )
+      );
+    });
+
+    socket.on("chat.typing", (payload) => {
+      const incomingSessionId = String(payload?.sessionId || "").trim();
+      if (!incomingSessionId) return;
+      setTypingByThread((prev) => ({
+        ...prev,
+        [incomingSessionId]: {
+          isTyping: Boolean(payload?.isTyping),
+          displayName: payload?.displayName || "Visitor"
+        }
+      }));
     });
 
     socket.on("incoming-call", (payload) => {
@@ -254,6 +291,12 @@ export default function HomeownerMessagesPage() {
     try {
       const saved = await sendHomeownerSessionMessage(selectedId, text);
       if (saved) {
+        socketRef.current?.emit("chat.typing", {
+          sessionId: selectedId,
+          senderType: "homeowner",
+          displayName: user?.fullName || "Homeowner",
+          isTyping: false
+        });
         setMessagesByThread((prev) => {
           const current = prev[selectedId] || [];
           if (current.some((item) => item.id === saved.id)) return prev;
@@ -478,6 +521,11 @@ export default function HomeownerMessagesPage() {
                 <p className="mt-1 truncate text-xs font-semibold text-slate-600">
                   {[heroThread?.purpose, heroThread?.visitorPhone].filter(Boolean).join(" • ") || "Waiting for visitor details"}
                 </p>
+                {typingByThread[selectedId]?.isTyping ? (
+                  <p className="mt-1 text-[10px] font-semibold text-amber-600">
+                    {typingByThread[selectedId]?.displayName || "Visitor"} is typing...
+                  </p>
+                ) : null}
               </div>
             </div>
             {heroThread?.photoUrl && (
@@ -537,7 +585,16 @@ export default function HomeownerMessagesPage() {
             <form onSubmit={handleSend} className="relative">
               <input
                 value={draft}
-                onChange={(e) => setDraft(e.target.value)}
+                onChange={(e) => {
+                  const nextValue = e.target.value;
+                  setDraft(nextValue);
+                  socketRef.current?.emit("chat.typing", {
+                    sessionId: selectedId,
+                    senderType: "homeowner",
+                    displayName: user?.fullName || "Homeowner",
+                    isTyping: Boolean(nextValue.trim())
+                  });
+                }}
                 placeholder="Type secure reply..."
                 className="w-full bg-slate-50 border-none rounded-2xl py-4 pl-5 pr-24 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-600/10"
               />

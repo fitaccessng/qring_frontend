@@ -30,6 +30,7 @@ export default function SecurityMessagesPage() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [error, setError] = useState("");
   const [callBusy, setCallBusy] = useState("");
+  const [typingByThread, setTypingByThread] = useState({});
   const [view, setView] = useState("list"); // "list" | "chat" on mobile
   const messagesRef = useRef(null);
   const selectedIdRef = useRef("");
@@ -144,6 +145,18 @@ export default function SecurityMessagesPage() {
       upsertThreadPreview(msg);
     });
 
+    socket.on("chat.typing", (payload) => {
+      const sid = String(payload?.sessionId || "").trim();
+      if (!sid) return;
+      setTypingByThread((prev) => ({
+        ...prev,
+        [sid]: {
+          isTyping: Boolean(payload?.isTyping),
+          displayName: payload?.displayName || "Participant"
+        }
+      }));
+    });
+
     return () => { socketRef.current = null; socket.disconnect(); };
   }, [token, threads]);
 
@@ -181,6 +194,12 @@ export default function SecurityMessagesPage() {
         displayName: saved?.displayName || "Security",
         at: saved?.at || new Date().toISOString()
       };
+      socketRef.current?.emit("chat.typing", {
+        sessionId: selectedId,
+        senderType: "security",
+        displayName: "Security",
+        isTyping: false
+      });
       setMessagesByThread(prev => {
         const curr = prev[selectedId] ?? [];
         if (curr.some(m => isLikelyDuplicate(m, out))) return prev;
@@ -486,6 +505,11 @@ export default function SecurityMessagesPage() {
                     ) : selectedMessages.length === 0 ? (
                       <div style={{ textAlign: "center", padding: "32px 0" }}>
                         <p style={{ fontSize: 13, color: "#a8a29e" }}>No messages yet — start the conversation.</p>
+                        {typingByThread[selectedId]?.isTyping ? (
+                          <p style={{ fontSize: 12, color: "#d97706", marginTop: 10 }}>
+                            {typingByThread[selectedId]?.displayName || "Participant"} is typing...
+                          </p>
+                        ) : null}
                       </div>
                     ) : (
                       selectedMessages.map((msg, i) => {
@@ -534,6 +558,12 @@ export default function SecurityMessagesPage() {
                         rows={1}
                         onChange={e => {
                           setDraft(e.target.value);
+                          socketRef.current?.emit("chat.typing", {
+                            sessionId: selectedId,
+                            senderType: "security",
+                            displayName: "Security",
+                            isTyping: Boolean(e.target.value.trim())
+                          });
                           e.target.style.height = "auto";
                           e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
                         }}

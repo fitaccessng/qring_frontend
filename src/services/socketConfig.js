@@ -18,10 +18,12 @@ export const realtimeTransportOptions = shouldForceWebsocketInDev()
   ? {
       // On LAN dev, start with polling and upgrade when possible to avoid hard websocket failures.
       transports: ["polling", "websocket"],
-      upgrade: true
+      upgrade: true,
+      rememberUpgrade: false
     }
   : {
-      // On Render-like multi-instance hosts, polling can trigger 400 due to non-sticky sessions.
-      transports: ["websocket"],
-      upgrade: true
+      // In production, allow polling fallback first so websocket startup races or proxy quirks do not hard-fail calls/chat.
+      transports: ["websocket", "polling"],
+      upgrade: true,
+      rememberUpgrade: true
     };

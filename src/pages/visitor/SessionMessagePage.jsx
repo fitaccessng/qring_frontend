@@ -25,9 +25,13 @@ export default function SessionMessagePage() {
     featureError,
     incomingCall,
     acceptedCallMode,
+    typingState,
+    mediaPermission,
     canStartCall,
     sendMessage,
+    sendTypingState,
     retryFailedMessage,
+    requestMediaPermissions,
     acceptIncomingCall,
     rejectIncomingCall
   } = useSessionRealtime(sessionId);
@@ -56,6 +60,13 @@ export default function SessionMessagePage() {
     if (!messagesRef.current) return;
     messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
   }, [messages]);
+
+  useEffect(() => {
+    if (!sessionId) return;
+    void requestMediaPermissions({ video: false }).catch(() => {
+      // Permission state is reflected through the hook.
+    });
+  }, [requestMediaPermissions, sessionId]);
 
   function resolveServerCallState(value) {
     if (value === "ringing") return "ringing";
@@ -113,6 +124,14 @@ export default function SessionMessagePage() {
               <header className="border-b border-slate-200 bg-white/85 px-4 py-3">
                 <h2 className="text-lg font-black">Conversation</h2>
                 <p className="text-xs text-slate-500">Live chat for this session.</p>
+                <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
+                  <PermissionPill permission={mediaPermission} />
+                  {typingState?.isTyping ? (
+                    <span className="rounded-full bg-amber-100 px-2.5 py-1 font-semibold text-amber-800">
+                      {typingState.displayName || "Participant"} is typing...
+                    </span>
+                  ) : null}
+                </div>
               </header>
 
               <div ref={messagesRef} className="h-[58vh] space-y-3 overflow-y-auto p-4 sm:h-[60vh]">
@@ -151,7 +170,11 @@ export default function SessionMessagePage() {
                 <div className="flex items-center gap-2">
                   <input
                     value={text}
-                    onChange={(event) => setText(event.target.value)}
+                    onChange={(event) => {
+                      const nextValue = event.target.value;
+                      setText(nextValue);
+                      sendTypingState(Boolean(nextValue.trim()));
+                    }}
                     className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm"
                     placeholder="Type your message..."
                   />
@@ -162,6 +185,19 @@ export default function SessionMessagePage() {
                     Send
                   </button>
                 </div>
+                {mediaPermission.state === "denied" || mediaPermission.state === "unavailable" ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void requestMediaPermissions({ video: false }).catch(() => {
+                        // The hook keeps the latest error state.
+                      });
+                    }}
+                    className="mt-3 rounded-xl border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700"
+                  >
+                    Retry camera and microphone permission
+                  </button>
+                ) : null}
               </form>
             </article>
           </section>
@@ -190,4 +226,26 @@ function getStoredUserRole() {
 function renderMessageBody(text) {
   if (typeof text !== "string") return <p>{String(text || "")}</p>;
   return <p>{text}</p>;
+}
+
+function PermissionPill({ permission }) {
+  const state = String(permission?.state || "idle");
+  const label =
+    state === "granted"
+      ? "Camera and mic ready"
+      : state === "requesting"
+        ? "Requesting camera and mic"
+        : state === "denied"
+          ? "Camera or mic denied"
+          : state === "unavailable"
+            ? "Camera or mic unavailable"
+            : "Waiting for media permission";
+  const className =
+    state === "granted"
+      ? "bg-emerald-100 text-emerald-800"
+      : state === "requesting"
+        ? "bg-sky-100 text-sky-800"
+        : "bg-rose-100 text-rose-800";
+
+  return <span className={`rounded-full px-2.5 py-1 font-semibold ${className}`}>{label}</span>;
 }

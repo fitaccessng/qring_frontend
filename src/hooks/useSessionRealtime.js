@@ -326,6 +326,14 @@ export function useSessionRealtime(sessionId) {
   const [localMicEnabled, setLocalMicEnabled] = useState(true);
   const [messages, setMessages] = useState([]);
   const [status, setStatus] = useState("");
+  const [typingState, setTypingState] = useState({ isTyping: false, senderType: "", displayName: "", at: "" });
+  const [messageDelivery, setMessageDelivery] = useState({});
+  const [mediaPermission, setMediaPermission] = useState({
+    state: "idle",
+    error: "",
+    lastRequestedAt: null,
+    lastGrantedAt: null,
+  });
   const [networkQuality, setNetworkQuality] = useState("reconnecting");
   const [networkDetail, setNetworkDetail] = useState("Connecting...");
   const [callLaunchStage, setCallLaunchStage] = useState("idle");
@@ -377,6 +385,7 @@ export function useSessionRealtime(sessionId) {
   const freezeEventsRef = useRef(0);
   const pendingStartIntentRef = useRef(null);
   const pendingAcceptIntentRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
   const statsSnapshotRef = useRef({
     at: 0,
     audioBytesReceived: 0,
@@ -687,6 +696,12 @@ export function useSessionRealtime(sessionId) {
       existing.getTracks().forEach((track) => track.stop());
     }
 
+    setMediaPermission((prev) => ({
+      ...prev,
+      state: "requesting",
+      error: "",
+      lastRequestedAt: Date.now(),
+    }));
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: {
         echoCancellation: true,
@@ -703,6 +718,12 @@ export function useSessionRealtime(sessionId) {
     setCameraOn(wantsVideo);
     setMuted(false);
     setLocalMicEnabled(true);
+    setMediaPermission({
+      state: "granted",
+      error: "",
+      lastRequestedAt: Date.now(),
+      lastGrantedAt: Date.now(),
+    });
     if (localVideoRef.current) {
       localVideoRef.current.srcObject = wantsVideo ? stream : null;
       localVideoRef.current.muted = true;
@@ -722,6 +743,25 @@ export function useSessionRealtime(sessionId) {
     stream.getTracks().forEach((track) => pc.addTrack(track, stream));
     await optimizeSenders(pc);
     return stream;
+  }
+
+  async function requestMediaPermissions({ video = false } = {}) {
+    try {
+      await ensureLocalStream({ video, reuse: false });
+      return true;
+    } catch (error) {
+      const message = String(error?.message || "");
+      const unavailable =
+        message.toLowerCase().includes("notfound") ||
+        message.toLowerCase().includes("device") ||
+        message.toLowerCase().includes("available");
+      setMediaPermission((prev) => ({
+        ...prev,
+        state: unavailable ? "unavailable" : "denied",
+        error: message || "Camera or microphone permission was denied.",
+      }));
+      throw error;
+    }
   }
 
   async function optimizeSenders(pc = peerRef.current) {
@@ -1260,6 +1300,17 @@ export function useSessionRealtime(sessionId) {
     return true;
   }
 
+  function sendTypingState(isTyping) {
+    if (!socketRef.current || !joined) return;
+    socketRef.current.emit("chat.typing", {
+      sessionId,
+      senderType: participantType,
+      displayName,
+      isTyping: Boolean(isTyping),
+      visitorToken: participantType === "visitor" ? getVisitorSessionToken(sessionId) || undefined : undefined
+    });
+  }
+
   async function retryFailedMessage(messageId) {
     const target = messages.find((item) => item.id === messageId);
     if (!target) return;
@@ -1403,12 +1454,51 @@ export function useSessionRealtime(sessionId) {
 
     socket.on("chat.persisted", (payload) => {
       if (payload?.sessionId !== sessionId) return;
+      setMessageDelivery((prev) => ({ ...prev, [payload?.clientId || payload?.id]: "delivered" }));
       upsertMessage({ ...payload, failed: false, persisted: true });
     });
 
     socket.on("chat.persist_failed", (payload) => {
       if (payload?.sessionId !== sessionId) return;
+      setMessageDelivery((prev) => ({ ...prev, [payload?.clientId || payload?.id]: "failed" }));
       upsertMessage({ ...payload, failed: true, persisted: false });
+    });
+
+    socket.on("chat.ack", (payload) => {
+      if (payload?.sessionId !== sessionId) return;
+      setMessageDelivery((prev) => ({ ...prev, [payload?.clientId || payload?.id]: payload?.status || "queued" }));
+    });
+
+    socket.on("chat.typing", (payload) => {
+      if (payload?.sessionId !== sessionId) return;
+      const nextState = {
+        isTyping: Boolean(payload?.isTyping),
+        senderType: payload?.senderType || "",
+        displayName: payload?.displayName || "Participant",
+        at: payload?.at || new Date().toISOString(),
+      };
+      setTypingState(nextState);
+      if (typingTimeoutRef.current) {
+        window.clearTimeout(typingTimeoutRef.current);
+      }
+      if (nextState.isTyping) {
+        typingTimeoutRef.current = window.setTimeout(() => {
+          setTypingState({ isTyping: false, senderType: "", displayName: "", at: "" });
+        }, 2500);
+      }
+    });
+
+    socket.on("chat.read", (payload) => {
+      if (payload?.sessionId !== sessionId) return;
+      setMessageDelivery((prev) => {
+        const next = { ...prev };
+        Object.keys(next).forEach((key) => {
+          if (next[key] === "queued" || next[key] === "delivered") {
+            next[key] = "read";
+          }
+        });
+        return next;
+      });
     });
 
     socket.on("call.invite", (payload) => {
@@ -1468,6 +1558,18 @@ export function useSessionRealtime(sessionId) {
         setStatus("Call ended by participant");
         void endCall(false);
       }
+    });
+
+    socket.on("session.status", (payload) => {
+      if (String(payload?.sessionId || "") !== String(sessionId || "")) return;
+      if (payload?.status) {
+        setStatus(String(payload.status));
+      }
+    });
+
+    socket.on("session.activated", (payload) => {
+      if (String(payload?.sessionId || payload?.data?.id || "") !== String(sessionId || "")) return;
+      setStatus("Access approved. Entering session...");
     });
 
     socket.on("webrtc.offer", async (payload) => {
@@ -1552,6 +1654,10 @@ export function useSessionRealtime(sessionId) {
     });
 
     return () => {
+      if (typingTimeoutRef.current) {
+        window.clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
+      }
       socket.removeAllListeners();
       socket.disconnect();
       socketRef.current = null;
@@ -1734,6 +1840,9 @@ export function useSessionRealtime(sessionId) {
     callDiagnostics,
     incomingCall,
     acceptedCallMode,
+    typingState,
+    messageDelivery,
+    mediaPermission,
     remoteVideoActive,
     callLogs,
     lowBandwidthMode,
@@ -1743,8 +1852,10 @@ export function useSessionRealtime(sessionId) {
     debugOverlayOpen,
     canStartCall,
     sendMessage,
+    sendTypingState,
     sendQuickResponse,
     retryFailedMessage,
+    requestMediaPermissions,
     toggleMute,
     toggleSpeaker,
     setLowBandwidthMode,

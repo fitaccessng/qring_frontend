@@ -20,23 +20,34 @@ export default function VisitorSessionGateRoute({ children }) {
   useEffect(() => {
     if (isStaff) return () => {};
     let active = true;
-    setLoading(true);
-    setError("");
-    getVisitorSessionStatus(sessionId)
-      .then((data) => {
+    let pollId = 0;
+    const check = async () => {
+      if (!active) return;
+      if (!pollId) {
+        setLoading(true);
+      }
+      setError("");
+      try {
+        const data = await getVisitorSessionStatus(sessionId);
         if (!active) return;
         setSessionStatus(normalizeStatus(data?.status || data?.sessionStatus));
-      })
-      .catch((err) => {
+      } catch (err) {
         if (!active) return;
         setError(err?.message || "Unable to verify session status");
-      })
-      .finally(() => {
+      } finally {
         if (!active) return;
         setLoading(false);
-      });
+      }
+    };
+    void check();
+    pollId = window.setInterval(() => {
+      void check();
+    }, 1000);
     return () => {
       active = false;
+      if (pollId) {
+        window.clearInterval(pollId);
+      }
     };
   }, [isStaff, sessionId]);
 
