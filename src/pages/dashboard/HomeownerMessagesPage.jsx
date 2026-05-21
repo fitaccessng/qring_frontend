@@ -85,6 +85,24 @@ export default function HomeownerMessagesPage() {
     return () => { active = false; };
   }, [preferredSessionId]);
 
+  useEffect(() => {
+    const intervalId = window.setInterval(async () => {
+      try {
+        const data = await getHomeownerMessages();
+        const normalized = (data || []).map((thread) => ({
+          ...thread,
+          last: previewMessageText(thread?.last || "")
+        }));
+        const sorted = sortThreadsForInbox(normalized);
+        setThreads((prev) => mergeThreadCollections(prev, sorted));
+      } catch {
+        // Keep polling best-effort so temporary backend issues do not wipe the inbox.
+      }
+    }, 10000);
+
+    return () => window.clearInterval(intervalId);
+  }, []);
+
   // --- Socket Logic & Message Handlers ---
   useEffect(() => {
     if (!token) return;
@@ -115,6 +133,50 @@ export default function HomeownerMessagesPage() {
       });
       if (normalized.senderType !== "homeowner") playMessageNotificationSound();
       upsertThreadPreview(normalized, setThreads, selectedIdRef.current);
+    });
+
+    socket.on("session.status", (payload) => {
+      const incomingSessionId = String(payload?.sessionId || "").trim();
+      const nextStatus = String(payload?.status || "").trim();
+      if (!incomingSessionId || !nextStatus) return;
+      setThreads((prev) =>
+        prev.map((thread) =>
+          thread.id === incomingSessionId ? { ...thread, sessionStatus: nextStatus } : thread
+        )
+      );
+    });
+
+    socket.on("incoming-call", (payload) => {
+      const incomingSessionId = String(payload?.sessionId || "").trim();
+      if (!incomingSessionId) return;
+      setThreads((prev) =>
+        prev.map((thread) =>
+          thread.id === incomingSessionId
+            ? {
+                ...thread,
+                last: payload?.message || thread.last,
+                time: payload?.at || new Date().toISOString()
+              }
+            : thread
+        )
+      );
+    });
+
+    socket.on("new_visitor_request", async () => {
+      try {
+        const data = await getHomeownerMessages();
+        const normalized = (data || []).map((thread) => ({
+          ...thread,
+          last: previewMessageText(thread?.last || "")
+        }));
+        const sorted = sortThreadsForInbox(normalized);
+        setThreads((prev) => mergeThreadCollections(prev, sorted));
+        if (!selectedIdRef.current && sorted[0]?.id) {
+          setSelectedId(sorted[0].id);
+        }
+      } catch {
+        // ignore transient refresh failures
+      }
     });
 
     socket.on("call.invite", (payload) => {
@@ -262,14 +324,22 @@ export default function HomeownerMessagesPage() {
     setCallBusy(busyKey);
     setError("");
     try {
-      window.sessionStorage.setItem(
-        "qring_call_start_intent",
-        JSON.stringify({ pending: true, sessionId: selectedId, mode: nextMode })
-      );
-      await apiRequest("/calls/start", {
+      const response = await apiRequest("/calls/start", {
         method: "POST",
         body: JSON.stringify({ sessionId: selectedId, type: nextMode, hasVideo: nextMode === "video" })
       });
+      const data = response?.data ?? response ?? {};
+      window.sessionStorage.setItem(
+        "qring_call_start_intent",
+        JSON.stringify({
+          pending: true,
+          sessionId: selectedId,
+          mode: nextMode,
+          callSessionId: data?.callSessionId || "",
+          visitorId: data?.visitorId || selectedId,
+          rtcConfig: data?.rtcConfig || null
+        })
+      );
       navigate(`/session/${selectedId}/${nextMode}`);
     } catch (err) {
       setError(err?.message || `Unable to start ${nextMode} call.`);
@@ -399,11 +469,16 @@ export default function HomeownerMessagesPage() {
         <section className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden flex flex-col h-[60vh]">
           {/* Live Feed / Header */}
           <div className="p-5 border-b border-slate-50 bg-slate-50/50 flex items-center justify-between">
-            <div className="flex items-center gap-3">
+            <div className="flex min-w-0 items-center gap-3">
               <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-              <h2 className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                Live: {heroThread?.gateLabel || "Main Entry"}
-              </h2>
+              <div className="min-w-0">
+                <h2 className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  Live: {heroThread?.gateLabel || "Main Entry"}
+                </h2>
+                <p className="mt-1 truncate text-xs font-semibold text-slate-600">
+                  {[heroThread?.purpose, heroThread?.visitorPhone].filter(Boolean).join(" • ") || "Waiting for visitor details"}
+                </p>
+              </div>
             </div>
             {heroThread?.photoUrl && (
                 <div className="w-10 h-10 rounded-lg overflow-hidden border-2 border-white shadow-sm">
@@ -510,4 +585,16 @@ function upsertThreadPreview(msg, setThreads, selectedId, extra = {}) {
 
 function sortThreadsForInbox(threads) {
   return [...threads].sort((a, b) => new Date(b.time) - new Date(a.time));
+}
+
+function mergeThreadCollections(current, incoming) {
+  const map = new Map();
+  for (const thread of current || []) {
+    map.set(thread.id, thread);
+  }
+  for (const thread of incoming || []) {
+    const previous = map.get(thread.id);
+    map.set(thread.id, previous ? { ...previous, ...thread } : thread);
+  }
+  return sortThreadsForInbox(Array.from(map.values()));
 }

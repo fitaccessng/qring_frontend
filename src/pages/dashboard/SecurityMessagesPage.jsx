@@ -213,8 +213,20 @@ export default function SecurityMessagesPage() {
     const key = `${selectedId}:${type}`;
     setCallBusy(key);
     try {
-      window.sessionStorage.setItem("qring_call_start_intent", JSON.stringify({ pending: true, sessionId: selectedId, mode: type === "video" ? "video" : "audio" }));
-      await apiRequest("/calls/start", { method: "POST", body: JSON.stringify({ sessionId: selectedId, type, hasVideo: type === "video" }) });
+      const nextMode = type === "video" ? "video" : "audio";
+      const response = await apiRequest("/calls/start", { method: "POST", body: JSON.stringify({ sessionId: selectedId, type, hasVideo: type === "video" }) });
+      const data = response?.data ?? response ?? {};
+      window.sessionStorage.setItem(
+        "qring_call_start_intent",
+        JSON.stringify({
+          pending: true,
+          sessionId: selectedId,
+          mode: nextMode,
+          callSessionId: data?.callSessionId || "",
+          visitorId: data?.visitorId || selectedId,
+          rtcConfig: data?.rtcConfig || null
+        })
+      );
       navigate(`/session/${selectedId}/${type === "video" ? "video" : "audio"}`);
     } catch (e) {
       setError(e?.message || "Unable to start call.");

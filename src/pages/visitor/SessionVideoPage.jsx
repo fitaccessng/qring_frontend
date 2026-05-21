@@ -7,7 +7,6 @@ import {
   Mic,
   MicOff,
   PhoneOff,
-  Radio,
   RotateCcw,
 } from "lucide-react";
 import VisitorIncomingCallModal from "../../components/VisitorIncomingCallModal";
@@ -27,6 +26,8 @@ export default function SessionVideoPage() {
   const { unreadCount } = useNotifications();
   const exitRoute = getExitRoute(sessionId);
   const {
+    connected,
+    joined,
     callState,
     muted,
     featureError,
@@ -39,6 +40,9 @@ export default function SessionVideoPage() {
     remoteVideoActive,
     cameraFacing,
     networkQuality,
+    networkDetail,
+    status,
+    callLaunchStage,
     callDiagnostics,
     callLogs,
     lowBandwidthMode,
@@ -51,6 +55,7 @@ export default function SessionVideoPage() {
     toggleMute,
     switchCamera,
     endCall,
+    retryCallConnection,
     acceptIncomingCall,
     rejectIncomingCall,
     setDebugOverlayOpen
@@ -91,27 +96,27 @@ export default function SessionVideoPage() {
         <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/60" />
       </div>
 
-      <header className="fixed top-0 w-full z-[100] bg-white/80 backdrop-blur-md border-b border-slate-100 px-6 py-4">
+      <header className="fixed top-0 w-full z-[100] bg-black/25 backdrop-blur-md border-b border-white/10 px-6 py-4">
         <div className="max-w-4xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-4">
             <button
               type="button"
               onClick={() => navigate(exitRoute)}
-              className="p-2.5 bg-slate-50 text-slate-600 rounded-full hover:bg-slate-100 transition-colors"
+              className="p-2.5 bg-white/10 text-white rounded-full hover:bg-white/20 transition-colors"
             >
               <ChevronLeft size={20} />
             </button>
             <div>
-              <h1 className="font-bold text-lg text-slate-900 leading-none">Video Feed</h1>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
-                {isPanicActive ? "🔴 Emergency Active" : "🟢 System Armed"}
+              <h1 className="font-bold text-lg text-white leading-none">Live Video Call</h1>
+              <p className="text-[10px] text-white/70 font-bold uppercase tracking-widest mt-1">
+                {isPanicActive ? "Emergency active" : connected ? "Signal online" : "Signal reconnecting"}
               </p>
             </div>
           </div>
-          <Link to="/dashboard/notifications" className="relative p-2.5 bg-slate-50 text-slate-600 rounded-full">
+          <Link to="/dashboard/notifications" className="relative p-2.5 bg-white/10 text-white rounded-full">
             <Bell size={18} />
             {unreadCount > 0 ? (
-              <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-white" />
+              <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-slate-950" />
             ) : null}
           </Link>
         </div>
@@ -133,7 +138,7 @@ export default function SessionVideoPage() {
         />
       </div>
 
-      <main className="fixed bottom-36 left-0 right-0 z-50 p-8 flex flex-col items-center gap-6">
+      <main className="fixed bottom-24 left-0 right-0 z-50 p-6 flex flex-col items-center gap-5">
         <div className="bg-black/40 backdrop-blur-md px-4 py-1.5 rounded-full border border-white/10 flex items-center gap-2 mb-2">
           <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
           <span className="text-white text-[10px] font-black uppercase tracking-widest tabular-nums">
@@ -141,7 +146,21 @@ export default function SessionVideoPage() {
           </span>
         </div>
 
-        {featureError ? <p className="text-sm font-bold text-rose-200">{featureError}</p> : null}
+        <div className="w-full max-w-lg rounded-[2rem] border border-white/10 bg-black/35 p-4 text-white shadow-2xl backdrop-blur-xl">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-white/60">Call Status</p>
+              <p className="mt-1 text-lg font-semibold">{networkDetail || formatCallStatus(callState)}</p>
+            </div>
+            <div className="flex flex-wrap gap-2 text-[10px] font-black uppercase tracking-[0.18em]">
+              <span className="rounded-full bg-white/10 px-3 py-1">{joined ? "Room joined" : "Joining room"}</span>
+              <span className="rounded-full bg-white/10 px-3 py-1">{networkQualityLabel(networkQuality)}</span>
+              <span className="rounded-full bg-white/10 px-3 py-1">{formatLaunchStage(callLaunchStage)}</span>
+            </div>
+          </div>
+          {featureError ? <p className="mt-3 text-sm font-bold text-rose-200">{featureError}</p> : null}
+          {status ? <p className="mt-3 rounded-2xl border border-amber-300/20 bg-amber-400/10 px-4 py-3 text-sm font-semibold text-amber-100">{status}</p> : null}
+        </div>
 
         <div className="flex flex-wrap justify-center gap-2 max-w-sm">
           {quickResponses.map((res, i) => (
@@ -181,6 +200,21 @@ export default function SessionVideoPage() {
           >
             <RotateCcw size={22} className={cameraFacing === "user" ? "" : "rotate-180"} />
           </button>
+        </div>
+
+        <div className="flex flex-wrap justify-center gap-3">
+          <button
+            type="button"
+            onClick={retryCallConnection}
+            className="rounded-full border border-white/15 bg-white/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.16em] text-white"
+          >
+            Retry Link
+          </button>
+          {lowBandwidthMode ? (
+            <span className="rounded-full border border-amber-200/20 bg-amber-300/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.16em] text-amber-100">
+              Low bandwidth mode
+            </span>
+          ) : null}
         </div>
       </main>
 
@@ -225,4 +259,16 @@ function formatCallStatus(callState) {
   if (callState === "ringing") return "Ringing...";
   if (callState === "ended") return "Call ended";
   return "Ready";
+}
+
+function networkQualityLabel(value) {
+  if (value === "good") return "Healthy";
+  if (value === "slow") return "Recovering";
+  return "Connecting";
+}
+
+function formatLaunchStage(value) {
+  if (!value || value === "idle") return "Standby";
+  if (value === "starting") return "Starting";
+  return value;
 }

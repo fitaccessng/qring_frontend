@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   AlertTriangle, CheckCircle2, Clock3, Package, Phone,
   PlusCircle, ShieldCheck, Star, Video, XCircle,
@@ -29,6 +29,7 @@ const SECTIONS = [
 ];
 
 export default function SecurityDashboardPage() {
+  const navigate = useNavigate();
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const cameraStreamRef = useRef(null);
@@ -182,8 +183,21 @@ export default function SecurityDashboardPage() {
     const key = `${sessionId}:call:${type}`;
     setBusyKey(key); setError("");
     try {
-      await apiRequest("/calls/start", { method: "POST", body: JSON.stringify({ sessionId, type, hasVideo: type === "video" }) });
-      await loadDashboard({ background: true });
+      const nextMode = type === "video" ? "video" : "audio";
+      const response = await apiRequest("/calls/start", { method: "POST", body: JSON.stringify({ sessionId, type, hasVideo: type === "video" }) });
+      const data = response?.data ?? response ?? {};
+      window.sessionStorage.setItem(
+        "qring_call_start_intent",
+        JSON.stringify({
+          pending: true,
+          sessionId,
+          mode: nextMode,
+          callSessionId: data?.callSessionId || "",
+          visitorId: data?.visitorId || sessionId,
+          rtcConfig: data?.rtcConfig || null
+        })
+      );
+      navigate(`/session/${sessionId}/${nextMode}`);
     } catch (e) { setError(e?.message || "Unable to start call."); }
     finally { setBusyKey(""); }
   }

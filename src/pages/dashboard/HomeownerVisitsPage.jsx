@@ -102,14 +102,22 @@ export default function HomeownerVisitsPage() {
     const busyKey = `${sessionId}:${nextType}`;
     setCallBusyId(busyKey);
     try {
-      window.sessionStorage.setItem(
-        "qring_call_start_intent",
-        JSON.stringify({ pending: true, sessionId, mode: nextType })
-      );
-      await apiRequest("/calls/start", {
+      const response = await apiRequest("/calls/start", {
         method: "POST",
         body: JSON.stringify({ sessionId, type: nextType, hasVideo: nextType === "video" })
       });
+      const data = response?.data ?? response ?? {};
+      window.sessionStorage.setItem(
+        "qring_call_start_intent",
+        JSON.stringify({
+          pending: true,
+          sessionId,
+          mode: nextType,
+          callSessionId: data?.callSessionId || "",
+          visitorId: data?.visitorId || sessionId,
+          rtcConfig: data?.rtcConfig || null
+        })
+      );
       navigate(`/session/${sessionId}/${nextType}`);
     } catch (err) {
       setError(err?.message || `Unable to start ${nextType} call.`);

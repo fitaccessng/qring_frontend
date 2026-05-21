@@ -23,7 +23,7 @@ const estateManagedHomeownerNav = [
   { to: "/dashboard/homeowner/estate-alerts", label: "Estate", icon: "broadcast" },
   { to: "/dashboard/homeowner/estate-dues", label: "Dues", icon: "dues" },
   { to: "/dashboard/homeowner/estate-messages", label: "Messages", icon: "messages" },
-  { to: "/dashboard/homeowner/estate-panic", label: "Panic", icon: "shield" }
+  { to: "/dashboard/homeowner/settings", label: "Settings", icon: "settings" }
 ];
 
 const estateNav = [
@@ -148,7 +148,8 @@ function NavIcon({ name }) {
     user_admin: <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm10 0v-2m0 0V7m0 2h-2m2 0h2" />,
     sessions: <path d="M8 7h13M8 12h13M8 17h13M3 7h.01M3 12h.01M3 17h.01" />,
     broadcast: <path d="M4 12h16M4 7h10M4 17h10M18 7v10" />,
-    dues: <path d="M3 7h18v10H3zM3 11h18M7 15h2" />
+    dues: <path d="M3 7h18v10H3zM3 11h18M7 15h2" />,
+    settings: <path d="M12 8.5A3.5 3.5 0 1 0 12 15.5A3.5 3.5 0 1 0 12 8.5zM19.4 15a1 1 0 0 0 .2 1.1l.1.1a1 1 0 0 1 0 1.4l-1.2 1.2a1 1 0 0 1-1.4 0l-.1-.1a1 1 0 0 0-1.1-.2a1 1 0 0 0-.6.9V20a1 1 0 0 1-1 1h-1.7a1 1 0 0 1-1-1v-.2a1 1 0 0 0-.6-.9a1 1 0 0 0-1.1.2l-.1.1a1 1 0 0 1-1.4 0L4.3 17.9a1 1 0 0 1 0-1.4l.1-.1a1 1 0 0 0 .2-1.1a1 1 0 0 0-.9-.6H3.5a1 1 0 0 1-1-1v-1.7a1 1 0 0 1 1-1h.2a1 1 0 0 0 .9-.6a1 1 0 0 0-.2-1.1l-.1-.1a1 1 0 0 1 0-1.4L5.5 4.8a1 1 0 0 1 1.4 0l.1.1a1 1 0 0 0 1.1.2a1 1 0 0 0 .6-.9V4a1 1 0 0 1 1-1h1.7a1 1 0 0 1 1 1v.2a1 1 0 0 0 .6.9a1 1 0 0 0 1.1-.2l.1-.1a1 1 0 0 1 1.4 0l1.2 1.2a1 1 0 0 1 0 1.4l-.1.1a1 1 0 0 0-.2 1.1a1 1 0 0 0 .9.6h.2a1 1 0 0 1 1 1v1.7a1 1 0 0 1-1 1h-.2a1 1 0 0 0-.9.6z" />
   };
 
   return (

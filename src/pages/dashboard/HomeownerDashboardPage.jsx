@@ -97,7 +97,7 @@ export default function HomeownerDashboardPage() {
         { to: "/dashboard/homeowner/estate-video-calls", icon: <PhoneCall size={24} />, label: "Video Calls" },
         { to: "/dashboard/homeowner/estate-audio-calls", icon: <PhoneCall size={24} />, label: "Audio Calls" },
         { to: "/dashboard/homeowner/estate-alerts", icon: <Bell size={24} />, label: "Alerts" },
-        { to: "/dashboard/homeowner/estate-panic", icon: <ShieldAlert size={24} />, label: "Panic", color: "text-rose-600", bg: "bg-rose-50" }
+        { to: "/dashboard/homeowner/settings", icon: <Settings size={24} />, label: "Settings" }
       ].filter((item) => {
         const requiredFeature = quickActionFeatureByRoute[item.to];
         return requiredFeature ? hasFeature(requiredFeature) : true;

@@ -375,6 +375,8 @@ export function useSessionRealtime(sessionId) {
   const recoveryInFlightRef = useRef(false);
   const lastRecoveryAtRef = useRef(0);
   const freezeEventsRef = useRef(0);
+  const pendingStartIntentRef = useRef(null);
+  const pendingAcceptIntentRef = useRef(null);
   const statsSnapshotRef = useRef({
     at: 0,
     audioBytesReceived: 0,
@@ -1117,6 +1119,18 @@ export function useSessionRealtime(sessionId) {
     await beginCall({ video: true });
   }
 
+  function queueStartIntent(intent) {
+    if (!intent || intent.sessionId !== sessionId || !canStartCall) return false;
+    pendingStartIntentRef.current = intent;
+    return true;
+  }
+
+  function queueAcceptIntent(intent) {
+    if (!intent || intent.sessionId !== sessionId || !intent.callSessionId) return false;
+    pendingAcceptIntentRef.current = intent;
+    return true;
+  }
+
   async function acceptIncomingCall(snapshotOverride = null) {
     const snapshot = snapshotOverride && typeof snapshotOverride === "object" ? snapshotOverride : incomingCallRef.current;
     if (!snapshot?.callSessionId) {
@@ -1549,33 +1563,51 @@ export function useSessionRealtime(sessionId) {
     const startIntent = readJsonStorage(CALL_START_INTENT_KEY);
     if (startIntent?.pending && startIntent?.sessionId === sessionId && canStartCall) {
       clearJsonStorage(CALL_START_INTENT_KEY);
-      callModeRef.current = startIntent.mode === CALL_MEDIA_MODE.VIDEO ? CALL_MEDIA_MODE.VIDEO : CALL_MEDIA_MODE.AUDIO;
-      if (startIntent.mode === CALL_MEDIA_MODE.VIDEO) {
-        void startVideoCall();
-      } else {
-        void startAudioCall();
-      }
+      queueStartIntent(startIntent);
     }
 
     const acceptIntent = readJsonStorage(CALL_ACCEPT_INTENT_KEY);
     if (acceptIntent?.sessionId === sessionId && acceptIntent?.callSessionId) {
       clearJsonStorage(CALL_ACCEPT_INTENT_KEY);
-      setIncomingCall({
-        pending: true,
-        hasVideo: Boolean(acceptIntent.hasVideo),
-        callSessionId: String(acceptIntent.callSessionId || ""),
-        visitorId: String(acceptIntent.visitorId || sessionId),
-        sessionId
-      });
-      void acceptIncomingCall({
-        pending: true,
-        hasVideo: Boolean(acceptIntent.hasVideo),
-        callSessionId: String(acceptIntent.callSessionId || ""),
-        visitorId: String(acceptIntent.visitorId || sessionId),
-        sessionId
-      });
+      queueAcceptIntent(acceptIntent);
     }
   }, [canStartCall, sessionId]);
+
+  useEffect(() => {
+    if (!connected || !joined) return;
+
+    if (pendingStartIntentRef.current && canStartCall) {
+      const startIntent = pendingStartIntentRef.current;
+      pendingStartIntentRef.current = null;
+      callModeRef.current = startIntent.mode === CALL_MEDIA_MODE.VIDEO ? CALL_MEDIA_MODE.VIDEO : CALL_MEDIA_MODE.AUDIO;
+      if (startIntent.callSessionId) {
+        callSessionRef.current = String(startIntent.callSessionId || "");
+        callVisitorIdRef.current = String(startIntent.visitorId || callVisitorIdRef.current || sessionId);
+        if (startIntent.rtcConfig && typeof startIntent.rtcConfig === "object") {
+          currentRtcConfigRef.current = startIntent.rtcConfig;
+        }
+      }
+      if (startIntent.mode === CALL_MEDIA_MODE.VIDEO) {
+        void beginCall({ video: true, restart: Boolean(startIntent.callSessionId) });
+      } else {
+        void beginCall({ video: false, restart: Boolean(startIntent.callSessionId) });
+      }
+    }
+
+    if (pendingAcceptIntentRef.current) {
+      const acceptIntent = pendingAcceptIntentRef.current;
+      pendingAcceptIntentRef.current = null;
+      const snapshot = {
+        pending: true,
+        hasVideo: Boolean(acceptIntent.hasVideo),
+        callSessionId: String(acceptIntent.callSessionId || ""),
+        visitorId: String(acceptIntent.visitorId || sessionId),
+        sessionId
+      };
+      setIncomingCall(snapshot);
+      void acceptIncomingCall(snapshot);
+    }
+  }, [acceptIncomingCall, beginCall, canStartCall, connected, joined, sessionId]);
 
   useEffect(() => {
     const handleOnline = () => {

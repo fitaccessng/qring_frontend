@@ -13,6 +13,8 @@ Backend prerequisites
 - Do not guess this value and do not use placeholder hosts like `redis.internal:6379` unless Render explicitly shows that exact hostname for your instance.
 - Your backend service and the Key Value instance must be in the same Render workspace and region.
 - If `REDIS_URL` is wrong or points to an unreachable host, login can fail with a backend `500`, and the browser may misleadingly show it as a CORS error.
+- The backend also needs TURN env vars for reliable production calling: `WEBRTC_TURN_URL` and/or `WEBRTC_TURN_TLS_URL`, plus `WEBRTC_TURN_USERNAME` and `WEBRTC_TURN_CREDENTIAL`.
+- Leave `WEBRTC_REQUIRE_TURN=false` if you want the API to boot before TURN is ready. Set `WEBRTC_REQUIRE_TURN=true` only when you want deploys to fail fast on missing TURN config.
 
 Required environment variables
 
