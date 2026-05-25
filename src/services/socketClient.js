@@ -5,6 +5,16 @@ import { getAccessToken } from "./authStorage";
 
 let socket;
 const namespaceSockets = new Map();
+const SOCKET_RELEASE_GRACE_MS = 1500;
+
+function buildNamespaceSocketKey(namespace, options = {}) {
+  const {
+    autoConnect = true,
+    reconnection = true,
+    withCredentials = true
+  } = options;
+  return JSON.stringify([namespace, Boolean(autoConnect), Boolean(withCredentials), Boolean(reconnection)]);
+}
 
 export function createRealtimeSocket(namespace, options = {}) {
   const {
@@ -19,10 +29,19 @@ export function createRealtimeSocket(namespace, options = {}) {
     ...rest
   } = options;
 
-  const key = JSON.stringify([namespace, Boolean(autoConnect), Boolean(withCredentials), Boolean(reconnection)]);
+  const key = buildNamespaceSocketKey(namespace, {
+    autoConnect,
+    reconnection,
+    withCredentials
+  });
   const existing = namespaceSockets.get(key);
-  if (existing?.connected || existing?.active) {
-    return existing;
+  if (existing?.releaseTimer) {
+    window.clearTimeout(existing.releaseTimer);
+    existing.releaseTimer = null;
+  }
+  if (existing?.socket) {
+    existing.refCount += 1;
+    return existing.socket;
   }
 
   const nextSocket = io(`${env.socketUrl}${namespace}`, {
@@ -46,13 +65,35 @@ export function createRealtimeSocket(namespace, options = {}) {
     autoConnect,
     ...rest
   });
-  namespaceSockets.set(key, nextSocket);
+  namespaceSockets.set(key, {
+    key,
+    socket: nextSocket,
+    refCount: 1,
+    releaseTimer: null
+  });
   nextSocket.on("disconnect", () => {
     if (!nextSocket.active) {
       namespaceSockets.delete(key);
     }
   });
   return nextSocket;
+}
+
+export function releaseRealtimeSocket(namespace, options = {}) {
+  const key = buildNamespaceSocketKey(namespace, options);
+  const entry = namespaceSockets.get(key);
+  if (!entry) return;
+  entry.refCount = Math.max(0, Number(entry.refCount || 0) - 1);
+  if (entry.refCount > 0) return;
+  if (entry.releaseTimer) {
+    window.clearTimeout(entry.releaseTimer);
+  }
+  entry.releaseTimer = window.setTimeout(() => {
+    const latest = namespaceSockets.get(key);
+    if (!latest || latest.refCount > 0) return;
+    latest.socket.disconnect();
+    namespaceSockets.delete(key);
+  }, SOCKET_RELEASE_GRACE_MS);
 }
 
 export function getDashboardSocket() {
@@ -68,9 +109,5 @@ export function getDashboardSocket() {
 }
 
 export function closeDashboardSocket() {
-  if (socket) {
-    socket.removeAllListeners();
-    socket.disconnect();
-    socket = undefined;
-  }
+  socket = undefined;
 }

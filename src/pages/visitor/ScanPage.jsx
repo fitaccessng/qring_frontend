@@ -21,7 +21,8 @@ function ConsentModal({ open, onAccept }) {
 import { useNavigate, useParams } from "react-router-dom";
 import { apiRequest } from "../../services/apiClient";
 import { env } from "../../config/env";
-import { createRealtimeSocket } from "../../services/socketClient";
+import { RealtimeEvent } from "../../services/realtimeEvents";
+import { createRealtimeSocket, releaseRealtimeSocket } from "../../services/socketClient";
 import { getVisitorSessionStatus } from "../../services/homeownerService";
 import { storeVisitorSessionToken, getVisitorSessionToken } from "../../services/visitorSessionToken";
 
@@ -277,25 +278,34 @@ export default function ScanPage() {
     });
     socketRef.current = socket;
 
-    socket.on("connect", () => {
+    const handleConnect = () => {
       const visitorToken = getVisitorSessionToken(requestState.sessionId);
-      socket.emit("session.join", {
+      socket.timeout(5000).emit(RealtimeEvent.SESSION_JOIN, {
         sessionId: requestState.sessionId,
         displayName: "Visitor",
         visitorToken: visitorToken || undefined
-      });
-    });
+      }, () => {});
+    };
 
-    socket.on("session.status", (payload) => {
+    const handleSessionStatus = (payload) => {
       if (payload?.sessionId !== requestState.sessionId) return;
       const status = String(payload?.status || "");
       if (!status) return;
       setRequestState((prev) => ({ ...prev, status }));
-    });
+    };
+
+    socket.on("connect", handleConnect);
+    socket.on(RealtimeEvent.SESSION_STATUS, handleSessionStatus);
 
     return () => {
+      socket.off("connect", handleConnect);
+      socket.off(RealtimeEvent.SESSION_STATUS, handleSessionStatus);
       socketRef.current = null;
-      socket.disconnect();
+      releaseRealtimeSocket(env.signalingNamespace ?? "/realtime/signaling", {
+        autoConnect: true,
+        reconnection: true,
+        withCredentials: true
+      });
     };
   }, [requestState.sent, requestState.sessionId]);
 

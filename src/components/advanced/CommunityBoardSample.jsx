@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
-import { io } from "socket.io-client";
 import { env } from "../../config/env";
-import { realtimeTransportOptions } from "../../services/socketConfig";
+import { createRealtimeSocket, releaseRealtimeSocket } from "../../services/socketClient";
 import {
   createCommunityPost,
   listCommunityPosts,
@@ -21,15 +20,16 @@ export default function CommunityBoardSample({ canPost = false }) {
 
   useEffect(() => {
     loadBoard().catch(() => {});
-    const socket = io(`${env.socketUrl}${env.dashboardNamespace}`, {
-      path: env.socketPath,
-      ...realtimeTransportOptions
-    });
+    const socket = createRealtimeSocket(env.dashboardNamespace);
     const onCreated = () => loadBoard();
     socket.on("community.post.created", onCreated);
     return () => {
       socket.off("community.post.created", onCreated);
-      socket.disconnect();
+      releaseRealtimeSocket(env.dashboardNamespace, {
+        autoConnect: true,
+        reconnection: true,
+        withCredentials: true
+      });
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

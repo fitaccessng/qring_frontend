@@ -4,7 +4,8 @@ import { ChevronLeft, Phone, Search, SendHorizontal, Trash2, Video, X, MessageSq
 import AppShell from "../../layouts/AppShell";
 import { env } from "../../config/env";
 import { getAccessToken } from "../../services/authStorage";
-import { createRealtimeSocket } from "../../services/socketClient";
+import { RealtimeEvent } from "../../services/realtimeEvents";
+import { createRealtimeSocket, releaseRealtimeSocket } from "../../services/socketClient";
 import { playMessageNotificationSound } from "../../utils/notificationSound";
 import {
   deleteSecuritySessionMessage,
@@ -34,11 +35,13 @@ export default function SecurityMessagesPage() {
   const [view, setView] = useState("list"); // "list" | "chat" on mobile
   const messagesRef = useRef(null);
   const selectedIdRef = useRef("");
+  const threadsRef = useRef([]);
   const socketRef = useRef(null);
   const inputRef = useRef(null);
   const token = getAccessToken();
 
   useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
+  useEffect(() => { threadsRef.current = threads; }, [threads]);
 
   function isLikelyDuplicate(a, b) {
     if (!a || !b) return false;
@@ -120,13 +123,13 @@ export default function SecurityMessagesPage() {
     });
     socketRef.current = socket;
 
-    socket.on("connect", () => {
-      const ids = new Set(threads.map(t => String(t?.id || "").trim()).filter(Boolean));
+    const handleConnect = () => {
+      const ids = new Set(threadsRef.current.map(t => String(t?.id || "").trim()).filter(Boolean));
       if (selectedIdRef.current) ids.add(String(selectedIdRef.current));
-      ids.forEach(id => socket.emit("session.join", { sessionId: id, displayName: "Security" }));
-    });
+      ids.forEach((id) => socket.timeout(5000).emit(RealtimeEvent.SESSION_JOIN, { sessionId: id, displayName: "Security" }, () => {}));
+    };
 
-    socket.on("chat.message", payload => {
+    const handleChatMessage = (payload) => {
       const sid = payload?.sessionId;
       if (!sid) return;
       const msg = {
@@ -143,9 +146,9 @@ export default function SecurityMessagesPage() {
       });
       if (msg.senderType !== "security") playMessageNotificationSound();
       upsertThreadPreview(msg);
-    });
+    };
 
-    socket.on("chat.typing", (payload) => {
+    const handleChatTyping = (payload) => {
       const sid = String(payload?.sessionId || "").trim();
       if (!sid) return;
       setTypingByThread((prev) => ({
@@ -155,16 +158,38 @@ export default function SecurityMessagesPage() {
           displayName: payload?.displayName || "Participant"
         }
       }));
-    });
+    };
 
-    return () => { socketRef.current = null; socket.disconnect(); };
-  }, [token, threads]);
+    const handleAnyEvent = (event, data) => {
+      console.log("[SOCKET EVENT]", event, data);
+    };
+
+    socket.on("connect", handleConnect);
+    socket.on("chat.message", handleChatMessage);
+    socket.on("chat.typing", handleChatTyping);
+    socket.onAny(handleAnyEvent);
+
+    return () => {
+      socket.off("connect", handleConnect);
+      socket.off("chat.message", handleChatMessage);
+      socket.off("chat.typing", handleChatTyping);
+      socket.offAny(handleAnyEvent);
+      socketRef.current = null;
+      releaseRealtimeSocket(env.signalingNamespace ?? "/realtime/signaling", {
+        autoConnect: true,
+        reconnection: true,
+        withCredentials: true
+      });
+    };
+  }, [token]);
 
   useEffect(() => {
     if (!socketRef.current?.connected) return;
     const ids = new Set(threads.map(t => String(t?.id || "").trim()).filter(Boolean));
     if (selectedIdRef.current) ids.add(String(selectedIdRef.current));
-    ids.forEach(id => socketRef.current?.emit("session.join", { sessionId: id, displayName: "Security" }));
+    ids.forEach((id) =>
+      socketRef.current?.timeout(5000).emit(RealtimeEvent.SESSION_JOIN, { sessionId: id, displayName: "Security" }, () => {})
+    );
   }, [threads, selectedId]);
 
   useEffect(() => {

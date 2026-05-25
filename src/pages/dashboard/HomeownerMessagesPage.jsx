@@ -7,7 +7,8 @@ import VisitorIncomingCallModal from "../../components/VisitorIncomingCallModal"
 import { env } from "../../config/env";
 import { getAccessToken } from "../../services/authStorage";
 import { apiRequest } from "../../services/apiClient";
-import { createRealtimeSocket } from "../../services/socketClient";
+import { RealtimeEvent } from "../../services/realtimeEvents";
+import { createRealtimeSocket, releaseRealtimeSocket } from "../../services/socketClient";
 import { playMessageNotificationSound } from "../../utils/notificationSound";
 import {
   decideVisit,
@@ -116,7 +117,7 @@ export default function HomeownerMessagesPage() {
     socketRef.current = socket;
     joinedSessionIdsRef.current = new Set();
 
-    socket.on("chat.message", (payload) => {
+    const handleChatMessage = (payload) => {
       const incomingSessionId = payload?.sessionId;
       if (!incomingSessionId) return;
       const normalized = {
@@ -134,9 +135,9 @@ export default function HomeownerMessagesPage() {
       });
       if (normalized.senderType !== "homeowner") playMessageNotificationSound();
       upsertThreadPreview(normalized, setThreads, selectedIdRef.current);
-    });
+    };
 
-    socket.on("session.status", (payload) => {
+    const handleSessionStatus = (payload) => {
       const incomingSessionId = String(payload?.sessionId || "").trim();
       const nextStatus = String(payload?.status || "").trim();
       if (!incomingSessionId || !nextStatus) return;
@@ -152,9 +153,9 @@ export default function HomeownerMessagesPage() {
             : thread
         )
       );
-    });
+    };
 
-    socket.on("session.activated", (payload) => {
+    const handleSessionActivated = (payload) => {
       const incomingSessionId = String(payload?.sessionId || payload?.data?.id || "").trim();
       if (!incomingSessionId) return;
       setThreads((prev) =>
@@ -169,9 +170,9 @@ export default function HomeownerMessagesPage() {
             : thread
         )
       );
-    });
+    };
 
-    socket.on("chat.typing", (payload) => {
+    const handleChatTyping = (payload) => {
       const incomingSessionId = String(payload?.sessionId || "").trim();
       if (!incomingSessionId) return;
       setTypingByThread((prev) => ({
@@ -181,9 +182,9 @@ export default function HomeownerMessagesPage() {
           displayName: payload?.displayName || "Visitor"
         }
       }));
-    });
+    };
 
-    socket.on("incoming-call", (payload) => {
+    const handleIncomingCallNotice = (payload) => {
       const incomingSessionId = String(payload?.sessionId || "").trim();
       if (!incomingSessionId) return;
       setThreads((prev) =>
@@ -197,9 +198,9 @@ export default function HomeownerMessagesPage() {
             : thread
         )
       );
-    });
+    };
 
-    socket.on("new_visitor_request", async () => {
+    const handleNewVisitorRequest = async () => {
       try {
         const data = await getHomeownerMessages();
         const normalized = (data || []).map((thread) => ({
@@ -214,13 +215,17 @@ export default function HomeownerMessagesPage() {
       } catch {
         // ignore transient refresh failures
       }
-    });
+    };
 
-    socket.on("call.invite", (payload) => {
+    const handleCallInvite = (payload) => {
       const incomingSessionId = String(payload?.sessionId || "").trim();
       const callSessionId = String(payload?.callSessionId || "").trim();
       if (!incomingSessionId || !callSessionId) return;
       if (callBusyRef.current.startsWith(`${incomingSessionId}:`)) return;
+      socket.timeout(5000).emit(RealtimeEvent.CALL_INVITE_RECEIVED, {
+        sessionId: incomingSessionId,
+        callSessionId
+      }, () => {});
       setIncomingCall({
         pending: true,
         hasVideo: Boolean(payload?.hasVideo),
@@ -231,9 +236,37 @@ export default function HomeownerMessagesPage() {
       if (!selectedIdRef.current) {
         setSelectedId(incomingSessionId);
       }
-    });
+    };
 
-    return () => socket.disconnect();
+    const handleAnyEvent = (event, data) => {
+      console.log("[SOCKET EVENT]", event, data);
+    };
+
+    socket.on("chat.message", handleChatMessage);
+    socket.on("session.status", handleSessionStatus);
+    socket.on("session.activated", handleSessionActivated);
+    socket.on("chat.typing", handleChatTyping);
+    socket.on("incoming-call", handleIncomingCallNotice);
+    socket.on("new_visitor_request", handleNewVisitorRequest);
+    socket.on("call.invite", handleCallInvite);
+    socket.onAny(handleAnyEvent);
+
+    return () => {
+      socket.off("chat.message", handleChatMessage);
+      socket.off("session.status", handleSessionStatus);
+      socket.off("session.activated", handleSessionActivated);
+      socket.off("chat.typing", handleChatTyping);
+      socket.off("incoming-call", handleIncomingCallNotice);
+      socket.off("new_visitor_request", handleNewVisitorRequest);
+      socket.off("call.invite", handleCallInvite);
+      socket.offAny(handleAnyEvent);
+      socketRef.current = null;
+      releaseRealtimeSocket(env.signalingNamespace ?? "/realtime/signaling", {
+        autoConnect: true,
+        reconnection: true,
+        withCredentials: true
+      });
+    };
   }, [token]);
 
   useEffect(() => {
@@ -242,10 +275,10 @@ export default function HomeownerMessagesPage() {
     const joinSession = (sessionId) => {
       const normalizedId = String(sessionId || "").trim();
       if (!normalizedId || joinedSessionIdsRef.current.has(normalizedId)) return;
-      socket.emit("session.join", {
+      socket.timeout(5000).emit(RealtimeEvent.SESSION_JOIN, {
         sessionId: normalizedId,
         displayName: user?.fullName || "Homeowner"
-      });
+      }, () => {});
       joinedSessionIdsRef.current.add(normalizedId);
     };
 

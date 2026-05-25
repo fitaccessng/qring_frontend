@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { io } from "socket.io-client";
 import { env } from "../../config/env";
-import { realtimeTransportOptions } from "../../services/socketConfig";
+import { createRealtimeSocket, releaseRealtimeSocket } from "../../services/socketClient";
 import { getLiveVisitorQueue } from "../../services/advancedService";
 
 export default function LiveVisitorFeedSample() {
@@ -23,17 +22,18 @@ export default function LiveVisitorFeedSample() {
 
   useEffect(() => {
     loadQueue();
-    const socket = io(`${env.socketUrl}${env.dashboardNamespace}`, {
-      path: env.socketPath,
-      ...realtimeTransportOptions
-    });
+    const socket = createRealtimeSocket(env.dashboardNamespace);
     const onPatch = () => loadQueue();
     socket.on("dashboard.patch", onPatch);
     socket.on("visitor.snapshot", onPatch);
     return () => {
       socket.off("dashboard.patch", onPatch);
       socket.off("visitor.snapshot", onPatch);
-      socket.disconnect();
+      releaseRealtimeSocket(env.dashboardNamespace, {
+        autoConnect: true,
+        reconnection: true,
+        withCredentials: true
+      });
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

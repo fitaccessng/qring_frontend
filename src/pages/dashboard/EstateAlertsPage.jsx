@@ -8,7 +8,7 @@ import EstateManagerPageShell, {
   estateTextareaClassName
 } from "../../components/mobile/EstateManagerPageShell";
 import { env } from "../../config/env";
-import { createRealtimeSocket } from "../../services/socketClient";
+import { createRealtimeSocket, releaseRealtimeSocket } from "../../services/socketClient";
 import {
   createEstateAlert,
   getEstateOverview,
@@ -103,9 +103,15 @@ export default function EstateAlertsPage() {
       loadAlertsData(estateId, filter).catch(() => {});
     };
     socket.on("ALERT_CREATED", reload);
-    socket.on("PAYMENT_STATUS_UPDATED", reload);
+   socket.on("PAYMENT_STATUS_UPDATED", reload);
     return () => {
-      socket.disconnect();
+      socket.off("ALERT_CREATED", reload);
+      socket.off("PAYMENT_STATUS_UPDATED", reload);
+      releaseRealtimeSocket(env.dashboardNamespace, {
+        autoConnect: true,
+        reconnection: true,
+        withCredentials: true
+      });
     };
   }, [token, estateId, filter]);
 

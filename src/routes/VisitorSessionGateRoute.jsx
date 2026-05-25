@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
+import { env } from "../config/env";
 import { getStoredUser } from "../services/authStorage";
 import { getVisitorSessionStatus } from "../services/homeownerService";
+import { RealtimeEvent } from "../services/realtimeEvents";
+import { createRealtimeSocket, releaseRealtimeSocket } from "../services/socketClient";
+import { getVisitorSessionToken } from "../services/visitorSessionToken";
 
 function normalizeStatus(value) {
   return String(value || "").trim().toLowerCase();
@@ -21,6 +25,62 @@ export default function VisitorSessionGateRoute({ children }) {
     if (isStaff) return () => {};
     let active = true;
     let pollId = 0;
+    let settled = false;
+    const normalizedSessionId = String(sessionId || "").trim();
+    const socket = createRealtimeSocket(env.signalingNamespace ?? "/realtime/signaling", {
+      authBuilder: () => {
+        const visitorToken = getVisitorSessionToken(sessionId);
+        return visitorToken ? { visitorToken } : {};
+      }
+    });
+
+    const handleConnect = () => {
+      socket.timeout(5000).emit(RealtimeEvent.SESSION_JOIN, {
+        sessionId,
+        displayName: "Visitor",
+        visitorToken: getVisitorSessionToken(sessionId) || undefined
+      }, () => {});
+    };
+
+    const handleSessionSnapshot = (payload) => {
+      const incomingSessionId = String(payload?.sessionId || "").trim();
+      if (!active || incomingSessionId !== normalizedSessionId) return;
+      const nextStatus = normalizeStatus(payload?.status);
+      if (!nextStatus) return;
+      settled = ["approved", "active", "closed", "completed", "rejected"].includes(nextStatus);
+      setSessionStatus(nextStatus);
+      setLoading(false);
+      setError("");
+    };
+
+    const handleSessionActivated = (payload) => {
+      const incomingSessionId = String(payload?.sessionId || payload?.data?.id || "").trim();
+      if (!active || incomingSessionId !== normalizedSessionId) return;
+      settled = true;
+      setSessionStatus("approved");
+      setLoading(false);
+      setError("");
+    };
+
+    const handleSessionStatus = (payload) => {
+      const incomingSessionId = String(payload?.sessionId || "").trim();
+      if (!active || incomingSessionId !== normalizedSessionId) return;
+      const nextStatus = normalizeStatus(payload?.status || payload?.sessionStatus);
+      if (!nextStatus) return;
+      settled = ["approved", "active", "closed", "completed", "rejected"].includes(nextStatus);
+      setSessionStatus(nextStatus);
+      setLoading(false);
+      setError("");
+    };
+
+    socket.on("connect", handleConnect);
+    socket.on(RealtimeEvent.SESSION_ACTIVATED, handleSessionActivated);
+    socket.on(RealtimeEvent.SESSION_STATUS, handleSessionStatus);
+    socket.on(RealtimeEvent.SESSION_SNAPSHOT, handleSessionSnapshot);
+    if (socket.connected) {
+      handleConnect();
+    }
+
     const check = async () => {
       if (!active) return;
       if (!pollId) {
@@ -30,7 +90,9 @@ export default function VisitorSessionGateRoute({ children }) {
       try {
         const data = await getVisitorSessionStatus(sessionId);
         if (!active) return;
-        setSessionStatus(normalizeStatus(data?.status || data?.sessionStatus));
+        const nextStatus = normalizeStatus(data?.status || data?.sessionStatus);
+        settled = ["approved", "active", "closed", "completed", "rejected"].includes(nextStatus);
+        setSessionStatus(nextStatus);
       } catch (err) {
         if (!active) return;
         setError(err?.message || "Unable to verify session status");
@@ -41,13 +103,23 @@ export default function VisitorSessionGateRoute({ children }) {
     };
     void check();
     pollId = window.setInterval(() => {
+      if (settled) return;
       void check();
-    }, 1000);
+    }, 2500);
     return () => {
       active = false;
       if (pollId) {
         window.clearInterval(pollId);
       }
+      socket.off("connect", handleConnect);
+      socket.off(RealtimeEvent.SESSION_ACTIVATED, handleSessionActivated);
+      socket.off(RealtimeEvent.SESSION_STATUS, handleSessionStatus);
+      socket.off(RealtimeEvent.SESSION_SNAPSHOT, handleSessionSnapshot);
+      releaseRealtimeSocket(env.signalingNamespace ?? "/realtime/signaling", {
+        autoConnect: true,
+        reconnection: true,
+        withCredentials: true
+      });
     };
   }, [isStaff, sessionId]);
 
