@@ -167,6 +167,7 @@ const resolvedSocketUrl = (() => {
 
 export const env = {
   apiBaseUrl: resolvedApiBaseUrl,
+  backendDirectApiBaseUrl: `${productionBackendOrigin}/api/v1`,
   socketUrl: resolvedSocketUrl,
   publicAppUrl: resolvePublicAppUrl(import.meta.env.VITE_PUBLIC_APP_URL),
   socketPath: import.meta.env.VITE_SOCKET_PATH ?? "/socket.io",

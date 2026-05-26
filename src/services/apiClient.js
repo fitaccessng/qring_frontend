@@ -102,10 +102,46 @@ function buildTransportErrorMessage(networkError) {
   return "We couldn't connect right now. Please check your internet and try again in a moment.";
 }
 
-export function buildApiUrl(path = "") {
-  if (!path) return env.apiBaseUrl;
+function normalizePath(path = "") {
+  if (!path) return "";
+  if (path.startsWith("/")) return path;
+  return `/${path}`;
+}
+
+function getBaseOrigin(value) {
+  try {
+    return new URL(value, typeof window !== "undefined" ? window.location.origin : undefined).origin;
+  } catch {
+    return "";
+  }
+}
+
+function isSameOriginApiBase() {
+  if (typeof window === "undefined") return false;
+  const apiBase = String(env.apiBaseUrl ?? "").trim();
+  if (!apiBase) return false;
+  if (apiBase.startsWith("/")) return true;
+  return getBaseOrigin(apiBase) === window.location.origin;
+}
+
+function shouldRetryAgainstDirectBackend(path, response) {
+  if (typeof window === "undefined") return false;
+  if (!isSameOriginApiBase()) return false;
+  if (/^https?:\/\//i.test(path)) return false;
+  const status = Number(response?.status ?? 0);
+  const contentType = response?.contentType;
+  const raw = response?.raw;
+  return status === 404 || isHtmlContentType(contentType) || looksLikeHtmlDocument(raw);
+}
+
+export function buildApiUrl(path = "", baseUrl = env.apiBaseUrl) {
+  if (!path) return baseUrl;
   if (/^https?:\/\//i.test(path)) return path;
-  return `${env.apiBaseUrl}${path.startsWith("/") ? path : `/${path}`}`;
+  return `${baseUrl}${normalizePath(path)}`;
+}
+
+async function performApiRequest(path, requestOptions = {}, baseUrl = env.apiBaseUrl) {
+  return performHttpRequest(buildApiUrl(path, baseUrl), requestOptions);
 }
 
 export function buildAuthHeaders(extraHeaders = {}, tokenOverride) {
@@ -223,11 +259,18 @@ async function performHttpRequest(url, options) {
 export async function apiPing(path = "/health") {
   if (typeof navigator !== "undefined" && navigator.onLine === false) return false;
   try {
-    const response = await performHttpRequest(buildApiUrl(path), {
+    let response = await performApiRequest(path, {
       method: "GET",
       headers: { "Cache-Control": "no-store" },
       timeoutMs: 8000
     });
+    if (shouldRetryAgainstDirectBackend(path, response)) {
+      response = await performApiRequest(path, {
+        method: "GET",
+        headers: { "Cache-Control": "no-store" },
+        timeoutMs: 8000
+      }, env.backendDirectApiBaseUrl);
+    }
     return Boolean(response.ok);
   } catch {
     return false;
@@ -242,13 +285,28 @@ export async function apiRequestBinary(path, options = {}) {
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const response = await fetch(buildApiUrl(path), {
+    let response = await fetch(buildApiUrl(path), {
       method,
       headers: buildAuthHeaders(options.headers ?? {}, options.token),
       body: options.body,
       cache: options.cache ?? "default",
       signal: controller.signal
     });
+    if (
+      shouldRetryAgainstDirectBackend(path, {
+        status: response.status,
+        contentType: response.headers.get("content-type") ?? "",
+        raw: ""
+      })
+    ) {
+      response = await fetch(buildApiUrl(path, env.backendDirectApiBaseUrl), {
+        method,
+        headers: buildAuthHeaders(options.headers ?? {}, options.token),
+        body: options.body,
+        cache: options.cache ?? "default",
+        signal: controller.signal
+      });
+    }
     if (!response.ok) {
       if (retryCount > 0 && shouldRetryResponseStatus(response.status)) {
         return apiRequestBinary(path, { ...options, retryCount: retryCount - 1 });
@@ -322,7 +380,7 @@ async function refreshAccessToken() {
   refreshPromise = (async () => {
     let response;
     try {
-      response = await performHttpRequest(buildApiUrl("/auth/refresh-token"), {
+      response = await performApiRequest("/auth/refresh-token", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -406,12 +464,20 @@ export async function apiRequest(path, options = {}, attempt = 0) {
   const requestRunner = async () => {
     let response;
     try {
-      response = await performHttpRequest(buildApiUrl(path), {
+      response = await performApiRequest(path, {
         method: options.method ?? "GET",
         headers,
         body: options.body,
         timeoutMs: options.timeoutMs
       });
+      if (shouldRetryAgainstDirectBackend(path, response)) {
+        response = await performApiRequest(path, {
+          method: options.method ?? "GET",
+          headers,
+          body: options.body,
+          timeoutMs: options.timeoutMs
+        }, env.backendDirectApiBaseUrl);
+      }
     } catch (networkError) {
       if (isGet) {
         const cached = readGetCache(cacheKey);
@@ -560,12 +626,20 @@ export async function apiUpload(path, formData) {
 
   let response;
   try {
-    response = await performHttpRequest(buildApiUrl(path), {
+    response = await performApiRequest(path, {
       method: "POST",
       headers,
       body: formData,
       timeoutMs: REQUEST_TIMEOUT_MS
     });
+    if (shouldRetryAgainstDirectBackend(path, response)) {
+      response = await performApiRequest(path, {
+        method: "POST",
+        headers,
+        body: formData,
+        timeoutMs: REQUEST_TIMEOUT_MS
+      }, env.backendDirectApiBaseUrl);
+    }
   } catch (networkError) {
     const message = buildTransportErrorMessage(networkError);
     emitFlash(message, "error");
