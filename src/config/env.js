@@ -80,9 +80,18 @@ function resolveRuntimeApiBaseSource() {
 
   if (typeof window !== "undefined" && !isDev) {
     const explicit = String(standardCandidate ?? "").trim();
-    if (!explicit) return productionBackendOrigin;
+    if (!explicit) return "/api/v1";
     if (isRelativePath(explicit)) return explicit;
-    return explicit;
+    try {
+      const parsed = new URL(explicit, window.location.origin);
+      if (parsed.origin === window.location.origin) {
+        return `${parsed.pathname}${parsed.search}${parsed.hash}` || "/api/v1";
+      }
+    } catch {
+      // Fall back to same-origin API routing for web builds.
+    }
+    // Web builds should use the site's own /api proxy so page requests do not depend on browser CORS.
+    return "/api/v1";
   }
 
   return standardCandidate;
