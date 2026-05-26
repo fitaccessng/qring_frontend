@@ -259,18 +259,11 @@ async function performHttpRequest(url, options) {
 export async function apiPing(path = "/health") {
   if (typeof navigator !== "undefined" && navigator.onLine === false) return false;
   try {
-    let response = await performApiRequest(path, {
+    const response = await performApiRequest(path, {
       method: "GET",
       headers: { "Cache-Control": "no-store" },
       timeoutMs: 8000
     });
-    if (shouldRetryAgainstDirectBackend(path, response)) {
-      response = await performApiRequest(path, {
-        method: "GET",
-        headers: { "Cache-Control": "no-store" },
-        timeoutMs: 8000
-      }, env.backendDirectApiBaseUrl);
-    }
     return Boolean(response.ok);
   } catch {
     return false;

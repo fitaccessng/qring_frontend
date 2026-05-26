@@ -62,6 +62,18 @@ function normalizeAuthData(response) {
   };
 }
 
+function requireAccessToken(data, response, fallbackMessage = "Authentication failed.") {
+  if (data?.accessToken) return data;
+  const first = response?.data ?? response;
+  const message =
+    first?.message ??
+    first?.detail ??
+    first?.data?.message ??
+    first?.data?.detail ??
+    fallbackMessage;
+  throw new Error(message);
+}
+
 function getCurrentRoutePath() {
   if (typeof window === "undefined") return "/";
   const hash = window.location.hash || "";
@@ -116,7 +128,11 @@ export function AuthProvider({ children }) {
     setLoading(true);
     try {
       const response = await authService.login(credentials);
-      const data = normalizeAuthData(response);
+      const data = requireAccessToken(
+        normalizeAuthData(response),
+        response,
+        "Login did not return an access token."
+      );
       persistAuth(data);
       return data;
     } finally {
@@ -137,7 +153,11 @@ export function AuthProvider({ children }) {
     setLoading(true);
     try {
       const response = await authService.googleSignIn();
-      const data = normalizeAuthData(response);
+      const data = requireAccessToken(
+        normalizeAuthData(response),
+        response,
+        "Google sign-in did not return an access token."
+      );
       persistAuth(data);
       return data;
     } finally {
@@ -149,7 +169,11 @@ export function AuthProvider({ children }) {
     setLoading(true);
     try {
       const response = await authService.googleSignUp(role);
-      const data = normalizeAuthData(response);
+      const data = requireAccessToken(
+        normalizeAuthData(response),
+        response,
+        "Google sign-up did not return an access token."
+      );
       if (!data.user?.role && data.accessToken) {
         data.user = { ...(data.user ?? {}), role };
       }
@@ -181,7 +205,11 @@ export function AuthProvider({ children }) {
       const result = await authService.resumeGoogleRedirectAuth();
       if (!result) return null;
       if (result.intent === "signin") {
-        const data = normalizeAuthData(result.response);
+        const data = requireAccessToken(
+          normalizeAuthData(result.response),
+          result.response,
+          "Google sign-in did not return an access token."
+        );
         persistAuth(data);
         return { intent: "signin", data };
       }
