@@ -91,6 +91,10 @@ export function createRealtimeSocket(namespace, options = {}) {
     // eslint-disable-next-line no-console
     console.info("qring.socket.connected", { namespace, id: nextSocket.id, target: socketTarget });
   });
+  nextSocket.io.on("reconnect_attempt", (attempt) => {
+    // eslint-disable-next-line no-console
+    console.info("qring.socket.reconnect_attempt", { namespace, attempt, target: socketTarget });
+  });
   return nextSocket;
 }
 

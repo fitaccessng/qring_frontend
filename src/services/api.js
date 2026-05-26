@@ -1,6 +1,7 @@
 import axios from "axios";
 import { env } from "../config/env";
-import { clearAuthSession, getAccessToken } from "./authStorage";
+import { buildApiUrl } from "./apiClient";
+import { clearAuthSession, getAccessToken, getRefreshToken, getStoredUser, persistAuthSession } from "./authStorage";
 import { redirectToLogin } from "../utils/authRouting";
 
 function clearStoredSession() {
@@ -14,6 +15,42 @@ export const api = axios.create({
   withCredentials: true,
   timeout: 30000
 });
+
+let axiosRefreshPromise = null;
+
+async function refreshAccessTokenForAxios() {
+  if (axiosRefreshPromise) return axiosRefreshPromise;
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) return null;
+
+  axiosRefreshPromise = (async () => {
+    const response = await fetch(buildApiUrl("/auth/refresh-token", env.apiBaseUrl), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-DB-Access-Mode": "write"
+      },
+      credentials: "include",
+      body: JSON.stringify({ refreshToken })
+    });
+    if (!response.ok) return null;
+    const payload = await response.json().catch(() => null);
+    const data = payload?.data ?? payload;
+    if (!data?.accessToken) return null;
+    persistAuthSession({
+      accessToken: data.accessToken,
+      refreshToken: data.refreshToken || refreshToken,
+      user: data.user ?? getStoredUser()
+    });
+    return data.accessToken;
+  })();
+
+  try {
+    return await axiosRefreshPromise;
+  } finally {
+    axiosRefreshPromise = null;
+  }
+}
 
 api.interceptors.request.use((config) => {
   const nextConfig = { ...config };
@@ -42,8 +79,20 @@ api.interceptors.request.use((config) => {
 
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     const status = Number(error?.response?.status ?? 0);
+    const originalRequest = error?.config ?? {};
+    if (status === 401 && !originalRequest._retry) {
+      const newToken = await refreshAccessTokenForAxios();
+      if (newToken) {
+        originalRequest._retry = true;
+        originalRequest.headers = {
+          ...(originalRequest.headers ?? {}),
+          Authorization: `Bearer ${newToken}`
+        };
+        return api.request(originalRequest);
+      }
+    }
     if (status === 401) {
       clearStoredSession();
       redirectToLogin();

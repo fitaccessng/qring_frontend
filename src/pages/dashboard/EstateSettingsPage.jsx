@@ -26,21 +26,17 @@ import {
 } from "lucide-react";
 import { useAuth } from "../../state/AuthContext";
 import { getEstateSettingsSummary, getEstateSettingsSummarySnapshot } from "../../services/estateService";
+import { useTheme } from "../../state/ThemeContext";
 
 export default function EstateSettingsPage() {
   const cachedSummary = getEstateSettingsSummarySnapshot();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const { isDark, toggleTheme } = useTheme();
   const [summary, setSummary] = useState(() => cachedSummary || { estates: [], doors: [], subscription: {} });
   const [selectedEstateId, setSelectedEstateId] = useState(() => cachedSummary?.estates?.[0]?.id || "");
   const [loading, setLoading] = useState(() => !cachedSummary);
   const [loadError, setLoadError] = useState("");
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("darkMode") === "true" || window.matchMedia("(prefers-color-scheme: dark)").matches;
-    }
-    return false;
-  });
   const [editingField, setEditingField] = useState(null);
   const [editValues, setEditValues] = useState({});
   const [activeModal, setActiveModal] = useState(null);
@@ -48,17 +44,6 @@ export default function EstateSettingsPage() {
     pushNotifications: true,
     emailNotifications: true,
   });
-
-  // Apply dark mode on mount and when it changes
-  useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add("dark");
-      localStorage.setItem("darkMode", "true");
-    } else {
-      document.documentElement.classList.remove("dark");
-      localStorage.setItem("darkMode", "false");
-    }
-  }, [isDarkMode]);
 
   useEffect(() => {
     let active = true;
@@ -253,10 +238,10 @@ export default function EstateSettingsPage() {
                 <span className="text-sm font-black text-slate-800">Dark Mode</span>
               </div>
               <button 
-                onClick={() => setIsDarkMode(!isDarkMode)}
-                className={`w-12 h-6 rounded-full transition-all relative ${isDarkMode ? 'bg-indigo-600' : 'bg-slate-200'}`}
+                onClick={toggleTheme}
+                className={`w-12 h-6 rounded-full transition-all relative ${isDark ? 'bg-indigo-600' : 'bg-slate-200'}`}
               >
-                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${isDarkMode ? 'left-7' : 'left-1'}`} />
+                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${isDark ? 'left-7' : 'left-1'}`} />
               </button>
             </div>
             <SettingsRow icon={<BellRing size={18} />} label="Notification Pulse" value="Push & Email" onEdit={() => setActiveModal("notifications")} />

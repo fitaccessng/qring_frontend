@@ -7,11 +7,13 @@ const THEME_EXPLICIT_KEY = "qring_theme_explicit";
 function getInitialThemeMode() {
   if (typeof window === "undefined") return "light";
   const stored = localStorage.getItem(THEME_STORAGE_KEY);
+  const explicit = localStorage.getItem(THEME_EXPLICIT_KEY) === "true";
+  // eslint-disable-next-line no-console
+  console.info("qring.theme.restore", { storedTheme: stored || "light", explicit });
 
   if (stored === "light" || stored === "dark") return stored;
 
   if (stored === "system") {
-    const explicit = localStorage.getItem(THEME_EXPLICIT_KEY) === "true";
     if (explicit) return "system";
     try {
       localStorage.removeItem(THEME_STORAGE_KEY);
@@ -42,6 +44,8 @@ export function ThemeProvider({ children }) {
     } catch {
       // ignore
     }
+    // eslint-disable-next-line no-console
+    console.info("qring.theme.update", { nextTheme: typeof next === "function" ? "updater" : next });
     setThemeModeState(next);
   }
 
@@ -61,6 +65,8 @@ export function ThemeProvider({ children }) {
     const root = document.documentElement;
     root.classList.toggle("dark", resolvedTheme === "dark");
     localStorage.setItem(THEME_STORAGE_KEY, themeMode);
+    // eslint-disable-next-line no-console
+    console.info("qring.theme.save", { themeMode, resolvedTheme });
   }, [themeMode, resolvedTheme]);
 
   const value = useMemo(
