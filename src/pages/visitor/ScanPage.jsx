@@ -32,6 +32,14 @@ const RETRY_BASE_DELAY_MS = 700;
 const DEVICE_STORAGE_KEY = "qring_visitor_device_id";
 let runtimeVisitorDeviceId = "";
 
+function normalizeSessionStatus(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function isVisitorSessionActive(status) {
+  return ["approved", "active", "gate_confirmed"].includes(normalizeSessionStatus(status));
+}
+
 function getOrCreateVisitorDeviceId() {
   const next = `visitor-device-${Math.random().toString(36).slice(2, 11)}`;
   try {
@@ -251,7 +259,10 @@ export default function ScanPage() {
       try {
         const data = await getVisitorSessionStatus(requestState.sessionId);
         if (!active || !data?.status) return;
-        setRequestState((prev) => ({ ...prev, status: data.status }));
+        const nextStatus = normalizeSessionStatus(data.status);
+        // eslint-disable-next-line no-console
+        console.info("qring.visitor.session.poll", { sessionId: requestState.sessionId, status: nextStatus });
+        setRequestState((prev) => ({ ...prev, status: nextStatus }));
       } catch {
         // silent poll failures
       }
@@ -266,7 +277,12 @@ export default function ScanPage() {
 
   useEffect(() => {
     if (!requestState.sessionId) return;
-    if (requestState.status !== "approved" && requestState.status !== "active") return;
+    if (!isVisitorSessionActive(requestState.status)) return;
+    // eslint-disable-next-line no-console
+    console.info("qring.visitor.session.navigate", {
+      sessionId: requestState.sessionId,
+      status: requestState.status
+    });
     navigate(`/session/${requestState.sessionId}/message`, { replace: true });
   }, [navigate, requestState.sessionId, requestState.status]);
 
@@ -289,17 +305,39 @@ export default function ScanPage() {
 
     const handleSessionStatus = (payload) => {
       if (payload?.sessionId !== requestState.sessionId) return;
-      const status = String(payload?.status || "");
+      const status = normalizeSessionStatus(payload?.status || payload?.sessionStatus);
+      if (!status) return;
+      // eslint-disable-next-line no-console
+      console.info("qring.visitor.session.status", { sessionId: requestState.sessionId, status });
+      setRequestState((prev) => ({ ...prev, status }));
+    };
+
+    const handleSessionActivated = (payload) => {
+      const incomingSessionId = String(payload?.sessionId || payload?.data?.id || "").trim();
+      if (incomingSessionId !== requestState.sessionId) return;
+      // eslint-disable-next-line no-console
+      console.info("qring.visitor.session.activated", { sessionId: requestState.sessionId });
+      setRequestState((prev) => ({ ...prev, status: "approved" }));
+    };
+
+    const handleSessionSnapshot = (payload) => {
+      const incomingSessionId = String(payload?.sessionId || "").trim();
+      if (incomingSessionId !== requestState.sessionId) return;
+      const status = normalizeSessionStatus(payload?.status);
       if (!status) return;
       setRequestState((prev) => ({ ...prev, status }));
     };
 
     socket.on("connect", handleConnect);
     socket.on(RealtimeEvent.SESSION_STATUS, handleSessionStatus);
+    socket.on(RealtimeEvent.SESSION_ACTIVATED, handleSessionActivated);
+    socket.on(RealtimeEvent.SESSION_SNAPSHOT, handleSessionSnapshot);
 
     return () => {
       socket.off("connect", handleConnect);
       socket.off(RealtimeEvent.SESSION_STATUS, handleSessionStatus);
+      socket.off(RealtimeEvent.SESSION_ACTIVATED, handleSessionActivated);
+      socket.off(RealtimeEvent.SESSION_SNAPSHOT, handleSessionSnapshot);
       socketRef.current = null;
       releaseRealtimeSocket(env.signalingNamespace ?? "/realtime/signaling", {
         autoConnect: true,
@@ -374,12 +412,9 @@ export default function ScanPage() {
         lastLatencyMs: latencyMs,
         sent: true,
         sessionId: data?.sessionId ?? "",
-        status: data?.status ?? "pending"
+        status: normalizeSessionStatus(data?.status ?? "pending")
       });
       setRequestLatencyMs(latencyMs);
-      if (data?.sessionId) {
-        navigate(`/session/${data.sessionId}/message`, { replace: true });
-      }
     } catch (submitError) {
       const latencyMs = Date.now() - startedAt;
       setRequestState((prev) => ({
@@ -624,18 +659,27 @@ export default function ScanPage() {
         {requestState.sent ? (
           <div className="mt-6 rounded-2xl bg-slate-100 p-4 dark:bg-slate-800">
             <p className="text-sm font-semibold">
-              {requestState.status === "approved"
+              {isVisitorSessionActive(requestState.status)
                 ? "Request approved"
                 : requestState.status === "rejected"
                   ? "Request rejected by homeowner"
                   : "Waiting for homeowner approval"}
             </p>
             <p className="mt-1 text-xs text-slate-500">Timer: {status}</p>
-            {requestState.sessionId && (requestState.status === "approved" || requestState.status === "active") ? (
+            {requestState.sessionId && isVisitorSessionActive(requestState.status) ? (
               <p className="mt-3 text-xs text-success">Homeowner is ready. Opening session automatically...</p>
             ) : null}
             {requestState.status === "rejected" ? (
-              <p className="mt-3 text-xs font-semibold text-danger">You can retry another request or contact the resident.</p>
+              <div className="mt-3 space-y-3">
+                <p className="text-xs font-semibold text-danger">You can retry another request or contact the resident.</p>
+                <button
+                  type="button"
+                  onClick={() => window.location.reload()}
+                  className="rounded-xl border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700"
+                >
+                  Start New Request
+                </button>
+              </div>
             ) : null}
           </div>
         ) : null}

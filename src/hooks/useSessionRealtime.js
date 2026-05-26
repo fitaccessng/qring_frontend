@@ -181,6 +181,8 @@ function isMineBySenderType(senderType, participantType) {
 function normalizeMessage(payload, participantType) {
   return {
     id: payload?.id || `${payload?.at || Date.now()}-${Math.random()}`,
+    clientId: payload?.clientId || "",
+    sessionId: payload?.sessionId || "",
     text: String(payload?.text || ""),
     displayName: payload?.displayName || "Participant",
     senderType: payload?.senderType || "visitor",
@@ -194,11 +196,13 @@ function normalizeMessage(payload, participantType) {
 function mergeMessages(existing, next) {
   const map = new Map();
   for (const item of existing) {
-    map.set(item.id, item);
+    const key = item.clientId || item.id;
+    map.set(key, item);
   }
   for (const item of next) {
-    const previous = map.get(item.id);
-    map.set(item.id, previous ? { ...previous, ...item } : item);
+    const key = item.clientId || item.id;
+    const previous = map.get(key);
+    map.set(key, previous ? { ...previous, ...item, id: item.id || previous.id, clientId: item.clientId || previous.clientId } : item);
   }
   return Array.from(map.values()).sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
 }
@@ -565,6 +569,10 @@ export function useSessionRealtime(sessionId) {
   }
 
   async function loadMessages() {
+    if (!sessionId) {
+      setMessages([]);
+      return;
+    }
     try {
       let rows = [];
       if (participantType === "homeowner") {
@@ -1315,10 +1323,12 @@ export function useSessionRealtime(sessionId) {
 
   function sendMessage(text) {
     const body = String(text || "").trim();
-    if (!body || !socketRef.current || !joined) return false;
+    if (!sessionId || !body || !socketRef.current || !joined) return false;
     const messageId = `${Date.now()}-${Math.random()}`;
     const optimistic = {
       id: messageId,
+      clientId: messageId,
+      sessionId,
       text: body,
       displayName,
       senderType: participantType,
@@ -1454,10 +1464,15 @@ export function useSessionRealtime(sessionId) {
   }, []);
 
   useEffect(() => {
+    if (!sessionId) return () => {};
     const socket = createRealtimeSocket(env.signalingNamespace ?? "/realtime/signaling", {
       authBuilder: () => {
         const token = getAccessToken();
-        return token ? { token } : {};
+        const visitorToken = participantType === "visitor" ? getVisitorSessionToken(sessionId) : "";
+        return {
+          ...(token ? { token } : {}),
+          ...(visitorToken ? { visitorToken } : {})
+        };
       }
     });
     socketRef.current = socket;
@@ -1707,12 +1722,19 @@ export function useSessionRealtime(sessionId) {
       if (String(payload?.sessionId || "") !== String(sessionId || "")) return;
       if (payload?.status) {
         setStatus(String(payload.status));
+        pushLog("Session status updated", {
+          sessionId,
+          status: String(payload.status)
+        });
       }
     };
 
     const handleSessionActivated = (payload) => {
       if (String(payload?.sessionId || payload?.data?.id || "") !== String(sessionId || "")) return;
       setStatus("Access approved. Entering session...");
+      pushLog("Session activated", {
+        sessionId
+      });
     };
 
     const handleWebrtcOffer = async (payload) => {

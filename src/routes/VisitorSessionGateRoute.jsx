@@ -11,6 +11,14 @@ function normalizeStatus(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+function isAllowedSessionStatus(value) {
+  return ["approved", "active", "gate_confirmed"].includes(normalizeStatus(value));
+}
+
+function isSettledSessionStatus(value) {
+  return ["approved", "active", "gate_confirmed", "closed", "completed", "rejected"].includes(normalizeStatus(value));
+}
+
 export default function VisitorSessionGateRoute({ children }) {
   const { sessionId } = useParams();
   const user = useMemo(() => getStoredUser(), []);
@@ -47,7 +55,9 @@ export default function VisitorSessionGateRoute({ children }) {
       if (!active || incomingSessionId !== normalizedSessionId) return;
       const nextStatus = normalizeStatus(payload?.status);
       if (!nextStatus) return;
-      settled = ["approved", "active", "closed", "completed", "rejected"].includes(nextStatus);
+      settled = isSettledSessionStatus(nextStatus);
+      // eslint-disable-next-line no-console
+      console.info("qring.visitor.gate.snapshot", { sessionId: normalizedSessionId, status: nextStatus });
       setSessionStatus(nextStatus);
       setLoading(false);
       setError("");
@@ -60,6 +70,8 @@ export default function VisitorSessionGateRoute({ children }) {
       setSessionStatus("approved");
       setLoading(false);
       setError("");
+      // eslint-disable-next-line no-console
+      console.info("qring.visitor.gate.activated", { sessionId: normalizedSessionId });
     };
 
     const handleSessionStatus = (payload) => {
@@ -67,7 +79,9 @@ export default function VisitorSessionGateRoute({ children }) {
       if (!active || incomingSessionId !== normalizedSessionId) return;
       const nextStatus = normalizeStatus(payload?.status || payload?.sessionStatus);
       if (!nextStatus) return;
-      settled = ["approved", "active", "closed", "completed", "rejected"].includes(nextStatus);
+      settled = isSettledSessionStatus(nextStatus);
+      // eslint-disable-next-line no-console
+      console.info("qring.visitor.gate.status", { sessionId: normalizedSessionId, status: nextStatus });
       setSessionStatus(nextStatus);
       setLoading(false);
       setError("");
@@ -91,7 +105,9 @@ export default function VisitorSessionGateRoute({ children }) {
         const data = await getVisitorSessionStatus(sessionId);
         if (!active) return;
         const nextStatus = normalizeStatus(data?.status || data?.sessionStatus);
-        settled = ["approved", "active", "closed", "completed", "rejected"].includes(nextStatus);
+        settled = isSettledSessionStatus(nextStatus);
+        // eslint-disable-next-line no-console
+        console.info("qring.visitor.gate.poll", { sessionId: normalizedSessionId, status: nextStatus });
         setSessionStatus(nextStatus);
       } catch (err) {
         if (!active) return;
@@ -125,7 +141,7 @@ export default function VisitorSessionGateRoute({ children }) {
 
   if (isStaff) return children;
 
-  const allowed = sessionStatus === "approved" || sessionStatus === "active";
+  const allowed = isAllowedSessionStatus(sessionStatus);
 
   if (allowed) return children;
 
@@ -152,13 +168,24 @@ export default function VisitorSessionGateRoute({ children }) {
                     ? "This session is no longer available."
                     : "You can start the session only after the homeowner accepts."}
           </p>
-          <button
-            type="button"
-            onClick={() => window.location.reload()}
-            className="mt-4 w-full rounded-2xl bg-white/12 px-4 py-3 text-sm font-semibold transition hover:bg-white/16 active:scale-[0.99]"
-          >
-            Refresh
-          </button>
+          <div className="mt-4 space-y-3">
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="w-full rounded-2xl bg-white/12 px-4 py-3 text-sm font-semibold transition hover:bg-white/16 active:scale-[0.99]"
+            >
+              Refresh
+            </button>
+            {sessionStatus === "rejected" ? (
+              <button
+                type="button"
+                onClick={() => window.history.back()}
+                className="w-full rounded-2xl border border-white/12 bg-transparent px-4 py-3 text-sm font-semibold text-white/80 transition hover:bg-white/6 active:scale-[0.99]"
+              >
+                Start New Request
+              </button>
+            ) : null}
+          </div>
         </div>
       </div>
     </div>

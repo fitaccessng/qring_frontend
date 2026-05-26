@@ -8,9 +8,13 @@ import { useSessionRealtime } from "../../hooks/useSessionRealtime";
 export default function SessionMessagePage() {
   const { sessionId } = useParams();
   const navigate = useNavigate();
+  const [acceptingCall, setAcceptingCall] = useState(false);
   const isHomeowner = getStoredUserRole() === "homeowner";
   if (isHomeowner) {
     return <Navigate to={`/dashboard/homeowner/messages?sessionId=${encodeURIComponent(sessionId || "")}`} replace />;
+  }
+  if (!sessionId) {
+    return <div className="min-h-screen grid place-items-center bg-slate-50 text-sm font-semibold text-slate-500">Session link is incomplete.</div>;
   }
   const [text, setText] = useState("");
   const messagesRef = useRef(null);
@@ -43,7 +47,30 @@ export default function SessionMessagePage() {
   }
 
   async function handleAcceptIncomingCall() {
-    await acceptIncomingCall();
+    if (!incomingCall?.callSessionId || acceptingCall) return;
+    setAcceptingCall(true);
+    try {
+      window.sessionStorage.setItem(
+        "qring_call_accept_intent",
+        JSON.stringify({
+          sessionId,
+          hasVideo: incomingCall.hasVideo,
+          callSessionId: incomingCall.callSessionId,
+          visitorId: incomingCall.visitorId
+        })
+      );
+      // eslint-disable-next-line no-console
+      console.info("qring.visitor.call.accept_clicked", {
+        sessionId,
+        callSessionId: incomingCall.callSessionId,
+        hasVideo: incomingCall.hasVideo
+      });
+      navigate(`/session/${sessionId}/${incomingCall.hasVideo ? "video" : "audio"}`, { replace: true });
+    } catch {
+      await acceptIncomingCall();
+    } finally {
+      window.setTimeout(() => setAcceptingCall(false), 1200);
+    }
   }
 
   function handleRejectIncomingCall() {
@@ -207,6 +234,7 @@ export default function SessionMessagePage() {
       <VisitorIncomingCallModal
         open={incomingCall.pending && !canStartCall}
         hasVideo={incomingCall.hasVideo}
+        busy={acceptingCall}
         onAccept={handleAcceptIncomingCall}
         onReject={handleRejectIncomingCall}
       />
