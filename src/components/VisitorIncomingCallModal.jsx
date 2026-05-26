@@ -7,6 +7,7 @@ export default function VisitorIncomingCallModal({
   hasVideo,
   onAccept,
   onReject,
+  busy = false,
   callerLabel = "Homeowner"
 }) {
   const [audioState, setAudioState] = useState(() => getNotificationAudioContextState());
@@ -66,18 +67,20 @@ export default function VisitorIncomingCallModal({
           <button
             type="button"
             onClick={handleAccept}
-            className="flex h-14 w-full items-center justify-between rounded-2xl bg-emerald-500 px-4 text-left text-white transition-all hover:bg-emerald-400 active:scale-[0.99]"
+            disabled={busy}
+            className="flex h-14 w-full items-center justify-between rounded-2xl bg-emerald-500 px-4 text-left text-white transition-all hover:bg-emerald-400 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-70"
           >
             <span>
-              <span className="block text-[14px] font-semibold">Accept</span>
-              <span className="text-[11px] text-emerald-50/90">Swipe/tap to join now</span>
+              <span className="block text-[14px] font-semibold">{busy ? "Joining..." : "Accept"}</span>
+              <span className="text-[11px] text-emerald-50/90">{busy ? "Preparing secure connection" : "Swipe/tap to join now"}</span>
             </span>
             <Phone size={18} />
           </button>
           <button
             type="button"
             onClick={handleReject}
-            className="flex h-14 w-full items-center justify-between rounded-2xl bg-rose-500 px-4 text-left text-white transition-all hover:bg-rose-400 active:scale-[0.99]"
+            disabled={busy}
+            className="flex h-14 w-full items-center justify-between rounded-2xl bg-rose-500 px-4 text-left text-white transition-all hover:bg-rose-400 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-70"
           >
             <span>
               <span className="block text-[14px] font-semibold">Decline</span>

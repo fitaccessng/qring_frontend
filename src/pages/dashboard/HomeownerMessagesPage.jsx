@@ -36,7 +36,7 @@ export default function HomeownerMessagesPage() {
   const [deletingMessageId, setDeletingMessageId] = useState("");
   const [query, setQuery] = useState("");
   const [error, setError] = useState("");
-  const [decisionBusy, setDecisionBusy] = useState(false);
+  const [decisionAction, setDecisionAction] = useState("");
   const [callBusy, setCallBusy] = useState("");
   const [typingByThread, setTypingByThread] = useState({});
   const [incomingCall, setIncomingCall] = useState({
@@ -53,6 +53,7 @@ export default function HomeownerMessagesPage() {
   const socketRef = useRef(null);
   const joinedSessionIdsRef = useRef(new Set());
   const callBusyRef = useRef("");
+  const seenCallInviteIdsRef = useRef(new Set());
   const token = getAccessToken();
 
   useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
@@ -130,8 +131,7 @@ export default function HomeownerMessagesPage() {
       };
       setMessagesByThread((prev) => {
         const current = prev[incomingSessionId] ?? [];
-        if (current.some((item) => isLikelyDuplicateMessage(item, normalized))) return prev;
-        return { ...prev, [incomingSessionId]: [...current, normalized] };
+        return { ...prev, [incomingSessionId]: mergeMessageCollections(current, [normalized]) };
       });
       if (normalized.senderType !== "homeowner") playMessageNotificationSound();
       upsertThreadPreview(normalized, setThreads, selectedIdRef.current);
@@ -222,6 +222,9 @@ export default function HomeownerMessagesPage() {
       const callSessionId = String(payload?.callSessionId || "").trim();
       if (!incomingSessionId || !callSessionId) return;
       if (callBusyRef.current.startsWith(`${incomingSessionId}:`)) return;
+      if (seenCallInviteIdsRef.current.has(callSessionId)) return;
+      if (incomingCall.pending && incomingCall.callSessionId === callSessionId) return;
+      seenCallInviteIdsRef.current.add(callSessionId);
       socket.timeout(5000).emit(RealtimeEvent.CALL_INVITE_RECEIVED, {
         sessionId: incomingSessionId,
         callSessionId
@@ -267,7 +270,7 @@ export default function HomeownerMessagesPage() {
         withCredentials: true
       });
     };
-  }, [token]);
+  }, [incomingCall.callSessionId, incomingCall.pending, token]);
 
   useEffect(() => {
     const socket = socketRef.current;
@@ -291,7 +294,7 @@ export default function HomeownerMessagesPage() {
         setConversationLoading(true);
         try {
             const rows = await getHomeownerSessionMessages(selectedId);
-            setMessagesByThread(prev => ({ ...prev, [selectedId]: rows }));
+            setMessagesByThread(prev => ({ ...prev, [selectedId]: mergeMessageCollections(prev[selectedId] || [], rows) }));
             setThreads(prev => prev.map(t => t.id === selectedId ? { ...t, unread: 0 } : t));
         } catch (err) { setError(err.message); }
         finally { setConversationLoading(false); }
@@ -316,6 +319,8 @@ export default function HomeownerMessagesPage() {
     return selectedMessages.some((msg) => String(msg?.text || "").trim().toLowerCase() === "access granted.");
   }, [heroThreadState, selectedMessages]);
 
+  const decisionBusy = Boolean(decisionAction);
+
   async function handleSend(e) {
     if (e) e.preventDefault();
     const text = draft.trim();
@@ -332,8 +337,7 @@ export default function HomeownerMessagesPage() {
         });
         setMessagesByThread((prev) => {
           const current = prev[selectedId] || [];
-          if (current.some((item) => item.id === saved.id)) return prev;
-          return { ...prev, [selectedId]: [...current, saved] };
+          return { ...prev, [selectedId]: mergeMessageCollections(current, [saved]) };
         });
         upsertThreadPreview(saved, setThreads, selectedId);
       }
@@ -352,8 +356,7 @@ export default function HomeownerMessagesPage() {
       if (saved) {
         setMessagesByThread((prev) => {
           const current = prev[selectedId] || [];
-          if (current.some((item) => item.id === saved.id)) return prev;
-          return { ...prev, [selectedId]: [...current, saved] };
+          return { ...prev, [selectedId]: mergeMessageCollections(current, [saved]) };
         });
         upsertThreadPreview(saved, setThreads, selectedId);
       }
@@ -367,7 +370,7 @@ export default function HomeownerMessagesPage() {
 
   async function handleGrantAccess() {
     if (!selectedId || decisionBusy || accessAlreadyGranted) return;
-    setDecisionBusy(true);
+    setDecisionAction("approve");
     setError("");
     try {
       await decideVisit(selectedId, "approve");
@@ -375,8 +378,7 @@ export default function HomeownerMessagesPage() {
       if (saved) {
         setMessagesByThread((prev) => {
           const current = prev[selectedId] || [];
-          if (current.some((item) => item.id === saved.id)) return prev;
-          return { ...prev, [selectedId]: [...current, saved] };
+          return { ...prev, [selectedId]: mergeMessageCollections(current, [saved]) };
         });
         upsertThreadPreview(saved, setThreads, selectedId, { sessionStatus: "approved" });
       } else {
@@ -389,7 +391,34 @@ export default function HomeownerMessagesPage() {
     } catch (err) {
       setError(err?.message || "Unable to grant access.");
     } finally {
-      setDecisionBusy(false);
+      setDecisionAction("");
+    }
+  }
+
+  async function handleRejectAccess() {
+    if (!selectedId || decisionBusy) return;
+    setDecisionAction("reject");
+    setError("");
+    try {
+      await decideVisit(selectedId, "reject");
+      const saved = await sendHomeownerSessionMessage(selectedId, "Access declined.");
+      if (saved) {
+        setMessagesByThread((prev) => {
+          const current = prev[selectedId] || [];
+          return { ...prev, [selectedId]: mergeMessageCollections(current, [saved]) };
+        });
+        upsertThreadPreview(saved, setThreads, selectedId, { sessionStatus: "rejected" });
+      } else {
+        setThreads((prev) =>
+          prev.map((thread) =>
+            thread.id === selectedId ? { ...thread, sessionStatus: "rejected" } : thread
+          )
+        );
+      }
+    } catch (err) {
+      setError(err?.message || "Unable to reject visitor.");
+    } finally {
+      setDecisionAction("");
     }
   }
 
@@ -426,6 +455,7 @@ export default function HomeownerMessagesPage() {
 
   function handleAcceptIncomingCall() {
     if (!incomingCall.pending || !incomingCall.sessionId || !incomingCall.callSessionId) return;
+    setCallBusy(`${incomingCall.sessionId}:${incomingCall.hasVideo ? "video" : "audio"}`);
     try {
       window.sessionStorage.setItem(
         "qring_call_accept_intent",
@@ -440,6 +470,7 @@ export default function HomeownerMessagesPage() {
       // Keep storage failure non-blocking and continue to route.
     }
     const mode = incomingCall.hasVideo ? "video" : "audio";
+    seenCallInviteIdsRef.current.add(incomingCall.callSessionId);
     setIncomingCall({
       pending: false,
       hasVideo: false,
@@ -452,6 +483,9 @@ export default function HomeownerMessagesPage() {
 
   async function handleRejectIncomingCall() {
     const activeIncoming = incomingCall;
+    if (activeIncoming.callSessionId) {
+      seenCallInviteIdsRef.current.add(activeIncoming.callSessionId);
+    }
     setIncomingCall({
       pending: false,
       hasVideo: false,
@@ -568,6 +602,38 @@ export default function HomeownerMessagesPage() {
             )}
           </div>
 
+          {heroThread ? (
+            <div className="grid gap-4 border-b border-slate-100 bg-white px-5 py-4 md:grid-cols-[minmax(0,1fr)_260px]">
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-[0.28em] text-slate-400">Visitor approval context</p>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <DetailChip label="Visitor" value={heroThread.name || "Visitor"} />
+                  <DetailChip label="Phone" value={heroThread.visitorPhone || "Not shared"} />
+                  <DetailChip label="Purpose" value={heroThread.purpose || "Not provided"} />
+                  <DetailChip label="Door / Unit" value={[heroThread.door, heroThread.unitName].filter(Boolean).join(" • ") || "Unknown"} />
+                </div>
+              </div>
+              <div className="flex items-center gap-4 rounded-[1.75rem] border border-slate-100 bg-slate-50 px-4 py-4">
+                {heroThread.photoUrl ? (
+                  <img
+                    src={heroThread.photoUrl}
+                    alt={`${heroThread.name || "Visitor"} snapshot`}
+                    className="h-20 w-20 rounded-[1.5rem] object-cover shadow-sm"
+                  />
+                ) : (
+                  <div className="grid h-20 w-20 place-items-center rounded-[1.5rem] bg-white text-lg font-black text-slate-400 shadow-sm">
+                    {(heroThread.name || "V")[0]}
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-black text-slate-900">{heroThread.name || "Visitor"}</p>
+                  <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{heroThread.gateLabel || heroThread.door || "Entry point"}</p>
+                  <p className="mt-2 text-xs text-slate-500">{heroThread.estateName || heroThread.unitName || "Pending homeowner review"}</p>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
           {/* Messages Area */}
           <div ref={messagesRef} className="flex-1 overflow-y-auto p-6 space-y-4 no-scrollbar bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-fixed">
             {conversationLoading ? (
@@ -612,7 +678,8 @@ export default function HomeownerMessagesPage() {
             ) : (
               <div className="mb-4 flex gap-2">
                 <button type="button" onClick={() => handleQuickReply("Please wait, checking.")} disabled={sending || decisionBusy} className="flex-1 py-2 bg-slate-50 rounded-xl text-[9px] font-black uppercase text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 transition-all disabled:opacity-60">Wait</button>
-                <button type="button" onClick={handleGrantAccess} disabled={sending || decisionBusy} className="flex-1 py-2 bg-emerald-50 rounded-xl text-[9px] font-black uppercase text-emerald-600 disabled:opacity-60">{decisionBusy ? "Granting..." : "Grant"}</button>
+                <button type="button" onClick={handleRejectAccess} disabled={sending || decisionBusy} className="flex-1 py-2 bg-rose-50 rounded-xl text-[9px] font-black uppercase text-rose-600 disabled:opacity-60">{decisionAction === "reject" ? "Rejecting..." : "Reject"}</button>
+                <button type="button" onClick={handleGrantAccess} disabled={sending || decisionBusy} className="flex-1 py-2 bg-emerald-50 rounded-xl text-[9px] font-black uppercase text-emerald-600 disabled:opacity-60">{decisionAction === "approve" ? "Accepting..." : "Accept"}</button>
               </div>
             )}
             <form onSubmit={handleSend} className="relative">
@@ -644,6 +711,7 @@ export default function HomeownerMessagesPage() {
         open={incomingCall.pending}
         hasVideo={incomingCall.hasVideo}
         callerLabel="Visitor"
+        busy={callBusy === `${incomingCall.sessionId}:${incomingCall.hasVideo ? "video" : "audio"}`}
         onAccept={handleAcceptIncomingCall}
         onReject={handleRejectIncomingCall}
       />
@@ -666,7 +734,33 @@ function previewMessageText(text) {
 }
 
 function isLikelyDuplicateMessage(a, b) {
-  return a.text === b.text && Math.abs(new Date(a.at) - new Date(b.at)) < 2000;
+  if (!a || !b) return false;
+  if (a.id && b.id && a.id === b.id) return true;
+  if ((a.sessionId || "") !== (b.sessionId || "")) return false;
+  if ((a.senderType || "") !== (b.senderType || "")) return false;
+  if ((a.text || "").trim() !== (b.text || "").trim()) return false;
+  const left = new Date(a.at).getTime();
+  const right = new Date(b.at).getTime();
+  if (Number.isNaN(left) || Number.isNaN(right)) return false;
+  return Math.abs(left - right) < 8000;
+}
+
+function mergeMessageCollections(current, incoming) {
+  const merged = [...(current || [])];
+  for (const candidate of incoming || []) {
+    if (!candidate) continue;
+    const normalized = {
+      ...candidate,
+      sessionId: candidate.sessionId || candidate.session_id || ""
+    };
+    const existingIndex = merged.findIndex((item) => isLikelyDuplicateMessage(item, normalized));
+    if (existingIndex === -1) {
+      merged.push(normalized);
+      continue;
+    }
+    merged[existingIndex] = { ...merged[existingIndex], ...normalized };
+  }
+  return merged.sort((left, right) => new Date(left.at || 0) - new Date(right.at || 0));
 }
 
 function upsertThreadPreview(msg, setThreads, selectedId, extra = {}) {
@@ -687,4 +781,13 @@ function mergeThreadCollections(current, incoming) {
     map.set(thread.id, previous ? { ...previous, ...thread } : thread);
   }
   return sortThreadsForInbox(Array.from(map.values()));
+}
+
+function DetailChip({ label, value }) {
+  return (
+    <div className="rounded-[1.35rem] border border-slate-100 bg-slate-50 px-4 py-3">
+      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">{label}</p>
+      <p className="mt-1 text-sm font-semibold text-slate-700">{value}</p>
+    </div>
+  );
 }

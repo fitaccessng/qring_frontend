@@ -38,20 +38,11 @@ export default function SecurityMessagesPage() {
   const threadsRef = useRef([]);
   const socketRef = useRef(null);
   const inputRef = useRef(null);
+  const joinedSessionIdsRef = useRef(new Set());
   const token = getAccessToken();
 
   useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
   useEffect(() => { threadsRef.current = threads; }, [threads]);
-
-  function isLikelyDuplicate(a, b) {
-    if (!a || !b) return false;
-    if (a.id && b.id && a.id === b.id) return true;
-    if ((a.text || "").trim() !== (b.text || "").trim()) return false;
-    if ((a.senderType || "") !== (b.senderType || "")) return false;
-    const ta = new Date(a.at).getTime(), tb = new Date(b.at).getTime();
-    if (isNaN(ta) || isNaN(tb)) return false;
-    return Math.abs(ta - tb) < 10000;
-  }
 
   function upsertThreadPreview(msg) {
     if (!msg?.sessionId) return;
@@ -101,7 +92,7 @@ export default function SecurityMessagesPage() {
       try {
         const [rows, latest] = await Promise.all([getSecuritySessionMessages(selectedId), getSecurityMessages()]);
         if (!active) return;
-        setMessagesByThread(prev => ({ ...prev, [selectedId]: rows }));
+        setMessagesByThread(prev => ({ ...prev, [selectedId]: mergeMessageCollections(prev[selectedId] ?? [], rows) }));
         setThreads(latest.map(t => ({ ...t, last: previewText(t?.last || ""), unread: t.id === selectedId ? 0 : t.unread })));
       } catch (e) {
         if (active) setError(e?.message || "Failed to load conversation.");
@@ -122,11 +113,16 @@ export default function SecurityMessagesPage() {
       }
     });
     socketRef.current = socket;
+    joinedSessionIdsRef.current = new Set();
 
     const handleConnect = () => {
       const ids = new Set(threadsRef.current.map(t => String(t?.id || "").trim()).filter(Boolean));
       if (selectedIdRef.current) ids.add(String(selectedIdRef.current));
-      ids.forEach((id) => socket.timeout(5000).emit(RealtimeEvent.SESSION_JOIN, { sessionId: id, displayName: "Security" }, () => {}));
+      joinedSessionIdsRef.current = new Set();
+      ids.forEach((id) => {
+        socket.timeout(5000).emit(RealtimeEvent.SESSION_JOIN, { sessionId: id, displayName: "Security" }, () => {});
+        joinedSessionIdsRef.current.add(id);
+      });
     };
 
     const handleChatMessage = (payload) => {
@@ -141,8 +137,7 @@ export default function SecurityMessagesPage() {
       };
       setMessagesByThread(prev => {
         const curr = prev[sid] ?? [];
-        if (curr.some(m => isLikelyDuplicate(m, msg))) return prev;
-        return { ...prev, [sid]: [...curr, msg] };
+        return { ...prev, [sid]: mergeMessageCollections(curr, [msg]) };
       });
       if (msg.senderType !== "security") playMessageNotificationSound();
       upsertThreadPreview(msg);
@@ -187,9 +182,11 @@ export default function SecurityMessagesPage() {
     if (!socketRef.current?.connected) return;
     const ids = new Set(threads.map(t => String(t?.id || "").trim()).filter(Boolean));
     if (selectedIdRef.current) ids.add(String(selectedIdRef.current));
-    ids.forEach((id) =>
-      socketRef.current?.timeout(5000).emit(RealtimeEvent.SESSION_JOIN, { sessionId: id, displayName: "Security" }, () => {})
-    );
+    ids.forEach((id) => {
+      if (joinedSessionIdsRef.current.has(id)) return;
+      socketRef.current?.timeout(5000).emit(RealtimeEvent.SESSION_JOIN, { sessionId: id, displayName: "Security" }, () => {});
+      joinedSessionIdsRef.current.add(id);
+    });
   }, [threads, selectedId]);
 
   useEffect(() => {
@@ -227,8 +224,7 @@ export default function SecurityMessagesPage() {
       });
       setMessagesByThread(prev => {
         const curr = prev[selectedId] ?? [];
-        if (curr.some(m => isLikelyDuplicate(m, out))) return prev;
-        return { ...prev, [selectedId]: [...curr, out] };
+        return { ...prev, [selectedId]: mergeMessageCollections(curr, [out]) };
       });
       upsertThreadPreview(out);
       setDraft("");
@@ -643,4 +639,30 @@ function formatClockTime(value) {
   const d = new Date(value);
   if (isNaN(d.getTime())) return "";
   return new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(d);
+}
+
+function isLikelyDuplicate(a, b) {
+  if (!a || !b) return false;
+  if (a.id && b.id && a.id === b.id) return true;
+  if ((a.sessionId || "") !== (b.sessionId || "")) return false;
+  if ((a.text || "").trim() !== (b.text || "").trim()) return false;
+  if ((a.senderType || "") !== (b.senderType || "")) return false;
+  const ta = new Date(a.at).getTime();
+  const tb = new Date(b.at).getTime();
+  if (isNaN(ta) || isNaN(tb)) return false;
+  return Math.abs(ta - tb) < 10000;
+}
+
+function mergeMessageCollections(current, incoming) {
+  const merged = [...(current || [])];
+  for (const candidate of incoming || []) {
+    if (!candidate) continue;
+    const existingIndex = merged.findIndex((item) => isLikelyDuplicate(item, candidate));
+    if (existingIndex === -1) {
+      merged.push(candidate);
+      continue;
+    }
+    merged[existingIndex] = { ...merged[existingIndex], ...candidate };
+  }
+  return merged.sort((left, right) => new Date(left.at || 0) - new Date(right.at || 0));
 }
