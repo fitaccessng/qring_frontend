@@ -168,6 +168,36 @@ function buildFormatErrorDetails({ path, status, contentType, raw, apiBaseUrl })
   };
 }
 
+function buildHttpErrorDetails({ path, status, payload, raw, contentType, apiBaseUrl }) {
+  const htmlLike = isHtmlContentType(contentType) || looksLikeHtmlDocument(raw || payload?.raw);
+  if (htmlLike) {
+    const detail = buildFormatErrorDetails({
+      path,
+      status,
+      contentType,
+      raw: raw || payload?.raw || "",
+      apiBaseUrl
+    });
+    return {
+      message: detail.message,
+      payload: {
+        ...(payload && typeof payload === "object" ? payload : {}),
+        code: detail.code,
+        path,
+        raw: raw || payload?.raw || "",
+        contentType,
+        apiBaseUrl
+      }
+    };
+  }
+
+  const message = payload?.message ?? payload?.detail ?? `Request failed (${status})`;
+  return {
+    message,
+    payload
+  };
+}
+
 function normalizeRequestData(body, headers) {
   if (body == null) return undefined;
   const contentType = String(getHeader(headers, "Content-Type") ?? "");
@@ -311,10 +341,18 @@ export async function apiRequestBinary(path, options = {}) {
       } catch {
         payload = raw ? { raw } : null;
       }
+      const detail = buildHttpErrorDetails({
+        path,
+        status: response.status,
+        payload,
+        raw,
+        contentType: response.headers.get("content-type") ?? "",
+        apiBaseUrl: env.apiBaseUrl
+      });
       throw new ApiError(
-        payload?.message ?? payload?.detail ?? `Request failed (${response.status})`,
+        detail.message,
         response.status,
-        payload
+        detail.payload
       );
     }
     return response;
@@ -550,16 +588,25 @@ export async function apiRequest(path, options = {}, attempt = 0) {
         emitFlash("Session timeout. Please login again.", "warning");
         redirectToLogin(getCurrentAppPath());
       }
-      const isSubscriptionBlocked = response.status === 403 && payload?.code === "SUBSCRIPTION_ACTION_BLOCKED";
+      const detail = buildHttpErrorDetails({
+        path,
+        status: response.status,
+        payload,
+        raw,
+        contentType,
+        apiBaseUrl: env.apiBaseUrl
+      });
+      const errorPayload = detail.payload;
+      const isSubscriptionBlocked = response.status === 403 && errorPayload?.code === "SUBSCRIPTION_ACTION_BLOCKED";
       const baseMessage = shouldHandleSessionTimeout
         ? "Session timeout. Please login again."
-        : payload?.message ?? payload?.detail ?? `Request failed (${response.status})`;
-      const requestId = payload?.requestId ? String(payload.requestId) : "";
+        : detail.message;
+      const requestId = errorPayload?.requestId ? String(errorPayload.requestId) : "";
       const isServerError = response.status >= 500 && !shouldHandleSessionTimeout;
       if (isServerError) {
         // Keep the UI friendly; log details for debugging/support.
         // eslint-disable-next-line no-console
-        console.error("API 5xx", { path, status: response.status, requestId, payload });
+        console.error("API 5xx", { path, status: response.status, requestId, payload: errorPayload });
       }
 
       const message = isServerError
@@ -569,10 +616,10 @@ export async function apiRequest(path, options = {}, attempt = 0) {
         : baseMessage;
       if (isSubscriptionBlocked) {
         emitBlockingSubscription({
-          title: payload?.subscription?.status === "suspended" ? "Service paused" : "Subscription restriction",
+          title: errorPayload?.subscription?.status === "suspended" ? "Service paused" : "Subscription restriction",
           message,
-          actionLabel: payload?.subscription?.is_bill_payer ?? payload?.subscription?.isBillPayer ? "Renew Now" : "",
-          actionRoute: payload?.renew_url ?? payload?.subscription?.renew_url ?? payload?.subscription?.renewUrl ?? "/billing/paywall"
+          actionLabel: errorPayload?.subscription?.is_bill_payer ?? errorPayload?.subscription?.isBillPayer ? "Renew Now" : "",
+          actionRoute: errorPayload?.renew_url ?? errorPayload?.subscription?.renew_url ?? errorPayload?.subscription?.renewUrl ?? "/billing/paywall"
         });
       } else if (!silent) {
         emitFlash(message, "error");
@@ -580,7 +627,7 @@ export async function apiRequest(path, options = {}, attempt = 0) {
       throw new ApiError(
         message,
         response.status,
-        payload
+        errorPayload
       );
     }
 
@@ -668,9 +715,17 @@ export async function apiUpload(path, formData) {
     });
   }
   if (!response.ok) {
-    const message = payload?.message ?? payload?.detail ?? `Upload failed (${response.status})`;
+    const detail = buildHttpErrorDetails({
+      path,
+      status: response.status,
+      payload,
+      raw,
+      contentType: response.contentType,
+      apiBaseUrl: env.apiBaseUrl
+    });
+    const message = detail.message;
     emitFlash(message, "error");
-    throw new ApiError(message, response.status, payload);
+    throw new ApiError(message, response.status, detail.payload);
   }
   return payload;
 }
