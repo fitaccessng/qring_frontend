@@ -7,6 +7,10 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    define: {
+      "process.env.NEXT_PUBLIC_API_BASE_URL": JSON.stringify(process.env.NEXT_PUBLIC_API_BASE_URL ?? env.NEXT_PUBLIC_API_BASE_URL ?? ""),
+      "process.env.NEXT_PUBLIC_NATIVE_API_BASE_URL": JSON.stringify(process.env.NEXT_PUBLIC_NATIVE_API_BASE_URL ?? env.NEXT_PUBLIC_NATIVE_API_BASE_URL ?? "")
+    },
     resolve: {
       alias: appBuildTarget === "mobile"
         ? {

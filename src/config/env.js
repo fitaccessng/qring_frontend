@@ -3,6 +3,14 @@ const hasHttpProtocol = (value) => /^https?:\/\//i.test(value ?? "");
 const looksLikeDomain = (value) => /^[a-z0-9.-]+\.[a-z]{2,}(\/.*)?$/i.test(value ?? "");
 const isRelativePath = (value) => typeof value === "string" && value.trim().startsWith("/");
 const normalizeLocalBackendHost = (value) => (value ?? "").replace(/:\/\/0\.0\.0\.0(?=[:/]|$)/i, "://localhost");
+const readGlobalEnvValue = (key) => {
+  if (typeof globalThis === "undefined") return "";
+  try {
+    return String(globalThis?.process?.env?.[key] ?? "").trim();
+  } catch {
+    return "";
+  }
+};
 const toBoolean = (value, fallback = false) => {
   if (value === undefined || value === null || value === "") return fallback;
   return ["1", "true", "yes", "on"].includes(String(value).trim().toLowerCase());
@@ -14,6 +22,12 @@ const toInteger = (value, fallback) => {
 
 const productionBackendOrigin = "https://qring-backend-1.onrender.com";
 const productionFrontendOrigin = "https://www.useqring.online";
+const buildId = String(
+  import.meta.env.VITE_BUILD_ID ??
+  import.meta.env.VERCEL_GIT_COMMIT_SHA ??
+  import.meta.env.RENDER_GIT_COMMIT ??
+  ""
+).trim();
 const isDev = Boolean(import.meta.env.DEV);
 const isMobileAppBuild = String(import.meta.env.VITE_APP_BUILD_TARGET ?? "").trim().toLowerCase() === "mobile";
 const isNativeRuntime = (() => {
@@ -27,9 +41,7 @@ const isNativeRuntime = (() => {
 const defaultApiBase =
   typeof window !== "undefined" && isDev
     ? `http://localhost:8000/api/v1`
-    : typeof window !== "undefined" && !isNativeRuntime && !isMobileAppBuild
-      ? `/api/v1`
-      : `${productionBackendOrigin}/api/v1`;
+    : `${productionBackendOrigin}/api/v1`;
 const defaultSocketUrl =
   typeof window !== "undefined" && isDev
     ? `http://localhost:8000`
@@ -71,8 +83,15 @@ function originFromUrl(value) {
 }
 
 function resolveRuntimeApiBaseSource() {
-  const nativeCandidate = import.meta.env.VITE_NATIVE_API_BASE_URL;
-  const standardCandidate = import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL;
+  const nativeCandidate =
+    import.meta.env.VITE_NATIVE_API_BASE_URL ||
+    readGlobalEnvValue("VITE_NATIVE_API_BASE_URL") ||
+    readGlobalEnvValue("NEXT_PUBLIC_NATIVE_API_BASE_URL");
+  const standardCandidate =
+    import.meta.env.VITE_API_BASE_URL ||
+    readGlobalEnvValue("VITE_API_BASE_URL") ||
+    readGlobalEnvValue("NEXT_PUBLIC_API_BASE_URL") ||
+    import.meta.env.VITE_API_URL;
 
   if (isNativeRuntime || isMobileAppBuild) {
     return nativeCandidate ?? standardCandidate;
@@ -80,18 +99,15 @@ function resolveRuntimeApiBaseSource() {
 
   if (typeof window !== "undefined" && !isDev) {
     const explicit = String(standardCandidate ?? "").trim();
-    if (!explicit) return "/api/v1";
-    if (isRelativePath(explicit)) return explicit;
-    try {
-      const parsed = new URL(explicit, window.location.origin);
-      if (parsed.origin === window.location.origin) {
-        return `${parsed.pathname}${parsed.search}${parsed.hash}` || "/api/v1";
-      }
-    } catch {
-      // Fall back to same-origin API routing for web builds.
+    if (!explicit) return `${productionBackendOrigin}/api/v1`;
+    if (isRelativePath(explicit)) {
+      console.warn("qring.env.invalid_api_base_url", {
+        reason: "relative-path-not-allowed-in-production",
+        value: explicit
+      });
+      return `${productionBackendOrigin}/api/v1`;
     }
-    // Web builds should use the site's own /api proxy so page requests do not depend on browser CORS.
-    return "/api/v1";
+    return explicit;
   }
 
   return standardCandidate;
@@ -167,9 +183,9 @@ const resolvedSocketUrl = (() => {
 
 export const env = {
   apiBaseUrl: resolvedApiBaseUrl,
-  backendDirectApiBaseUrl: `${productionBackendOrigin}/api/v1`,
   socketUrl: resolvedSocketUrl,
   publicAppUrl: resolvePublicAppUrl(import.meta.env.VITE_PUBLIC_APP_URL),
+  buildId,
   socketPath: import.meta.env.VITE_SOCKET_PATH ?? "/socket.io",
   dashboardNamespace:
     import.meta.env.VITE_DASHBOARD_NAMESPACE ?? "/realtime/dashboard",
@@ -182,3 +198,15 @@ export const env = {
   enableRealtimeInDev: String(import.meta.env.VITE_ENABLE_REALTIME_IN_DEV ?? "true").toLowerCase() !== "false",
   routerMode: String(import.meta.env.VITE_ROUTER_MODE ?? "auto").trim().toLowerCase()
 };
+
+if (typeof window !== "undefined") {
+  // eslint-disable-next-line no-console
+  console.info("qring.env", {
+    mode: isDev ? "development" : "production",
+    buildId: buildId || "unknown",
+    apiBaseSource: runtimeApiBaseSource || "(default)",
+    apiBaseUrl: env.apiBaseUrl,
+    socketUrl: env.socketUrl,
+    socketPath: env.socketPath
+  });
+}

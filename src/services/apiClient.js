@@ -25,7 +25,6 @@ const GET_CACHE_STALE_TTL_MS = 2 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 30000;
 const getResponseCache = new Map();
 const inFlightGetRequests = new Map();
-const API_BASE_OVERRIDE_STORAGE_KEY = "qring_runtime_api_base_override";
 const protectedPathPrefixes = [
   "/dashboard",
   "/homeowner",
@@ -109,27 +108,7 @@ function normalizePath(path = "") {
   return `/${path}`;
 }
 
-function readStoredApiBaseOverride() {
-  if (typeof window === "undefined") return "";
-  try {
-    return String(window.sessionStorage.getItem(API_BASE_OVERRIDE_STORAGE_KEY) || "").trim();
-  } catch {
-    return "";
-  }
-}
-
-function shouldPreferDirectBackendByDefault() {
-  if (typeof window === "undefined") return false;
-  if (import.meta.env.DEV) return false;
-  return String(env.apiBaseUrl || "").trim().startsWith("/");
-}
-
-let runtimeApiBaseUrl = (() => {
-  const stored = readStoredApiBaseOverride();
-  if (stored) return stored;
-  if (shouldPreferDirectBackendByDefault()) return env.backendDirectApiBaseUrl;
-  return env.apiBaseUrl;
-})();
+let runtimeApiBaseUrl = env.apiBaseUrl;
 
 function getCurrentApiBaseUrl() {
   return runtimeApiBaseUrl || env.apiBaseUrl;
@@ -138,48 +117,28 @@ function getCurrentApiBaseUrl() {
 function setCurrentApiBaseUrl(nextBaseUrl) {
   const normalized = String(nextBaseUrl || "").trim() || env.apiBaseUrl;
   runtimeApiBaseUrl = normalized;
-  if (typeof window === "undefined") return;
-  try {
-    if (normalized === env.apiBaseUrl) {
-      window.sessionStorage.removeItem(API_BASE_OVERRIDE_STORAGE_KEY);
-    } else {
-      window.sessionStorage.setItem(API_BASE_OVERRIDE_STORAGE_KEY, normalized);
-    }
-  } catch {
-    // Ignore storage errors.
-  }
-}
-
-function getBaseOrigin(value) {
-  try {
-    return new URL(value, typeof window !== "undefined" ? window.location.origin : undefined).origin;
-  } catch {
-    return "";
-  }
-}
-
-function isSameOriginApiBase() {
-  if (typeof window === "undefined") return false;
-  const apiBase = String(getCurrentApiBaseUrl() ?? "").trim();
-  if (!apiBase) return false;
-  if (apiBase.startsWith("/")) return true;
-  return getBaseOrigin(apiBase) === window.location.origin;
 }
 
 function shouldRetryAgainstDirectBackend(path, response) {
-  if (typeof window === "undefined") return false;
-  if (!isSameOriginApiBase()) return false;
-  if (/^https?:\/\//i.test(path)) return false;
-  const status = Number(response?.status ?? 0);
-  const contentType = response?.contentType;
-  const raw = response?.raw;
-  return status === 404 || isHtmlContentType(contentType) || looksLikeHtmlDocument(raw);
+  return false;
 }
 
 export function buildApiUrl(path = "", baseUrl = getCurrentApiBaseUrl()) {
   if (!path) return baseUrl;
   if (/^https?:\/\//i.test(path)) return path;
   return `${baseUrl}${normalizePath(path)}`;
+}
+
+function logRequestDebug(path, baseUrl, method) {
+  if (typeof window === "undefined") return;
+  // eslint-disable-next-line no-console
+  console.debug("qring.api.request", {
+    mode: import.meta.env.DEV ? "development" : "production",
+    method,
+    path,
+    baseUrl,
+    finalUrl: buildApiUrl(path, baseUrl)
+  });
 }
 
 async function performApiRequest(path, requestOptions = {}, baseUrl = getCurrentApiBaseUrl()) {
@@ -331,19 +290,12 @@ async function performHttpRequest(url, options) {
 export async function apiPing(path = "/health") {
   if (typeof navigator !== "undefined" && navigator.onLine === false) return false;
   try {
+    logRequestDebug(path, getCurrentApiBaseUrl(), "GET");
     let response = await performApiRequest(path, {
       method: "GET",
       headers: { "Cache-Control": "no-store" },
       timeoutMs: 8000
     });
-    if (shouldRetryAgainstDirectBackend(path, response)) {
-      setCurrentApiBaseUrl(env.backendDirectApiBaseUrl);
-      response = await performApiRequest(path, {
-        method: "GET",
-        headers: { "Cache-Control": "no-store" },
-        timeoutMs: 8000
-      }, env.backendDirectApiBaseUrl);
-    }
     return Boolean(response.ok);
   } catch {
     return false;
@@ -358,6 +310,7 @@ export async function apiRequestBinary(path, options = {}) {
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
+    logRequestDebug(path, getCurrentApiBaseUrl(), method);
     let response = await fetch(buildApiUrl(path), {
       method,
       headers: buildAuthHeaders(options.headers ?? {}, options.token),
@@ -365,22 +318,6 @@ export async function apiRequestBinary(path, options = {}) {
       cache: options.cache ?? "default",
       signal: controller.signal
     });
-    if (
-      shouldRetryAgainstDirectBackend(path, {
-        status: response.status,
-        contentType: response.headers.get("content-type") ?? "",
-        raw: ""
-      })
-    ) {
-      setCurrentApiBaseUrl(env.backendDirectApiBaseUrl);
-      response = await fetch(buildApiUrl(path, env.backendDirectApiBaseUrl), {
-        method,
-        headers: buildAuthHeaders(options.headers ?? {}, options.token),
-        body: options.body,
-        cache: options.cache ?? "default",
-        signal: controller.signal
-      });
-    }
     if (!response.ok) {
       if (retryCount > 0 && shouldRetryResponseStatus(response.status)) {
         return apiRequestBinary(path, { ...options, retryCount: retryCount - 1 });
@@ -543,24 +480,16 @@ export async function apiRequest(path, options = {}, attempt = 0) {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const requestRunner = async () => {
+    const requestRunner = async () => {
     let response;
     try {
+      logRequestDebug(path, getCurrentApiBaseUrl(), options.method ?? "GET");
       response = await performApiRequest(path, {
         method: options.method ?? "GET",
         headers,
         body: options.body,
         timeoutMs: options.timeoutMs
       });
-      if (shouldRetryAgainstDirectBackend(path, response)) {
-        setCurrentApiBaseUrl(env.backendDirectApiBaseUrl);
-        response = await performApiRequest(path, {
-          method: options.method ?? "GET",
-          headers,
-          body: options.body,
-          timeoutMs: options.timeoutMs
-        }, env.backendDirectApiBaseUrl);
-      }
     } catch (networkError) {
       if (isGet) {
         const cached = readGetCache(cacheKey);
@@ -718,20 +647,13 @@ export async function apiUpload(path, formData) {
 
   let response;
   try {
+    logRequestDebug(path, getCurrentApiBaseUrl(), "POST");
     response = await performApiRequest(path, {
       method: "POST",
       headers,
       body: formData,
       timeoutMs: REQUEST_TIMEOUT_MS
     });
-    if (shouldRetryAgainstDirectBackend(path, response)) {
-      response = await performApiRequest(path, {
-        method: "POST",
-        headers,
-        body: formData,
-        timeoutMs: REQUEST_TIMEOUT_MS
-      }, env.backendDirectApiBaseUrl);
-    }
   } catch (networkError) {
     const message = buildTransportErrorMessage(networkError);
     emitFlash(message, "error");

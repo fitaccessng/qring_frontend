@@ -27,6 +27,16 @@ api.interceptors.request.use((config) => {
     nextConfig.headers.Authorization = `Bearer ${token}`;
   }
 
+  const finalUrl = String(nextConfig.url ?? "");
+  // eslint-disable-next-line no-console
+  console.debug("qring.api.axios_request", {
+    mode: import.meta.env.DEV ? "development" : "production",
+    baseURL: nextConfig.baseURL,
+    url: finalUrl,
+    finalUrl: /^https?:\/\//i.test(finalUrl) ? finalUrl : `${nextConfig.baseURL || ""}${finalUrl}`,
+    method: nextConfig.method ?? "get"
+  });
+
   return nextConfig;
 });
 

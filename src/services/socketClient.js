@@ -44,7 +44,16 @@ export function createRealtimeSocket(namespace, options = {}) {
     return existing.socket;
   }
 
-  const nextSocket = io(`${env.socketUrl}${namespace}`, {
+  const socketTarget = `${env.socketUrl}${namespace}`;
+  // eslint-disable-next-line no-console
+  console.info("qring.socket.connect", {
+    namespace,
+    socketUrl: env.socketUrl,
+    path: env.socketPath,
+    target: socketTarget
+  });
+
+  const nextSocket = io(socketTarget, {
     path: env.socketPath,
     ...realtimeTransportOptions,
     reconnection,
@@ -72,9 +81,15 @@ export function createRealtimeSocket(namespace, options = {}) {
     releaseTimer: null
   });
   nextSocket.on("disconnect", () => {
+    // eslint-disable-next-line no-console
+    console.info("qring.socket.disconnect", { namespace, target: socketTarget });
     if (!nextSocket.active) {
       namespaceSockets.delete(key);
     }
+  });
+  nextSocket.on("connect", () => {
+    // eslint-disable-next-line no-console
+    console.info("qring.socket.connected", { namespace, id: nextSocket.id, target: socketTarget });
   });
   return nextSocket;
 }
