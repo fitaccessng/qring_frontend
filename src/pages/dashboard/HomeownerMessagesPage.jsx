@@ -9,7 +9,7 @@ import { env } from "../../config/env";
 import { getAccessToken } from "../../services/authStorage";
 import { apiRequest } from "../../services/apiClient";
 import { RealtimeEvent } from "../../services/realtimeEvents";
-import { createRealtimeSocket, releaseRealtimeSocket } from "../../services/socketClient";
+import { createRealtimeSocket, getDashboardSocket, releaseRealtimeSocket } from "../../services/socketClient";
 import { playMessageNotificationSound } from "../../utils/notificationSound";
 import {
   decideVisit,
@@ -58,6 +58,22 @@ export default function HomeownerMessagesPage() {
   const seenCallInviteIdsRef = useRef(new Set());
   const token = getAccessToken();
 
+  async function refreshThreads(options = {}) {
+    const { focusSessionId = "" } = options;
+    const data = await getHomeownerMessages();
+    const normalized = (data || []).map((thread) => ({
+      ...thread,
+      last: previewMessageText(thread?.last || "")
+    }));
+    const sorted = sortThreadsForInbox(normalized);
+    setThreads((prev) => mergeThreadCollections(prev, sorted));
+    const nextSelectedId = String(focusSessionId || selectedIdRef.current || "").trim();
+    if (nextSelectedId && sorted.some((item) => item.id === nextSelectedId)) {
+      setSelectedId(nextSelectedId);
+    }
+    return sorted;
+  }
+
   useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
   useEffect(() => { threadsRef.current = threads; }, [threads]);
   useEffect(() => { callBusyRef.current = callBusy; }, [callBusy]);
@@ -86,17 +102,10 @@ export default function HomeownerMessagesPage() {
       setLoading(true);
       setError("");
       try {
-        const data = await getHomeownerMessages();
+        const data = await refreshThreads({ focusSessionId: preferredSessionId });
         if (!active) return;
-        const normalized = (data || []).map((thread) => ({
-          ...thread,
-          last: previewMessageText(thread?.last || "")
-        }));
-        const sorted = sortThreadsForInbox(normalized);
-        setThreads(sorted);
-        
-        const preferredExists = preferredSessionId && sorted.some((item) => item.id === preferredSessionId);
-        const targetId = preferredExists ? preferredSessionId : sorted[0]?.id || "";
+        const preferredExists = preferredSessionId && data.some((item) => item.id === preferredSessionId);
+        const targetId = preferredExists ? preferredSessionId : data[0]?.id || "";
         
         if (targetId) {
           setSelectedId(targetId);
@@ -118,13 +127,7 @@ export default function HomeownerMessagesPage() {
   useEffect(() => {
     const intervalId = window.setInterval(async () => {
       try {
-        const data = await getHomeownerMessages();
-        const normalized = (data || []).map((thread) => ({
-          ...thread,
-          last: previewMessageText(thread?.last || "")
-        }));
-        const sorted = sortThreadsForInbox(normalized);
-        setThreads((prev) => mergeThreadCollections(prev, sorted));
+        await refreshThreads();
       } catch {
         // Keep polling background data silently
       }
@@ -145,6 +148,22 @@ export default function HomeownerMessagesPage() {
     socketRef.current = socket;
     joinedSessionIdsRef.current = new Set();
 
+    const joinKnownSessions = () => {
+      const ids = new Set(threadsRef.current.map((thread) => String(thread?.id || "").trim()).filter(Boolean));
+      if (selectedIdRef.current) ids.add(String(selectedIdRef.current).trim());
+      joinedSessionIdsRef.current = new Set();
+      ids.forEach((sessionId) => {
+        if (!sessionId) return;
+        socket.emit(RealtimeEvent.SESSION_JOIN, {
+          sessionId,
+          displayName: user?.fullName || "Homeowner"
+        });
+        joinedSessionIdsRef.current.add(sessionId);
+      });
+      // eslint-disable-next-line no-console
+      console.info("qring.homeowner.sessions.joined", { count: ids.size, sessionIds: Array.from(ids) });
+    };
+
     const handleChatMessage = (payload) => {
       const incomingSessionId = payload?.sessionId;
       if (!incomingSessionId) return;
@@ -162,6 +181,15 @@ export default function HomeownerMessagesPage() {
       });
       if (normalized.senderType !== "homeowner") playMessageNotificationSound();
       upsertThreadPreview(normalized, setThreads, selectedIdRef.current);
+      if (!threadsRef.current.some((thread) => thread.id === incomingSessionId)) {
+        void refreshThreads({ focusSessionId: incomingSessionId }).catch(() => {});
+      }
+      // eslint-disable-next-line no-console
+      console.info("qring.homeowner.chat.received", {
+        sessionId: incomingSessionId,
+        messageId: normalized.id,
+        senderType: normalized.senderType
+      });
     };
 
     const handleSessionStatus = (payload) => {
@@ -174,12 +202,41 @@ export default function HomeownerMessagesPage() {
             ? {
                 ...thread,
                 sessionStatus: nextStatus,
+                photoUrl: payload?.photoUrl || thread.photoUrl,
+                snapshotAuditId: payload?.snapshotAuditId || thread.snapshotAuditId,
                 last: payload?.sessionActivated ? "Access approved. Visitor can now enter the session." : thread.last,
                 time: new Date().toISOString()
               }
             : thread
         )
       );
+    };
+
+    const handleSessionSnapshot = (payload) => {
+      const incomingSessionId = String(payload?.sessionId || "").trim();
+      if (!incomingSessionId) return;
+      setThreads((prev) =>
+        prev.map((thread) =>
+          thread.id === incomingSessionId
+            ? {
+                ...thread,
+                photoUrl: payload?.photoUrl || thread.photoUrl,
+                snapshotAuditId: payload?.snapshotAuditId || thread.snapshotAuditId,
+                purpose: payload?.purpose || thread.purpose,
+                visitorPhone: payload?.visitorPhone || thread.visitorPhone,
+                name: payload?.visitorName || thread.name
+              }
+            : thread
+        )
+      );
+      if (payload?.photoUrl || payload?.snapshotAuditId) {
+        // eslint-disable-next-line no-console
+        console.info("qring.homeowner.snapshot.session_update", {
+          sessionId: incomingSessionId,
+          photoUrl: payload?.photoUrl || null,
+          snapshotAuditId: payload?.snapshotAuditId || null
+        });
+      }
     };
 
     const handleSessionActivated = (payload) => {
@@ -240,22 +297,79 @@ export default function HomeownerMessagesPage() {
       });
     };
 
+    socket.on("connect", joinKnownSessions);
     socket.on("chat.message", handleChatMessage);
     socket.on("session.status", handleSessionStatus);
+    socket.on("session.snapshot", handleSessionSnapshot);
     socket.on("session.activated", handleSessionActivated);
     socket.on("chat.typing", handleChatTyping);
     socket.on("incoming-call", handleIncomingCallNotice);
     socket.on("call.invite", handleCallInvite);
 
     return () => {
+      socket.off("connect", joinKnownSessions);
       socket.off("chat.message", handleChatMessage);
       socket.off("session.status", handleSessionStatus);
+      socket.off("session.snapshot", handleSessionSnapshot);
       socket.off("session.activated", handleSessionActivated);
       socket.off("chat.typing", handleChatTyping);
       socket.off("incoming-call", handleIncomingCallNotice);
       socket.off("call.invite", handleCallInvite);
       socketRef.current = null;
       releaseRealtimeSocket(env.signalingNamespace ?? "/realtime/signaling");
+    };
+  }, [token, user?.fullName]);
+
+  useEffect(() => {
+    if (!token) return;
+    const dashboardSocket = getDashboardSocket();
+
+    const handleDashboardRefresh = (payload) => {
+      const parsedPayload = typeof payload?.payload === "string" ? safeParsePayload(payload.payload) : payload?.data || payload || {};
+      const focusSessionId = String(parsedPayload?.sessionId || payload?.data?.visitorSessionId || payload?.visitorSessionId || "").trim();
+      void refreshThreads({ focusSessionId }).catch(() => {});
+    };
+
+    const handleVisitorSnapshot = (payload) => {
+      const data = payload?.data || payload || {};
+      const visitorSessionId = String(data?.visitorSessionId || "").trim();
+      const nextUrl = String(data?.fileUrl || data?.url || "").trim();
+      if (visitorSessionId && nextUrl) {
+        setThreads((prev) =>
+          prev.map((thread) =>
+            thread.id === visitorSessionId
+              ? {
+                  ...thread,
+                  photoUrl: nextUrl,
+                  snapshotAuditId: data?.id || thread.snapshotAuditId
+                }
+              : thread
+          )
+        );
+        // eslint-disable-next-line no-console
+        console.info("qring.homeowner.snapshot.dashboard_update", {
+          visitorSessionId,
+          snapshotId: data?.id || null,
+          fileUrl: nextUrl
+        });
+      } else {
+        // eslint-disable-next-line no-console
+        console.warn("qring.homeowner.snapshot.missing", {
+          visitorSessionId: visitorSessionId || null,
+          snapshotId: data?.id || null
+        });
+      }
+      void refreshThreads({ focusSessionId: visitorSessionId }).catch(() => {});
+    };
+
+    dashboardSocket.on("notification.created", handleDashboardRefresh);
+    dashboardSocket.on("notification.updated", handleDashboardRefresh);
+    dashboardSocket.on("visitor.snapshot", handleVisitorSnapshot);
+
+    return () => {
+      dashboardSocket.off("notification.created", handleDashboardRefresh);
+      dashboardSocket.off("notification.updated", handleDashboardRefresh);
+      dashboardSocket.off("visitor.snapshot", handleVisitorSnapshot);
     };
   }, [token]);
 
@@ -704,4 +818,12 @@ function getThreadSnapshotSrc(thread) {
   const snapshotAuditId = String(thread.snapshotAuditId || "").trim();
   if (!snapshotAuditId) return "";
   return `/advanced/visitor/snapshots/${encodeURIComponent(snapshotAuditId)}/file`;
+}
+
+function safeParsePayload(value) {
+  try {
+    return JSON.parse(value || "{}");
+  } catch {
+    return {};
+  }
 }

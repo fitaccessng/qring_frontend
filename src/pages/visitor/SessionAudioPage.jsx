@@ -71,6 +71,13 @@ export default function SessionAudioPage() {
     return () => window.clearInterval(timer);
   }, [callConnectedAt, callState]);
 
+  useEffect(() => {
+    if (callState !== "ended" || !shouldReturnToMessagesAfterEnd) return;
+    // eslint-disable-next-line no-console
+    console.info("qring.call.redirect.after_end", { sessionId, route: exitRoute, mode: "audio" });
+    navigate(exitRoute, { replace: true });
+  }, [callState, exitRoute, navigate, sessionId, shouldReturnToMessagesAfterEnd]);
+
   async function handleEndCall() {
     await endCall();
     if (shouldReturnToMessagesAfterEnd) {
@@ -184,7 +191,7 @@ export default function SessionAudioPage() {
       </main>
 
       <VisitorIncomingCallModal
-        open={incomingCall.pending}
+        open={incomingCall.phase === "incoming"}
         hasVideo={incomingCall.hasVideo}
         onAccept={acceptIncomingCall}
         onReject={rejectIncomingCall}

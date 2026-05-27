@@ -63,6 +63,16 @@ const VIDEO_QUALITY_PROFILES = {
     maxBitrate: 180_000
   }
 };
+const CALL_PHASE_ORDER = {
+  idle: 0,
+  incoming: 1,
+  accepting: 2,
+  connected: 3,
+  ending: 4,
+  ended: 5,
+  rejected: 5
+};
+let activeIncomingCallModalSessionId = "";
 
 function normalizeIceServers(servers = []) {
   const seen = new Set();
@@ -121,7 +131,11 @@ function createIncomingCallState() {
     hasVideo: false,
     callSessionId: "",
     visitorId: "",
-    sessionId: ""
+    sessionId: "",
+    phase: "idle",
+    eventId: "",
+    openCount: 0,
+    lastTransitionAt: null
   };
 }
 
@@ -398,6 +412,11 @@ export function useSessionRealtime(sessionId) {
   const acceptIncomingCallRef = useRef(null);
   const emitWithAckRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+  const seenIncomingCallEventIdsRef = useRef(new Set());
+  const seenMessageEventIdsRef = useRef(new Set());
+  const seenCallLifecycleEventIdsRef = useRef(new Set());
+  const syncInProgressRef = useRef(false);
+  const syncGenerationRef = useRef(0);
   const statsSnapshotRef = useRef({
     at: 0,
     audioBytesReceived: 0,
@@ -449,6 +468,74 @@ export function useSessionRealtime(sessionId) {
   function setCallStateSafe(nextState) {
     callStateRef.current = nextState;
     setCallState(nextState);
+  }
+
+  function transitionIncomingCall(phase, patch = {}, reason = "incoming_call_transition") {
+    setIncomingCall((current) => {
+      const currentCallSessionId = String(current.callSessionId || "").trim();
+      const nextCallSessionId = String(patch.callSessionId || current.callSessionId || "").trim();
+      const currentPhaseRank = CALL_PHASE_ORDER[current.phase] ?? 0;
+      const nextPhaseRank = CALL_PHASE_ORDER[phase] ?? 0;
+      const isSameCall = Boolean(nextCallSessionId) && nextCallSessionId === currentCallSessionId;
+      const isResetPhase = ["idle", "ended", "rejected"].includes(phase);
+      if (isSameCall && !isResetPhase && nextPhaseRank < currentPhaseRank) {
+        pushLog("Incoming call backward transition ignored", {
+          reason,
+          from: current.phase || "idle",
+          to: phase,
+          callSessionId: nextCallSessionId || null
+        });
+        return current;
+      }
+      const eventId = String(
+        patch.eventId ||
+        current.eventId ||
+        patch.callSessionId ||
+        current.callSessionId ||
+        ""
+      ).trim();
+      const pending = phase === "incoming" || phase === "accepting";
+      if (phase === "incoming") {
+        if (activeIncomingCallModalSessionId && activeIncomingCallModalSessionId !== sessionId) {
+          pushLog("Incoming call modal lock prevented duplicate modal", {
+            reason,
+            lockedBySessionId: activeIncomingCallModalSessionId,
+            requestedSessionId: sessionId,
+            eventId: eventId || null
+          });
+          return current;
+        }
+        activeIncomingCallModalSessionId = sessionId;
+      } else if (
+        activeIncomingCallModalSessionId === sessionId &&
+        ["accepting", "connected", "ending", "ended", "idle", "rejected"].includes(phase)
+      ) {
+        activeIncomingCallModalSessionId = "";
+      }
+      const next = {
+        ...(phase === "idle" ? createIncomingCallState() : current),
+        ...patch,
+        pending,
+        phase,
+        eventId,
+        openCount:
+          phase === "incoming"
+            ? current.eventId === eventId && current.openCount
+              ? current.openCount
+              : current.openCount + 1
+            : current.openCount,
+        lastTransitionAt: new Date().toISOString()
+      };
+      pushLog("Incoming call state changed", {
+        reason,
+        from: current.phase || "idle",
+        to: phase,
+        eventId: next.eventId || null,
+        callSessionId: next.callSessionId || null,
+        openCount: next.openCount
+      });
+      return next;
+    });
   }
 
   function clearConnectTimers() {
@@ -575,7 +662,7 @@ export function useSessionRealtime(sessionId) {
   async function loadMessages() {
     if (!sessionId) {
       setMessages([]);
-      return;
+      return [];
     }
     try {
       let rows = [];
@@ -586,9 +673,12 @@ export function useSessionRealtime(sessionId) {
       } else {
         rows = await getVisitorSessionMessages(sessionId);
       }
-      setMessages(rows.map((item) => normalizeMessage(item, participantType)));
+      const normalizedRows = rows.map((item) => normalizeMessage(item, participantType));
+      setMessages((prev) => mergeMessages(prev, normalizedRows));
+      return normalizedRows;
     } catch (error) {
       setStatus(error?.message || "Failed to load session messages");
+      return [];
     }
   }
 
@@ -1211,12 +1301,23 @@ export function useSessionRealtime(sessionId) {
       setStatus("Incoming call is no longer available.");
       return;
     }
+    if (incomingCallRef.current.phase === "accepting" || incomingCallRef.current.phase === "connected") {
+      pushLog("Duplicate accept prevented", {
+        eventId: incomingCallRef.current.eventId || snapshot.callSessionId,
+        callSessionId: snapshot.callSessionId
+      });
+      return;
+    }
 
     callSessionRef.current = snapshot.callSessionId;
     callVisitorIdRef.current = snapshot.visitorId || sessionId;
     callModeRef.current = snapshot.hasVideo ? CALL_MEDIA_MODE.VIDEO : CALL_MEDIA_MODE.AUDIO;
     setAcceptedCallMode(snapshot.hasVideo ? CALL_MEDIA_MODE.VIDEO : CALL_MEDIA_MODE.AUDIO);
-    setIncomingCall(createIncomingCallState());
+    transitionIncomingCall("accepting", {
+      ...snapshot,
+      pending: false,
+      eventId: snapshot.eventId || snapshot.callSessionId
+    }, "accept_clicked");
     grantSessionCallAccess(sessionId, "connected");
 
     try {
@@ -1224,7 +1325,8 @@ export function useSessionRealtime(sessionId) {
       await emitWithAck(RealtimeEvent.CALL_ACCEPTED, {
         sessionId,
         callSessionId: snapshot.callSessionId,
-        hasVideo: snapshot.hasVideo
+        hasVideo: snapshot.hasVideo,
+        idempotencyKey: snapshot.eventId || snapshot.callSessionId
       }, "call.accepted");
       pushLog("Call accepted", {
         hasVideo: snapshot.hasVideo
@@ -1250,8 +1352,16 @@ export function useSessionRealtime(sessionId) {
 
       setStatus(snapshot.hasVideo ? "Joining video call..." : "Joining audio call...");
       setCallStateSafe("connecting");
+      transitionIncomingCall("connected", {
+        callSessionId: snapshot.callSessionId,
+        visitorId: snapshot.visitorId || sessionId,
+        sessionId,
+        hasVideo: snapshot.hasVideo,
+        eventId: snapshot.eventId || snapshot.callSessionId
+      }, "accept_confirmed");
     } catch (error) {
       setStatus(error?.message || "Failed to accept incoming call");
+      transitionIncomingCall("ended", {}, "accept_failed");
       cleanupMedia({ preserveCallSession: false });
     }
   }
@@ -1259,13 +1369,20 @@ export function useSessionRealtime(sessionId) {
   async function rejectIncomingCall() {
     if (!incomingCallRef.current.pending) return;
     const activeCall = incomingCallRef.current;
-    setIncomingCall(createIncomingCallState());
+    transitionIncomingCall("rejected", {
+      callSessionId: activeCall.callSessionId,
+      sessionId,
+      visitorId: activeCall.visitorId || sessionId,
+      hasVideo: activeCall.hasVideo,
+      eventId: activeCall.eventId || activeCall.callSessionId
+    }, "reject_clicked");
     clearSessionCallAccess(sessionId);
     if (activeCall.callSessionId) {
       socketRef.current?.emit(RealtimeEvent.CALL_REJECTED, {
         sessionId,
         callSessionId: activeCall.callSessionId,
-        hasVideo: activeCall.hasVideo
+        hasVideo: activeCall.hasVideo,
+        idempotencyKey: activeCall.eventId || activeCall.callSessionId
       });
       pushLog("Call rejected", {
         callSessionId: activeCall.callSessionId
@@ -1285,6 +1402,8 @@ export function useSessionRealtime(sessionId) {
       }
     } catch (error) {
       setStatus(error?.message || "Unable to reject call");
+    } finally {
+      transitionIncomingCall("idle", {}, "reject_cleanup");
     }
   }
 
@@ -1305,6 +1424,7 @@ export function useSessionRealtime(sessionId) {
   }
 
   async function endCall(broadcast = true) {
+    const activeCallSessionId = callSessionRef.current;
     if (broadcast && callSessionRef.current) {
       try {
         await apiRequest("/calls/end", {
@@ -1322,7 +1442,18 @@ export function useSessionRealtime(sessionId) {
     }
     setCallStateSafe("ended");
     clearSessionCallAccess(sessionId);
+    activeIncomingCallModalSessionId = activeIncomingCallModalSessionId === sessionId ? "" : activeIncomingCallModalSessionId;
+    transitionIncomingCall("ended", {
+      callSessionId: activeCallSessionId,
+      sessionId,
+      visitorId: callVisitorIdRef.current || sessionId,
+      eventId: activeCallSessionId
+    }, broadcast ? "local_call_end" : "remote_call_end");
     cleanupMedia({ preserveCallSession: false });
+    pushLog("Call cleanup completed", {
+      broadcast,
+      callSessionId: activeCallSessionId || null
+    });
   }
 
   function sendMessage(text) {
@@ -1348,6 +1479,7 @@ export function useSessionRealtime(sessionId) {
       sessionId,
       text: body,
       clientId: messageId,
+      idempotencyKey: messageId,
       displayName,
       senderType: participantType,
       visitorToken: participantType === "visitor" ? getVisitorSessionToken(sessionId) || undefined : undefined
@@ -1502,10 +1634,13 @@ export function useSessionRealtime(sessionId) {
     emitWithAckRef.current = emitWithAck;
 
     const handleConnect = () => {
+      syncGenerationRef.current += 1;
+      syncInProgressRef.current = true;
       setConnected(true);
       updateNetwork("reconnecting", "Signaling connected");
       pushLog("Socket connected", {
-        socketId: socket.id
+        socketId: socket.id,
+        syncGeneration: syncGenerationRef.current
       });
       void emitWithAck(RealtimeEvent.SESSION_JOIN, {
         sessionId,
@@ -1519,6 +1654,7 @@ export function useSessionRealtime(sessionId) {
     };
 
     const handleDisconnect = () => {
+      syncInProgressRef.current = true;
       setConnected(false);
       setJoined(false);
       updateNetwork("reconnecting", "Signaling disconnected");
@@ -1538,15 +1674,27 @@ export function useSessionRealtime(sessionId) {
       pushLog("Socket reconnect attempt", { attempt });
     };
 
-    const handleSessionJoined = () => {
+    const handleSessionJoined = async () => {
       setJoined(true);
       updateNetwork("good", "Signaling ready");
+      pushLog("Reconnect/session sync started", {
+        sessionId,
+        syncGeneration: syncGenerationRef.current
+      });
+      await loadMessages();
+      syncInProgressRef.current = false;
       pushLog("Session joined", {
-        sessionId
+        sessionId,
+        syncGeneration: syncGenerationRef.current
+      });
+      pushLog("Reconnect/session sync completed", {
+        sessionId,
+        syncGeneration: syncGenerationRef.current
       });
     };
 
     const handleSessionJoinDenied = (payload) => {
+      syncInProgressRef.current = false;
       pushLog("Session join denied", payload || {});
       setStatus(payload?.reason === "invalid_visitor_token" ? "Session access expired. Re-open the invite link." : "Unable to join session.");
     };
@@ -1557,7 +1705,18 @@ export function useSessionRealtime(sessionId) {
         setStatus(String(payload.status));
       }
       const activeCall = payload?.activeCall;
-      if (!activeCall?.callSessionId) return;
+      if (!activeCall?.callSessionId) {
+        if (incomingCallRef.current.pending || isCallInProgress(callStateRef.current)) {
+          pushLog("Session snapshot cleared stale call state", {
+            eventId: incomingCallRef.current.eventId || null,
+            phase: incomingCallRef.current.phase || "idle"
+          });
+        }
+        if (incomingCallRef.current.pending) {
+          transitionIncomingCall("idle", {}, "session_snapshot_no_active_call");
+        }
+        return;
+      }
       const activeCallSessionId = String(activeCall.callSessionId || "");
       const activeCallStatus = String(activeCall.status || "").toLowerCase();
       const shouldSuppressIncomingModal =
@@ -1567,20 +1726,35 @@ export function useSessionRealtime(sessionId) {
       callSessionRef.current = String(activeCall.callSessionId || callSessionRef.current || "");
       callVisitorIdRef.current = String(activeCall.visitorId || callVisitorIdRef.current || sessionId);
       if (activeCallStatus === "ringing" && !canStartCall && !shouldSuppressIncomingModal) {
-        setIncomingCall((current) => current.pending ? current : {
-          pending: true,
+        transitionIncomingCall("incoming", {
           hasVideo: Boolean(activeCall.hasVideo),
           callSessionId: String(activeCall.callSessionId || ""),
           visitorId: String(activeCall.visitorId || sessionId),
-          sessionId
-        });
+          sessionId,
+          eventId: String(activeCall.callSessionId || "")
+        }, "session_snapshot_ringing");
         grantSessionCallAccess(sessionId, "incoming");
+      }
+      if (shouldSuppressIncomingModal) {
+        pushLog("Duplicate snapshot call invite suppressed", {
+          eventId: activeCallSessionId,
+          callState: callStateRef.current
+        });
       }
       if (["active", "ongoing"].includes(String(activeCall.status || ""))) {
         setCallStateSafe("connecting");
+        transitionIncomingCall("connected", {
+          hasVideo: Boolean(activeCall.hasVideo),
+          callSessionId: activeCallSessionId,
+          visitorId: String(activeCall.visitorId || sessionId),
+          sessionId,
+          eventId: activeCallSessionId
+        }, "session_snapshot_active_call");
       }
       pushLog("Session snapshot received", {
         activeCallStatus: activeCall.status || "none",
+        snapshotAuditId: payload?.snapshotAuditId || null,
+        photoUrl: payload?.photoUrl || null,
         participantCount: Array.isArray(payload?.participants) ? payload.participants.length : 0
       });
     };
@@ -1588,6 +1762,18 @@ export function useSessionRealtime(sessionId) {
     const handleChatMessage = (payload) => {
       if (payload?.sessionId !== sessionId) return;
       const normalized = normalizeMessage(payload, participantType);
+      const eventId = String(payload?.eventId || payload?.id || "").trim();
+      if (eventId && seenMessageEventIdsRef.current.has(eventId)) {
+        pushLog("Duplicate chat message suppressed", {
+          eventId,
+          messageId: normalized.id,
+          senderType: normalized.senderType
+        });
+        return;
+      }
+      if (eventId) {
+        seenMessageEventIdsRef.current.add(eventId);
+      }
       setMessages((prev) => {
         const existing = prev.find((item) => item.id === normalized.id);
         if (existing) return prev;
@@ -1653,23 +1839,49 @@ export function useSessionRealtime(sessionId) {
 
     const handleCallInvite = (payload) => {
       if (String(payload?.sessionId || "") !== String(sessionId || "")) return;
+      if (syncInProgressRef.current && payload?.replayed) {
+        pushLog("Replayed invite suppressed during sync", {
+          eventId: payload?.eventId || payload?.callSessionId || null,
+          callSessionId: payload?.callSessionId || null
+        });
+        return;
+      }
+      const eventId = String(payload?.eventId || payload?.callSessionId || "").trim();
       const nextIncoming = {
         pending: true,
         hasVideo: Boolean(payload?.hasVideo || payload?.type === "video"),
         callSessionId: String(payload?.callSessionId || ""),
         visitorId: String(payload?.visitorId || sessionId),
-        sessionId: String(payload?.sessionId || sessionId)
+        sessionId: String(payload?.sessionId || sessionId),
+        eventId,
+        phase: "incoming"
       };
       if (
         nextIncoming.callSessionId &&
         nextIncoming.callSessionId === callSessionRef.current &&
         (hasSessionCallAccess(sessionId) || isCallInProgress(callStateRef.current))
       ) {
+        pushLog("Duplicate incoming call ignored", {
+          eventId,
+          callSessionId: nextIncoming.callSessionId,
+          callState: callStateRef.current
+        });
         return;
+      }
+      if (eventId && seenIncomingCallEventIdsRef.current.has(eventId)) {
+        pushLog("Incoming call event replay ignored", {
+          eventId,
+          callSessionId: nextIncoming.callSessionId,
+          replayed: Boolean(payload?.replayed)
+        });
+        return;
+      }
+      if (eventId) {
+        seenIncomingCallEventIdsRef.current.add(eventId);
       }
       callSessionRef.current = nextIncoming.callSessionId || callSessionRef.current;
       callVisitorIdRef.current = nextIncoming.visitorId || callVisitorIdRef.current;
-      setIncomingCall(nextIncoming);
+      transitionIncomingCall("incoming", nextIncoming, payload?.replayed ? "call_invite_replayed" : "call_invite_received");
       setStatus(nextIncoming.hasVideo ? "Incoming video call" : "Incoming audio call");
       setCallStateSafe("ringing");
       grantSessionCallAccess(sessionId, "incoming");
@@ -1679,6 +1891,7 @@ export function useSessionRealtime(sessionId) {
         callSessionId: nextIncoming.callSessionId
       }, "call.invite.received").catch(() => {});
       pushLog("Incoming call received", {
+        eventId,
         callSessionId: nextIncoming.callSessionId,
         hasVideo: nextIncoming.hasVideo,
         replayed: Boolean(payload?.replayed)
@@ -1688,7 +1901,25 @@ export function useSessionRealtime(sessionId) {
     const handleCallAccepted = async (payload) => {
       if (String(payload?.sessionId || "") !== String(sessionId || "")) return;
       if (String(payload?.callSessionId || "") && payload.callSessionId !== callSessionRef.current) return;
+      const eventId = String(payload?.eventId || payload?.callSessionId || "").trim();
+      if (eventId && seenCallLifecycleEventIdsRef.current.has(`accepted:${eventId}`)) {
+        pushLog("Duplicate call accepted suppressed", {
+          eventId,
+          callSessionId: payload?.callSessionId || callSessionRef.current
+        });
+        return;
+      }
+      if (eventId) {
+        seenCallLifecycleEventIdsRef.current.add(`accepted:${eventId}`);
+      }
       setStatus("Call accepted. Connecting media...");
+      transitionIncomingCall("connected", {
+        callSessionId: String(payload?.callSessionId || callSessionRef.current || ""),
+        sessionId,
+        visitorId: callVisitorIdRef.current || sessionId,
+        hasVideo: callModeRef.current === CALL_MEDIA_MODE.VIDEO,
+        eventId: String(payload?.callSessionId || callSessionRef.current || "")
+      }, "remote_call_accepted");
       pushLog("Remote accepted call", {
         callSessionId: payload?.callSessionId || callSessionRef.current
       });
@@ -1699,7 +1930,24 @@ export function useSessionRealtime(sessionId) {
 
     const handleCallRejected = (payload) => {
       if (String(payload?.sessionId || "") !== String(sessionId || "")) return;
+      const eventId = String(payload?.eventId || payload?.callSessionId || "").trim();
+      if (eventId && seenCallLifecycleEventIdsRef.current.has(`rejected:${eventId}`)) {
+        pushLog("Duplicate call rejected suppressed", {
+          eventId,
+          callSessionId: payload?.callSessionId || callSessionRef.current
+        });
+        return;
+      }
+      if (eventId) {
+        seenCallLifecycleEventIdsRef.current.add(`rejected:${eventId}`);
+      }
       setStatus("Call was rejected");
+      transitionIncomingCall("rejected", {
+        callSessionId: String(payload?.callSessionId || callSessionRef.current || ""),
+        sessionId,
+        visitorId: callVisitorIdRef.current || sessionId,
+        eventId: String(payload?.callSessionId || callSessionRef.current || "")
+      }, "remote_call_rejected");
       pushLog("Remote rejected call", {
         callSessionId: payload?.callSessionId || callSessionRef.current
       });
@@ -1710,7 +1958,24 @@ export function useSessionRealtime(sessionId) {
       if (String(payload?.sessionId || "") !== String(sessionId || "") && String(payload?.callSessionId || "") !== callSessionRef.current) {
         return;
       }
+      const eventId = String(payload?.eventId || payload?.callSessionId || "").trim();
+      if (eventId && seenCallLifecycleEventIdsRef.current.has(`ended:${eventId}`)) {
+        pushLog("Duplicate call ended suppressed", {
+          eventId,
+          callSessionId: payload?.callSessionId || callSessionRef.current
+        });
+        return;
+      }
+      if (eventId) {
+        seenCallLifecycleEventIdsRef.current.add(`ended:${eventId}`);
+      }
       setStatus("Call ended by participant");
+      transitionIncomingCall("ended", {
+        callSessionId: String(payload?.callSessionId || callSessionRef.current || ""),
+        sessionId,
+        visitorId: callVisitorIdRef.current || sessionId,
+        eventId: String(payload?.callSessionId || callSessionRef.current || "")
+      }, "remote_call_ended");
       pushLog("Remote ended call", {
         callSessionId: payload?.callSessionId || callSessionRef.current
       });
@@ -1758,13 +2023,13 @@ export function useSessionRealtime(sessionId) {
         Boolean(readJsonStorage(CALL_ACCEPT_INTENT_KEY));
 
       if (!readyToAnswer) {
-        setIncomingCall((current) => current.pending ? current : {
-          pending: true,
+        transitionIncomingCall("incoming", {
           hasVideo: Boolean(payload?.hasVideo),
           callSessionId: callSessionRef.current,
           visitorId: callVisitorIdRef.current || sessionId,
-          sessionId
-        });
+          sessionId,
+          eventId: String(payload?.callSessionId || callSessionRef.current || "")
+        }, "offer_requires_accept");
         return;
       }
 
@@ -1902,6 +2167,9 @@ export function useSessionRealtime(sessionId) {
       socket.off(RealtimeEvent.WEBRTC_ANSWER, handleWebrtcAnswer);
       socket.off(RealtimeEvent.WEBRTC_ICE, handleWebrtcIce);
       socket.offAny(handleAnyEvent);
+      if (activeIncomingCallModalSessionId === sessionId) {
+        activeIncomingCallModalSessionId = "";
+      }
       releaseRealtimeSocket(env.signalingNamespace ?? "/realtime/signaling", {
         autoConnect: true,
         reconnection: true,
@@ -1909,6 +2177,7 @@ export function useSessionRealtime(sessionId) {
       });
       socketRef.current = null;
       cleanupMedia({ preserveCallSession: false });
+      syncInProgressRef.current = false;
     };
   }, [displayName, participantType, polite, sessionId]);
 
@@ -1959,13 +2228,14 @@ export function useSessionRealtime(sessionId) {
       const acceptIntent = pendingAcceptIntentRef.current;
       pendingAcceptIntentRef.current = null;
       const snapshot = {
-        pending: true,
         hasVideo: Boolean(acceptIntent.hasVideo),
         callSessionId: String(acceptIntent.callSessionId || ""),
         visitorId: String(acceptIntent.visitorId || sessionId),
-        sessionId
+        sessionId,
+        phase: "incoming",
+        eventId: String(acceptIntent.callSessionId || "")
       };
-      setIncomingCall(snapshot);
+      transitionIncomingCall("incoming", snapshot, "accept_intent_replayed");
       void acceptIncomingCallRef.current?.(snapshot);
     }
   }, [canStartCall, connected, joined, sessionId]);
