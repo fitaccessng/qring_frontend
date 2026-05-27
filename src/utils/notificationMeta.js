@@ -117,6 +117,10 @@ export function normalizeNotification(raw, route = "/dashboard/notifications") {
   return {
     ...raw,
     id: String(raw?.id || payload?.id || `${kind}-${createdAt || Date.now()}`),
+    notificationId: String(raw?.notificationId || payload?.notificationId || raw?.id || payload?.id || ""),
+    eventId: String(raw?.eventId || payload?.eventId || raw?.id || payload?.id || ""),
+    idempotencyKey: String(raw?.idempotencyKey || payload?.idempotencyKey || raw?.id || payload?.id || ""),
+    type: String(raw?.type || payload?.type || kind),
     kind,
     title,
     message,

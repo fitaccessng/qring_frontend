@@ -9,6 +9,7 @@ import {
   requestBrowserNotificationPermission
 } from "../services/notificationService";
 import { getDashboardSocket } from "../services/socketClient";
+import { createNotificationManager } from "../services/notificationManager";
 import { useAuth } from "./AuthContext";
 import { normalizeNotification, parseNotificationPayload } from "../utils/notificationMeta";
 import { resolveNotificationRoute } from "../utils/notificationRouting";
@@ -55,8 +56,12 @@ export function NotificationsProvider({ children }) {
     () => (typeof window !== "undefined" && window.Notification ? window.Notification.permission : "unsupported")
   );
   const [pushStatus, setPushStatus] = useState("idle");
+  const [syncing, setSyncing] = useState(false);
+  const [activeIncomingCall, setActiveIncomingCall] = useState(null);
+  const [lastRealtimeEvent, setLastRealtimeEvent] = useState(null);
   const isMountedRef = useRef(false);
   const shownNotificationIdsRef = useRef(new Set());
+  const managerRef = useRef(createNotificationManager());
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -68,6 +73,10 @@ export function NotificationsProvider({ children }) {
   useEffect(() => {
     setItems([]);
     shownNotificationIdsRef.current.clear();
+    managerRef.current.reset();
+    setActiveIncomingCall(null);
+    setLastRealtimeEvent(null);
+    setSyncing(false);
   }, [user?.id, user?.role]);
 
   async function refresh({ silent = false } = {}) {
@@ -76,9 +85,11 @@ export function NotificationsProvider({ children }) {
     try {
       const rows = await getNotifications();
       if (!isMountedRef.current) return [];
-      const next = (Array.isArray(rows) ? rows : [])
-        .map((item) => toNotification(item, user?.role))
-        .sort((left, right) => new Date(right.createdAt || 0).getTime() - new Date(left.createdAt || 0).getTime());
+      const next = managerRef.current
+        .ingestNotificationList(
+          (Array.isArray(rows) ? rows : []).map((item) => toNotification(item, user?.role)),
+          user?.role
+        );
       setItems(next);
       return next;
     } catch {
@@ -131,23 +142,41 @@ export function NotificationsProvider({ children }) {
       rooms.forEach((room) => socket.emit("dashboard.subscribe", { room }));
     };
 
-    const triggerRefresh = () => {
-      refresh({ silent: true });
+    const triggerRefresh = async () => {
+      if (managerRef.current.state.syncing) return;
+      await refresh({ silent: true });
     };
 
-    const onConnect = () => {
+    const onConnect = async () => {
       setConnected(true);
+      setSyncing(true);
+      managerRef.current.beginSync();
       subscribe();
-      triggerRefresh();
+      await refresh({ silent: true });
+      managerRef.current.endSync();
+      if (isMountedRef.current) {
+        setSyncing(false);
+      }
     };
     const onDisconnect = () => setConnected(false);
-    const onNotificationUpdate = () => {
-      triggerRefresh();
+    const onNotificationUpdate = async () => {
+      setLastRealtimeEvent({ eventName: "notifications.updated", at: Date.now() });
+      await triggerRefresh();
     };
     const onAny = (eventName) => {
+      if (managerRef.current.state.syncing) return;
       if (SOCKET_EVENTS.has(eventName) || String(eventName || "").toLowerCase().includes("notification")) {
-        triggerRefresh();
+        void triggerRefresh();
       }
+    };
+    const onIncomingCall = (payload) => {
+      const nextCall = managerRef.current.ingestIncomingCall(payload);
+      if (!nextCall) return;
+      setLastRealtimeEvent({ eventName: "incoming-call", payload: nextCall, at: Date.now() });
+      setActiveIncomingCall(nextCall);
+    };
+    const onVisitorSnapshot = (payload) => {
+      setLastRealtimeEvent({ eventName: "visitor.snapshot", payload: payload?.data ?? payload, at: Date.now() });
     };
 
     socket.on("connect", onConnect);
@@ -155,10 +184,18 @@ export function NotificationsProvider({ children }) {
     socket.on("notification.created", onNotificationUpdate);
     socket.on("notification.updated", onNotificationUpdate);
     socket.on("notifications.updated", onNotificationUpdate);
+    socket.on("incoming-call", onIncomingCall);
+    socket.on("visitor.snapshot", onVisitorSnapshot);
     socket.onAny(onAny);
     if (socket.connected) {
       setConnected(true);
+      setSyncing(true);
+      managerRef.current.beginSync();
       subscribe();
+      void refresh({ silent: true }).finally(() => {
+        managerRef.current.endSync();
+        if (isMountedRef.current) setSyncing(false);
+      });
     }
 
     return () => {
@@ -167,8 +204,11 @@ export function NotificationsProvider({ children }) {
       socket.off("notification.created", onNotificationUpdate);
       socket.off("notification.updated", onNotificationUpdate);
       socket.off("notifications.updated", onNotificationUpdate);
+      socket.off("incoming-call", onIncomingCall);
+      socket.off("visitor.snapshot", onVisitorSnapshot);
       socket.offAny(onAny);
       setConnected(false);
+      setSyncing(false);
     };
   }, [user?.id, user?.role]);
 
@@ -225,8 +265,8 @@ export function NotificationsProvider({ children }) {
   }, [nativeApp, user?.id]);
 
   useEffect(() => {
-    items
-      .filter((item) => item.unread)
+    managerRef.current
+      .getUndisplayedNotifications(items)
       .forEach((item) => {
         if (shownNotificationIdsRef.current.has(item.id)) return;
         shownNotificationIdsRef.current.add(item.id);
@@ -255,6 +295,10 @@ export function NotificationsProvider({ children }) {
     );
     try {
       await markNotificationRead(notificationId);
+      const target = items.find((item) => item.id === notificationId);
+      if (target) {
+        managerRef.current.markDismissed(target);
+      }
     } catch {
       await refresh({ silent: true });
     }
@@ -265,6 +309,7 @@ export function NotificationsProvider({ children }) {
     setItems((current) => current.map((item) => ({ ...item, unread: false, readAt: item.readAt || readAt })));
     try {
       await markAllNotificationsRead();
+      items.forEach((item) => managerRef.current.markDismissed(item));
     } catch {
       await refresh({ silent: true });
     }
@@ -275,6 +320,7 @@ export function NotificationsProvider({ children }) {
     setItems([]);
     try {
       await clearNotifications();
+      previous.forEach((item) => managerRef.current.markDismissed(item));
     } catch {
       setItems(previous);
     }
@@ -286,6 +332,7 @@ export function NotificationsProvider({ children }) {
 
     try {
       await decideVisit(sessionId, action);
+      managerRef.current.invalidateSession(sessionId);
       await handleMarkRead(notification.id);
       await refresh({ silent: true });
       return { ok: true };
@@ -317,6 +364,8 @@ export function NotificationsProvider({ children }) {
       targetIds.map(async (id) => {
         try {
           await markNotificationRead(id);
+          const target = current.find((item) => item.id === id);
+          if (target) managerRef.current.markDismissed(target);
         } catch {
           // Best-effort sync for related request notifications.
         }
@@ -417,7 +466,10 @@ export function NotificationsProvider({ children }) {
       items,
       loading,
       connected,
+      syncing,
       unreadCount,
+      activeIncomingCall,
+      lastRealtimeEvent,
       permission,
       pushStatus,
       nativeApp,
@@ -428,9 +480,13 @@ export function NotificationsProvider({ children }) {
       clearAll: handleClearAll,
       runVisitorAction: handleVisitorAction,
       syncVisitRequestNotifications,
-      enableBrowserAlerts
+      enableBrowserAlerts,
+      dismissIncomingCall: (notification) => {
+        managerRef.current.dismissIncomingCall(notification || activeIncomingCall);
+        setActiveIncomingCall(null);
+      }
     };
-  }, [items, loading, connected, permission, pushStatus, nativeApp]);
+  }, [items, loading, connected, syncing, activeIncomingCall, lastRealtimeEvent, permission, pushStatus, nativeApp]);
 
   return <NotificationsContext.Provider value={value}>{children}</NotificationsContext.Provider>;
 }

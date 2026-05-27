@@ -10,7 +10,7 @@ import { getAccessToken } from "../../services/authStorage";
 import { apiRequest } from "../../services/apiClient";
 import { RealtimeEvent } from "../../services/realtimeEvents";
 import { grantSessionCallAccess } from "../../services/sessionCallAccess";
-import { createRealtimeSocket, getDashboardSocket, releaseRealtimeSocket } from "../../services/socketClient";
+import { createRealtimeSocket, releaseRealtimeSocket } from "../../services/socketClient";
 import { playMessageNotificationSound } from "../../utils/notificationSound";
 import {
   decideVisit,
@@ -24,7 +24,12 @@ import { useNotifications } from "../../state/NotificationsContext";
 export default function HomeownerMessagesPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { unreadCount: globalUnreadCount } = useNotifications();
+  const {
+    unreadCount: globalUnreadCount,
+    activeIncomingCall: managedIncomingCall,
+    dismissIncomingCall,
+    lastRealtimeEvent
+  } = useNotifications();
   const [searchParams, setSearchParams] = useSearchParams();
   const preferredSessionId = (searchParams.get("sessionId") || "").trim();
 
@@ -326,57 +331,45 @@ export default function HomeownerMessagesPage() {
   }, [token, user?.fullName]);
 
   useEffect(() => {
-    if (!token) return;
-    const dashboardSocket = getDashboardSocket();
+    const eventName = String(lastRealtimeEvent?.eventName || "").trim();
+    if (!eventName) return;
 
-    const handleDashboardRefresh = (payload) => {
-      const parsedPayload = typeof payload?.payload === "string" ? safeParsePayload(payload.payload) : payload?.data || payload || {};
-      const focusSessionId = String(parsedPayload?.sessionId || payload?.data?.visitorSessionId || payload?.visitorSessionId || "").trim();
-      void refreshThreads({ focusSessionId }).catch(() => {});
-    };
-
-    const handleVisitorSnapshot = (payload) => {
-      const data = payload?.data || payload || {};
-      const visitorSessionId = String(data?.visitorSessionId || "").trim();
+    if (eventName === "visitor.snapshot") {
+      const data = lastRealtimeEvent?.payload || {};
+      const visitorSessionId = String(data?.visitorSessionId || data?.sessionId || "").trim();
       const nextUrl = String(data?.fileUrl || data?.url || "").trim();
       if (visitorSessionId && nextUrl) {
         setThreads((prev) =>
           prev.map((thread) =>
             thread.id === visitorSessionId
-              ? {
-                  ...thread,
-                  photoUrl: nextUrl,
-                  snapshotAuditId: data?.id || thread.snapshotAuditId
-                }
+              ? { ...thread, photoUrl: nextUrl, snapshotAuditId: data?.id || thread.snapshotAuditId }
               : thread
           )
         );
-        // eslint-disable-next-line no-console
-        console.info("qring.homeowner.snapshot.dashboard_update", {
-          visitorSessionId,
-          snapshotId: data?.id || null,
-          fileUrl: nextUrl
-        });
-      } else {
-        // eslint-disable-next-line no-console
-        console.warn("qring.homeowner.snapshot.missing", {
-          visitorSessionId: visitorSessionId || null,
-          snapshotId: data?.id || null
-        });
       }
       void refreshThreads({ focusSessionId: visitorSessionId }).catch(() => {});
-    };
+      return;
+    }
 
-    dashboardSocket.on("notification.created", handleDashboardRefresh);
-    dashboardSocket.on("notification.updated", handleDashboardRefresh);
-    dashboardSocket.on("visitor.snapshot", handleVisitorSnapshot);
+    if (eventName === "notifications.updated" || eventName === "incoming-call") {
+      const payload = lastRealtimeEvent?.payload || {};
+      const parsedPayload =
+        typeof payload?.payload === "string" ? safeParsePayload(payload.payload) : payload?.data || payload || {};
+      const focusSessionId = String(parsedPayload?.sessionId || payload?.sessionId || payload?.visitorSessionId || "").trim();
+      void refreshThreads({ focusSessionId }).catch(() => {});
+    }
+  }, [lastRealtimeEvent]);
 
-    return () => {
-      dashboardSocket.off("notification.created", handleDashboardRefresh);
-      dashboardSocket.off("notification.updated", handleDashboardRefresh);
-      dashboardSocket.off("visitor.snapshot", handleVisitorSnapshot);
-    };
-  }, [token]);
+  useEffect(() => {
+    if (!managedIncomingCall?.sessionId || !managedIncomingCall?.callSessionId) return;
+    setIncomingCall({
+      pending: true,
+      hasVideo: Boolean(managedIncomingCall?.hasVideo),
+      callSessionId: String(managedIncomingCall?.callSessionId || ""),
+      visitorId: String(managedIncomingCall?.visitorId || managedIncomingCall?.sessionId || ""),
+      sessionId: String(managedIncomingCall?.sessionId || "")
+    });
+  }, [managedIncomingCall]);
 
   useEffect(() => {
     const socket = socketRef.current;
@@ -528,6 +521,7 @@ export default function HomeownerMessagesPage() {
       return next;
     });
     setIncomingCall({ pending: false, hasVideo: false, callSessionId: "", visitorId: "", sessionId: "" });
+    dismissIncomingCall(acceptIntent);
     navigate(`/session/${incomingCall.sessionId}/${mode}`);
   }
 
@@ -762,6 +756,7 @@ export default function HomeownerMessagesPage() {
         onAccept={handleAcceptIncomingCall}
         onReject={() => {
           setIncomingCallBusy(false);
+          dismissIncomingCall(incomingCall);
           setIncomingCall(p => ({ ...p, pending: false }));
         }}
       />

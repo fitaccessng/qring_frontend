@@ -29,7 +29,6 @@ function hasDashboardPayload(payload) {
 export function useDashboardData() {
   const realtimeEnabled = !import.meta.env.DEV || env.enableRealtimeInDev;
   const [connected, setConnected] = useState(false);
-  const [incomingCall, setIncomingCall] = useState(null);
   const [realtimeError, setRealtimeError] = useState("");
   const {
     data: dashboard = initialData,
@@ -77,18 +76,12 @@ export function useDashboardData() {
       if (!mounted) return;
       setConnected(false);
     };
-    const onIncomingCall = (payload) => {
-      if (!mounted) return;
-      setIncomingCall(payload?.data ?? payload ?? null);
-    };
-
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);
     socket.on("connect_error", onConnectError);
     socket.on("dashboard.snapshot", onSnapshot);
     socket.on("dashboard.patch", onPatch);
     socket.on("dashboard.error", onError);
-    socket.on("incoming-call", onIncomingCall);
 
     return () => {
       mounted = false;
@@ -98,7 +91,6 @@ export function useDashboardData() {
       socket.off("dashboard.snapshot", onSnapshot);
       socket.off("dashboard.patch", onPatch);
       socket.off("dashboard.error", onError);
-      socket.off("incoming-call", onIncomingCall);
       closeDashboardSocket();
     };
   }, [realtimeEnabled]);
@@ -110,11 +102,9 @@ export function useDashboardData() {
       refreshing: isFetching,
       error: realtimeError || error?.message || "",
       connected,
-      incomingCall,
-      clearIncomingCall: () => setIncomingCall(null),
       realtimeEnabled,
       refresh: refetch
     }),
-    [dashboard, isLoading, isFetching, realtimeError, error, connected, incomingCall, realtimeEnabled, refetch]
+    [dashboard, isLoading, isFetching, realtimeError, error, connected, realtimeEnabled, refetch]
   );
 }
