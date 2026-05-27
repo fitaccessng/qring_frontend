@@ -9,6 +9,7 @@ import { env } from "../../config/env";
 import { getAccessToken } from "../../services/authStorage";
 import { apiRequest } from "../../services/apiClient";
 import { RealtimeEvent } from "../../services/realtimeEvents";
+import { grantSessionCallAccess } from "../../services/sessionCallAccess";
 import { createRealtimeSocket, getDashboardSocket, releaseRealtimeSocket } from "../../services/socketClient";
 import { playMessageNotificationSound } from "../../utils/notificationSound";
 import {
@@ -38,6 +39,7 @@ export default function HomeownerMessagesPage() {
   const [error, setError] = useState("");
   const [decisionAction, setDecisionAction] = useState("");
   const [callBusy, setCallBusy] = useState("");
+  const [incomingCallBusy, setIncomingCallBusy] = useState(false);
   const [snapshotUrls, setSnapshotUrls] = useState({});
   const [typingByThread, setTypingByThread] = useState({});
   const [mobileView, setMobileView] = useState("list"); // "list" | "chat"
@@ -61,10 +63,7 @@ export default function HomeownerMessagesPage() {
   async function refreshThreads(options = {}) {
     const { focusSessionId = "" } = options;
     const data = await getHomeownerMessages();
-    const normalized = (data || []).map((thread) => ({
-      ...thread,
-      last: previewMessageText(thread?.last || "")
-    }));
+    const normalized = (data || []).map((thread) => normalizeInboxThread(thread));
     const sorted = sortThreadsForInbox(normalized);
     setThreads((prev) => mergeThreadCollections(prev, sorted));
     const nextSelectedId = String(focusSessionId || selectedIdRef.current || "").trim();
@@ -77,6 +76,11 @@ export default function HomeownerMessagesPage() {
   useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
   useEffect(() => { threadsRef.current = threads; }, [threads]);
   useEffect(() => { callBusyRef.current = callBusy; }, [callBusy]);
+  useEffect(() => {
+    if (!incomingCall.pending) {
+      setIncomingCallBusy(false);
+    }
+  }, [incomingCall.pending]);
   useEffect(() => {
     setSnapshotUrls(() => {
       const next = {};
@@ -295,6 +299,7 @@ export default function HomeownerMessagesPage() {
         visitorId: String(payload?.visitorId || incomingSessionId),
         sessionId: incomingSessionId
       });
+      setIncomingCallBusy(false);
     };
 
     socket.on("connect", joinKnownSessions);
@@ -505,9 +510,23 @@ export default function HomeownerMessagesPage() {
   }
 
   function handleAcceptIncomingCall() {
-    if (!incomingCall.sessionId) return;
+    if (!incomingCall.sessionId || !incomingCall.callSessionId || incomingCallBusy) return;
     const mode = incomingCall.hasVideo ? "video" : "audio";
-    window.sessionStorage.setItem("qring_call_accept_intent", JSON.stringify({ ...incomingCall }));
+    setIncomingCallBusy(true);
+    const acceptIntent = {
+      sessionId: incomingCall.sessionId,
+      hasVideo: incomingCall.hasVideo,
+      callSessionId: incomingCall.callSessionId,
+      visitorId: incomingCall.visitorId
+    };
+    grantSessionCallAccess(incomingCall.sessionId, "incoming");
+    window.sessionStorage.setItem("qring_call_accept_intent", JSON.stringify(acceptIntent));
+    setSelectedId(incomingCall.sessionId);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("sessionId", incomingCall.sessionId);
+      return next;
+    });
     setIncomingCall({ pending: false, hasVideo: false, callSessionId: "", visitorId: "", sessionId: "" });
     navigate(`/session/${incomingCall.sessionId}/${mode}`);
   }
@@ -738,9 +757,13 @@ export default function HomeownerMessagesPage() {
       <VisitorIncomingCallModal
         open={incomingCall.pending}
         hasVideo={incomingCall.hasVideo}
+        busy={incomingCallBusy}
         callerLabel="Visitor"
         onAccept={handleAcceptIncomingCall}
-        onReject={() => setIncomingCall(p => ({ ...p, pending: false }))}
+        onReject={() => {
+          setIncomingCallBusy(false);
+          setIncomingCall(p => ({ ...p, pending: false }));
+        }}
       />
     </div>
   );
@@ -759,6 +782,36 @@ function renderMessageBody(text) {
 
 function previewMessageText(text) {
   return text;
+}
+
+function normalizeInboxThread(thread) {
+  const normalized = { ...(thread || {}) };
+  normalized.name =
+    normalized.name ||
+    normalized.visitorFullName ||
+    normalized.visitorName ||
+    normalized.visitor ||
+    "Visitor";
+  normalized.last = previewMessageText(normalized?.last || "");
+  normalized.photoUrl =
+    String(
+      normalized.photoUrl ||
+      normalized.photo_url ||
+      normalized.snapshotUrl ||
+      normalized.snapshot_url ||
+      normalized.snapshot?.fileUrl ||
+      normalized.snapshot?.url ||
+      normalized.requestPayload?.photoUrl ||
+      ""
+    ).trim();
+  normalized.snapshotAuditId = String(
+    normalized.snapshotAuditId ||
+    normalized.snapshot_audit_id ||
+    normalized.snapshot?.id ||
+    normalized.requestPayload?.snapshotAuditId ||
+    ""
+  ).trim();
+  return normalized;
 }
 
 function isLikelyDuplicateMessage(a, b) {
@@ -813,9 +866,22 @@ function upsertThreadPreview(msg, setThreads, selectedId, extra = {}) {
 
 function getThreadSnapshotSrc(thread) {
   if (!thread) return "";
-  const photoUrl = String(thread.photoUrl || "").trim();
+  const photoUrl = String(
+    thread.photoUrl ||
+    thread.photo_url ||
+    thread.snapshotUrl ||
+    thread.snapshot_url ||
+    thread.snapshot?.fileUrl ||
+    thread.snapshot?.url ||
+    ""
+  ).trim();
   if (photoUrl) return photoUrl;
-  const snapshotAuditId = String(thread.snapshotAuditId || "").trim();
+  const snapshotAuditId = String(
+    thread.snapshotAuditId ||
+    thread.snapshot_audit_id ||
+    thread.snapshot?.id ||
+    ""
+  ).trim();
   if (!snapshotAuditId) return "";
   return `/advanced/visitor/snapshots/${encodeURIComponent(snapshotAuditId)}/file`;
 }

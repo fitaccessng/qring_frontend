@@ -49,15 +49,16 @@ export default function SessionMessagePage() {
   async function handleAcceptIncomingCall() {
     if (!incomingCall?.callSessionId || acceptingCall) return;
     setAcceptingCall(true);
+    const snapshot = {
+      sessionId,
+      hasVideo: Boolean(incomingCall.hasVideo),
+      callSessionId: incomingCall.callSessionId,
+      visitorId: incomingCall.visitorId
+    };
     try {
       window.sessionStorage.setItem(
         "qring_call_accept_intent",
-        JSON.stringify({
-          sessionId,
-          hasVideo: incomingCall.hasVideo,
-          callSessionId: incomingCall.callSessionId,
-          visitorId: incomingCall.visitorId
-        })
+        JSON.stringify(snapshot)
       );
       // eslint-disable-next-line no-console
       console.info("qring.visitor.call.accept_clicked", {
@@ -65,9 +66,13 @@ export default function SessionMessagePage() {
         callSessionId: incomingCall.callSessionId,
         hasVideo: incomingCall.hasVideo
       });
-      navigate(`/session/${sessionId}/${incomingCall.hasVideo ? "video" : "audio"}`, { replace: true });
+      await acceptIncomingCall({
+        ...snapshot,
+        phase: "incoming",
+        eventId: incomingCall.eventId || incomingCall.callSessionId
+      });
     } catch {
-      await acceptIncomingCall();
+      navigate(`/session/${sessionId}/${incomingCall.hasVideo ? "video" : "audio"}`, { replace: true });
     } finally {
       window.setTimeout(() => setAcceptingCall(false), 1200);
     }
