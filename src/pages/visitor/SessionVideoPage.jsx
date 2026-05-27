@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   ChevronLeft,
   LockOpen,
@@ -22,7 +22,7 @@ function formatDuration(totalSeconds) {
 export default function SessionVideoPage() {
   const navigate = useNavigate();
   const { sessionId } = useParams();
-  const { unreadCount } = useNotifications();
+  useNotifications();
   const exitRoute = getExitRoute(sessionId);
   const shouldReturnToMessagesAfterEnd = getStoredUserRole() === "homeowner";
   const {
@@ -50,6 +50,7 @@ export default function SessionVideoPage() {
     networkType,
     videoQualityProfile,
     debugOverlayOpen,
+    acceptedCallMode,
     sendQuickResponse,
     startVideoCall,
     toggleMute,
@@ -62,6 +63,7 @@ export default function SessionVideoPage() {
   } = useSessionRealtime(sessionId);
 
   const [seconds, setSeconds] = useState(0);
+  const [acceptingCall, setAcceptingCall] = useState(false);
   const [isPanicActive] = useState(false);
   const showRemoteAsPrimary = callState === "connected" && remoteVideoActive;
   const quickResponses = [
@@ -91,6 +93,39 @@ export default function SessionVideoPage() {
   async function handleEndCall() {
     await endCall();
   }
+
+  async function handleAcceptIncomingCall() {
+    if (!incomingCall?.callSessionId || acceptingCall) return;
+    const nextMode = incomingCall.hasVideo ? "video" : "audio";
+    const snapshot = {
+      sessionId,
+      hasVideo: Boolean(incomingCall.hasVideo),
+      callSessionId: incomingCall.callSessionId,
+      visitorId: incomingCall.visitorId
+    };
+    setAcceptingCall(true);
+    try {
+      window.sessionStorage.setItem("qring_call_accept_intent", JSON.stringify(snapshot));
+      if (nextMode !== "video") {
+        navigate(`/session/${sessionId}/${nextMode}`, { replace: true });
+        return;
+      }
+      await acceptIncomingCall({
+        ...snapshot,
+        phase: "incoming",
+        eventId: incomingCall.eventId || incomingCall.callSessionId
+      });
+    } catch {
+      navigate(`/session/${sessionId}/${nextMode}`, { replace: true });
+    } finally {
+      window.setTimeout(() => setAcceptingCall(false), 1200);
+    }
+  }
+
+  useEffect(() => {
+    if (!acceptedCallMode) return;
+    navigate(`/session/${sessionId}/${acceptedCallMode}`, { replace: true });
+  }, [acceptedCallMode, navigate, sessionId]);
 
   return (
     <div className="bg-neutral-900 font-sans text-white overflow-hidden h-screen w-screen relative select-none">
@@ -226,9 +261,10 @@ export default function SessionVideoPage() {
 
       {/* --- BACKGROUND MODALS & EXPERT ASSISTANTS --- */}
       <VisitorIncomingCallModal
-        open={incomingCall.phase === "incoming"}
+        open={incomingCall.phase === "incoming" && !acceptingCall}
         hasVideo={incomingCall.hasVideo}
-        onAccept={acceptIncomingCall}
+        busy={acceptingCall}
+        onAccept={handleAcceptIncomingCall}
         onReject={rejectIncomingCall}
       />
       <SessionDebugOverlay

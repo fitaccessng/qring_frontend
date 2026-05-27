@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
+import SecureSnapshotImage from "../../components/SecureSnapshotImage";
 import SessionNetworkBadge from "../../components/SessionNetworkBadge";
 import SessionModeNav from "../../components/SessionModeNav";
 import VisitorIncomingCallModal from "../../components/VisitorIncomingCallModal";
@@ -266,7 +267,17 @@ function renderSessionMessage(message) {
     return (
       <div className="space-y-2">
         {message?.snapshotUrl ? (
-          <img src={message.snapshotUrl} alt="Visitor snapshot" className="max-h-56 w-full rounded-xl object-cover" />
+          <SecureSnapshotImage
+            src={message.snapshotUrl}
+            alt="Visitor snapshot"
+            visitorSessionId={message?.sessionId || ""}
+            className="max-h-56 w-full rounded-xl object-cover"
+            fallback={
+              <div className="grid h-40 w-full place-items-center rounded-xl bg-slate-200 text-xs font-semibold text-slate-500">
+                Snapshot unavailable
+              </div>
+            }
+          />
         ) : (
           <div className="grid h-40 w-full place-items-center rounded-xl bg-slate-200 text-xs font-semibold text-slate-500">
             Snapshot unavailable

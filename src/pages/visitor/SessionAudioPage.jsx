@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   ChevronLeft,
   Mic,
@@ -23,7 +23,7 @@ function formatDuration(totalSeconds) {
 export default function SessionAudioPage() {
   const navigate = useNavigate();
   const { sessionId } = useParams();
-  const { unreadCount } = useNotifications();
+  useNotifications();
   const exitRoute = getExitRoute(sessionId);
   const shouldReturnToMessagesAfterEnd = getStoredUserRole() === "homeowner";
   const {
@@ -48,6 +48,7 @@ export default function SessionAudioPage() {
     networkType,
     videoQualityProfile,
     debugOverlayOpen,
+    acceptedCallMode,
     startAudioCall,
     toggleMute,
     toggleSpeaker,
@@ -59,6 +60,7 @@ export default function SessionAudioPage() {
   } = useSessionRealtime(sessionId);
 
   const [connectedSeconds, setConnectedSeconds] = useState(0);
+  const [acceptingCall, setAcceptingCall] = useState(false);
 
   useEffect(() => {
     if (callState !== "connected" || !callConnectedAt) {
@@ -81,6 +83,39 @@ export default function SessionAudioPage() {
   async function handleEndCall() {
     await endCall();
   }
+
+  async function handleAcceptIncomingCall() {
+    if (!incomingCall?.callSessionId || acceptingCall) return;
+    const nextMode = incomingCall.hasVideo ? "video" : "audio";
+    const snapshot = {
+      sessionId,
+      hasVideo: Boolean(incomingCall.hasVideo),
+      callSessionId: incomingCall.callSessionId,
+      visitorId: incomingCall.visitorId
+    };
+    setAcceptingCall(true);
+    try {
+      window.sessionStorage.setItem("qring_call_accept_intent", JSON.stringify(snapshot));
+      if (nextMode !== "audio") {
+        navigate(`/session/${sessionId}/${nextMode}`, { replace: true });
+        return;
+      }
+      await acceptIncomingCall({
+        ...snapshot,
+        phase: "incoming",
+        eventId: incomingCall.eventId || incomingCall.callSessionId
+      });
+    } catch {
+      navigate(`/session/${sessionId}/${nextMode}`, { replace: true });
+    } finally {
+      window.setTimeout(() => setAcceptingCall(false), 1200);
+    }
+  }
+
+  useEffect(() => {
+    if (!acceptedCallMode) return;
+    navigate(`/session/${sessionId}/${acceptedCallMode}`, { replace: true });
+  }, [acceptedCallMode, navigate, sessionId]);
 
   return (
     <div className="h-screen w-screen bg-gradient-to-b from-neutral-800 to-neutral-950 font-sans text-white overflow-hidden relative select-none flex flex-col justify-between p-6">
@@ -210,9 +245,10 @@ export default function SessionAudioPage() {
 
       {/* --- BACKGROUND CALL CONTROL MODALS & HOOK OVERLAYS --- */}
       <VisitorIncomingCallModal
-        open={incomingCall.phase === "incoming"}
+        open={incomingCall.phase === "incoming" && !acceptingCall}
         hasVideo={incomingCall.hasVideo}
-        onAccept={acceptIncomingCall}
+        busy={acceptingCall}
+        onAccept={handleAcceptIncomingCall}
         onReject={rejectIncomingCall}
       />
       <SessionDebugOverlay
