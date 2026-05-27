@@ -80,9 +80,6 @@ export default function SessionAudioPage() {
 
   async function handleEndCall() {
     await endCall();
-    if (shouldReturnToMessagesAfterEnd) {
-      navigate(exitRoute, { replace: true });
-    }
   }
 
   return (

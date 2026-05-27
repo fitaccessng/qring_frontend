@@ -197,17 +197,26 @@ function isMineBySenderType(senderType, participantType) {
 }
 
 function normalizeMessage(payload, participantType) {
+  const senderRole = String(payload?.senderRole || payload?.senderType || "visitor").toLowerCase();
   return {
-    id: payload?.id || `${payload?.at || Date.now()}-${Math.random()}`,
+    id: payload?.messageId || payload?.id || `${payload?.at || Date.now()}-${Math.random()}`,
+    messageId: payload?.messageId || payload?.id || "",
     clientId: payload?.clientId || "",
     sessionId: payload?.sessionId || "",
     text: String(payload?.text || ""),
+    messageType: payload?.messageType || "text",
+    snapshotUrl: String(payload?.snapshotUrl || payload?.photoUrl || "").trim(),
+    senderRole,
     displayName: payload?.displayName || "Participant",
-    senderType: payload?.senderType || "visitor",
-    at: payload?.at || new Date().toISOString(),
+    senderType: senderRole,
+    visitorName: payload?.visitorName || "",
+    visitorPhone: payload?.visitorPhone || "",
+    purpose: payload?.purpose || "",
+    doorId: payload?.doorId || "",
+    at: payload?.at || payload?.timestamp || new Date().toISOString(),
     persisted: payload?.persisted !== false,
     failed: Boolean(payload?.failed),
-    mine: isMineBySenderType(payload?.senderType, participantType)
+    mine: isMineBySenderType(senderRole, participantType)
   };
 }
 
@@ -1250,6 +1259,9 @@ export function useSessionRealtime(sessionId) {
           })
         });
         const data = response?.data ?? null;
+        if (String(data?.status || "").toLowerCase() === "ok" || String(data?.state || "").toLowerCase() === "connecting") {
+          setCallStateSafe("connecting");
+        }
         callSessionRef.current = data?.callSessionId || callSessionRef.current;
         callVisitorIdRef.current = data?.visitorId || callVisitorIdRef.current || sessionId;
         currentRtcConfigRef.current = data?.rtcConfig || currentRtcConfigRef.current;
@@ -1313,6 +1325,8 @@ export function useSessionRealtime(sessionId) {
     callVisitorIdRef.current = snapshot.visitorId || sessionId;
     callModeRef.current = snapshot.hasVideo ? CALL_MEDIA_MODE.VIDEO : CALL_MEDIA_MODE.AUDIO;
     setAcceptedCallMode(snapshot.hasVideo ? CALL_MEDIA_MODE.VIDEO : CALL_MEDIA_MODE.AUDIO);
+    setCallStateSafe("connecting");
+    setStatus(snapshot.hasVideo ? "Accepting video call..." : "Accepting audio call...");
     transitionIncomingCall("accepting", {
       ...snapshot,
       pending: false,
@@ -1351,7 +1365,6 @@ export function useSessionRealtime(sessionId) {
       }
 
       setStatus(snapshot.hasVideo ? "Joining video call..." : "Joining audio call...");
-      setCallStateSafe("connecting");
       transitionIncomingCall("connected", {
         callSessionId: snapshot.callSessionId,
         visitorId: snapshot.visitorId || sessionId,
@@ -1361,6 +1374,7 @@ export function useSessionRealtime(sessionId) {
       }, "accept_confirmed");
     } catch (error) {
       setStatus(error?.message || "Failed to accept incoming call");
+      setCallStateSafe("ended");
       transitionIncomingCall("ended", {}, "accept_failed");
       cleanupMedia({ preserveCallSession: false });
     }
@@ -1856,6 +1870,14 @@ export function useSessionRealtime(sessionId) {
         eventId,
         phase: "incoming"
       };
+      if (!["idle", "incoming"].includes(String(incomingCallRef.current.phase || "idle"))) {
+        pushLog("Incoming call ignored because phase already advanced", {
+          eventId,
+          callSessionId: nextIncoming.callSessionId,
+          currentPhase: incomingCallRef.current.phase || "idle"
+        });
+        return;
+      }
       if (
         nextIncoming.callSessionId &&
         nextIncoming.callSessionId === callSessionRef.current &&

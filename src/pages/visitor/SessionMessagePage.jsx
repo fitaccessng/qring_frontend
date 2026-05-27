@@ -177,7 +177,7 @@ export default function SessionMessagePage() {
                       }`}
                     >
                       <p className={`text-[11px] font-semibold ${message.mine ? "text-slate-200" : "text-slate-500"}`}>{message.displayName}</p>
-                      {renderMessageBody(message.text)}
+                      {renderSessionMessage(message)}
                       {message.mine && message.failed ? (
                         <div className="mt-1 flex items-center justify-between gap-2 text-[10px]">
                           <span className="rounded bg-amber-200/90 px-2 py-0.5 font-semibold text-amber-900">
@@ -259,6 +259,28 @@ function getStoredUserRole() {
 function renderMessageBody(text) {
   if (typeof text !== "string") return <p>{String(text || "")}</p>;
   return <p>{text}</p>;
+}
+
+function renderSessionMessage(message) {
+  if (String(message?.messageType || "text") === "visitor_snapshot") {
+    return (
+      <div className="space-y-2">
+        {message?.snapshotUrl ? (
+          <img src={message.snapshotUrl} alt="Visitor snapshot" className="max-h-56 w-full rounded-xl object-cover" />
+        ) : (
+          <div className="grid h-40 w-full place-items-center rounded-xl bg-slate-200 text-xs font-semibold text-slate-500">
+            Snapshot unavailable
+          </div>
+        )}
+        <div className="space-y-1 text-xs">
+          {message?.visitorName ? <p>Name: {message.visitorName}</p> : null}
+          {message?.visitorPhone ? <p>Phone: {message.visitorPhone}</p> : null}
+          {message?.purpose ? <p>Purpose: {message.purpose}</p> : null}
+        </div>
+      </div>
+    );
+  }
+  return renderMessageBody(message?.text);
 }
 
 function PermissionPill({ permission }) {

@@ -177,11 +177,18 @@ export default function HomeownerMessagesPage() {
       const incomingSessionId = payload?.sessionId;
       if (!incomingSessionId) return;
       const normalized = {
-        id: payload?.id ?? `${payload?.at || Date.now()}-${Math.random()}`,
+        id: payload?.messageId || payload?.id || `${payload?.at || Date.now()}-${Math.random()}`,
+        messageId: payload?.messageId || payload?.id || "",
         sessionId: incomingSessionId,
         text: payload?.text || "",
-        senderType: payload?.senderType || "visitor",
+        messageType: payload?.messageType || "text",
+        snapshotUrl: payload?.snapshotUrl || payload?.photoUrl || "",
+        senderRole: payload?.senderRole || payload?.senderType || "visitor",
+        senderType: payload?.senderRole || payload?.senderType || "visitor",
         displayName: payload?.displayName || "Participant",
+        visitorName: payload?.visitorName || "",
+        visitorPhone: payload?.visitorPhone || "",
+        purpose: payload?.purpose || "",
         at: payload?.at || new Date().toISOString()
       };
       setMessagesByThread((prev) => {
@@ -671,13 +678,13 @@ export default function HomeownerMessagesPage() {
                   </div>
                 ) : (
                   selectedMessages.map((msg, i) => (
-                    <div key={i} className={`flex ${msg.senderType === 'homeowner' ? 'justify-end' : 'justify-start'}`}>
+                    <div key={msg.messageId || msg.id || i} className={`flex ${msg.senderType === 'homeowner' ? 'justify-end' : 'justify-start'}`}>
                       <div className={`max-w-[85%] p-3.5 rounded-xl text-sm ${
                         msg.senderType === 'homeowner'
                         ? 'bg-indigo-600 text-white rounded-tr-none font-medium shadow-xs'
                         : 'bg-white text-slate-700 rounded-tl-none border border-slate-200/70 shadow-xs'
                       }`}>
-                        {renderMessageBody(msg.text)}
+                        {renderThreadMessageBody(msg)}
                         <p className={`text-[8px] mt-1.5 font-bold uppercase tracking-wider text-right ${msg.senderType === 'homeowner' ? 'text-indigo-200' : 'text-slate-400'}`}>
                           {formatClockTime(msg.at)}
                         </p>
@@ -773,6 +780,32 @@ function formatClockTime(v) {
 // Ensure bolding rules don't match unstyled strings improperly
 function renderMessageBody(text) {
   return <p className="whitespace-pre-wrap break-words leading-relaxed font-medium">{text}</p>;
+}
+
+function renderThreadMessageBody(message) {
+  if (String(message?.messageType || "text") === "visitor_snapshot") {
+    const snapshotUrl = String(message?.snapshotUrl || "").trim();
+    return (
+      <div className="space-y-2">
+        {snapshotUrl ? (
+          <SecureSnapshotImage
+            src={snapshotUrl}
+            alt="Visitor snapshot"
+            className="max-h-56 w-full rounded-lg object-cover"
+            fallback={<div className="grid h-40 w-full place-items-center rounded-lg bg-slate-200 text-xs font-bold text-slate-500">Snapshot unavailable</div>}
+          />
+        ) : (
+          <div className="grid h-40 w-full place-items-center rounded-lg bg-slate-200 text-xs font-bold text-slate-500">Snapshot unavailable</div>
+        )}
+        <div className="space-y-1 text-[11px] text-slate-500">
+          {message?.visitorName ? <p>Name: <span className="font-semibold text-slate-700">{message.visitorName}</span></p> : null}
+          {message?.visitorPhone ? <p>Phone: <span className="font-semibold text-slate-700">{message.visitorPhone}</span></p> : null}
+          {message?.purpose ? <p>Purpose: <span className="font-semibold text-slate-700">{message.purpose}</span></p> : null}
+        </div>
+      </div>
+    );
+  }
+  return renderMessageBody(message?.text);
 }
 
 function previewMessageText(text) {

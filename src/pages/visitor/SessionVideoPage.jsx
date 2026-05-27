@@ -90,9 +90,6 @@ export default function SessionVideoPage() {
 
   async function handleEndCall() {
     await endCall();
-    if (shouldReturnToMessagesAfterEnd) {
-      navigate(exitRoute, { replace: true });
-    }
   }
 
   return (
