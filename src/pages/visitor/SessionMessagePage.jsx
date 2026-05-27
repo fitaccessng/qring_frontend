@@ -232,7 +232,7 @@ export default function SessionMessagePage() {
       </div>
 
       <VisitorIncomingCallModal
-        open={incomingCall.pending && !canStartCall}
+        open={incomingCall.pending && !canStartCall && !acceptingCall}
         hasVideo={incomingCall.hasVideo}
         busy={acceptingCall}
         onAccept={handleAcceptIncomingCall}

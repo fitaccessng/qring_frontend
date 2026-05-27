@@ -25,6 +25,7 @@ export default function SessionAudioPage() {
   const { sessionId } = useParams();
   const { unreadCount } = useNotifications();
   const exitRoute = getExitRoute(sessionId);
+  const shouldReturnToMessagesAfterEnd = getStoredUserRole() === "homeowner";
   const {
     connected,
     joined,
@@ -69,6 +70,13 @@ export default function SessionAudioPage() {
     }, 1000);
     return () => window.clearInterval(timer);
   }, [callConnectedAt, callState]);
+
+  async function handleEndCall() {
+    await endCall();
+    if (shouldReturnToMessagesAfterEnd) {
+      navigate(exitRoute, { replace: true });
+    }
+  }
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#eff6ff_0,_#f8fafc_38%,_#e2e8f0_100%)] font-sans text-slate-900 antialiased flex flex-col">
@@ -164,7 +172,7 @@ export default function SessionAudioPage() {
               >
                 {callState === "connected" ? "Connected" : "Start Call"}
               </button>
-              <button type="button" onClick={endCall} className="group flex flex-col items-center outline-none">
+              <button type="button" onClick={handleEndCall} className="group flex flex-col items-center outline-none">
                 <div className="w-20 h-20 bg-gradient-to-br from-rose-500 to-rose-700 rounded-full flex items-center justify-center text-white shadow-[0_12px_40px_rgba(244,63,94,0.3)] active:scale-90 transition-all duration-300">
                   <PhoneOff size={32} strokeWidth={2.5} className="rotate-[135deg]" />
                 </div>
@@ -234,6 +242,15 @@ function getExitRoute(sessionId) {
     return `/dashboard/homeowner/messages?sessionId=${encodeURIComponent(sessionId)}`;
   } catch {
     return `/session/${sessionId}/message`;
+  }
+}
+
+function getStoredUserRole() {
+  try {
+    const raw = window.sessionStorage.getItem("qring_user") || window.localStorage.getItem("qring_user") || "null";
+    return String(JSON.parse(raw)?.role || "").toLowerCase();
+  } catch {
+    return "";
   }
 }
 

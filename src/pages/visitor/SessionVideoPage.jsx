@@ -25,6 +25,7 @@ export default function SessionVideoPage() {
   const { sessionId } = useParams();
   const { unreadCount } = useNotifications();
   const exitRoute = getExitRoute(sessionId);
+  const shouldReturnToMessagesAfterEnd = getStoredUserRole() === "homeowner";
   const {
     connected,
     joined,
@@ -80,6 +81,13 @@ export default function SessionVideoPage() {
     }, 1000);
     return () => window.clearInterval(timer);
   }, [callConnectedAt, callState]);
+
+  async function handleEndCall() {
+    await endCall();
+    if (shouldReturnToMessagesAfterEnd) {
+      navigate(exitRoute, { replace: true });
+    }
+  }
 
   return (
     <div className="bg-slate-950 font-sans text-slate-900 overflow-hidden h-screen w-screen">
@@ -186,7 +194,7 @@ export default function SessionVideoPage() {
 
           <button
             type="button"
-            onClick={callState === "connected" ? endCall : startVideoCall}
+            onClick={callState === "connected" ? handleEndCall : startVideoCall}
             disabled={Boolean(featureError) || (!canStartCall && callState !== "connected")}
             className="w-20 h-20 rounded-full bg-rose-600 flex items-center justify-center text-white shadow-[0_0_40px_rgba(225,29,72,0.4)] active:scale-90 transition-all disabled:opacity-45"
           >
@@ -250,6 +258,15 @@ function getExitRoute(sessionId) {
     return `/dashboard/homeowner/messages?sessionId=${encodeURIComponent(sessionId)}`;
   } catch {
     return `/session/${sessionId}/message`;
+  }
+}
+
+function getStoredUserRole() {
+  try {
+    const raw = window.sessionStorage.getItem("qring_user") || window.localStorage.getItem("qring_user") || "null";
+    return String(JSON.parse(raw)?.role || "").toLowerCase();
+  } catch {
+    return "";
   }
 }
 

@@ -38,6 +38,7 @@ export default function HomeownerMessagesPage() {
   const [error, setError] = useState("");
   const [decisionAction, setDecisionAction] = useState("");
   const [callBusy, setCallBusy] = useState("");
+  const [snapshotUrls, setSnapshotUrls] = useState({});
   const [typingByThread, setTypingByThread] = useState({});
   const [mobileView, setMobileView] = useState("list"); // "list" | "chat"
   const [incomingCall, setIncomingCall] = useState({
@@ -60,6 +61,16 @@ export default function HomeownerMessagesPage() {
   useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
   useEffect(() => { threadsRef.current = threads; }, [threads]);
   useEffect(() => { callBusyRef.current = callBusy; }, [callBusy]);
+  useEffect(() => {
+    setSnapshotUrls(() => {
+      const next = {};
+      threads.forEach((thread) => {
+        const snapshotSrc = getThreadSnapshotSrc(thread);
+        if (snapshotSrc) next[thread.id] = snapshotSrc;
+      });
+      return next;
+    });
+  }, [threads]);
 
   // Keep chat scrolled down smoothly
   useEffect(() => {
@@ -492,10 +503,10 @@ export default function HomeownerMessagesPage() {
               {/* Context-Aware Header Frame with Impeccable Image Snapshots Rendering */}
               <div className="p-4 border-b border-slate-100 bg-slate-50/60 flex items-center justify-between gap-4 flex-shrink-0">
                 <div className="flex items-center gap-3.5 min-w-0">
-                  {heroThread?.photoUrl ? (
+                  {heroThread?.id && snapshotUrls[heroThread.id] ? (
                     <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl overflow-hidden border border-slate-200 bg-white flex-shrink-0 shadow-sm">
                       <SecureSnapshotImage
-                        src={heroThread.photoUrl}
+                        src={snapshotUrls[heroThread.id]}
                         alt="Secure entryway capture pass snapshot"
                         className="w-full h-full object-cover"
                         fallback={<div className="grid h-full w-full place-items-center bg-slate-200 text-[10px] font-black text-slate-400">N/A</div>}
@@ -639,7 +650,10 @@ function previewMessageText(text) {
 function isLikelyDuplicateMessage(a, b) {
   if (!a || !b) return false;
   if (a.id && b.id && a.id === b.id) return true;
+  if (a.clientId && b.clientId && a.clientId === b.clientId) return true;
   if ((a.sessionId || "") !== (b.sessionId || "")) return false;
+  if (String(a.senderType || "").toLowerCase() !== String(b.senderType || "").toLowerCase()) return false;
+  if (String(a.text || "").trim() !== String(b.text || "").trim()) return false;
   const left = new Date(a.at).getTime();
   const right = new Date(b.at).getTime();
   return Math.abs(left - right) < 8000;
@@ -681,4 +695,13 @@ function upsertThreadPreview(msg, setThreads, selectedId, extra = {}) {
     }
     return [{ id: msg.sessionId, last: msg.text, time: msg.at, unread: 1, ...extra }, ...prev];
   });
+}
+
+function getThreadSnapshotSrc(thread) {
+  if (!thread) return "";
+  const photoUrl = String(thread.photoUrl || "").trim();
+  if (photoUrl) return photoUrl;
+  const snapshotAuditId = String(thread.snapshotAuditId || "").trim();
+  if (!snapshotAuditId) return "";
+  return `/advanced/visitor/snapshots/${encodeURIComponent(snapshotAuditId)}/file`;
 }

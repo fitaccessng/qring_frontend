@@ -125,6 +125,10 @@ function createIncomingCallState() {
   };
 }
 
+function isCallInProgress(state) {
+  return ["connecting", "ringing", "connected"].includes(String(state || "").toLowerCase());
+}
+
 function createEmptyStream() {
   if (typeof MediaStream !== "undefined") {
     return new MediaStream();
@@ -1554,9 +1558,15 @@ export function useSessionRealtime(sessionId) {
       }
       const activeCall = payload?.activeCall;
       if (!activeCall?.callSessionId) return;
+      const activeCallSessionId = String(activeCall.callSessionId || "");
+      const activeCallStatus = String(activeCall.status || "").toLowerCase();
+      const shouldSuppressIncomingModal =
+        activeCallSessionId &&
+        activeCallSessionId === callSessionRef.current &&
+        (hasSessionCallAccess(sessionId) || isCallInProgress(callStateRef.current));
       callSessionRef.current = String(activeCall.callSessionId || callSessionRef.current || "");
       callVisitorIdRef.current = String(activeCall.visitorId || callVisitorIdRef.current || sessionId);
-      if (activeCall.status === "ringing" && !canStartCall) {
+      if (activeCallStatus === "ringing" && !canStartCall && !shouldSuppressIncomingModal) {
         setIncomingCall((current) => current.pending ? current : {
           pending: true,
           hasVideo: Boolean(activeCall.hasVideo),
@@ -1651,10 +1661,9 @@ export function useSessionRealtime(sessionId) {
         sessionId: String(payload?.sessionId || sessionId)
       };
       if (
-        canStartCall &&
         nextIncoming.callSessionId &&
         nextIncoming.callSessionId === callSessionRef.current &&
-        ["connecting", "ringing", "connected"].includes(callStateRef.current)
+        (hasSessionCallAccess(sessionId) || isCallInProgress(callStateRef.current))
       ) {
         return;
       }
