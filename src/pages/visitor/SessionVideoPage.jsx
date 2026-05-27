@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
-  Bell,
   ChevronLeft,
   LockOpen,
   Mic,
@@ -97,10 +96,11 @@ export default function SessionVideoPage() {
   }
 
   return (
-    <div className="bg-slate-950 font-sans text-slate-900 overflow-hidden h-screen w-screen">
+    <div className="bg-neutral-900 font-sans text-white overflow-hidden h-screen w-screen relative select-none">
       <audio ref={remoteAudioRef} autoPlay playsInline />
 
-      <div className="fixed inset-0 z-0">
+      {/* --- BACKGROUND / REMOTE VIDEO STREAM --- */}
+      <div className="absolute inset-0 z-0 bg-neutral-950">
         <video
           ref={remoteVideoRef}
           autoPlay
@@ -108,40 +108,45 @@ export default function SessionVideoPage() {
           muted
           className={`w-full h-full object-cover transition-opacity duration-300 ${showRemoteAsPrimary ? "opacity-100" : "opacity-0"}`}
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/60" />
+        {/* Dark overlays mimicking WhatsApp's subtle UI readability shadows */}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/60 pointer-events-none" />
       </div>
 
-      <header className="fixed top-0 w-full z-[100] bg-black/25 backdrop-blur-md border-b border-white/10 px-6 py-4">
-        <div className="max-w-4xl mx-auto flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <button
-              type="button"
-              onClick={() => navigate(exitRoute)}
-              className="p-2.5 bg-white/10 text-white rounded-full hover:bg-white/20 transition-colors"
-            >
-              <ChevronLeft size={20} />
-            </button>
-            <div>
-              <h1 className="font-bold text-lg text-white leading-none">Live Video Call</h1>
-              <p className="text-[10px] text-white/70 font-bold uppercase tracking-widest mt-1">
-                {isPanicActive ? "Emergency active" : connected ? "Signal online" : "Signal reconnecting"}
-              </p>
-            </div>
+      {/* --- FLOATING WHATSAPP TOP HEADER --- */}
+      <header className="absolute top-0 inset-x-0 z-50 flex items-center justify-between p-4 bg-gradient-to-b from-black/50 to-transparent">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => navigate(exitRoute)}
+            className="p-1 text-white/90 hover:text-white transition-colors"
+          >
+            <ChevronLeft size={28} />
+          </button>
+          <div>
+            <h1 className="font-medium text-base text-white tracking-wide">
+              {isPanicActive ? "🚨 Emergency Call" : "Live Video Call"}
+            </h1>
+            <p className="text-xs text-white/70 mt-0.5 font-light">
+              {callState === "connected" ? formatDuration(seconds) : formatCallStatus(callState)}
+            </p>
           </div>
-          <Link to="/dashboard/notifications" className="relative p-2.5 bg-white/10 text-white rounded-full">
-            <Bell size={18} />
-            {unreadCount > 0 ? (
-              <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-slate-950" />
-            ) : null}
-          </Link>
         </div>
+        
+        {/* Hidden button to toggle the debug overlay when needed without ruining the minimal UI */}
+        <button 
+          onClick={() => setDebugOverlayOpen(prev => !prev)}
+          className="text-white/20 text-xs px-2 py-1 absolute right-16 top-6"
+        >
+          •
+        </button>
       </header>
 
+      {/* --- WHATSAPP FLOATING LOCAL CAMERA PIP --- */}
       <div
-        className={`fixed overflow-hidden border-white/20 shadow-2xl z-40 bg-slate-800 transition-all duration-300 ${
+        className={`absolute overflow-hidden border border-white/10 shadow-xl z-40 bg-neutral-800 rounded-lg transition-all duration-300 ${
           showRemoteAsPrimary
-            ? "top-28 right-6 w-28 md:w-32 aspect-[3/4] rounded-2xl border-2"
-            : "inset-0 w-full h-full border-0 rounded-none"
+            ? "top-20 right-4 w-28 aspect-[3/4]"
+            : "inset-0 w-full h-full rounded-none border-0"
         }`}
       >
         <video
@@ -153,86 +158,76 @@ export default function SessionVideoPage() {
         />
       </div>
 
-      <main className="fixed bottom-24 left-0 right-0 z-50 p-6 flex flex-col items-center gap-5">
-        <div className="bg-black/40 backdrop-blur-md px-4 py-1.5 rounded-full border border-white/10 flex items-center gap-2 mb-2">
-          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-white text-[10px] font-black uppercase tracking-widest tabular-nums">
-            Live • {callState === "connected" ? formatDuration(seconds) : formatCallStatus(callState)}
-          </span>
-        </div>
-
-        <div className="w-full max-w-lg rounded-[2rem] border border-white/10 bg-black/35 p-4 text-white shadow-2xl backdrop-blur-xl">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-white/60">Call Status</p>
-              <p className="mt-1 text-lg font-semibold">{networkDetail || formatCallStatus(callState)}</p>
-            </div>
-            <div className="flex flex-wrap gap-2 text-[10px] font-black uppercase tracking-[0.18em]">
-              <span className="rounded-full bg-white/10 px-3 py-1">{joined ? "Room joined" : "Joining room"}</span>
-              <span className="rounded-full bg-white/10 px-3 py-1">{networkQualityLabel(networkQuality)}</span>
-              <span className="rounded-full bg-white/10 px-3 py-1">{formatLaunchStage(callLaunchStage)}</span>
-            </div>
+      {/* --- FLOATING BOTTOM ACTION PANEL --- */}
+      <main className="absolute bottom-0 inset-x-0 z-50 p-6 flex flex-col items-center gap-6 bg-gradient-to-t from-black/70 via-black/40 to-transparent">
+        
+        {/* Errors & Status notifications pushed cleanly right above controls */}
+        {featureError || status ? (
+          <div className="w-full max-w-xs text-center bg-black/60 backdrop-blur-md py-2 px-4 rounded-xl text-xs text-rose-300 border border-white/5 animate-pulse">
+            {featureError || status}
           </div>
-          {featureError ? <p className="mt-3 text-sm font-bold text-rose-200">{featureError}</p> : null}
-          {status ? <p className="mt-3 rounded-2xl border border-amber-300/20 bg-amber-400/10 px-4 py-3 text-sm font-semibold text-amber-100">{status}</p> : null}
-        </div>
+        ) : null}
 
-        <div className="flex flex-wrap justify-center gap-2 max-w-sm">
+        {/* Quick Responses Pill Pack */}
+        <div className="flex flex-wrap justify-center gap-2 max-w-sm w-full">
           {quickResponses.map((res, i) => (
             <button
               key={i}
               type="button"
               onClick={() => sendQuickResponse(res.key)}
-              className="px-4 py-2 bg-white/10 backdrop-blur-xl border border-white/10 rounded-full text-white font-bold text-[11px] uppercase tracking-wider hover:bg-white/20 transition-all active:scale-95"
+              className="px-4 py-2 bg-neutral-900/80 backdrop-blur-md border border-white/10 rounded-full text-white/95 font-medium text-xs transition-all active:scale-95 shadow-sm hover:bg-neutral-800"
             >
-              {res.icon ? <span className="flex items-center gap-2">{res.icon} {res.label}</span> : `"${res.label}"`}
+              {res.icon ? <span className="flex items-center gap-1.5">{res.icon} {res.label}</span> : res.label}
             </button>
           ))}
         </div>
 
-        <div className="flex gap-6 items-center justify-center w-full max-w-md">
+        {/* Action Controls Bar */}
+        <div className="flex gap-8 items-center justify-center w-full max-w-xs">
+          {/* Mute Button */}
           <button
             type="button"
             onClick={toggleMute}
-            className={`w-14 h-14 rounded-full flex items-center justify-center backdrop-blur-xl border border-white/10 transition-all ${muted ? "bg-rose-500 text-white" : "bg-white/10 text-white hover:bg-white/20"}`}
+            className={`w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-md transition-all ${
+              muted 
+                ? "bg-white text-neutral-900" 
+                : "bg-neutral-900/70 text-white hover:bg-neutral-800"
+            }`}
           >
             {muted ? <MicOff size={22} /> : <Mic size={22} />}
           </button>
 
+          {/* Call Trigger (Red Circle End Button) */}
           <button
             type="button"
             onClick={callState === "connected" ? handleEndCall : startVideoCall}
             disabled={Boolean(featureError) || (!canStartCall && callState !== "connected")}
-            className="w-20 h-20 rounded-full bg-rose-600 flex items-center justify-center text-white shadow-[0_0_40px_rgba(225,29,72,0.4)] active:scale-90 transition-all disabled:opacity-45"
+            className={`w-16 h-16 rounded-full flex items-center justify-center text-white shadow-lg active:scale-90 transition-all disabled:opacity-40 ${
+              callState === "connected" ? "bg-rose-600" : "bg-emerald-600 animate-bounce"
+            }`}
           >
-            <PhoneOff size={32} strokeWidth={2.5} className="rotate-[135deg]" />
+            <PhoneOff size={26} className={callState === "connected" ? "rotate-[135deg]" : ""} />
           </button>
 
+          {/* Flip Camera Button */}
           <button
             type="button"
             onClick={switchCamera}
-            className="w-14 h-14 rounded-full bg-white/10 backdrop-blur-xl flex items-center justify-center text-white border border-white/10 hover:bg-white/20 transition-all"
+            className="w-12 h-12 rounded-full bg-neutral-900/70 backdrop-blur-md flex items-center justify-center text-white hover:bg-neutral-800 transition-all"
           >
-            <RotateCcw size={22} className={cameraFacing === "user" ? "" : "rotate-180"} />
+            <RotateCcw size={22} className={`transition-transform duration-300 ${cameraFacing === "user" ? "" : "rotate-180"}`} />
           </button>
         </div>
 
-        <div className="flex flex-wrap justify-center gap-3">
-          <button
-            type="button"
-            onClick={retryCallConnection}
-            className="rounded-full border border-white/15 bg-white/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.16em] text-white"
-          >
-            Retry Link
-          </button>
-          {lowBandwidthMode ? (
-            <span className="rounded-full border border-amber-200/20 bg-amber-300/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.16em] text-amber-100">
-              Low bandwidth mode
-            </span>
-          ) : null}
-        </div>
+        {/* Subtle Network Quality/Low Bandwidth Indicators */}
+        {(lowBandwidthMode || networkQuality !== "good") && (
+          <div className="text-[11px] text-white/40 tracking-wide">
+            {lowBandwidthMode ? "Low bandwidth mode active" : `Connection: ${networkQualityLabel(networkQuality)}`}
+          </div>
+        )}
       </main>
 
+      {/* --- BACKGROUND MODALS & EXPERT ASSISTANTS --- */}
       <VisitorIncomingCallModal
         open={incomingCall.phase === "incoming"}
         hasVideo={incomingCall.hasVideo}
@@ -289,10 +284,4 @@ function networkQualityLabel(value) {
   if (value === "good") return "Healthy";
   if (value === "slow") return "Recovering";
   return "Connecting";
-}
-
-function formatLaunchStage(value) {
-  if (!value || value === "idle") return "Standby";
-  if (value === "starting") return "Starting";
-  return value;
 }

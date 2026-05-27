@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
-  Bell,
   ChevronLeft,
+  Mic,
   MicOff,
   PhoneOff,
-  Radio,
   RotateCcw,
+  User,
   Volume2
 } from "lucide-react";
 import VisitorIncomingCallModal from "../../components/VisitorIncomingCallModal";
@@ -86,110 +86,132 @@ export default function SessionAudioPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#eff6ff_0,_#f8fafc_38%,_#e2e8f0_100%)] font-sans text-slate-900 antialiased flex flex-col">
+    <div className="h-screen w-screen bg-gradient-to-b from-neutral-800 to-neutral-950 font-sans text-white overflow-hidden relative select-none flex flex-col justify-between p-6">
       <audio ref={remoteAudioRef} autoPlay playsInline />
-      <header className="fixed top-0 w-full z-[100] bg-white/80 backdrop-blur-md border-b border-slate-100 px-6 py-4">
-        <div className="max-w-4xl mx-auto flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <button
-              type="button"
-              onClick={() => navigate(exitRoute)}
-              className="p-2.5 bg-slate-50 text-slate-600 rounded-full hover:bg-slate-100 transition-colors"
-            >
-              <ChevronLeft size={20} />
-            </button>
-            <div>
-              <h1 className="font-bold text-lg text-slate-900 leading-none">Secure Audio Call</h1>
-              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">
-                {connected ? "Signal online" : "Signal reconnecting"}
-              </p>
-            </div>
+
+      {/* --- WHATSAPP FLOATING TOP HEADER --- */}
+      <header className="w-full flex items-center justify-between z-50">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => navigate(exitRoute)}
+            className="p-1 text-white/90 hover:text-white transition-colors"
+          >
+            <ChevronLeft size={28} />
+          </button>
+          <div>
+            <span className="text-xs text-white/50 font-light uppercase tracking-wider block">WhatsApp Voice Call</span>
+            <span className="text-[10px] text-white/30 block mt-0.5">
+              {connected ? "Secure Signal" : "Reconnecting Link..."}
+            </span>
           </div>
-          <Link to="/dashboard/notifications" className="relative p-2.5 bg-slate-50 text-slate-600 rounded-full">
-            <Bell size={18} />
-            {unreadCount > 0 ? (
-              <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-white" />
-            ) : null}
-          </Link>
         </div>
+
+        {/* Hidden button to open debug overlay layout dynamically without cluttering screen */}
+        <button 
+          onClick={() => setDebugOverlayOpen(prev => !prev)}
+          className="text-white/10 text-xs px-2 py-1"
+        >
+          •
+        </button>
       </header>
 
-      <main
-        className="flex-grow flex flex-col items-center justify-between pt-32 pb-32 relative overflow-hidden px-6"
-      >
-        <div className="absolute inset-x-0 top-24 mx-auto h-64 w-64 rounded-full bg-indigo-500/10 blur-3xl" />
+      {/* --- CENTERED IDENTITY & STATUS PROFILE BLOCK --- */}
+      <main className="flex-grow flex flex-col items-center justify-center text-center gap-4 z-10 -mt-12">
+        <h1 className="text-2xl font-normal text-white tracking-wide">Visitor at Gate</h1>
+        
+        <p className="text-sm text-white/70 font-light tracking-wide min-h-[20px]">
+          {callState === "connected" ? formatDuration(connectedSeconds) : formatCallStatus(callState)}
+        </p>
 
-        <div className="z-10 flex w-full max-w-xl flex-col items-center text-center">
-          <div className="bg-indigo-50 text-indigo-600 px-4 py-1.5 rounded-full flex items-center gap-2 mb-6 animate-pulse">
-            <Radio size={14} />
-            <span className="text-[10px] uppercase tracking-[0.2em] font-black">Encrypted Audio</span>
-          </div>
+        {/* Dynamic, clean network descriptions right under timing */}
+        {networkDetail && (
+          <p className="text-xs text-white/40 max-w-xs">{networkDetail}</p>
+        )}
 
-          <div className="grid h-28 w-28 place-items-center rounded-full border border-indigo-200 bg-white/80 shadow-[0_20px_60px_rgba(37,99,235,0.12)]">
-            <div className="grid h-20 w-20 place-items-center rounded-full bg-indigo-600 text-white shadow-lg shadow-indigo-300/50">
-              <Radio size={30} />
-            </div>
-          </div>
-
-          <h1 className="mt-6 text-4xl font-black text-slate-900 tracking-tight mb-3">Visitor at Gate</h1>
-          <p className="text-xl font-medium text-slate-500 tabular-nums">
-            {callState === "connected" ? formatDuration(connectedSeconds) : formatCallStatus(callState)}
-          </p>
-          <p className="mt-2 text-sm font-semibold text-slate-500">
-            {networkDetail || (joined ? "Call room ready" : "Preparing call room")}
-          </p>
-          {featureError ? <p className="mt-3 text-sm font-bold text-rose-500">{featureError}</p> : null}
-          {status ? <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">{status}</p> : null}
-
-          <div className="mt-6 grid w-full gap-3 sm:grid-cols-3">
-            <InfoTile label="Signaling" value={joined ? "Joined" : connected ? "Connected" : "Offline"} />
-            <InfoTile label="Network" value={networkQualityLabel(networkQuality)} />
-            <InfoTile label="Launch" value={formatLaunchStage(callLaunchStage)} />
+        {/* Profile Avatar Canvas matching WhatsApp's calling image bubble */}
+        <div className="relative mt-6 flex items-center justify-center">
+          <div className={`absolute inset-0 rounded-full bg-emerald-500/10 blur-xl transition-all duration-500 ${callState === "connected" ? "animate-pulse" : "opacity-0"}`} />
+          <div className="h-32 w-32 rounded-full bg-neutral-700/60 border border-white/10 shadow-2xl flex items-center justify-center relative z-10 overflow-hidden">
+            <User size={64} className="text-white/40 translate-y-1" />
           </div>
         </div>
 
-        <div className="z-10 w-full max-w-md">
-          <div className="rounded-[2rem] border border-white/70 bg-white/80 p-5 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
-            <div className="mb-5 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Live Controls</p>
-                <p className="mt-1 text-sm font-semibold text-slate-600">
-                  Route {audioRoute} · Link {networkType || "unknown"}
-                </p>
-              </div>
-              {lowBandwidthMode ? (
-                <span className="rounded-full bg-amber-100 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-amber-700">
-                  Low bandwidth
-                </span>
-              ) : null}
-            </div>
-
-            <div className="grid grid-cols-3 gap-4 mb-10">
-            <ControlBtn icon={<MicOff size={24} />} label={muted ? "Unmute" : "Mute"} active={muted} onClick={toggleMute} />
-            <ControlBtn icon={<RotateCcw size={24} />} label="Retry" onClick={retryCallConnection} disabled={!canStartCall && callState !== "connected"} />
-            <ControlBtn icon={<Volume2 size={24} />} label="Speaker" active={speakerOn} onClick={toggleSpeaker} disabled={callState !== "connected"} />
-            </div>
-
-            <div className="flex justify-center gap-4">
-              <button
-                type="button"
-                onClick={startAudioCall}
-                disabled={Boolean(featureError) || !canStartCall}
-                className="px-6 h-12 rounded-2xl bg-indigo-600 text-white font-bold disabled:opacity-45"
-              >
-                {callState === "connected" ? "Connected" : "Start Call"}
-              </button>
-              <button type="button" onClick={handleEndCall} className="group flex flex-col items-center outline-none">
-                <div className="w-20 h-20 bg-gradient-to-br from-rose-500 to-rose-700 rounded-full flex items-center justify-center text-white shadow-[0_12px_40px_rgba(244,63,94,0.3)] active:scale-90 transition-all duration-300">
-                  <PhoneOff size={32} strokeWidth={2.5} className="rotate-[135deg]" />
-                </div>
-                <span className="mt-4 text-[11px] font-black uppercase tracking-[0.2em] text-rose-600">End Call</span>
-              </button>
-            </div>
+        {/* Error notifications container stacked neatly under avatar frame */}
+        {(featureError || status) && (
+          <div className="mt-4 max-w-xs bg-black/40 backdrop-blur-md py-2 px-4 rounded-xl text-xs text-rose-300 border border-white/5">
+            {featureError || status}
           </div>
-        </div>
+        )}
       </main>
 
+      {/* --- BOTTOM SYSTEM ACTION SHELF --- */}
+      <footer className="w-full max-w-md mx-auto flex flex-col items-center gap-6 z-50">
+        
+        {/* Tray Action Buttons Grid */}
+        <div className="w-full bg-neutral-900/60 backdrop-blur-xl border border-white/5 rounded-[2rem] p-4 flex items-center justify-around shadow-2xl">
+          
+          {/* Speaker Button */}
+          <button
+            type="button"
+            onClick={toggleSpeaker}
+            disabled={callState !== "connected"}
+            className={`w-12 h-12 rounded-full flex items-center justify-center transition-all disabled:opacity-20 ${
+              speakerOn 
+                ? "bg-white text-neutral-900" 
+                : "bg-neutral-800/80 text-white hover:bg-neutral-700"
+            }`}
+          >
+            <Volume2 size={22} />
+          </button>
+
+          {/* Mute/Microphone Button */}
+          <button
+            type="button"
+            onClick={toggleMute}
+            className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
+              muted 
+                ? "bg-white text-neutral-900" 
+                : "bg-neutral-800/80 text-white hover:bg-neutral-700"
+            }`}
+          >
+            {muted ? <MicOff size={22} /> : <Mic size={22} />}
+          </button>
+
+          {/* Connection Trigger / Dynamic Retry Action Toggle */}
+          <button
+            type="button"
+            onClick={retryCallConnection}
+            disabled={!canStartCall && callState !== "connected"}
+            className="w-12 h-12 rounded-full bg-neutral-800/80 flex items-center justify-center text-white hover:bg-neutral-700 transition-all disabled:opacity-20"
+          >
+            <RotateCcw size={20} className={callState === "connecting" ? "animate-spin" : ""} />
+          </button>
+
+          {/* End Call / Start Call Master Trigger */}
+          <button
+            type="button"
+            onClick={callState === "connected" ? handleEndCall : startAudioCall}
+            disabled={Boolean(featureError) || (!canStartCall && callState !== "connected")}
+            className={`w-14 h-14 rounded-full flex items-center justify-center text-white shadow-lg transition-all active:scale-90 disabled:opacity-40 ${
+              callState === "connected" ? "bg-rose-600" : "bg-emerald-600 animate-bounce"
+            }`}
+          >
+            <PhoneOff size={24} className={callState === "connected" ? "rotate-[135deg]" : ""} />
+          </button>
+        </div>
+
+        {/* Low Profile Diagnostic Labels */}
+        {(lowBandwidthMode || audioRoute || networkType) && (
+          <div className="text-[10px] text-white/30 tracking-wide flex gap-3">
+            {lowBandwidthMode && <span>Low Bandwidth</span>}
+            {audioRoute && <span>Route: {audioRoute}</span>}
+            {networkType && <span>Network: {networkType}</span>}
+          </div>
+        )}
+      </footer>
+
+      {/* --- BACKGROUND CALL CONTROL MODALS & HOOK OVERLAYS --- */}
       <VisitorIncomingCallModal
         open={incomingCall.phase === "incoming"}
         hasVideo={incomingCall.hasVideo}
@@ -207,33 +229,6 @@ export default function SessionAudioPage() {
         networkType={networkType}
         videoQualityProfile={videoQualityProfile}
       />
-    </div>
-  );
-}
-
-function ControlBtn({ icon, label, active = false, onClick, disabled = false }) {
-  return (
-    <div className="flex flex-col items-center gap-3">
-      <button
-        type="button"
-        onClick={onClick}
-        disabled={disabled}
-        className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 active:scale-90 disabled:opacity-45 ${
-          active ? "bg-indigo-600 text-white shadow-lg shadow-indigo-200" : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-100 shadow-sm"
-        }`}
-      >
-        {icon}
-      </button>
-      <span className={`text-[10px] font-black uppercase tracking-widest ${active ? "text-indigo-600" : "text-slate-400"}`}>{label}</span>
-    </div>
-  );
-}
-
-function InfoTile({ label, value }) {
-  return (
-    <div className="rounded-2xl border border-white/80 bg-white/80 px-4 py-3 text-left shadow-sm">
-      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">{label}</p>
-      <p className="mt-2 text-sm font-semibold text-slate-800">{value}</p>
     </div>
   );
 }
@@ -267,16 +262,4 @@ function formatCallStatus(callState) {
   if (callState === "ringing") return "Ringing...";
   if (callState === "ended") return "Call ended";
   return "Ready";
-}
-
-function networkQualityLabel(value) {
-  if (value === "good") return "Healthy";
-  if (value === "slow") return "Recovering";
-  return "Connecting";
-}
-
-function formatLaunchStage(value) {
-  if (!value || value === "idle") return "Standby";
-  if (value === "starting") return "Starting";
-  return value;
 }
