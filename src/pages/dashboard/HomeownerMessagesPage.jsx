@@ -395,12 +395,19 @@ export default function HomeownerMessagesPage() {
         <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             {mobileView === "chat" ? (
-              <button onClick={() => setMobileView("list")} className="md:hidden flex items-center gap-1.5 text-indigo-600 text-xs font-black uppercase tracking-tight bg-indigo-50 px-3 py-2 rounded-xl">
+              <button 
+                onClick={() => setMobileView("list")} 
+                className="md:hidden flex items-center gap-1.5 text-indigo-600 text-xs font-black uppercase tracking-tight bg-indigo-50 px-3 py-2 rounded-xl"
+              >
                 <ArrowLeft size={14} />
                 <span>Visitors</span>
               </button>
             ) : (
-              <button onClick={() => navigate(-1)} className="p-2.5 bg-slate-50 text-slate-600 rounded-full hover:bg-slate-100 transition-colors">
+              <button 
+                onClick={() => navigate("/dashboard")} 
+                className="p-2.5 bg-slate-50 text-slate-600 rounded-full hover:bg-slate-100 transition-colors"
+                aria-label="Back to dashboard"
+              >
                 <ChevronLeft size={18} />
               </button>
             )}
@@ -620,6 +627,7 @@ function formatClockTime(v) {
   return new Date(v).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
+// Ensure bolding rules don't match unstyled strings improperly
 function renderMessageBody(text) {
   return <p className="whitespace-pre-wrap break-words leading-relaxed font-medium">{text}</p>;
 }
