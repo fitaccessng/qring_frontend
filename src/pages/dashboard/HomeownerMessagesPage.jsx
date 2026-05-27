@@ -218,7 +218,8 @@ export default function HomeownerMessagesPage() {
             ? {
                 ...thread,
                 sessionStatus: nextStatus,
-                photoUrl: payload?.photoUrl || thread.photoUrl,
+                photoUrl: payload?.snapshotUrl || payload?.photoUrl || thread.photoUrl,
+                snapshotUrl: payload?.snapshotUrl || payload?.photoUrl || thread.snapshotUrl,
                 snapshotAuditId: payload?.snapshotAuditId || thread.snapshotAuditId,
                 last: payload?.sessionActivated ? "Access approved. Visitor can now enter the session." : thread.last,
                 time: new Date().toISOString()
@@ -236,7 +237,8 @@ export default function HomeownerMessagesPage() {
           thread.id === incomingSessionId
             ? {
                 ...thread,
-                photoUrl: payload?.photoUrl || thread.photoUrl,
+                photoUrl: payload?.snapshotUrl || payload?.photoUrl || thread.photoUrl,
+                snapshotUrl: payload?.snapshotUrl || payload?.photoUrl || thread.snapshotUrl,
                 snapshotAuditId: payload?.snapshotAuditId || thread.snapshotAuditId,
                 purpose: payload?.purpose || thread.purpose,
                 visitorPhone: payload?.visitorPhone || thread.visitorPhone,
@@ -418,6 +420,10 @@ export default function HomeownerMessagesPage() {
 
   const heroThread = useMemo(() => threads.find(t => t.id === selectedId) || filteredThreads[0], [threads, selectedId, filteredThreads]);
   const selectedMessages = useMemo(() => messagesByThread[selectedId] || [], [messagesByThread, selectedId]);
+  const heroSnapshotUrl = useMemo(() => {
+    if (!heroThread) return "";
+    return String(snapshotUrls[heroThread.id] || heroThread.snapshotUrl || heroThread.photoUrl || "").trim();
+  }, [heroThread, snapshotUrls]);
   const heroThreadState = String(heroThread?.sessionStatus || "").trim().toLowerCase();
   
   const accessAlreadyGranted = useMemo(() => {
@@ -637,20 +643,24 @@ export default function HomeownerMessagesPage() {
               {/* Context-Aware Header Frame with Impeccable Image Snapshots Rendering */}
               <div className="p-4 border-b border-slate-100 bg-slate-50/60 flex items-center justify-between gap-4 flex-shrink-0">
                 <div className="flex items-center gap-3.5 min-w-0">
-                  {heroThread?.id && snapshotUrls[heroThread.id] ? (
-                    <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl overflow-hidden border border-slate-200 bg-white flex-shrink-0 shadow-sm">
+                  <div className="h-12 w-12 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-sm md:h-14 md:w-14 dark:border-slate-700 dark:bg-slate-800">
+                    {heroSnapshotUrl ? (
                       <SecureSnapshotImage
-                        src={snapshotUrls[heroThread.id]}
-                        alt="Secure entryway capture pass snapshot"
-                        className="w-full h-full object-cover"
-                        fallback={<div className="grid h-full w-full place-items-center bg-slate-200 text-[10px] font-black text-slate-400">N/A</div>}
+                        src={heroSnapshotUrl}
+                        alt="Visitor snapshot"
+                        className="h-full w-full object-cover"
+                        fallback={
+                          <div className="grid h-full w-full place-items-center bg-gradient-to-br from-slate-200 to-slate-300 text-[10px] font-black text-slate-500 dark:from-slate-700 dark:to-slate-800 dark:text-slate-300">
+                            {(heroThread?.name || "V")[0]}
+                          </div>
+                        }
                       />
-                    </div>
-                  ) : (
-                    <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-base font-black text-indigo-600 flex-shrink-0 shadow-sm">
-                      {(heroThread?.name || "V")[0]}
-                    </div>
-                  )}
+                    ) : (
+                      <div className="grid h-full w-full place-items-center bg-gradient-to-br from-slate-200 to-slate-300 text-sm font-black text-slate-600 dark:from-slate-700 dark:to-slate-800 dark:text-slate-200">
+                        {(heroThread?.name || "V")[0]}
+                      </div>
+                    )}
+                  </div>
                   
                   <div className="min-w-0">
                     <h2 className="text-sm font-black text-slate-900 truncate leading-tight uppercase tracking-tight">{heroThread?.name || "Visitor Identification"}</h2>
@@ -832,6 +842,7 @@ function normalizeInboxThread(thread) {
       normalized.requestPayload?.photoUrl ||
       ""
     ).trim();
+  normalized.snapshotUrl = normalized.photoUrl;
   normalized.snapshotAuditId = String(
     normalized.snapshotAuditId ||
     normalized.snapshot_audit_id ||

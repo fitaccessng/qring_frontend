@@ -1,30 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-function ConsentModal({ open, onAccept }) {
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full border border-slate-200">
-        <h2 className="text-lg font-bold mb-2">Visitor Data Consent</h2>
-        <p className="text-sm text-slate-700 mb-4">
-          Do you consent to your data being saved for 30 days to enable visitor management? This is required to proceed.
-        </p>
-        <button
-          className="w-full rounded-xl bg-brand-500 px-4 py-3 text-sm font-semibold text-white hover:bg-brand-600"
-          onClick={onAccept}
-        >
-          I Consent & Continue
-        </button>
-      </div>
-    </div>
-  );
-}
 import { useNavigate, useParams } from "react-router-dom";
+import VisitorConsentModal from "../../components/VisitorConsentModal";
 import { apiRequest } from "../../services/apiClient";
 import { env } from "../../config/env";
 import { RealtimeEvent } from "../../services/realtimeEvents";
 import { createRealtimeSocket, releaseRealtimeSocket } from "../../services/socketClient";
 import { getVisitorSessionStatus } from "../../services/homeownerService";
 import { storeVisitorSessionToken, getVisitorSessionToken } from "../../services/visitorSessionToken";
+import { buildVisitorConsentPayload, getVisitorConsent, hasVisitorConsent, recordVisitorConsent } from "../../services/visitorConsent";
 
 const RETRYABLE_STATUSES = new Set([0, 502, 503, 504]);
 const MAX_SUBMIT_RETRIES = 2;
@@ -100,13 +83,12 @@ async function submitVisitorRequestWithRetry(payload, onRetry) {
 }
 
 export default function ScanPage() {
-    const [showConsent, setShowConsent] = useState(() => {
-      // Only show once per session
-      return !window.sessionStorage.getItem("qring_visitor_consent");
-    });
+  const [consentState, setConsentState] = useState(() => getVisitorConsent());
+  const consentAccepted = Boolean(consentState?.consentAccepted);
+  const [showConsent, setShowConsent] = useState(() => !hasVisitorConsent());
   const { qrId } = useParams();
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [qr, setQr] = useState(null);
   const [doorId, setDoorId] = useState("");
@@ -122,7 +104,7 @@ export default function ScanPage() {
   });
   const [seconds, setSeconds] = useState(0);
   const [requestLatencyMs, setRequestLatencyMs] = useState(0);
-  const visitorDeviceId = useMemo(() => getOrCreateVisitorDeviceId(), []);
+  const visitorDeviceId = useMemo(() => (consentAccepted ? getOrCreateVisitorDeviceId() : ""), [consentAccepted]);
   const socketRef = useRef(null);
   const cameraStreamRef = useRef(null);
   const videoRef = useRef(null);
@@ -150,6 +132,7 @@ export default function ScanPage() {
   }
 
   async function startCamera() {
+    if (!consentAccepted) return;
     if (cameraStreamRef.current || cameraState.starting) return;
     setCameraState({ starting: true, ready: false, error: "" });
     try {
@@ -182,7 +165,7 @@ export default function ScanPage() {
       return;
     }
 
-    const maxWidth = 720;
+    const maxWidth = 640;
     const scale = Math.min(1, maxWidth / vw);
     const targetW = Math.round(vw * scale);
     const targetH = Math.round(vh * scale);
@@ -192,7 +175,7 @@ export default function ScanPage() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.drawImage(video, 0, 0, targetW, targetH);
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.72);
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.68);
     setVisitorForm((prev) => ({ ...prev, snapshotDataUrl: dataUrl }));
     stopCamera();
   }
@@ -205,6 +188,10 @@ export default function ScanPage() {
   }, []);
 
   useEffect(() => {
+    if (!consentAccepted) {
+      setLoading(false);
+      return;
+    }
     let mounted = true;
     const run = async () => {
       setLoading(true);
@@ -226,17 +213,17 @@ export default function ScanPage() {
     return () => {
       mounted = false;
     };
-  }, [qrId]);
+  }, [consentAccepted, qrId]);
 
   useEffect(() => {
-    if (loading) return;
+    if (!consentAccepted || loading) return;
     if (requestState.sent) return;
     if (!qr) return;
     if (visitorForm.snapshotDataUrl) return;
     if (cameraState.ready || cameraState.starting) return;
     startCamera();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, qr, requestState.sent, visitorForm.snapshotDataUrl]);
+  }, [consentAccepted, loading, qr, requestState.sent, visitorForm.snapshotDataUrl]);
 
   useEffect(() => {
     if (!requestState.sent) return;
@@ -350,6 +337,10 @@ export default function ScanPage() {
   const onSubmit = async (event) => {
     event.preventDefault();
     setError("");
+    if (!consentAccepted) {
+      setError("Please accept the privacy notice before continuing.");
+      return;
+    }
     if (!doorId) {
       setError("Please select a door before submitting.");
       return;
@@ -388,7 +379,8 @@ export default function ScanPage() {
           deliveryOption: visitorType === "delivery" ? visitorForm.deliveryOption : undefined,
           snapshotBase64: visitorForm.snapshotDataUrl.split(",")[1] || "",
           snapshotMime: "image/jpeg",
-          deviceId: visitorDeviceId
+          deviceId: visitorDeviceId,
+          ...(buildVisitorConsentPayload(consentState) || {})
         },
         ({ attempt }) => {
           setRequestState((prev) => ({
@@ -459,11 +451,12 @@ export default function ScanPage() {
 
   return (
     <div className="min-h-[100dvh] bg-slate-50 px-3 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 dark:bg-slate-950 sm:grid sm:place-items-center sm:p-4">
-      <ConsentModal
+      <VisitorConsentModal
         open={showConsent}
         onAccept={() => {
+          const nextConsent = recordVisitorConsent({ persist: false });
+          setConsentState(nextConsent);
           setShowConsent(false);
-          window.sessionStorage.setItem("qring_visitor_consent", "1");
         }}
       />
       {/* The rest of the page is blocked until consent is given */}
