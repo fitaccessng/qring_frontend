@@ -52,6 +52,36 @@ function createVisitorRequestId() {
   return `vrq_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`;
 }
 
+function getVisitorSubmitErrorMessage(error) {
+  const code = String(error?.payload?.code || "").trim();
+  if (code === "VISITOR_CONSENT_EXPIRED" || code === "VISITOR_CONSENT_REQUIRED" || code === "VISITOR_CONSENT_TIMESTAMP_REQUIRED") {
+    return "Your privacy notice session expired. Please accept it again, then retry your request.";
+  }
+  if (code === "VISITOR_CONSENT_STORAGE_INVALID") {
+    return "We couldn't confirm your consent session. Please accept the privacy notice again.";
+  }
+  if (error?.status === 422) {
+    return "We couldn't validate your request. Please check the form and try again.";
+  }
+  if (error?.status === 400) {
+    return error?.message || "Please review the form and try again.";
+  }
+  if (error?.status >= 500) {
+    return "The server responded with an error even though the connection worked. Please try again.";
+  }
+  return error?.message || "Request failed";
+}
+
+function canReacceptConsentFromError(message) {
+  const normalized = String(message || "").toLowerCase();
+  return (
+    normalized.includes("privacy notice session expired") ||
+    normalized.includes("accept the privacy notice again") ||
+    normalized.includes("visitor consent") ||
+    normalized.includes("consent")
+  );
+}
+
 function isRetryableSubmitError(error) {
   const status = Number(error?.status ?? -1);
   return RETRYABLE_STATUSES.has(status);
@@ -418,7 +448,7 @@ export default function ScanPage() {
         lastLatencyMs: latencyMs
       }));
       setRequestLatencyMs(latencyMs);
-      setError(submitError.message ?? "Request failed");
+      setError(getVisitorSubmitErrorMessage(submitError));
     }
   };
 
@@ -448,6 +478,7 @@ export default function ScanPage() {
       reveal: true,
     };
   }, [qrId]);
+  const canReacceptConsent = canReacceptConsentFromError(error);
 
   return (
     <div className="min-h-[100dvh] bg-slate-50 px-3 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 dark:bg-slate-950 sm:grid sm:place-items-center sm:p-4">
@@ -469,7 +500,23 @@ export default function ScanPage() {
         </div>
 
         {loading ? <p className="mt-5 text-sm">Resolving secure QR route...</p> : null}
-        {error ? <p className="mt-5 text-sm text-danger">{error}</p> : null}
+        {error ? (
+          <div className="mt-5 rounded-2xl border border-danger/20 bg-danger/5 p-4 text-sm text-danger dark:border-danger/30 dark:bg-danger/10">
+            <p>{error}</p>
+            {canReacceptConsent ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setError("");
+                  setShowConsent(true);
+                }}
+                className="mt-3 inline-flex items-center rounded-xl border border-danger/20 bg-white px-3 py-2 text-xs font-semibold text-danger transition hover:bg-danger/5 dark:border-danger/30 dark:bg-slate-950 dark:hover:bg-slate-900"
+              >
+                Re-accept consent
+              </button>
+            ) : null}
+          </div>
+        ) : null}
 
         {!loading && qr && !requestState.sent ? (
           <form onSubmit={onSubmit} className="mt-6 space-y-4">
