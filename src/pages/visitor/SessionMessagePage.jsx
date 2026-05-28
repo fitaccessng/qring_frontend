@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Navigate, useNavigate, useParams } from "react-router-dom";
+import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Mic, MicOff, PhoneOff, RotateCcw, User, Video, Volume2 } from "lucide-react";
 import SecureSnapshotImage from "../../components/SecureSnapshotImage";
 import SessionNetworkBadge from "../../components/SessionNetworkBadge";
 import SessionModeNav from "../../components/SessionModeNav";
@@ -9,6 +10,7 @@ import { useSessionRealtime } from "../../hooks/useSessionRealtime";
 export default function SessionMessagePage() {
   const { sessionId } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [acceptingCall, setAcceptingCall] = useState(false);
   const isHomeowner = getStoredUserRole() === "homeowner";
   if (isHomeowner) {
@@ -33,11 +35,25 @@ export default function SessionMessagePage() {
     typingState,
     mediaPermission,
     canStartCall,
+    cameraFacing,
+    localVideoRef,
+    remoteVideoRef,
+    remoteAudioRef,
+    muted,
+    speakerOn,
+    remoteVideoActive,
     sendMessage,
     sendTypingState,
     retryFailedMessage,
     requestMediaPermissions,
     acceptIncomingCall,
+    startAudioCall,
+    startVideoCall,
+    toggleMute,
+    toggleSpeaker,
+    switchCamera,
+    retryCallConnection,
+    endCall,
     rejectIncomingCall
   } = useSessionRealtime(sessionId);
 
@@ -73,7 +89,7 @@ export default function SessionMessagePage() {
         eventId: incomingCall.eventId || incomingCall.callSessionId
       });
     } catch {
-      navigate(`/session/${sessionId}/${incomingCall.hasVideo ? "video" : "audio"}`, { replace: true });
+      // Stay on the unified session page; the hook will surface the call state here.
     } finally {
       window.setTimeout(() => setAcceptingCall(false), 1200);
     }
@@ -83,11 +99,6 @@ export default function SessionMessagePage() {
     rejectIncomingCall();
     navigate(`/session/${sessionId}/message`, { replace: true });
   }
-
-  useEffect(() => {
-    if (!acceptedCallMode) return;
-    navigate(`/session/${sessionId}/${acceptedCallMode}`);
-  }, [acceptedCallMode, navigate, sessionId]);
 
   useEffect(() => {
     if (!messagesRef.current) return;
@@ -110,6 +121,8 @@ export default function SessionMessagePage() {
   }
 
   const serverCallState = resolveServerCallState(callState);
+  const requestedCallMode = String(searchParams.get("mode") || "").trim().toLowerCase();
+  const activeCallMode = acceptedCallMode || (requestedCallMode === "video" || requestedCallMode === "audio" ? requestedCallMode : "");
   const callModeLabels =
     serverCallState === "ringing"
       ? { audio: "Audio (Ringing)", video: "Video (Ringing)" }
@@ -150,10 +163,44 @@ export default function SessionMessagePage() {
             disableCallModes={!canStartCall && !incomingCall.pending && callState !== "connected"}
             disabledCallTooltip={disabledCallTooltip}
             modeLabels={callModeLabels}
+            onModeSelect={(mode) => {
+              if (mode === "video") {
+                void startVideoCall();
+                return;
+              }
+              void startAudioCall();
+            }}
           />
 
           <section className="lg:col-span-9">
-            <article className="min-h-[74vh] overflow-hidden rounded-[2rem] border border-slate-200 bg-slate-100/70 shadow-sm">
+            {activeCallMode || callState !== "idle" || incomingCall.pending ? (
+              <article className="mb-4 overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                {renderCallSurface({
+                  activeCallMode,
+                  callState,
+                  cameraFacing,
+                  localVideoRef,
+                  remoteVideoRef,
+                  remoteAudioRef,
+                  remoteVideoActive,
+                  muted,
+                  speakerOn,
+                  requestMediaPermissions,
+                  retryCallConnection,
+                  toggleMute,
+                  toggleSpeaker,
+                  switchCamera,
+                  endCall,
+                  sessionId,
+                  activeLabel: callModeLabels[activeCallMode] || "Call",
+                  networkQuality,
+                  networkDetail,
+                  status
+                })}
+              </article>
+            ) : null}
+
+            <article className="min-h-[74vh] overflow-hidden rounded-[2rem] border border-slate-200 bg-slate-100/70 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
               <header className="border-b border-slate-200 bg-white/85 px-4 py-3">
                 <h2 className="text-lg font-black">Conversation</h2>
                 <p className="text-xs text-slate-500">Live chat for this session.</p>
@@ -244,6 +291,117 @@ export default function SessionMessagePage() {
         onAccept={handleAcceptIncomingCall}
         onReject={handleRejectIncomingCall}
       />
+    </div>
+  );
+}
+
+function renderCallSurface({
+  activeCallMode,
+  callState,
+  cameraFacing,
+  localVideoRef,
+  remoteVideoRef,
+  remoteAudioRef,
+  remoteVideoActive,
+  muted,
+  speakerOn,
+  requestMediaPermissions,
+  retryCallConnection,
+  toggleMute,
+  toggleSpeaker,
+  switchCamera,
+  endCall,
+  sessionId,
+  activeLabel,
+  networkQuality,
+  networkDetail,
+  status
+}) {
+  const isVideo = activeCallMode === "video";
+  const isConnected = callState === "connected";
+  const isConnecting = callState === "connecting" || callState === "ringing";
+  const callHeadline = isVideo ? "Video call in progress" : "Audio call in progress";
+  return (
+    <div className="relative overflow-hidden bg-slate-950 text-white">
+      {!isVideo ? <audio ref={remoteAudioRef} autoPlay playsInline /> : null}
+      {isVideo ? (
+        <div className="relative aspect-[16/10] bg-black">
+          <video
+            ref={remoteVideoRef}
+            autoPlay
+            playsInline
+            muted
+            className={`h-full w-full object-cover transition-opacity duration-300 ${isConnected && remoteVideoActive ? "opacity-100" : "opacity-30"}`}
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/10 to-black/60" />
+          <div className="absolute left-4 top-4 rounded-full bg-black/40 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/80">
+            {callHeadline}
+          </div>
+          <div className="absolute bottom-4 right-4 h-28 w-20 overflow-hidden rounded-2xl border border-white/10 bg-slate-900 shadow-2xl">
+            <video ref={localVideoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
+          </div>
+        </div>
+      ) : (
+        <div className="grid gap-4 px-4 py-6 sm:grid-cols-[auto,1fr] sm:items-center">
+          <div className="grid h-24 w-24 place-items-center rounded-full bg-white/10">
+            <User size={36} className="text-white/60" />
+          </div>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-300">{activeLabel}</p>
+            <h2 className="mt-1 text-2xl font-black tracking-tight">{callHeadline}</h2>
+            <p className="mt-2 text-sm text-white/70">{isConnecting ? "Connecting securely..." : isConnected ? "You are live now." : "Waiting to connect."}</p>
+            {networkDetail ? <p className="mt-2 text-xs text-white/45">{networkDetail}</p> : null}
+            {status ? <p className="mt-2 text-xs text-amber-200">{status}</p> : null}
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-4 border-t border-white/10 px-4 py-4">
+        <div className="flex flex-wrap gap-2 text-[11px] text-white/60">
+          {networkQuality ? <span className="rounded-full bg-white/10 px-2.5 py-1 font-semibold">{networkQuality}</span> : null}
+          {cameraFacing ? <span className="rounded-full bg-white/10 px-2.5 py-1 font-semibold">Camera: {cameraFacing}</span> : null}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={toggleSpeaker} className={`rounded-xl px-3 py-2 text-xs font-semibold ${speakerOn ? "bg-white text-slate-950" : "bg-white/10 text-white"}`}>
+            <span className="inline-flex items-center gap-1.5">
+              <Volume2 size={14} />
+              {speakerOn ? "Speaker on" : "Speaker off"}
+            </span>
+          </button>
+          <button type="button" onClick={toggleMute} className={`rounded-xl px-3 py-2 text-xs font-semibold ${muted ? "bg-white text-slate-950" : "bg-white/10 text-white"}`}>
+            <span className="inline-flex items-center gap-1.5">
+              {muted ? <MicOff size={14} /> : <Mic size={14} />}
+              {muted ? "Muted" : "Mic on"}
+            </span>
+          </button>
+          {isVideo ? (
+            <button type="button" onClick={switchCamera} className="rounded-xl bg-white/10 px-3 py-2 text-xs font-semibold text-white">
+              <span className="inline-flex items-center gap-1.5">
+                <Video size={14} />
+                Switch camera
+              </span>
+            </button>
+          ) : null}
+          <button type="button" onClick={retryCallConnection} className="rounded-xl bg-white/10 px-3 py-2 text-xs font-semibold text-white">
+            <span className="inline-flex items-center gap-1.5">
+              <RotateCcw size={14} />
+              Retry
+            </span>
+          </button>
+          <button type="button" onClick={() => void endCall()} className="rounded-xl bg-rose-500 px-3 py-2 text-xs font-semibold text-white">
+            <span className="inline-flex items-center gap-1.5">
+              <PhoneOff size={14} />
+              End call
+            </span>
+          </button>
+          {!isConnected ? (
+            <button type="button" onClick={() => void requestMediaPermissions({ video: isVideo })} className="rounded-xl bg-emerald-500 px-3 py-2 text-xs font-semibold text-white">
+              Grant media
+            </button>
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 }

@@ -1437,7 +1437,9 @@ export function useSessionRealtime(sessionId) {
     }
   }
 
-  async function endCall(broadcast = true) {
+  async function endCall(broadcast = true, options = {}) {
+    const incomingPhase = String(options.incomingPhase || "ended").trim() || "ended";
+    const statusMessage = String(options.statusMessage || "Call ended by participant").trim() || "Call ended by participant";
     const activeCallSessionId = callSessionRef.current;
     if (broadcast && callSessionRef.current) {
       try {
@@ -1454,10 +1456,12 @@ export function useSessionRealtime(sessionId) {
         setStatus(error?.message || "Unable to end call cleanly");
       }
     }
+    setAcceptedCallMode("");
     setCallStateSafe("ended");
     clearSessionCallAccess(sessionId);
     activeIncomingCallModalSessionId = activeIncomingCallModalSessionId === sessionId ? "" : activeIncomingCallModalSessionId;
-    transitionIncomingCall("ended", {
+    setStatus(statusMessage);
+    transitionIncomingCall(incomingPhase, {
       callSessionId: activeCallSessionId,
       sessionId,
       visitorId: callVisitorIdRef.current || sessionId,
@@ -1973,7 +1977,10 @@ export function useSessionRealtime(sessionId) {
       pushLog("Remote rejected call", {
         callSessionId: payload?.callSessionId || callSessionRef.current
       });
-      void endCall(false);
+      void endCall(false, {
+        incomingPhase: "rejected",
+        statusMessage: "Call was rejected"
+      });
     };
 
     const handleCallEnded = (payload) => {
@@ -1988,11 +1995,21 @@ export function useSessionRealtime(sessionId) {
         });
         return;
       }
+      if (eventId && seenCallLifecycleEventIdsRef.current.has(`rejected:${eventId}`)) {
+        pushLog("Call ended after rejection suppressed", {
+          eventId,
+          callSessionId: payload?.callSessionId || callSessionRef.current
+        });
+        return;
+      }
       if (eventId) {
         seenCallLifecycleEventIdsRef.current.add(`ended:${eventId}`);
       }
-      setStatus("Call ended by participant");
-      transitionIncomingCall("ended", {
+      const endedWhileNotConnected = callStateRef.current !== "connected";
+      const incomingPhase = endedWhileNotConnected ? "rejected" : "ended";
+      const statusMessage = endedWhileNotConnected ? "Call was rejected" : "Call ended by participant";
+      setStatus(statusMessage);
+      transitionIncomingCall(incomingPhase, {
         callSessionId: String(payload?.callSessionId || callSessionRef.current || ""),
         sessionId,
         visitorId: callVisitorIdRef.current || sessionId,
@@ -2001,7 +2018,10 @@ export function useSessionRealtime(sessionId) {
       pushLog("Remote ended call", {
         callSessionId: payload?.callSessionId || callSessionRef.current
       });
-      void endCall(false);
+      void endCall(false, {
+        incomingPhase,
+        statusMessage
+      });
     };
 
     const handleSessionControl = (payload) => {

@@ -510,7 +510,7 @@ export default function HomeownerMessagesPage() {
       window.sessionStorage.setItem("qring_call_start_intent", JSON.stringify({
         pending: true, sessionId: selectedId, mode, callSessionId: data?.callSessionId, visitorId: data?.visitorId || selectedId
       }));
-      navigate(`/session/${selectedId}/${mode}`);
+      navigate(`/session/${selectedId}/message`);
     } catch (err) { setError(err?.message || "Failed to route call"); }
     finally { setCallBusy(""); }
   }
@@ -535,7 +535,39 @@ export default function HomeownerMessagesPage() {
     });
     setIncomingCall({ pending: false, hasVideo: false, callSessionId: "", visitorId: "", sessionId: "" });
     dismissIncomingCall(acceptIntent);
-    navigate(`/session/${incomingCall.sessionId}/${mode}`);
+    navigate(`/session/${incomingCall.sessionId}/message`);
+  }
+
+  async function handleRejectIncomingCall() {
+    if (!incomingCall.sessionId || !incomingCall.callSessionId || incomingCallBusy) return;
+    setIncomingCallBusy(true);
+    const rejectPayload = {
+      sessionId: incomingCall.sessionId,
+      callSessionId: incomingCall.callSessionId,
+      hasVideo: incomingCall.hasVideo,
+      visitorId: incomingCall.visitorId
+    };
+    try {
+      socketRef.current?.emit(RealtimeEvent.CALL_REJECTED, {
+        sessionId: incomingCall.sessionId,
+        callSessionId: incomingCall.callSessionId,
+        hasVideo: incomingCall.hasVideo,
+        idempotencyKey: incomingCall.callSessionId
+      });
+      await apiRequest("/calls/end", {
+        method: "POST",
+        body: JSON.stringify({
+          callSessionId: incomingCall.callSessionId,
+          participantType: "homeowner"
+        })
+      });
+    } catch (err) {
+      setError(err?.message || "Unable to reject call");
+    } finally {
+      dismissIncomingCall(rejectPayload);
+      setIncomingCall({ pending: false, hasVideo: false, callSessionId: "", visitorId: "", sessionId: "" });
+      setIncomingCallBusy(false);
+    }
   }
 
   return (
@@ -771,11 +803,7 @@ export default function HomeownerMessagesPage() {
         busy={incomingCallBusy}
         callerLabel="Visitor"
         onAccept={handleAcceptIncomingCall}
-        onReject={() => {
-          setIncomingCallBusy(false);
-          dismissIncomingCall(incomingCall);
-          setIncomingCall(p => ({ ...p, pending: false }));
-        }}
+        onReject={handleRejectIncomingCall}
       />
     </div>
   );

@@ -11,7 +11,8 @@ export default function SessionModeNav({
   sessionId,
   disableCallModes = false,
   disabledCallTooltip = "Audio and Video are disabled until the homeowner starts a call.",
-  modeLabels = {}
+  modeLabels = {},
+  onModeSelect = null
 }) {
   const [tooltipMode, setTooltipMode] = useState("");
   const tooltipTimerRef = useRef(null);
@@ -58,6 +59,15 @@ export default function SessionModeNav({
     return modeLabels?.[modeKey] || fallback;
   }
 
+  function handleModeSelect(modeKey) {
+    if (modeKey === "audio" || modeKey === "video") {
+      if (typeof onModeSelect === "function") {
+        onModeSelect(modeKey);
+        return;
+      }
+    }
+  }
+
   return (
     <>
       <aside className="hidden lg:col-span-3 lg:block">
@@ -75,13 +85,24 @@ export default function SessionModeNav({
                   {getModeLabel(item.key, item.label)}
                 </button>
               ) : (
-                <NavLink
-                  key={item.key}
-                  to={`/session/${sessionId}/${item.key}`}
-                  className={({ isActive }) => itemClassName(isActive)}
-                >
-                  {getModeLabel(item.key, item.label)}
-                </NavLink>
+                item.key === "message" || !onModeSelect ? (
+                  <NavLink
+                    key={item.key}
+                    to={`/session/${sessionId}/${item.key}`}
+                    className={({ isActive }) => itemClassName(isActive)}
+                  >
+                    {getModeLabel(item.key, item.label)}
+                  </NavLink>
+                ) : (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => handleModeSelect(item.key)}
+                    className={itemClassName(false)}
+                  >
+                    {getModeLabel(item.key, item.label)}
+                  </button>
+                )
               )
             )}
           </nav>
@@ -101,16 +122,27 @@ export default function SessionModeNav({
                 onClick={() => showTooltip(item.key)}
                 className="rounded-xl bg-slate-100 px-2 py-2 text-center text-xs font-semibold text-slate-400"
               >
-                {getModeLabel(item.key, item.label)}
-              </button>
-            ) : (
-              <NavLink
-                key={item.key}
-                to={`/session/${sessionId}/${item.key}`}
-                className={({ isActive }) => mobileItemClassName(isActive)}
-              >
-                {getModeLabel(item.key, item.label)}
-              </NavLink>
+                  {getModeLabel(item.key, item.label)}
+                </button>
+              ) : (
+              item.key === "message" || !onModeSelect ? (
+                <NavLink
+                  key={item.key}
+                  to={`/session/${sessionId}/${item.key}`}
+                  className={({ isActive }) => mobileItemClassName(isActive)}
+                >
+                  {getModeLabel(item.key, item.label)}
+                </NavLink>
+              ) : (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => handleModeSelect(item.key)}
+                  className={mobileItemClassName(false)}
+                >
+                  {getModeLabel(item.key, item.label)}
+                </button>
+              )
             )
           )}
         </div>

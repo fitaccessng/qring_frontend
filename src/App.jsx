@@ -1,4 +1,4 @@
-import { BrowserRouter, HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { BrowserRouter, HashRouter, Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Suspense, lazy, useEffect, useState } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import LoginPage from "./pages/auth/LoginPage";
@@ -12,7 +12,6 @@ import NotFoundPage from "./pages/common/NotFoundPage";
 import LoaderPage from "./pages/common/LoaderPage";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import RoleRoute from "./routes/RoleRoute";
-import VisitorCallRoute from "./routes/VisitorCallRoute";
 import VisitorSessionGateRoute from "./routes/VisitorSessionGateRoute";
 import PublicOnlyRoute from "./routes/PublicOnlyRoute";
 import EstateManagedHomeownerRoute from "./routes/EstateManagedHomeownerRoute";
@@ -123,8 +122,6 @@ const NotificationsPage = lazy(() => import("./pages/dashboard/NotificationsPage
 const ScanPage = lazy(() => import("./pages/visitor/ScanPage"));
 const AppointmentPage = lazy(() => import("./pages/visitor/AppointmentPage"));
 const SessionMessagePage = lazy(() => import("./pages/visitor/SessionMessagePage"));
-const SessionAudioPage = lazy(() => import("./pages/visitor/SessionAudioPage"));
-const SessionVideoPage = lazy(() => import("./pages/visitor/SessionVideoPage"));
 
 export default function App() {
   const Router = resolveRouterComponent();
@@ -301,26 +298,8 @@ function AppRoutes() {
                   </VisitorSessionGateRoute>
                 }
               />
-              <Route
-                path="/session/:sessionId/audio"
-                element={
-                  <VisitorSessionGateRoute>
-                    <VisitorCallRoute>
-                      <LazyRoute><SessionAudioPage /></LazyRoute>
-                    </VisitorCallRoute>
-                  </VisitorSessionGateRoute>
-                }
-              />
-              <Route
-                path="/session/:sessionId/video"
-                element={
-                  <VisitorSessionGateRoute>
-                    <VisitorCallRoute>
-                      <LazyRoute><SessionVideoPage /></LazyRoute>
-                    </VisitorCallRoute>
-                  </VisitorSessionGateRoute>
-                }
-              />
+              <Route path="/session/:sessionId/audio" element={<LegacySessionCallRedirect />} />
+              <Route path="/session/:sessionId/video" element={<LegacySessionCallRedirect />} />
 
               <Route element={<ProtectedRoute />}>
                 <Route element={<RoleRoute allowedRoles={["homeowner", "estate"]} />}>
@@ -426,6 +405,11 @@ function LazyRoute({ children }) {
       {children}
     </Suspense>
   );
+}
+
+function LegacySessionCallRedirect() {
+  const { sessionId } = useParams();
+  return <Navigate to={`/session/${encodeURIComponent(sessionId || "")}/message`} replace />;
 }
 
 function RouteFallback() {
