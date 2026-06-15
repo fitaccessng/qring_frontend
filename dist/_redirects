@@ -1,2 +1,2 @@
-/api/* https://qring-backend-1.onrender.com/api/:splat 200
+/api/* https://qring-backend-production.up.railway.app/api/:splat 200
 /* /index.html 200

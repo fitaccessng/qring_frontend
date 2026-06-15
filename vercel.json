@@ -9,7 +9,7 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "https://qring-backend-1.onrender.com/api/$1"
+      "destination": "https://qring-backend-production.up.railway.app/api/$1"
     },
     {
       "source": "/(.*)",

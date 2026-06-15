@@ -20,7 +20,7 @@ const toInteger = (value, fallback) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
-const productionBackendOrigin = "https://qring-backend-1.onrender.com";
+const productionBackendOrigin = "https://qring-backend-production.up.railway.app";
 const productionFrontendOrigin = "https://www.useqring.online";
 const buildId = String(
   import.meta.env.VITE_BUILD_ID ??
