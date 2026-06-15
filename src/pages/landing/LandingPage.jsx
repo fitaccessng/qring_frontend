@@ -464,12 +464,12 @@ export default function LandingPage() {
                   >
                     Get Started
                   </Link>
-                  <Link
-                    to="/request-demo"
-                    className="rounded-2xl border border-white/20 bg-white/10 px-10 py-4 text-sm font-bold uppercase tracking-[0.15em] text-white transition hover:bg-white/15"
-                  >
-                    Request Demo
-                  </Link>
+                <a
+                  href="mailto:info@useqring.online?subject=Request%20Demo%20for%20QRing"
+                  className="rounded-2xl border border-white/20 bg-white/10 px-10 py-4 text-sm font-bold uppercase tracking-[0.15em] text-white transition hover:bg-white/15"
+                >
+                  Request Demo
+                </a>
                 </div>
               </div>
             </div>
