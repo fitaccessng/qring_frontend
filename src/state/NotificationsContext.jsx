@@ -131,6 +131,8 @@ export function NotificationsProvider({ children }) {
     if (!user?.id || !user?.role) return () => {};
 
     const socket = getDashboardSocket();
+    const terminalCallEvents = ["call.accepted", "call.rejected", "call.ended"];
+    const terminalCallListeners = new Map();
 
     const subscribe = () => {
       const rooms = [
@@ -175,6 +177,24 @@ export function NotificationsProvider({ children }) {
       setLastRealtimeEvent({ eventName: "incoming-call", payload: nextCall, at: Date.now() });
       setActiveIncomingCall(nextCall);
     };
+    const onCallTerminal = (eventName) => (payload) => {
+      const nextPayload = payload?.data ?? payload ?? {};
+      const activeCall = managerRef.current.state.activeIncomingCall;
+      const activeCallId = String(activeCall?.callSessionId || activeCall?.eventId || "").trim();
+      const nextCallId = String(nextPayload?.callSessionId || nextPayload?.eventId || "").trim();
+      const activeSessionId = String(activeCall?.sessionId || "").trim();
+      const nextSessionId = String(nextPayload?.sessionId || "").trim();
+      const matchesActiveCall =
+        Boolean(activeCall) &&
+        (
+          (activeCallId && nextCallId && activeCallId === nextCallId) ||
+          (activeSessionId && nextSessionId && activeSessionId === nextSessionId)
+        );
+      if (!matchesActiveCall) return;
+      managerRef.current.dismissIncomingCall(nextPayload);
+      setActiveIncomingCall(null);
+      setLastRealtimeEvent({ eventName, payload: nextPayload, at: Date.now() });
+    };
     const onVisitorSnapshot = (payload) => {
       setLastRealtimeEvent({ eventName: "visitor.snapshot", payload: payload?.data ?? payload, at: Date.now() });
     };
@@ -185,6 +205,11 @@ export function NotificationsProvider({ children }) {
     socket.on("notification.updated", onNotificationUpdate);
     socket.on("notifications.updated", onNotificationUpdate);
     socket.on("incoming-call", onIncomingCall);
+    terminalCallEvents.forEach((eventName) => {
+      const listener = onCallTerminal(eventName);
+      terminalCallListeners.set(eventName, listener);
+      socket.on(eventName, listener);
+    });
     socket.on("visitor.snapshot", onVisitorSnapshot);
     socket.onAny(onAny);
     if (socket.connected) {
@@ -205,6 +230,9 @@ export function NotificationsProvider({ children }) {
       socket.off("notification.updated", onNotificationUpdate);
       socket.off("notifications.updated", onNotificationUpdate);
       socket.off("incoming-call", onIncomingCall);
+      terminalCallListeners.forEach((listener, eventName) => {
+        socket.off(eventName, listener);
+      });
       socket.off("visitor.snapshot", onVisitorSnapshot);
       socket.offAny(onAny);
       setConnected(false);

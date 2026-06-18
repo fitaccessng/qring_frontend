@@ -114,6 +114,8 @@ export default function SessionMessagePage() {
 
   function resolveServerCallState(value) {
     if (value === "ringing") return "ringing";
+    if (value === "accepted") return "active";
+    if (value === "reconnecting") return "active";
     if (value === "connected") return "active";
     if (value === "ended") return "ended";
     if (value === "failed") return "failed";

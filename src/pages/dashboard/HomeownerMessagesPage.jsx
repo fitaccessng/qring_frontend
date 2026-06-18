@@ -62,6 +62,7 @@ export default function HomeownerMessagesPage() {
   const socketRef = useRef(null);
   const joinedSessionIdsRef = useRef(new Set());
   const callBusyRef = useRef("");
+  const incomingCallRef = useRef(null);
   const seenCallInviteIdsRef = useRef(new Set());
   const token = getAccessToken();
 
@@ -86,6 +87,9 @@ export default function HomeownerMessagesPage() {
       setIncomingCallBusy(false);
     }
   }, [incomingCall.pending]);
+  useEffect(() => {
+    incomingCallRef.current = incomingCall;
+  }, [incomingCall]);
   useEffect(() => {
     setSnapshotUrls(() => {
       const next = {};
@@ -315,6 +319,23 @@ export default function HomeownerMessagesPage() {
       });
       setIncomingCallBusy(false);
     };
+    const handleCallTerminal = (payload) => {
+      const nextPayload = payload?.data ?? payload ?? {};
+      const nextCallId = String(nextPayload?.callSessionId || nextPayload?.eventId || "").trim();
+      const nextSessionId = String(nextPayload?.sessionId || "").trim();
+      const activeIncoming = incomingCallRef.current;
+      const currentCallId = String(activeIncoming?.callSessionId || activeIncoming?.eventId || "").trim();
+      const currentSessionId = String(activeIncoming?.sessionId || "").trim();
+      const matchesIncoming =
+        Boolean(activeIncoming?.pending) &&
+        (
+          (currentCallId && nextCallId && currentCallId === nextCallId) ||
+          (currentSessionId && nextSessionId && currentSessionId === nextSessionId)
+        );
+      if (!matchesIncoming) return;
+      setIncomingCall({ pending: false, hasVideo: false, callSessionId: "", visitorId: "", sessionId: "" });
+      setIncomingCallBusy(false);
+    };
 
     socket.on("connect", joinKnownSessions);
     socket.on("chat.message", handleChatMessage);
@@ -324,6 +345,9 @@ export default function HomeownerMessagesPage() {
     socket.on("chat.typing", handleChatTyping);
     socket.on("incoming-call", handleIncomingCallNotice);
     socket.on("call.invite", handleCallInvite);
+    socket.on("call.accepted", handleCallTerminal);
+    socket.on("call.rejected", handleCallTerminal);
+    socket.on("call.ended", handleCallTerminal);
 
     return () => {
       socket.off("connect", joinKnownSessions);
@@ -334,6 +358,9 @@ export default function HomeownerMessagesPage() {
       socket.off("chat.typing", handleChatTyping);
       socket.off("incoming-call", handleIncomingCallNotice);
       socket.off("call.invite", handleCallInvite);
+      socket.off("call.accepted", handleCallTerminal);
+      socket.off("call.rejected", handleCallTerminal);
+      socket.off("call.ended", handleCallTerminal);
       socketRef.current = null;
       releaseRealtimeSocket(env.signalingNamespace ?? "/realtime/signaling");
     };

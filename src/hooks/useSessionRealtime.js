@@ -140,7 +140,7 @@ function createIncomingCallState() {
 }
 
 function isCallInProgress(state) {
-  return ["connecting", "ringing", "connected"].includes(String(state || "").toLowerCase());
+  return ["connecting", "ringing", "accepted", "reconnecting", "connected"].includes(String(state || "").toLowerCase());
 }
 
 function createEmptyStream() {
@@ -190,6 +190,14 @@ function getParticipantContext() {
     displayName: user?.fullName || "Visitor",
     polite: true
   };
+}
+
+function canVisitorInitiateCall(status, activeCallStatus) {
+  const normalizedStatus = String(status || "").toLowerCase();
+  const normalizedCallStatus = String(activeCallStatus || "").toLowerCase();
+  return [normalizedStatus, normalizedCallStatus].some((value) =>
+    ["approved", "active", "gate_confirmed", "accepted", "connecting", "reconnecting", "connected"].includes(value)
+  );
 }
 
 function isMineBySenderType(senderType, participantType) {
@@ -340,7 +348,7 @@ function buildSessionRtcConfig(rtcConfig, forceRelay = false) {
 
 export function useSessionRealtime(sessionId) {
   const context = useMemo(() => getParticipantContext(), []);
-  const { participantType, canStartCall, displayName, polite } = context;
+  const { participantType, canStartCall: baseCanStartCall, displayName, polite } = context;
   const supportsWebRTC = typeof window !== "undefined" && typeof window.RTCPeerConnection !== "undefined";
   const supportsUserMedia =
     typeof navigator !== "undefined" && typeof navigator.mediaDevices?.getUserMedia === "function";
@@ -373,6 +381,7 @@ export function useSessionRealtime(sessionId) {
   const [callConnectedAt, setCallConnectedAt] = useState(null);
   const [incomingCall, setIncomingCall] = useState(createIncomingCallState);
   const [acceptedCallMode, setAcceptedCallMode] = useState("");
+  const [visitorCallInitiationAllowed, setVisitorCallInitiationAllowed] = useState(false);
   const [remoteVideoActive, setRemoteVideoActive] = useState(false);
   const [callLogs, setCallLogs] = useState([]);
   const [callDiagnostics, setCallDiagnostics] = useState(() => emptyDiagnostics());
@@ -381,6 +390,7 @@ export function useSessionRealtime(sessionId) {
   const [networkType, setNetworkType] = useState("unknown");
   const [videoQualityProfile, setVideoQualityProfile] = useState("balanced");
   const [debugOverlayOpen, setDebugOverlayOpen] = useState(false);
+  const canStartCall = baseCanStartCall || (participantType === "visitor" && visitorCallInitiationAllowed);
 
   const socketRef = useRef(null);
   const peerRef = useRef(null);
@@ -1074,7 +1084,7 @@ export function useSessionRealtime(sessionId) {
     stopMediaWatchdog();
     mediaWatchdogTimerRef.current = window.setInterval(() => {
       if (!pc || peerRef.current !== pc) return;
-      if (callStateRef.current !== "connected" && callStateRef.current !== "connecting") return;
+      if (callStateRef.current !== "connected" && callStateRef.current !== "connecting" && callStateRef.current !== "reconnecting") return;
       const now = Date.now();
       const snapshot = statsSnapshotRef.current;
       const hasRemoteAudio = remoteStreamRef.current.getAudioTracks().length > 0;
@@ -1121,10 +1131,10 @@ export function useSessionRealtime(sessionId) {
       payload.visitorId = callVisitorIdRef.current || incomingCallRef.current.visitorId || sessionId;
       payload.visitorToken = getVisitorSessionToken(sessionId) || undefined;
     }
-      const response = await apiRequest("/calls/join", {
-        method: "POST",
-        body: JSON.stringify(payload)
-      });
+    const response = await apiRequest("/calls/join", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
     const data = response?.data ?? null;
     if (data?.rtcConfig) {
       currentRtcConfigRef.current = data.rtcConfig;
@@ -1155,9 +1165,16 @@ export function useSessionRealtime(sessionId) {
         sessionId,
         callSessionId: callSessionRef.current || undefined,
         hasVideo: localVideoEnabledRef.current,
+        iceRestart,
         sdp: pc.localDescription
       });
-      setCallStateSafe(callStateRef.current === "connected" ? "connecting" : "ringing");
+      setCallStateSafe(
+        iceRestart
+          ? "reconnecting"
+          : callStateRef.current === "connected"
+            ? "connecting"
+            : "ringing"
+      );
       offerTimeoutRef.current = window.setTimeout(() => {
         if (callStateRef.current === "connected") return;
         void recoverCall("offer_timeout");
@@ -1255,7 +1272,8 @@ export function useSessionRealtime(sessionId) {
           body: JSON.stringify({
             sessionId,
             type: nextMode,
-            hasVideo: video
+            hasVideo: video,
+            visitorToken: participantType === "visitor" ? getVisitorSessionToken(sessionId) || undefined : undefined
           })
         });
         const data = response?.data ?? null;
@@ -1603,7 +1621,7 @@ export function useSessionRealtime(sessionId) {
     const connection = navigator?.connection || navigator?.mozConnection || navigator?.webkitConnection;
     const handleConnectionChange = () => {
       refreshBrowserNetworkType();
-      if (callStateRef.current === "connected" || callStateRef.current === "connecting") {
+      if (callStateRef.current === "connected" || callStateRef.current === "connecting" || callStateRef.current === "reconnecting") {
         void recoverCall("network_type_change");
       }
     };
@@ -1677,7 +1695,7 @@ export function useSessionRealtime(sessionId) {
       setJoined(false);
       updateNetwork("reconnecting", "Signaling disconnected");
       pushLog("Socket disconnected");
-      if (callStateRef.current === "connected" || callStateRef.current === "connecting") {
+      if (callStateRef.current === "connected" || callStateRef.current === "connecting" || callStateRef.current === "reconnecting") {
         void recoverCall("socket_disconnect");
       }
     };
@@ -1724,6 +1742,9 @@ export function useSessionRealtime(sessionId) {
       }
       const activeCall = payload?.activeCall;
       if (!activeCall?.callSessionId) {
+        if (participantType === "visitor") {
+          setVisitorCallInitiationAllowed(canVisitorInitiateCall(payload?.status, ""));
+        }
         if (incomingCallRef.current.pending || isCallInProgress(callStateRef.current)) {
           pushLog("Session snapshot cleared stale call state", {
             eventId: incomingCallRef.current.eventId || null,
@@ -1743,6 +1764,9 @@ export function useSessionRealtime(sessionId) {
         (hasSessionCallAccess(sessionId) || isCallInProgress(callStateRef.current));
       callSessionRef.current = String(activeCall.callSessionId || callSessionRef.current || "");
       callVisitorIdRef.current = String(activeCall.visitorId || callVisitorIdRef.current || sessionId);
+      if (participantType === "visitor") {
+        setVisitorCallInitiationAllowed(canVisitorInitiateCall(payload?.status, activeCallStatus));
+      }
       if (activeCallStatus === "ringing" && !canStartCall && !shouldSuppressIncomingModal) {
         transitionIncomingCall("incoming", {
           hasVideo: Boolean(activeCall.hasVideo),
@@ -1759,7 +1783,7 @@ export function useSessionRealtime(sessionId) {
           callState: callStateRef.current
         });
       }
-      if (["active", "ongoing"].includes(String(activeCall.status || ""))) {
+      if (["accepted", "connecting", "reconnecting"].includes(activeCallStatus)) {
         setCallStateSafe("connecting");
         transitionIncomingCall("connected", {
           hasVideo: Boolean(activeCall.hasVideo),
@@ -1768,6 +1792,16 @@ export function useSessionRealtime(sessionId) {
           sessionId,
           eventId: activeCallSessionId
         }, "session_snapshot_active_call");
+      }
+      if (activeCallStatus === "connected") {
+        setCallStateSafe("connected");
+        transitionIncomingCall("connected", {
+          hasVideo: Boolean(activeCall.hasVideo),
+          callSessionId: activeCallSessionId,
+          visitorId: String(activeCall.visitorId || sessionId),
+          sessionId,
+          eventId: activeCallSessionId
+        }, "session_snapshot_connected_call");
       }
       pushLog("Session snapshot received", {
         activeCallStatus: activeCall.status || "none",
@@ -1949,7 +1983,7 @@ export function useSessionRealtime(sessionId) {
       pushLog("Remote accepted call", {
         callSessionId: payload?.callSessionId || callSessionRef.current
       });
-      if (canStartCall && localStreamRef.current) {
+      if (canStartCall && localStreamRef.current && !(participantType === "visitor" && incomingCallRef.current.pending)) {
         await sendOffer();
       }
     };
@@ -2042,6 +2076,9 @@ export function useSessionRealtime(sessionId) {
           sessionId,
           status: String(payload.status)
         });
+        if (participantType === "visitor") {
+          setVisitorCallInitiationAllowed(canVisitorInitiateCall(payload?.status, ""));
+        }
       }
     };
 
@@ -2057,6 +2094,9 @@ export function useSessionRealtime(sessionId) {
       if (String(payload?.sessionId || "") !== String(sessionId || "")) return;
       pendingOfferPayloadRef.current = payload;
       callSessionRef.current = String(payload?.callSessionId || callSessionRef.current || "");
+      if (participantType === "visitor") {
+        setVisitorCallInitiationAllowed(canVisitorInitiateCall(null, payload?.status));
+      }
 
       const readyToAnswer =
         participantType !== "visitor" ||
@@ -2095,7 +2135,7 @@ export function useSessionRealtime(sessionId) {
           callSessionId: callSessionRef.current || undefined,
           sdp: pc.localDescription
         });
-        setCallStateSafe("connecting");
+        setCallStateSafe(payload?.iceRestart ? "reconnecting" : "connecting");
         setStatus("Connecting call...");
         pushLog("Answer sent");
       } catch (error) {
@@ -2285,7 +2325,7 @@ export function useSessionRealtime(sessionId) {
   useEffect(() => {
     const handleOnline = () => {
       updateNetwork("reconnecting", "Network restored. Reconnecting...");
-      if (callStateRef.current === "connected" || callStateRef.current === "connecting") {
+      if (callStateRef.current === "connected" || callStateRef.current === "connecting" || callStateRef.current === "reconnecting") {
         void recoverCall("browser_online");
       }
     };
@@ -2310,7 +2350,7 @@ export function useSessionRealtime(sessionId) {
       removeNativeNetwork = cleanup;
     });
     void addNativeAppStateListener((state) => {
-      if (state?.isActive && (callStateRef.current === "connected" || callStateRef.current === "connecting")) {
+      if (state?.isActive && (callStateRef.current === "connected" || callStateRef.current === "connecting" || callStateRef.current === "reconnecting")) {
         void refreshAudioRoute("app_resumed");
         void recoverCall("app_resumed");
       }

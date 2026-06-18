@@ -55,6 +55,7 @@ export default function SecurityDashboardPage() {
   const [activeSection, setActiveSection] = useState("newRequests");
   const [refreshing, setRefreshing] = useState(false);
   const [incomingCall, setIncomingCall] = useState(null);
+  const incomingCallRef = useRef(null);
   const modalOpen = registerOpen || validateOpen;
 
   async function loadDashboard({ background = false } = {}) {
@@ -124,14 +125,40 @@ export default function SecurityDashboardPage() {
 
   useEffect(() => {
     const socket = getDashboardSocket();
+    const terminalCallEvents = ["call.accepted", "call.rejected", "call.ended"];
+    const terminalCallListeners = new Map();
     function handleIncomingCall(payload) {
       setIncomingCall(payload?.data ?? payload ?? null);
     }
+    function handleCallTerminal(payload) {
+      const nextPayload = payload?.data ?? payload ?? {};
+      const nextCallId = String(nextPayload?.callSessionId || nextPayload?.eventId || "").trim();
+      const nextSessionId = String(nextPayload?.sessionId || "").trim();
+      const activeIncoming = incomingCallRef.current;
+      const currentCallId = String(activeIncoming?.callSessionId || activeIncoming?.eventId || "").trim();
+      const currentSessionId = String(activeIncoming?.sessionId || "").trim();
+      if (!activeIncoming || !((currentCallId && nextCallId && currentCallId === nextCallId) || (currentSessionId && nextSessionId && currentSessionId === nextSessionId))) {
+        return;
+      }
+      setIncomingCall(null);
+    }
     socket.on("incoming-call", handleIncomingCall);
+    terminalCallEvents.forEach((eventName) => {
+      const listener = (payload) => handleCallTerminal(payload);
+      terminalCallListeners.set(eventName, listener);
+      socket.on(eventName, listener);
+    });
     return () => {
       socket.off("incoming-call", handleIncomingCall);
+      terminalCallListeners.forEach((listener, eventName) => {
+        socket.off(eventName, listener);
+      });
     };
   }, []);
+
+  useEffect(() => {
+    incomingCallRef.current = incomingCall;
+  }, [incomingCall]);
 
   useSocketEvents(useMemo(() => ({
     new_visitor_request: () => loadDashboard({ background: true }),
@@ -200,6 +227,20 @@ export default function SecurityDashboardPage() {
       navigate(`/session/${sessionId}/${nextMode}`);
     } catch (e) { setError(e?.message || "Unable to start call."); }
     finally { setBusyKey(""); }
+  }
+
+  function handleAnswerIncomingCall() {
+    if (!incomingCall?.sessionId || !incomingCall?.callSessionId) return;
+    window.sessionStorage.setItem(
+      "qring_call_accept_intent",
+      JSON.stringify({
+        sessionId: incomingCall.sessionId,
+        hasVideo: Boolean(incomingCall.hasVideo),
+        callSessionId: incomingCall.callSessionId,
+        visitorId: incomingCall.visitorId || incomingCall.sessionId
+      })
+    );
+    setIncomingCall(null);
   }
 
   function stopCamera() {
@@ -385,6 +426,7 @@ export default function SecurityDashboardPage() {
               <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
                 <Link
                   to={`/session/${encodeURIComponent(incomingCall.sessionId)}/${incomingCall.hasVideo ? "video" : "audio"}`}
+                  onClick={handleAnswerIncomingCall}
                   style={{ background: "#059669", color: "#fff", borderRadius: 12, padding: "10px 12px", fontSize: 12, fontWeight: 700, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6 }}
                 >
                   {incomingCall.hasVideo ? <Video size={13} /> : <Phone size={13} />}
