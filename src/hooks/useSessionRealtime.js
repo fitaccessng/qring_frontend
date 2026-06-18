@@ -346,6 +346,30 @@ function buildSessionRtcConfig(rtcConfig, forceRelay = false) {
   };
 }
 
+function normalizeMediaPermissionError(error, wantsVideo) {
+  const rawMessage = String(error?.message || "").trim();
+  const errorName = String(error?.name || "").trim();
+  const loweredMessage = rawMessage.toLowerCase();
+  const mediaKind = wantsVideo ? "camera and microphone" : "microphone";
+
+  if (errorName === "NotAllowedError" || loweredMessage.includes("permission") || loweredMessage.includes("denied")) {
+    return `Permission to use the ${mediaKind} was blocked. Open your browser settings and allow access, then try again.`;
+  }
+  if (errorName === "NotFoundError" || loweredMessage.includes("notfound") || loweredMessage.includes("device")) {
+    return `No ${mediaKind} device was found on this phone or browser session.`;
+  }
+  if (errorName === "SecurityError" || loweredMessage.includes("secure") || loweredMessage.includes("https")) {
+    return "Camera and microphone need a secure HTTPS connection. Open the app in HTTPS or localhost.";
+  }
+  if (errorName === "AbortError" || loweredMessage.includes("abort")) {
+    return `The ${mediaKind} request was interrupted. Please try again.`;
+  }
+  if (errorName === "OverconstrainedError" || loweredMessage.includes("overconstrained")) {
+    return `The requested ${mediaKind} settings are not supported by this device.`;
+  }
+  return rawMessage || `Unable to access the ${mediaKind}.`;
+}
+
 export function useSessionRealtime(sessionId) {
   const context = useMemo(() => getParticipantContext(), []);
   const { participantType, canStartCall: baseCanStartCall, displayName, polite } = context;
@@ -447,7 +471,7 @@ export function useSessionRealtime(sessionId) {
   const featureError = useMemo(() => {
     if (!supportsWebRTC) return "This browser does not support WebRTC calls.";
     if (!isSecureOrigin) {
-      return "Camera and microphone require HTTPS on network devices. Open the app with HTTPS or localhost.";
+      return "Camera and microphone need a secure HTTPS connection. iPhone Safari and Android WebView can block media on HTTP.";
     }
     if (!supportsUserMedia) return "Camera/microphone APIs are unavailable in this browser.";
     return "";
@@ -838,14 +862,19 @@ export function useSessionRealtime(sessionId) {
       error: "",
       lastRequestedAt: Date.now(),
     }));
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true
-      },
-      video: getVideoConstraintsForProfile({ enabled: wantsVideo, facingMode, profile: qualityProfile })
-    });
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        },
+        video: getVideoConstraintsForProfile({ enabled: wantsVideo, facingMode, profile: qualityProfile })
+      });
+    } catch (error) {
+      throw new Error(normalizeMediaPermissionError(error, wantsVideo));
+    }
 
     localStreamRef.current = stream;
     localVideoEnabledRef.current = wantsVideo;
@@ -881,11 +910,14 @@ export function useSessionRealtime(sessionId) {
     return stream;
   }
 
-  async function requestMediaPermissions({ video = false } = {}) {
+  async function requestMediaPermissions({ video = false, silent = false } = {}) {
     try {
       await ensureLocalStream({ video, reuse: false });
       return true;
     } catch (error) {
+      if (silent) {
+        return false;
+      }
       const message = String(error?.message || "");
       const unavailable =
         message.toLowerCase().includes("notfound") ||

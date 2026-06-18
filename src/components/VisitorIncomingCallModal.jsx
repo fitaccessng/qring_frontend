@@ -8,7 +8,8 @@ export default function VisitorIncomingCallModal({
   onAccept,
   onReject,
   busy = false,
-  callerLabel = "Homeowner"
+  callerLabel = "Caller",
+  sourceLabel = ""
 }) {
   const [audioState, setAudioState] = useState(() => getNotificationAudioContextState());
   const showSoundUnlock = audioState !== "running";
@@ -42,7 +43,9 @@ export default function VisitorIncomingCallModal({
         <h2 className="mt-2 text-[28px] font-semibold leading-tight tracking-tight">
           {hasVideo ? `${callerLabel} Video Call` : `${callerLabel} Audio Call`}
         </h2>
-        <p className="mt-1.5 text-[13px] text-white/70">Tap to answer quickly or decline to stay in chat.</p>
+        <p className="mt-1.5 text-[13px] text-white/70">
+          {sourceLabel ? `${callerLabel} is calling from the ${sourceLabel}.` : "Tap to answer quickly or decline to stay in chat."}
+        </p>
 
         {showSoundUnlock ? (
           <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-[12px] text-white/80">

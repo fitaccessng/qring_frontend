@@ -296,7 +296,11 @@ export default function HomeownerMessagesPage() {
       setThreads((prev) =>
         prev.map((thread) =>
           thread.id === incomingSessionId
-            ? { ...thread, last: payload?.message || thread.last, time: payload?.at || new Date().toISOString() }
+            ? {
+                ...thread,
+                last: payload?.message || thread.last,
+                time: payload?.at || new Date().toISOString()
+              }
             : thread
         )
       );
@@ -315,7 +319,10 @@ export default function HomeownerMessagesPage() {
         hasVideo: Boolean(payload?.hasVideo),
         callSessionId,
         visitorId: String(payload?.visitorId || incomingSessionId),
-        sessionId: incomingSessionId
+        sessionId: incomingSessionId,
+        callerName: String(payload?.callerName || roleLabel(payload?.callerRole) || payload?.homeownerName || payload?.visitorName || "Caller"),
+        callerOrigin: String(payload?.callerOrigin || "").trim(),
+        callerRole: String(payload?.callerRole || "").trim()
       });
       setIncomingCallBusy(false);
     };
@@ -398,13 +405,16 @@ export default function HomeownerMessagesPage() {
 
   useEffect(() => {
     if (!managedIncomingCall?.sessionId || !managedIncomingCall?.callSessionId) return;
-    setIncomingCall({
-      pending: true,
-      hasVideo: Boolean(managedIncomingCall?.hasVideo),
-      callSessionId: String(managedIncomingCall?.callSessionId || ""),
-      visitorId: String(managedIncomingCall?.visitorId || managedIncomingCall?.sessionId || ""),
-      sessionId: String(managedIncomingCall?.sessionId || "")
-    });
+      setIncomingCall({
+        pending: true,
+        hasVideo: Boolean(managedIncomingCall?.hasVideo),
+        callSessionId: String(managedIncomingCall?.callSessionId || ""),
+        visitorId: String(managedIncomingCall?.visitorId || managedIncomingCall?.sessionId || ""),
+        sessionId: String(managedIncomingCall?.sessionId || ""),
+        callerName: String(managedIncomingCall?.callerName || roleLabel(managedIncomingCall?.callerRole) || managedIncomingCall?.homeownerName || managedIncomingCall?.visitorName || "Caller"),
+        callerOrigin: String(managedIncomingCall?.callerOrigin || "").trim(),
+        callerRole: String(managedIncomingCall?.callerRole || "").trim()
+      });
   }, [managedIncomingCall]);
 
   useEffect(() => {
@@ -828,7 +838,8 @@ export default function HomeownerMessagesPage() {
         open={incomingCall.pending}
         hasVideo={incomingCall.hasVideo}
         busy={incomingCallBusy}
-        callerLabel="Visitor"
+        callerLabel={incomingCall.callerName || roleLabel(incomingCall.callerRole) || incomingCall.homeownerName || incomingCall.visitorName || "Caller"}
+        sourceLabel={incomingCall.callerOrigin || ""}
         onAccept={handleAcceptIncomingCall}
         onReject={handleRejectIncomingCall}
       />
@@ -871,6 +882,14 @@ function renderThreadMessageBody(message) {
     );
   }
   return renderMessageBody(message?.text);
+}
+
+function roleLabel(role) {
+  const normalized = String(role || "").trim().toLowerCase();
+  if (normalized === "homeowner") return "Homeowner";
+  if (normalized === "security") return "Security";
+  if (normalized === "visitor") return "Visitor";
+  return "";
 }
 
 function previewMessageText(text) {

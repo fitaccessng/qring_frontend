@@ -107,7 +107,7 @@ export default function SessionMessagePage() {
 
   useEffect(() => {
     if (!sessionId) return;
-    void requestMediaPermissions({ video: false }).catch(() => {
+    void requestMediaPermissions({ video: false, silent: true }).catch(() => {
       // Permission state is reflected through the hook.
     });
   }, [requestMediaPermissions, sessionId]);

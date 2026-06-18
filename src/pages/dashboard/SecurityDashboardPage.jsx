@@ -243,6 +243,14 @@ export default function SecurityDashboardPage() {
     setIncomingCall(null);
   }
 
+  function getIncomingCallRoleLabel() {
+    const role = String(incomingCall?.callerRole || "").trim().toLowerCase();
+    if (role === "security") return "Security";
+    if (role === "homeowner") return "Homeowner";
+    if (role === "visitor") return "Visitor";
+    return "Caller";
+  }
+
   function stopCamera() {
     const stream = cameraStreamRef.current;
     cameraStreamRef.current = null;
@@ -414,13 +422,13 @@ export default function SecurityDashboardPage() {
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
               <div>
                 <p className="sec-label" style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#047857", margin: "0 0 4px" }}>
-                  Incoming Homeowner Call
+                  Incoming {getIncomingCallRoleLabel()} Call
                 </p>
                 <p style={{ fontSize: 14, fontWeight: 700, color: "#064e3b", margin: "0 0 4px" }}>
-                  {incomingCall.homeownerName || incomingCall.visitorName || "Homeowner"} is calling security.
+                  {incomingCall.callerName || incomingCall.homeownerName || incomingCall.visitorName || "Caller"} is calling security.
                 </p>
                 <p style={{ fontSize: 12, color: "#065f46", margin: 0 }}>
-                  Open the live call screen to answer now.
+                  {incomingCall.callerOrigin ? `From the ${incomingCall.callerOrigin}.` : "Open the live call screen to answer now."}
                 </p>
               </div>
               <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
@@ -748,7 +756,7 @@ export default function SecurityDashboardPage() {
 
         <MobileBottomSheet
           open={!!incomingCall?.sessionId}
-          title="Incoming Homeowner Call"
+          title={`Incoming ${getIncomingCallRoleLabel()} Call`}
           onClose={() => setIncomingCall(null)}
           width="680px"
           height="60dvh"
@@ -756,10 +764,12 @@ export default function SecurityDashboardPage() {
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <div style={{ background: "#f0fdf4", borderRadius: 18, padding: "16px", border: "1px solid #bbf7d0" }}>
               <p className="sec-label" style={{ fontSize: 20, color: "#064e3b", margin: "0 0 6px" }}>
-                {incomingCall?.homeownerName || incomingCall?.visitorName || "Homeowner"}
+                {incomingCall?.callerName || incomingCall?.homeownerName || incomingCall?.visitorName || "Caller"}
               </p>
               <p style={{ fontSize: 13, color: "#065f46", margin: "0 0 4px" }}>
-                A homeowner is trying to reach the security desk right now.
+                {incomingCall?.callerOrigin
+                  ? `${incomingCall.callerName || "The caller"} is calling from the ${incomingCall.callerOrigin}.`
+                  : "A caller is trying to reach the security desk right now."}
               </p>
               <p style={{ fontSize: 12, color: "#047857", margin: 0 }}>
                 Session: {incomingCall?.sessionId || "N/A"}
