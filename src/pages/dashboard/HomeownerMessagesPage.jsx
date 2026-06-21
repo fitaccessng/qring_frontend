@@ -236,6 +236,7 @@ export default function HomeownerMessagesPage() {
     const handleSessionSnapshot = (payload) => {
       const incomingSessionId = String(payload?.sessionId || "").trim();
       if (!incomingSessionId) return;
+      const snapshotMessage = buildSnapshotMessage(payload, incomingSessionId);
       setThreads((prev) =>
         prev.map((thread) =>
           thread.id === incomingSessionId
@@ -251,6 +252,15 @@ export default function HomeownerMessagesPage() {
             : thread
         )
       );
+      if (snapshotMessage) {
+        setMessagesByThread((prev) => {
+          const current = prev[incomingSessionId] ?? [];
+          return {
+            ...prev,
+            [incomingSessionId]: mergeMessageCollections(current, [snapshotMessage])
+          };
+        });
+      }
       if (payload?.photoUrl || payload?.snapshotAuditId) {
         // eslint-disable-next-line no-console
         console.info("qring.homeowner.snapshot.session_update", {
@@ -389,6 +399,24 @@ export default function HomeownerMessagesPage() {
               : thread
           )
         );
+        const snapshotMessage = buildSnapshotMessage(
+          {
+            ...data,
+            sessionId: visitorSessionId,
+            photoUrl: nextUrl,
+            snapshotUrl: nextUrl
+          },
+          visitorSessionId
+        );
+        if (snapshotMessage) {
+          setMessagesByThread((prev) => {
+            const current = prev[visitorSessionId] ?? [];
+            return {
+              ...prev,
+              [visitorSessionId]: mergeMessageCollections(current, [snapshotMessage])
+            };
+          });
+        }
       }
       void refreshThreads({ focusSessionId: visitorSessionId }).catch(() => {});
       return;
@@ -547,7 +575,7 @@ export default function HomeownerMessagesPage() {
       window.sessionStorage.setItem("qring_call_start_intent", JSON.stringify({
         pending: true, sessionId: selectedId, mode, callSessionId: data?.callSessionId, visitorId: data?.visitorId || selectedId
       }));
-      navigate(`/session/${selectedId}/message`);
+      navigate(`/session/${selectedId}/${mode}`);
     } catch (err) { setError(err?.message || "Failed to route call"); }
     finally { setCallBusy(""); }
   }
@@ -572,7 +600,7 @@ export default function HomeownerMessagesPage() {
     });
     setIncomingCall({ pending: false, hasVideo: false, callSessionId: "", visitorId: "", sessionId: "" });
     dismissIncomingCall(acceptIntent);
-    navigate(`/session/${incomingCall.sessionId}/message`);
+    navigate(`/session/${incomingCall.sessionId}/${mode}`);
   }
 
   async function handleRejectIncomingCall() {
@@ -997,6 +1025,28 @@ function getThreadSnapshotSrc(thread) {
   ).trim();
   if (!snapshotAuditId) return "";
   return `/advanced/visitor/snapshots/${encodeURIComponent(snapshotAuditId)}/file`;
+}
+
+function buildSnapshotMessage(payload, fallbackSessionId = "") {
+  const sessionId = String(payload?.sessionId || fallbackSessionId || "").trim();
+  if (!sessionId) return null;
+  const snapshotUrl = String(payload?.snapshotUrl || payload?.photoUrl || "").trim();
+  return {
+    id: `snapshot:${sessionId}`,
+    messageId: `snapshot:${sessionId}`,
+    sessionId,
+    text: payload?.message || "Visitor snapshot submitted.",
+    messageType: "visitor_snapshot",
+    snapshotUrl,
+    photoUrl: snapshotUrl,
+    senderRole: "visitor",
+    senderType: "visitor",
+    displayName: payload?.visitorName || "Visitor",
+    visitorName: payload?.visitorName || "Visitor",
+    visitorPhone: payload?.visitorPhone || "",
+    purpose: payload?.purpose || "",
+    at: payload?.at || payload?.timestamp || new Date().toISOString()
+  };
 }
 
 function safeParsePayload(value) {

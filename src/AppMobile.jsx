@@ -13,6 +13,7 @@ import LoaderPage from "./pages/common/LoaderPage";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import RoleRoute from "./routes/RoleRoute";
 import VisitorSessionGateRoute from "./routes/VisitorSessionGateRoute";
+import SessionCallRoute from "./routes/SessionCallRoute";
 import PublicOnlyRoute from "./routes/PublicOnlyRoute";
 import EstateManagedHomeownerRoute from "./routes/EstateManagedHomeownerRoute";
 import HomeownerSubscriptionRoute from "./routes/HomeownerSubscriptionRoute";
@@ -233,7 +234,7 @@ function AppRoutes() {
                 path="/session/:sessionId/audio"
                 element={
                   <VisitorSessionGateRoute>
-                    <LegacySessionCallRedirect />
+                    <SessionCallRoute />
                   </VisitorSessionGateRoute>
                 }
               />
@@ -241,7 +242,7 @@ function AppRoutes() {
                 path="/session/:sessionId/video"
                 element={
                   <VisitorSessionGateRoute>
-                    <LegacySessionCallRedirect />
+                    <SessionCallRoute />
                   </VisitorSessionGateRoute>
                 }
               />
@@ -353,7 +354,10 @@ function LazyRoute({ children }) {
 
 function LegacySessionCallRedirect() {
   const { sessionId } = useParams();
-  return <Navigate to={`/session/${encodeURIComponent(sessionId || "")}/message`} replace />;
+  const location = useLocation();
+  const path = String(location.pathname || "").toLowerCase();
+  const mode = path.endsWith("/video") ? "video" : "audio";
+  return <Navigate to={`/session/${encodeURIComponent(sessionId || "")}/message?mode=${mode}`} replace />;
 }
 
 function RouteFallback() {

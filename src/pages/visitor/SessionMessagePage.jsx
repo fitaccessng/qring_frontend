@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Mic, MicOff, PhoneOff, RotateCcw, User, Video, Volume2 } from "lucide-react";
+import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Mic, MicOff, PhoneCall, PhoneOff, RotateCcw, User, Video, Volume2 } from "lucide-react";
 import SecureSnapshotImage from "../../components/SecureSnapshotImage";
 import SessionNetworkBadge from "../../components/SessionNetworkBadge";
 import SessionModeNav from "../../components/SessionModeNav";
@@ -10,10 +10,12 @@ import { useSessionRealtime } from "../../hooks/useSessionRealtime";
 export default function SessionMessagePage() {
   const { sessionId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const [acceptingCall, setAcceptingCall] = useState(false);
   const isHomeowner = getStoredUserRole() === "homeowner";
-  if (isHomeowner) {
+  const requestedCallMode = resolveRequestedCallMode(location.pathname, searchParams);
+  if (isHomeowner && !requestedCallMode) {
     return <Navigate to={`/dashboard/homeowner/messages?sessionId=${encodeURIComponent(sessionId || "")}`} replace />;
   }
   if (!sessionId) {
@@ -88,6 +90,7 @@ export default function SessionMessagePage() {
         phase: "incoming",
         eventId: incomingCall.eventId || incomingCall.callSessionId
       });
+      navigate(`/session/${sessionId}/${snapshot.hasVideo ? "video" : "audio"}`, { replace: true });
     } catch {
       // Stay on the unified session page; the hook will surface the call state here.
     } finally {
@@ -123,8 +126,40 @@ export default function SessionMessagePage() {
   }
 
   const serverCallState = resolveServerCallState(callState);
-  const requestedCallMode = String(searchParams.get("mode") || "").trim().toLowerCase();
   const activeCallMode = acceptedCallMode || (requestedCallMode === "video" || requestedCallMode === "audio" ? requestedCallMode : "");
+  const callRouteMode = activeCallMode || requestedCallMode;
+  const callRouteLabel =
+    callRouteMode === "video"
+      ? "Video Call"
+      : callRouteMode === "audio"
+        ? "Audio Call"
+        : "Session Messages";
+  const callRouteDescription =
+    callRouteMode === "video"
+      ? "This route keeps the video experience front and center for both sides."
+      : callRouteMode === "audio"
+        ? "This route is tuned for a direct two-way voice session."
+        : "Chat stays available while the call connects.";
+  const routeTheme = {
+    audio: {
+      pageBg: "bg-[radial-gradient(circle_at_top_left,_#f8fafc_0,_#ecfeff_40%,_#cffafe_78%,_#bae6fd_100%)]",
+      headerLine: "bg-gradient-to-r from-sky-500 via-cyan-400 to-sky-300",
+      routeChip: "bg-sky-100 text-sky-900 border-sky-200",
+      routeBadge: "bg-sky-50 text-sky-700 border-sky-200"
+    },
+    video: {
+      pageBg: "bg-[radial-gradient(circle_at_top_left,_#f8fafc_0,_#f0fdf4_38%,_#dcfce7_76%,_#bbf7d0_100%)]",
+      headerLine: "bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-400",
+      routeChip: "bg-emerald-100 text-emerald-900 border-emerald-200",
+      routeBadge: "bg-emerald-50 text-emerald-700 border-emerald-200"
+    },
+    session: {
+      pageBg: "bg-[radial-gradient(circle_at_top_left,_#f8fafc_0,_#eef2ff_42%,_#e0f2fe_78%,_#dbeafe_100%)]",
+      headerLine: "bg-gradient-to-r from-sky-500 via-cyan-400 to-emerald-400",
+      routeChip: "bg-slate-100 text-slate-700 border-slate-200",
+      routeBadge: "bg-white text-slate-500 border-slate-200"
+    }
+  }[callRouteMode === "video" ? "video" : callRouteMode === "audio" ? "audio" : "session"];
   const callModeLabels =
     serverCallState === "ringing"
       ? { audio: "Audio (Ringing)", video: "Video (Ringing)" }
@@ -146,12 +181,39 @@ export default function SessionMessagePage() {
             ? "Server call session state: failed. Check network/permissions and retry."
       : "Server call session state: pending. Audio and video unlock once homeowner starts a call.";
 
+  useEffect(() => {
+    if (typeof document === "undefined") return () => {};
+    const previousTitle = document.title;
+    document.title =
+      callRouteMode === "video"
+        ? `Video Call | Qring`
+        : callRouteMode === "audio"
+          ? `Audio Call | Qring`
+          : `Session Messages | Qring`;
+    return () => {
+      document.title = previousTitle;
+    };
+  }, [callRouteMode]);
+
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_#f8fafc_0,_#eef2ff_42%,_#e0f2fe_78%,_#dbeafe_100%)] p-4 text-slate-900">
+    <div className={`min-h-screen ${routeTheme.pageBg} p-4 text-slate-900`}>
       <div className="mx-auto w-full max-w-7xl py-6">
-        <header className="mb-4 rounded-3xl border border-slate-200/80 bg-white/90 p-5 shadow-soft backdrop-blur">
-          <h1 className="font-heading text-2xl font-black md:text-3xl">Session Messages</h1>
-          <p className="mt-1 text-xs text-slate-500">
+        <header className="relative mb-4 overflow-hidden rounded-3xl border border-slate-200/80 bg-white/90 p-5 shadow-soft backdrop-blur">
+          <div className={`absolute inset-x-0 top-0 h-1 ${routeTheme.headerLine}`} />
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={`rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-[0.22em] ${routeTheme.routeChip}`}>
+              <span className="inline-flex items-center gap-1.5">
+                {callRouteMode === "video" ? <Video size={11} /> : callRouteMode === "audio" ? <PhoneCall size={11} /> : <PhoneCall size={11} />}
+                {callRouteMode === "video" ? "Video Route" : callRouteMode === "audio" ? "Audio Route" : "Session Route"}
+              </span>
+            </span>
+            <span className={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${routeTheme.routeBadge}`}>
+              /session/{sessionId}/{callRouteMode || "message"}
+            </span>
+          </div>
+          <h1 className="mt-3 font-heading text-2xl font-black md:text-3xl">{callRouteLabel}</h1>
+          <p className="mt-1 max-w-2xl text-sm text-slate-600">{callRouteDescription}</p>
+          <p className="mt-3 text-xs text-slate-500">
             Session {sessionId} | {connected ? "Signaling Online" : "Connecting"} | {joined ? "Room Joined" : "Waiting Room"} | Server Call Session: {serverCallState}
           </p>
           <SessionNetworkBadge quality={networkQuality} detail={networkDetail} />
@@ -180,6 +242,8 @@ export default function SessionMessagePage() {
                 {renderCallSurface({
                   activeCallMode,
                   callState,
+                  callRouteMode,
+                  routeTheme,
                   cameraFacing,
                   localVideoRef,
                   remoteVideoRef,
@@ -300,6 +364,8 @@ export default function SessionMessagePage() {
 function renderCallSurface({
   activeCallMode,
   callState,
+  callRouteMode,
+  routeTheme,
   cameraFacing,
   localVideoRef,
   remoteVideoRef,
@@ -324,10 +390,12 @@ function renderCallSurface({
   const isConnecting = callState === "connecting" || callState === "ringing";
   const callHeadline = isVideo ? "Video call in progress" : "Audio call in progress";
   return (
-    <div className="relative overflow-hidden bg-slate-950 text-white">
-      {!isVideo ? <audio ref={remoteAudioRef} autoPlay playsInline /> : null}
-      {isVideo ? (
-        <div className="relative aspect-[16/10] bg-black">
+    <div className={`relative overflow-hidden text-white ${routeTheme?.pageBg || "bg-slate-950"}`}>
+      <div className={`absolute inset-0 opacity-95 ${isVideo ? "bg-[radial-gradient(circle_at_top_right,_rgba(16,185,129,0.32)_0,_rgba(15,23,42,0.88)_55%,_rgba(2,6,23,1)_100%)]" : "bg-[radial-gradient(circle_at_top_right,_rgba(14,165,233,0.28)_0,_rgba(15,23,42,0.90)_58%,_rgba(2,6,23,1)_100%)]"}`} />
+      <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
+      <div className="relative">
+        {isVideo ? (
+          <div className="relative aspect-[16/10] bg-black">
           <video
             ref={remoteVideoRef}
             autoPlay
@@ -342,21 +410,22 @@ function renderCallSurface({
           <div className="absolute bottom-4 right-4 h-28 w-20 overflow-hidden rounded-2xl border border-white/10 bg-slate-900 shadow-2xl">
             <video ref={localVideoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
           </div>
-        </div>
-      ) : (
-        <div className="grid gap-4 px-4 py-6 sm:grid-cols-[auto,1fr] sm:items-center">
-          <div className="grid h-24 w-24 place-items-center rounded-full bg-white/10">
-            <User size={36} className="text-white/60" />
           </div>
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-300">{activeLabel}</p>
-            <h2 className="mt-1 text-2xl font-black tracking-tight">{callHeadline}</h2>
-            <p className="mt-2 text-sm text-white/70">{isConnecting ? "Connecting securely..." : isConnected ? "You are live now." : "Waiting to connect."}</p>
-            {networkDetail ? <p className="mt-2 text-xs text-white/45">{networkDetail}</p> : null}
-            {status ? <p className="mt-2 text-xs text-amber-200">{status}</p> : null}
+        ) : (
+          <div className="grid gap-4 px-4 py-6 sm:grid-cols-[auto,1fr] sm:items-center">
+            <div className="grid h-24 w-24 place-items-center rounded-full bg-white/10 backdrop-blur-sm">
+              <User size={36} className="text-white/60" />
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-300">{activeLabel}</p>
+              <h2 className="mt-1 text-2xl font-black tracking-tight">{callHeadline}</h2>
+              <p className="mt-2 text-sm text-white/70">{isConnecting ? "Connecting securely..." : isConnected ? "You are live now." : "Waiting to connect."}</p>
+              {networkDetail ? <p className="mt-2 text-xs text-white/45">{networkDetail}</p> : null}
+              {status ? <p className="mt-2 text-xs text-amber-200">{status}</p> : null}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       <div className="space-y-4 border-t border-white/10 px-4 py-4">
         <div className="flex flex-wrap gap-2 text-[11px] text-white/60">
@@ -474,4 +543,13 @@ function PermissionPill({ permission }) {
         : "bg-rose-100 text-rose-800";
 
   return <span className={`rounded-full px-2.5 py-1 font-semibold ${className}`}>{label}</span>;
+}
+
+function resolveRequestedCallMode(pathname, searchParams) {
+  const queryMode = String(searchParams.get("mode") || "").trim().toLowerCase();
+  if (queryMode === "audio" || queryMode === "video") return queryMode;
+  const path = String(pathname || "").toLowerCase();
+  if (path.endsWith("/audio")) return "audio";
+  if (path.endsWith("/video")) return "video";
+  return "";
 }
