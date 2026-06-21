@@ -1,7 +1,7 @@
 import { lazy, Suspense } from "react";
 import { Navigate, useLocation, useParams } from "react-router-dom";
 
-const SessionMessagePage = lazy(() => import("../pages/visitor/SessionMessagePage"));
+const SessionCallPage = lazy(() => import("../pages/visitor/SessionCallPage"));
 
 export default function SessionCallRoute() {
   const { sessionId } = useParams();
@@ -21,7 +21,7 @@ export default function SessionCallRoute() {
         </div>
       }
     >
-      <SessionMessagePage key={`${sessionId}:${mode}`} />
+      <SessionCallPage key={`${sessionId}:${mode}`} />
     </Suspense>
   );
 }

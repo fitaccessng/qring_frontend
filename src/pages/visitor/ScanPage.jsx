@@ -152,6 +152,15 @@ export default function ScanPage() {
     snapshotDataUrl: "",
   });
 
+  useEffect(() => {
+    if (!qrId) return;
+    try {
+      sessionStorage.setItem("qring_visitor_last_qr_id", String(qrId).trim());
+    } catch {
+      // ignore storage failures
+    }
+  }, [qrId]);
+
   async function stopCamera() {
     const stream = cameraStreamRef.current;
     cameraStreamRef.current = null;

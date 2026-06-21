@@ -180,13 +180,14 @@ export default function HomeownerMessagesPage() {
     const handleChatMessage = (payload) => {
       const incomingSessionId = payload?.sessionId;
       if (!incomingSessionId) return;
+      const snapshotUrl = extractSnapshotUrl(payload);
       const normalized = {
         id: payload?.messageId || payload?.id || `${payload?.at || Date.now()}-${Math.random()}`,
         messageId: payload?.messageId || payload?.id || "",
         sessionId: incomingSessionId,
         text: payload?.text || "",
         messageType: payload?.messageType || "text",
-        snapshotUrl: payload?.snapshotUrl || payload?.photoUrl || "",
+        snapshotUrl,
         senderRole: payload?.senderRole || payload?.senderType || "visitor",
         senderType: payload?.senderRole || payload?.senderType || "visitor",
         displayName: payload?.displayName || "Participant",
@@ -216,14 +217,15 @@ export default function HomeownerMessagesPage() {
       const incomingSessionId = String(payload?.sessionId || "").trim();
       const nextStatus = String(payload?.status || "").trim();
       if (!incomingSessionId || !nextStatus) return;
+      const snapshotUrl = extractSnapshotUrl(payload);
       setThreads((prev) =>
         prev.map((thread) =>
           thread.id === incomingSessionId
             ? {
                 ...thread,
                 sessionStatus: nextStatus,
-                photoUrl: payload?.snapshotUrl || payload?.photoUrl || thread.photoUrl,
-                snapshotUrl: payload?.snapshotUrl || payload?.photoUrl || thread.snapshotUrl,
+                photoUrl: snapshotUrl || thread.photoUrl,
+                snapshotUrl: snapshotUrl || thread.snapshotUrl,
                 snapshotAuditId: payload?.snapshotAuditId || thread.snapshotAuditId,
                 last: payload?.sessionActivated ? "Access approved. Visitor can now enter the session." : thread.last,
                 time: new Date().toISOString()
@@ -236,14 +238,15 @@ export default function HomeownerMessagesPage() {
     const handleSessionSnapshot = (payload) => {
       const incomingSessionId = String(payload?.sessionId || "").trim();
       if (!incomingSessionId) return;
-      const snapshotMessage = buildSnapshotMessage(payload, incomingSessionId);
+      const snapshotUrl = extractSnapshotUrl(payload);
+      const snapshotMessage = buildSnapshotMessage({ ...payload, snapshotUrl }, incomingSessionId);
       setThreads((prev) =>
         prev.map((thread) =>
           thread.id === incomingSessionId
             ? {
                 ...thread,
-                photoUrl: payload?.snapshotUrl || payload?.photoUrl || thread.photoUrl,
-                snapshotUrl: payload?.snapshotUrl || payload?.photoUrl || thread.snapshotUrl,
+                photoUrl: snapshotUrl || thread.photoUrl,
+                snapshotUrl: snapshotUrl || thread.snapshotUrl,
                 snapshotAuditId: payload?.snapshotAuditId || thread.snapshotAuditId,
                 purpose: payload?.purpose || thread.purpose,
                 visitorPhone: payload?.visitorPhone || thread.visitorPhone,
@@ -390,12 +393,12 @@ export default function HomeownerMessagesPage() {
     if (eventName === "visitor.snapshot") {
       const data = lastRealtimeEvent?.payload || {};
       const visitorSessionId = String(data?.visitorSessionId || data?.sessionId || "").trim();
-      const nextUrl = String(data?.fileUrl || data?.url || "").trim();
+      const nextUrl = extractSnapshotUrl(data);
       if (visitorSessionId && nextUrl) {
         setThreads((prev) =>
           prev.map((thread) =>
             thread.id === visitorSessionId
-              ? { ...thread, photoUrl: nextUrl, snapshotAuditId: data?.id || thread.snapshotAuditId }
+              ? { ...thread, photoUrl: nextUrl, snapshotUrl: nextUrl, snapshotAuditId: data?.id || thread.snapshotAuditId }
               : thread
           )
         );
@@ -468,7 +471,9 @@ export default function HomeownerMessagesPage() {
         setConversationLoading(true);
         try {
             const rows = await getHomeownerSessionMessages(selectedId);
-            setMessagesByThread(prev => ({ ...prev, [selectedId]: mergeMessageCollections(prev[selectedId] || [], rows) }));
+            const threadSnapshot = threadsRef.current.find((thread) => thread.id === selectedId);
+            const mergedRows = ensureSnapshotConversationRows(rows, selectedId, threadSnapshot);
+            setMessagesByThread(prev => ({ ...prev, [selectedId]: mergeMessageCollections(prev[selectedId] || [], mergedRows) }));
             setThreads(prev => prev.map(t => t.id === selectedId ? { ...t, unread: 0 } : t));
         } catch (err) { setError(err.message); }
         finally { setConversationLoading(false); }
@@ -786,16 +791,22 @@ export default function HomeownerMessagesPage() {
                 ) : (
                   selectedMessages.map((msg, i) => (
                     <div key={msg.messageId || msg.id || i} className={`flex ${msg.senderType === 'homeowner' ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[85%] p-3.5 rounded-xl text-sm ${
-                        msg.senderType === 'homeowner'
-                        ? 'bg-indigo-600 text-white rounded-tr-none font-medium shadow-xs'
-                        : 'bg-white text-slate-700 rounded-tl-none border border-slate-200/70 shadow-xs'
-                      }`}>
-                        {renderThreadMessageBody(msg)}
-                        <p className={`text-[8px] mt-1.5 font-bold uppercase tracking-wider text-right ${msg.senderType === 'homeowner' ? 'text-indigo-200' : 'text-slate-400'}`}>
-                          {formatClockTime(msg.at)}
-                        </p>
-                      </div>
+                      {(() => {
+                        const snapshotBubble = isSnapshotThreadMessage(msg);
+                        const bubbleClass = msg.senderType === "homeowner"
+                          ? "bg-indigo-600 text-white rounded-tr-none font-medium shadow-xs"
+                          : snapshotBubble
+                            ? "bg-white text-slate-800 rounded-tl-none border border-slate-200/90 shadow-[0_14px_40px_rgba(15,23,42,0.08)] ring-1 ring-slate-100"
+                            : "bg-white text-slate-700 rounded-tl-none border border-slate-200/70 shadow-xs";
+                        return (
+                          <div className={`max-w-[85%] p-3.5 rounded-xl text-sm ${bubbleClass}`}>
+                            {renderThreadMessageBody(msg)}
+                            <p className={`text-[8px] mt-1.5 font-bold uppercase tracking-wider text-right ${msg.senderType === 'homeowner' ? 'text-indigo-200' : 'text-slate-400'}`}>
+                              {formatClockTime(msg.at)}
+                            </p>
+                          </div>
+                        );
+                      })()}
                     </div>
                   ))
                 )}
@@ -887,24 +898,47 @@ function renderMessageBody(text) {
 }
 
 function renderThreadMessageBody(message) {
-  if (String(message?.messageType || "text") === "visitor_snapshot") {
-    const snapshotUrl = String(message?.snapshotUrl || "").trim();
+  const snapshotUrl = extractSnapshotUrl(message);
+  const messageType = String(message?.messageType || "text");
+  if (messageType === "visitor_snapshot" || Boolean(snapshotUrl)) {
+    const footerLabel = getSnapshotFooterLabel(message);
     return (
-      <div className="space-y-2">
-        {snapshotUrl ? (
-          <SecureSnapshotImage
-            src={snapshotUrl}
-            alt="Visitor snapshot"
-            className="max-h-56 w-full rounded-lg object-cover"
-            fallback={<div className="grid h-40 w-full place-items-center rounded-lg bg-slate-200 text-xs font-bold text-slate-500">Snapshot unavailable</div>}
-          />
-        ) : (
-          <div className="grid h-40 w-full place-items-center rounded-lg bg-slate-200 text-xs font-bold text-slate-500">Snapshot unavailable</div>
-        )}
-        <div className="space-y-1 text-[11px] text-slate-500">
-          {message?.visitorName ? <p>Name: <span className="font-semibold text-slate-700">{message.visitorName}</span></p> : null}
-          {message?.visitorPhone ? <p>Phone: <span className="font-semibold text-slate-700">{message.visitorPhone}</span></p> : null}
-          {message?.purpose ? <p>Purpose: <span className="font-semibold text-slate-700">{message.purpose}</span></p> : null}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-amber-900">
+            Visitor snapshot
+          </span>
+          <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+            Photo + details
+          </span>
+        </div>
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-sm">
+          {snapshotUrl ? (
+            <SecureSnapshotImage
+              src={snapshotUrl}
+              alt="Visitor snapshot"
+              className="h-52 w-full object-cover"
+              fallback={<div className="grid h-52 w-full place-items-center bg-gradient-to-br from-slate-200 via-slate-100 to-slate-200 text-xs font-bold text-slate-500">Snapshot unavailable</div>}
+            />
+          ) : (
+            <div className="grid h-52 w-full place-items-center bg-gradient-to-br from-slate-200 via-slate-100 to-slate-200 text-xs font-bold text-slate-500">Snapshot unavailable</div>
+          )}
+        </div>
+        <div className="grid gap-2 rounded-2xl bg-slate-50 p-3 text-[11px] text-slate-600">
+          <div className="flex flex-wrap gap-2">
+            {message?.visitorName ? <span className="rounded-full bg-white px-2.5 py-1 font-semibold text-slate-700 shadow-sm">Name: {message.visitorName}</span> : null}
+            {message?.visitorPhone ? <span className="rounded-full bg-white px-2.5 py-1 font-semibold text-slate-700 shadow-sm">Phone: {message.visitorPhone}</span> : null}
+          </div>
+          {message?.purpose ? (
+            <p className="leading-relaxed">
+              <span className="font-black uppercase tracking-[0.16em] text-slate-400">Purpose</span>
+              <span className="ml-2 font-semibold text-slate-700">{message.purpose}</span>
+            </p>
+          ) : null}
+        </div>
+        <div className="flex items-center justify-between gap-3 rounded-full border border-slate-200 bg-white px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500 shadow-sm">
+          <span>{footerLabel}</span>
+          <span>{formatClockTime(message?.at) || "Just now"}</span>
         </div>
       </div>
     );
@@ -933,17 +967,7 @@ function normalizeInboxThread(thread) {
     normalized.visitor ||
     "Visitor";
   normalized.last = previewMessageText(normalized?.last || "");
-  normalized.photoUrl =
-    String(
-      normalized.photoUrl ||
-      normalized.photo_url ||
-      normalized.snapshotUrl ||
-      normalized.snapshot_url ||
-      normalized.snapshot?.fileUrl ||
-      normalized.snapshot?.url ||
-      normalized.requestPayload?.photoUrl ||
-      ""
-    ).trim();
+  normalized.photoUrl = extractSnapshotUrl(normalized);
   normalized.snapshotUrl = normalized.photoUrl;
   normalized.snapshotAuditId = String(
     normalized.snapshotAuditId ||
@@ -1007,15 +1031,7 @@ function upsertThreadPreview(msg, setThreads, selectedId, extra = {}) {
 
 function getThreadSnapshotSrc(thread) {
   if (!thread) return "";
-  const photoUrl = String(
-    thread.photoUrl ||
-    thread.photo_url ||
-    thread.snapshotUrl ||
-    thread.snapshot_url ||
-    thread.snapshot?.fileUrl ||
-    thread.snapshot?.url ||
-    ""
-  ).trim();
+  const photoUrl = extractSnapshotUrl(thread);
   if (photoUrl) return photoUrl;
   const snapshotAuditId = String(
     thread.snapshotAuditId ||
@@ -1030,7 +1046,7 @@ function getThreadSnapshotSrc(thread) {
 function buildSnapshotMessage(payload, fallbackSessionId = "") {
   const sessionId = String(payload?.sessionId || fallbackSessionId || "").trim();
   if (!sessionId) return null;
-  const snapshotUrl = String(payload?.snapshotUrl || payload?.photoUrl || "").trim();
+  const snapshotUrl = extractSnapshotUrl(payload);
   return {
     id: `snapshot:${sessionId}`,
     messageId: `snapshot:${sessionId}`,
@@ -1045,8 +1061,65 @@ function buildSnapshotMessage(payload, fallbackSessionId = "") {
     visitorName: payload?.visitorName || "Visitor",
     visitorPhone: payload?.visitorPhone || "",
     purpose: payload?.purpose || "",
+    requestSource: String(payload?.requestSource || payload?.source || payload?.requestPayload?.requestSource || "").trim(),
+    creatorRole: String(payload?.creatorRole || payload?.requestPayload?.creatorRole || "").trim(),
     at: payload?.at || payload?.timestamp || new Date().toISOString()
   };
+}
+
+function ensureSnapshotConversationRows(rows, sessionId, threadSnapshot) {
+  const list = Array.isArray(rows) ? [...rows] : [];
+  const hasSnapshotMessage = list.some((item) => String(item?.messageType || "").trim() === "visitor_snapshot" || Boolean(extractSnapshotUrl(item)));
+  if (hasSnapshotMessage) return list;
+  const source = threadSnapshot && extractSnapshotUrl(threadSnapshot)
+    ? {
+        sessionId,
+        snapshotUrl: extractSnapshotUrl(threadSnapshot),
+        photoUrl: extractSnapshotUrl(threadSnapshot),
+        snapshotAuditId: threadSnapshot?.snapshotAuditId || "",
+        visitorName: threadSnapshot?.name || threadSnapshot?.visitorName || "Visitor",
+        visitorPhone: threadSnapshot?.visitorPhone || "",
+        purpose: threadSnapshot?.purpose || "",
+        requestSource: threadSnapshot?.requestSource || threadSnapshot?.request_source || "",
+        creatorRole: threadSnapshot?.creatorRole || threadSnapshot?.creator_role || "",
+        at: threadSnapshot?.timestamp || threadSnapshot?.time || new Date().toISOString()
+    }
+    : null;
+  if (!source) return list;
+  const snapshotMessage = buildSnapshotMessage(source, sessionId);
+  return snapshotMessage ? [snapshotMessage, ...list] : list;
+}
+
+function extractSnapshotUrl(source) {
+  return String(
+    source?.snapshotUrl ||
+    source?.photoUrl ||
+    source?.fileUrl ||
+    source?.url ||
+    source?.photo_url ||
+    source?.snapshot_url ||
+    source?.snapshot?.fileUrl ||
+    source?.snapshot?.url ||
+    source?.requestPayload?.snapshotUrl ||
+    source?.requestPayload?.photoUrl ||
+    source?.requestPayload?.fileUrl ||
+    source?.requestPayload?.url ||
+    ""
+  ).trim();
+}
+
+function isSnapshotThreadMessage(message) {
+  return String(message?.messageType || "").trim() === "visitor_snapshot" || Boolean(extractSnapshotUrl(message));
+}
+
+function getSnapshotFooterLabel(message) {
+  const requestSource = String(message?.requestSource || message?.source || "").trim().toLowerCase();
+  const creatorRole = String(message?.creatorRole || message?.senderRole || message?.senderType || "").trim().toLowerCase();
+  if (requestSource.includes("visitor_form") || (requestSource.includes("visitor") && requestSource.includes("form"))) return "Uploaded from visitor form";
+  if (requestSource.includes("visitor_qr")) return "Captured from visitor scan";
+  if (requestSource.includes("security")) return "Registered by security";
+  if (creatorRole === "security") return "Registered by security";
+  return "Captured snapshot";
 }
 
 function safeParsePayload(value) {

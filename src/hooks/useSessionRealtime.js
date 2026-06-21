@@ -214,6 +214,7 @@ function normalizeMessage(payload, participantType) {
     text: String(payload?.text || ""),
     messageType: payload?.messageType || "text",
     snapshotUrl: String(payload?.snapshotUrl || payload?.photoUrl || "").trim(),
+    photoUrl: String(payload?.photoUrl || payload?.snapshotUrl || "").trim(),
     senderRole,
     displayName: payload?.displayName || "Participant",
     senderType: senderRole,
@@ -259,6 +260,11 @@ function clearJsonStorage(key) {
   } catch {
     // ignore
   }
+}
+
+function clearCallIntentStorage() {
+  clearJsonStorage(CALL_START_INTENT_KEY);
+  clearJsonStorage(CALL_ACCEPT_INTENT_KEY);
 }
 
 function persistLowBandwidthMode(enabled) {
@@ -702,6 +708,19 @@ export function useSessionRealtime(sessionId) {
     }));
   }
 
+  function clearTerminalCallState({ clearAccess = true } = {}) {
+    pendingStartIntentRef.current = null;
+    pendingAcceptIntentRef.current = null;
+    pendingOfferPayloadRef.current = null;
+    if (clearAccess) {
+      clearSessionCallAccess(sessionId);
+    }
+    clearCallIntentStorage();
+    if (activeIncomingCallModalSessionId === sessionId) {
+      activeIncomingCallModalSessionId = "";
+    }
+  }
+
   async function loadMessages() {
     if (!sessionId) {
       setMessages([]);
@@ -794,11 +813,13 @@ export function useSessionRealtime(sessionId) {
       pushLog("ICE candidate generated", {
         candidateType: getCandidateType(event.candidate?.candidate || "")
       });
-      socketRef.current.emit(RealtimeEvent.WEBRTC_ICE, {
+      const payload = {
         sessionId,
         callSessionId: callSessionRef.current || undefined,
         candidate: event.candidate
-      });
+      };
+      socketRef.current.emit(RealtimeEvent.WEBRTC_ICE_CANDIDATE, payload);
+      socketRef.current.emit(RealtimeEvent.WEBRTC_ICE, payload);
     };
 
     pc.onconnectionstatechange = () => {
@@ -1253,6 +1274,7 @@ export function useSessionRealtime(sessionId) {
         }
         setStatus(fallback.detail);
         setCallStateSafe("ended");
+        clearTerminalCallState({ clearAccess: true });
         cleanupMedia({ preserveCallSession: false });
         return;
       }
@@ -1426,6 +1448,7 @@ export function useSessionRealtime(sessionId) {
       setStatus(error?.message || "Failed to accept incoming call");
       setCallStateSafe("ended");
       transitionIncomingCall("ended", {}, "accept_failed");
+      clearTerminalCallState({ clearAccess: true });
       cleanupMedia({ preserveCallSession: false });
     }
   }
@@ -1467,6 +1490,7 @@ export function useSessionRealtime(sessionId) {
     } catch (error) {
       setStatus(error?.message || "Unable to reject call");
     } finally {
+      clearTerminalCallState({ clearAccess: true });
       transitionIncomingCall("idle", {}, "reject_cleanup");
     }
   }
@@ -1517,6 +1541,7 @@ export function useSessionRealtime(sessionId) {
       visitorId: callVisitorIdRef.current || sessionId,
       eventId: activeCallSessionId
     }, broadcast ? "local_call_end" : "remote_call_end");
+    clearTerminalCallState({ clearAccess: true });
     cleanupMedia({ preserveCallSession: false });
     pushLog("Call cleanup completed", {
       broadcast,
@@ -1990,6 +2015,8 @@ export function useSessionRealtime(sessionId) {
       });
     };
 
+    const handleCallRequested = (payload) => handleCallInvite(payload);
+
     const handleCallAccepted = async (payload) => {
       if (String(payload?.sessionId || "") !== String(sessionId || "")) return;
       if (String(payload?.callSessionId || "") && payload.callSessionId !== callSessionRef.current) return;
@@ -2237,6 +2264,7 @@ export function useSessionRealtime(sessionId) {
     socket.on(RealtimeEvent.CHAT_ACK, handleChatAck);
     socket.on(RealtimeEvent.CHAT_TYPING, handleChatTyping);
     socket.on(RealtimeEvent.CHAT_READ, handleChatRead);
+    socket.on(RealtimeEvent.CALL_REQUESTED, handleCallRequested);
     socket.on(RealtimeEvent.CALL_INVITE, handleCallInvite);
     socket.on(RealtimeEvent.CALL_ACCEPTED, handleCallAccepted);
     socket.on(RealtimeEvent.CALL_REJECTED, handleCallRejected);
@@ -2246,6 +2274,7 @@ export function useSessionRealtime(sessionId) {
     socket.on(RealtimeEvent.SESSION_ACTIVATED, handleSessionActivated);
     socket.on(RealtimeEvent.WEBRTC_OFFER, handleWebrtcOffer);
     socket.on(RealtimeEvent.WEBRTC_ANSWER, handleWebrtcAnswer);
+    socket.on(RealtimeEvent.WEBRTC_ICE_CANDIDATE, handleWebrtcIce);
     socket.on(RealtimeEvent.WEBRTC_ICE, handleWebrtcIce);
     socket.onAny(handleAnyEvent);
     if (socket.connected) {
@@ -2270,6 +2299,7 @@ export function useSessionRealtime(sessionId) {
       socket.off(RealtimeEvent.CHAT_ACK, handleChatAck);
       socket.off(RealtimeEvent.CHAT_TYPING, handleChatTyping);
       socket.off(RealtimeEvent.CHAT_READ, handleChatRead);
+      socket.off(RealtimeEvent.CALL_REQUESTED, handleCallRequested);
       socket.off(RealtimeEvent.CALL_INVITE, handleCallInvite);
       socket.off(RealtimeEvent.CALL_ACCEPTED, handleCallAccepted);
       socket.off(RealtimeEvent.CALL_REJECTED, handleCallRejected);
@@ -2279,6 +2309,7 @@ export function useSessionRealtime(sessionId) {
       socket.off(RealtimeEvent.SESSION_ACTIVATED, handleSessionActivated);
       socket.off(RealtimeEvent.WEBRTC_OFFER, handleWebrtcOffer);
       socket.off(RealtimeEvent.WEBRTC_ANSWER, handleWebrtcAnswer);
+      socket.off(RealtimeEvent.WEBRTC_ICE_CANDIDATE, handleWebrtcIce);
       socket.off(RealtimeEvent.WEBRTC_ICE, handleWebrtcIce);
       socket.offAny(handleAnyEvent);
       if (activeIncomingCallModalSessionId === sessionId) {
@@ -2440,6 +2471,17 @@ export function useSessionRealtime(sessionId) {
       remoteAudioRef.current.muted = !speakerOn;
     }
   }, [speakerOn]);
+
+  useEffect(() => {
+    if (callState === "connected") {
+      clearCallIntentStorage();
+      return;
+    }
+    if (callState === "ended" || callState === "rejected" || callState === "failed") {
+      clearCallIntentStorage();
+      clearTerminalCallState({ clearAccess: false });
+    }
+  }, [callState]);
 
   useEffect(() => {
     const pc = peerRef.current;

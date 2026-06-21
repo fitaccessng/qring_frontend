@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Mic, MicOff, PhoneCall, PhoneOff, RotateCcw, User, Video, Volume2 } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import SecureSnapshotImage from "../../components/SecureSnapshotImage";
 import SessionNetworkBadge from "../../components/SessionNetworkBadge";
-import SessionModeNav from "../../components/SessionModeNav";
 import VisitorIncomingCallModal from "../../components/VisitorIncomingCallModal";
 import { useSessionRealtime } from "../../hooks/useSessionRealtime";
 
@@ -15,6 +14,20 @@ export default function SessionMessagePage() {
   const [acceptingCall, setAcceptingCall] = useState(false);
   const isHomeowner = getStoredUserRole() === "homeowner";
   const requestedCallMode = resolveRequestedCallMode(location.pathname, searchParams);
+  const backButtonLabel =
+    isHomeowner
+      ? "Back to Inbox"
+      : requestedCallMode === "audio" || requestedCallMode === "video"
+        ? "Back to Chat"
+        : "Back to Scan";
+  const handleGoBack = () => {
+    const backPath = getSessionBackPath({
+      sessionId,
+      isHomeowner,
+      callRouteMode: requestedCallMode
+    });
+    navigate(backPath, { replace: true });
+  };
   if (isHomeowner && !requestedCallMode) {
     return <Navigate to={`/dashboard/homeowner/messages?sessionId=${encodeURIComponent(sessionId || "")}`} replace />;
   }
@@ -201,6 +214,14 @@ export default function SessionMessagePage() {
         <header className="relative mb-4 overflow-hidden rounded-3xl border border-slate-200/80 bg-white/90 p-5 shadow-soft backdrop-blur">
           <div className={`absolute inset-x-0 top-0 h-1 ${routeTheme.headerLine}`} />
           <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleGoBack}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-[0.22em] transition hover:-translate-y-px ${routeTheme.routeChip}`}
+            >
+              <ChevronLeft size={12} />
+              {backButtonLabel}
+            </button>
             <span className={`rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-[0.22em] ${routeTheme.routeChip}`}>
               <span className="inline-flex items-center gap-1.5">
                 {callRouteMode === "video" ? <Video size={11} /> : callRouteMode === "audio" ? <PhoneCall size={11} /> : <PhoneCall size={11} />}
@@ -221,133 +242,86 @@ export default function SessionMessagePage() {
           {status ? <p className="mt-2 text-sm text-amber-700">{status}</p> : null}
         </header>
 
-        <div className="grid gap-4 lg:grid-cols-12">
-          <SessionModeNav
-            sessionId={sessionId}
-            disableCallModes={!canStartCall && !incomingCall.pending && callState !== "connected"}
-            disabledCallTooltip={disabledCallTooltip}
-            modeLabels={callModeLabels}
-            onModeSelect={(mode) => {
-              if (mode === "video") {
-                void startVideoCall();
-                return;
-              }
-              void startAudioCall();
-            }}
-          />
+        <article className="min-h-[74vh] overflow-hidden rounded-[2rem] border border-slate-200 bg-slate-100/70 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
+          <header className="border-b border-slate-200 bg-white/85 px-4 py-3">
+            <h2 className="text-lg font-black">Conversation</h2>
+            <p className="text-xs text-slate-500">Live chat for this session.</p>
+            <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
+              <PermissionPill permission={mediaPermission} />
+              {typingState?.isTyping ? (
+                <span className="rounded-full bg-amber-100 px-2.5 py-1 font-semibold text-amber-800">
+                  {typingState.displayName || "Participant"} is typing...
+                </span>
+              ) : null}
+            </div>
+          </header>
 
-          <section className="lg:col-span-9">
-            {activeCallMode || callState !== "idle" || incomingCall.pending ? (
-              <article className="mb-4 overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                {renderCallSurface({
-                  activeCallMode,
-                  callState,
-                  callRouteMode,
-                  routeTheme,
-                  cameraFacing,
-                  localVideoRef,
-                  remoteVideoRef,
-                  remoteAudioRef,
-                  remoteVideoActive,
-                  muted,
-                  speakerOn,
-                  requestMediaPermissions,
-                  retryCallConnection,
-                  toggleMute,
-                  toggleSpeaker,
-                  switchCamera,
-                  endCall,
-                  sessionId,
-                  activeLabel: callModeLabels[activeCallMode] || "Call",
-                  networkQuality,
-                  networkDetail,
-                  status
-                })}
-              </article>
-            ) : null}
-
-            <article className="min-h-[74vh] overflow-hidden rounded-[2rem] border border-slate-200 bg-slate-100/70 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
-              <header className="border-b border-slate-200 bg-white/85 px-4 py-3">
-                <h2 className="text-lg font-black">Conversation</h2>
-                <p className="text-xs text-slate-500">Live chat for this session.</p>
-                <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
-                  <PermissionPill permission={mediaPermission} />
-                  {typingState?.isTyping ? (
-                    <span className="rounded-full bg-amber-100 px-2.5 py-1 font-semibold text-amber-800">
-                      {typingState.displayName || "Participant"} is typing...
-                    </span>
+          <div ref={messagesRef} className="h-[58vh] space-y-3 overflow-y-auto p-4 sm:h-[60vh]">
+            {messages.map((message) => (
+              <div key={message.id || `${message.at}-${message.text}`} className={`flex ${message.mine ? "justify-end" : "justify-start"}`}>
+                <div
+                  className={`max-w-[84%] rounded-2xl px-4 py-2.5 text-sm ${
+                    message.mine
+                      ? "bg-slate-900 text-white"
+                      : "border border-slate-200 bg-white text-slate-800"
+                  }`}
+                >
+                  <p className={`text-[11px] font-semibold ${message.mine ? "text-slate-200" : "text-slate-500"}`}>{message.displayName}</p>
+                  {renderSessionMessage(message)}
+                  {message.mine && message.failed ? (
+                    <div className="mt-1 flex items-center justify-between gap-2 text-[10px]">
+                      <span className="rounded bg-amber-200/90 px-2 py-0.5 font-semibold text-amber-900">
+                        Not saved
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => retryFailedMessage(message.id)}
+                        className="rounded bg-white/20 px-2 py-0.5 font-semibold text-white hover:bg-white/30"
+                      >
+                        Retry
+                      </button>
+                    </div>
                   ) : null}
                 </div>
-              </header>
-
-              <div ref={messagesRef} className="h-[58vh] space-y-3 overflow-y-auto p-4 sm:h-[60vh]">
-                {messages.map((message) => (
-                  <div key={message.id || `${message.at}-${message.text}`} className={`flex ${message.mine ? "justify-end" : "justify-start"}`}>
-                    <div
-                      className={`max-w-[84%] rounded-2xl px-4 py-2.5 text-sm ${
-                        message.mine
-                          ? "bg-slate-900 text-white"
-                          : "border border-slate-200 bg-white text-slate-800"
-                      }`}
-                    >
-                      <p className={`text-[11px] font-semibold ${message.mine ? "text-slate-200" : "text-slate-500"}`}>{message.displayName}</p>
-                      {renderSessionMessage(message)}
-                      {message.mine && message.failed ? (
-                        <div className="mt-1 flex items-center justify-between gap-2 text-[10px]">
-                          <span className="rounded bg-amber-200/90 px-2 py-0.5 font-semibold text-amber-900">
-                            Not saved
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => retryFailedMessage(message.id)}
-                            className="rounded bg-white/20 px-2 py-0.5 font-semibold text-white hover:bg-white/30"
-                          >
-                            Retry
-                          </button>
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                ))}
-                {messages.length === 0 ? <p className="text-sm text-slate-500">No messages yet.</p> : null}
               </div>
+            ))}
+            {messages.length === 0 ? <p className="text-sm text-slate-500">No messages yet.</p> : null}
+          </div>
 
-              <form onSubmit={onSubmit} className="mb-20 border-t border-slate-200 bg-white/90 p-3 lg:mb-0">
-                <div className="flex items-center gap-2">
-                  <input
-                    value={text}
-                    onChange={(event) => {
-                      const nextValue = event.target.value;
-                      setText(nextValue);
-                      sendTypingState(Boolean(nextValue.trim()));
-                    }}
-                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm"
-                    placeholder="Type your message..."
-                  />
-                  <button
-                    type="submit"
-                    className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white"
-                  >
-                    Send
-                  </button>
-                </div>
-                {mediaPermission.state === "denied" || mediaPermission.state === "unavailable" ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void requestMediaPermissions({ video: false }).catch(() => {
-                        // The hook keeps the latest error state.
-                      });
-                    }}
-                    className="mt-3 rounded-xl border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700"
-                  >
-                    Retry camera and microphone permission
-                  </button>
-                ) : null}
-              </form>
-            </article>
-          </section>
-        </div>
+          <form onSubmit={onSubmit} className="mb-20 border-t border-slate-200 bg-white/90 p-3 lg:mb-0">
+            <div className="flex items-center gap-2">
+              <input
+                value={text}
+                onChange={(event) => {
+                  const nextValue = event.target.value;
+                  setText(nextValue);
+                  sendTypingState(Boolean(nextValue.trim()));
+                }}
+                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm"
+                placeholder="Type your message..."
+              />
+              <button
+                type="submit"
+                className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white"
+              >
+                Send
+              </button>
+            </div>
+            {mediaPermission.state === "denied" || mediaPermission.state === "unavailable" ? (
+              <button
+                type="button"
+                onClick={() => {
+                  void requestMediaPermissions({ video: false }).catch(() => {
+                    // The hook keeps the latest error state.
+                  });
+                }}
+                className="mt-3 rounded-xl border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700"
+              >
+                Retry camera and microphone permission
+              </button>
+            ) : null}
+          </form>
+        </article>
       </div>
 
       <VisitorIncomingCallModal
@@ -361,122 +335,6 @@ export default function SessionMessagePage() {
   );
 }
 
-function renderCallSurface({
-  activeCallMode,
-  callState,
-  callRouteMode,
-  routeTheme,
-  cameraFacing,
-  localVideoRef,
-  remoteVideoRef,
-  remoteAudioRef,
-  remoteVideoActive,
-  muted,
-  speakerOn,
-  requestMediaPermissions,
-  retryCallConnection,
-  toggleMute,
-  toggleSpeaker,
-  switchCamera,
-  endCall,
-  sessionId,
-  activeLabel,
-  networkQuality,
-  networkDetail,
-  status
-}) {
-  const isVideo = activeCallMode === "video";
-  const isConnected = callState === "connected";
-  const isConnecting = callState === "connecting" || callState === "ringing";
-  const callHeadline = isVideo ? "Video call in progress" : "Audio call in progress";
-  return (
-    <div className={`relative overflow-hidden text-white ${routeTheme?.pageBg || "bg-slate-950"}`}>
-      <div className={`absolute inset-0 opacity-95 ${isVideo ? "bg-[radial-gradient(circle_at_top_right,_rgba(16,185,129,0.32)_0,_rgba(15,23,42,0.88)_55%,_rgba(2,6,23,1)_100%)]" : "bg-[radial-gradient(circle_at_top_right,_rgba(14,165,233,0.28)_0,_rgba(15,23,42,0.90)_58%,_rgba(2,6,23,1)_100%)]"}`} />
-      <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
-      <div className="relative">
-        {isVideo ? (
-          <div className="relative aspect-[16/10] bg-black">
-          <video
-            ref={remoteVideoRef}
-            autoPlay
-            playsInline
-            muted
-            className={`h-full w-full object-cover transition-opacity duration-300 ${isConnected && remoteVideoActive ? "opacity-100" : "opacity-30"}`}
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/10 to-black/60" />
-          <div className="absolute left-4 top-4 rounded-full bg-black/40 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/80">
-            {callHeadline}
-          </div>
-          <div className="absolute bottom-4 right-4 h-28 w-20 overflow-hidden rounded-2xl border border-white/10 bg-slate-900 shadow-2xl">
-            <video ref={localVideoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
-          </div>
-          </div>
-        ) : (
-          <div className="grid gap-4 px-4 py-6 sm:grid-cols-[auto,1fr] sm:items-center">
-            <div className="grid h-24 w-24 place-items-center rounded-full bg-white/10 backdrop-blur-sm">
-              <User size={36} className="text-white/60" />
-            </div>
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-300">{activeLabel}</p>
-              <h2 className="mt-1 text-2xl font-black tracking-tight">{callHeadline}</h2>
-              <p className="mt-2 text-sm text-white/70">{isConnecting ? "Connecting securely..." : isConnected ? "You are live now." : "Waiting to connect."}</p>
-              {networkDetail ? <p className="mt-2 text-xs text-white/45">{networkDetail}</p> : null}
-              {status ? <p className="mt-2 text-xs text-amber-200">{status}</p> : null}
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="space-y-4 border-t border-white/10 px-4 py-4">
-        <div className="flex flex-wrap gap-2 text-[11px] text-white/60">
-          {networkQuality ? <span className="rounded-full bg-white/10 px-2.5 py-1 font-semibold">{networkQuality}</span> : null}
-          {cameraFacing ? <span className="rounded-full bg-white/10 px-2.5 py-1 font-semibold">Camera: {cameraFacing}</span> : null}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <button type="button" onClick={toggleSpeaker} className={`rounded-xl px-3 py-2 text-xs font-semibold ${speakerOn ? "bg-white text-slate-950" : "bg-white/10 text-white"}`}>
-            <span className="inline-flex items-center gap-1.5">
-              <Volume2 size={14} />
-              {speakerOn ? "Speaker on" : "Speaker off"}
-            </span>
-          </button>
-          <button type="button" onClick={toggleMute} className={`rounded-xl px-3 py-2 text-xs font-semibold ${muted ? "bg-white text-slate-950" : "bg-white/10 text-white"}`}>
-            <span className="inline-flex items-center gap-1.5">
-              {muted ? <MicOff size={14} /> : <Mic size={14} />}
-              {muted ? "Muted" : "Mic on"}
-            </span>
-          </button>
-          {isVideo ? (
-            <button type="button" onClick={switchCamera} className="rounded-xl bg-white/10 px-3 py-2 text-xs font-semibold text-white">
-              <span className="inline-flex items-center gap-1.5">
-                <Video size={14} />
-                Switch camera
-              </span>
-            </button>
-          ) : null}
-          <button type="button" onClick={retryCallConnection} className="rounded-xl bg-white/10 px-3 py-2 text-xs font-semibold text-white">
-            <span className="inline-flex items-center gap-1.5">
-              <RotateCcw size={14} />
-              Retry
-            </span>
-          </button>
-          <button type="button" onClick={() => void endCall()} className="rounded-xl bg-rose-500 px-3 py-2 text-xs font-semibold text-white">
-            <span className="inline-flex items-center gap-1.5">
-              <PhoneOff size={14} />
-              End call
-            </span>
-          </button>
-          {!isConnected ? (
-            <button type="button" onClick={() => void requestMediaPermissions({ video: isVideo })} className="rounded-xl bg-emerald-500 px-3 py-2 text-xs font-semibold text-white">
-              Grant media
-            </button>
-          ) : null}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function getStoredUserRole() {
   try {
     const raw = window.sessionStorage.getItem("qring_user") || window.localStorage.getItem("qring_user") || "null";
@@ -486,18 +344,45 @@ function getStoredUserRole() {
   }
 }
 
+function getStoredVisitorQrId() {
+  try {
+    return String(window.sessionStorage.getItem("qring_visitor_last_qr_id") || "").trim();
+  } catch {
+    return "";
+  }
+}
+
+function getSessionBackPath({ sessionId, isHomeowner, callRouteMode }) {
+  const safeSessionId = String(sessionId || "").trim();
+  if (isHomeowner) {
+    return `/dashboard/homeowner/messages?sessionId=${encodeURIComponent(safeSessionId)}`;
+  }
+  if (callRouteMode === "audio" || callRouteMode === "video") {
+    return safeSessionId ? `/session/${safeSessionId}/message` : "/";
+  }
+  const qrId = getStoredVisitorQrId();
+  if (qrId) {
+    return `/scan/${encodeURIComponent(qrId)}`;
+  }
+  return "/";
+}
+
 function renderMessageBody(text) {
   if (typeof text !== "string") return <p>{String(text || "")}</p>;
   return <p>{text}</p>;
 }
 
 function renderSessionMessage(message) {
-  if (String(message?.messageType || "text") === "visitor_snapshot") {
+  const snapshotSrc = String(message?.snapshotUrl || message?.photoUrl || "").trim();
+  const messageType = String(message?.messageType || "text");
+  const hasSnapshot = messageType === "visitor_snapshot" || Boolean(snapshotSrc);
+
+  if (hasSnapshot) {
     return (
       <div className="space-y-2">
-        {message?.snapshotUrl ? (
+        {snapshotSrc ? (
           <SecureSnapshotImage
-            src={message.snapshotUrl}
+            src={snapshotSrc}
             alt="Visitor snapshot"
             visitorSessionId={message?.sessionId || ""}
             className="max-h-56 w-full rounded-xl object-cover"
