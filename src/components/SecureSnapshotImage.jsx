@@ -26,9 +26,7 @@ export default function SecureSnapshotImage({
     const assetUrl = resolveBackendAssetUrl(raw);
     const accessToken = getAccessToken();
     const effectiveVisitorToken = visitorToken || getVisitorSessionToken(visitorSessionId);
-    const needsAuthenticatedFetch =
-      assetUrl.includes("/advanced/visitor/snapshots/") &&
-      (Boolean(accessToken) || Boolean(effectiveVisitorToken));
+    const needsAuthenticatedFetch = assetUrl.includes("/advanced/visitor/snapshots/");
 
     if (!needsAuthenticatedFetch) {
       setResolvedSrc(assetUrl);
@@ -41,6 +39,7 @@ export default function SecureSnapshotImage({
     console.info("qring.snapshot.fetch.start", { assetUrl, visitorSessionId: visitorSessionId || undefined });
 
     fetch(assetUrl, {
+      credentials: "include",
       headers: {
         ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
         ...(effectiveVisitorToken ? { "X-Visitor-Token": effectiveVisitorToken } : {})
