@@ -1061,7 +1061,7 @@ function getThreadSnapshotSrc(thread) {
     ""
   ).trim();
   if (!snapshotAuditId) return "";
-  return `/advanced/visitor/snapshots/${encodeURIComponent(snapshotAuditId)}/file`;
+  return `/api/v1/advanced/visitor/snapshots/${encodeURIComponent(snapshotAuditId)}/file`;
 }
 
 function buildSnapshotMessage(payload, fallbackSessionId = "") {
