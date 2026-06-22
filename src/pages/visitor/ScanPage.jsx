@@ -53,6 +53,17 @@ function createVisitorRequestId() {
   return `vrq_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`;
 }
 
+function getSnapshotPayloadParts(dataUrl) {
+  const raw = String(dataUrl || "").trim();
+  if (!raw) return { snapshotBase64: "", snapshotMime: "" };
+  const [prefix, body = ""] = raw.split(",", 2);
+  const mimeMatch = prefix.match(/^data:([^;]+);base64$/i);
+  return {
+    snapshotBase64: body.trim(),
+    snapshotMime: (mimeMatch?.[1] || "image/jpeg").trim().toLowerCase()
+  };
+}
+
 function getVisitorSubmitErrorMessage(error) {
   const code = String(error?.payload?.code || "").trim();
   if (code === "SNAPSHOT_SAVE_FAILED") {
@@ -400,8 +411,7 @@ export default function ScanPage() {
     const visitorType = normalizedPurpose === "delivery" ? "delivery" : "guest";
     const startedAt = Date.now();
     const requestId = createVisitorRequestId();
-    const snapshotBase64 = visitorForm.snapshotDataUrl.split(",")[1] || "";
-    const snapshotMime = "image/jpeg";
+    const { snapshotBase64, snapshotMime } = getSnapshotPayloadParts(visitorForm.snapshotDataUrl);
     // eslint-disable-next-line no-console
     console.info("qring.snapshot.submit_payload", {
       hasSnapshotBase64: Boolean(snapshotBase64),
@@ -505,7 +515,14 @@ export default function ScanPage() {
   const canReacceptConsent = canReacceptConsentFromError(error);
 
   return (
-    <div className="min-h-[100dvh] bg-slate-50 px-3 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 dark:bg-slate-950 sm:grid sm:place-items-center sm:p-4">
+    <div className="relative min-h-[100dvh] overflow-hidden bg-[#07111f] text-white">
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -left-24 top-[-7rem] h-72 w-72 rounded-full bg-cyan-500/20 blur-3xl" />
+        <div className="absolute right-[-6rem] top-28 h-80 w-80 rounded-full bg-amber-400/10 blur-3xl" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_35%),linear-gradient(180deg,rgba(7,17,31,0.88),rgba(7,17,31,1))]" />
+        <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(225deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:32px_32px]" />
+      </div>
+
       <VisitorConsentModal
         open={showConsent}
         onAccept={() => {
@@ -514,253 +531,340 @@ export default function ScanPage() {
           setShowConsent(false);
         }}
       />
-      {/* The rest of the page is blocked until consent is given */}
+
       {showConsent ? null : (
-      <article className="mx-auto w-full max-w-lg rounded-3xl border border-slate-200 bg-white/95 p-4 shadow-soft dark:border-slate-800 dark:bg-slate-900/90 sm:p-7">
-        <h1 className="font-heading text-2xl font-bold sm:text-3xl">Qring Visitor Access</h1>
-        <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-300">
-          <p className="font-semibold">{qrMeta.label}</p>
-          <p className="mt-1 break-all wrap-anywhere font-mono">{qrMeta.value}</p>
-        </div>
-
-        {loading ? <p className="mt-5 text-sm">Resolving secure QR route...</p> : null}
-        {error ? (
-          <div className="mt-5 rounded-2xl border border-danger/20 bg-danger/5 p-4 text-sm text-danger dark:border-danger/30 dark:bg-danger/10">
-            <p>{error}</p>
-            {canReacceptConsent ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setError("");
-                  setShowConsent(true);
-                }}
-                className="mt-3 inline-flex items-center rounded-xl border border-danger/20 bg-white px-3 py-2 text-xs font-semibold text-danger transition hover:bg-danger/5 dark:border-danger/30 dark:bg-slate-950 dark:hover:bg-slate-900"
-              >
-                Re-accept consent
-              </button>
-            ) : null}
-          </div>
-        ) : null}
-
-        {!loading && qr && !requestState.sent ? (
-          <form onSubmit={onSubmit} className="mt-6 space-y-4">
-            <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-100">
-              Visitor initiates, homeowner verifies, gateman executes. Capture your live photo, pick a purpose, and the resident will choose how to respond.
+        <main className="relative mx-auto flex min-h-[100dvh] w-full max-w-6xl flex-col px-3 py-4 sm:px-4 lg:px-6 lg:py-6">
+          <header className="mb-4 flex items-center justify-between gap-3 rounded-[1.75rem] border border-white/10 bg-white/6 px-4 py-3 shadow-[0_24px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl sm:px-5">
+            <div className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-[0.34em] text-cyan-200/80">Visitor capture</p>
+              <h1 className="mt-1 truncate font-heading text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+                Qring Camera Pass
+              </h1>
             </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <div className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-emerald-200">
+                {requestState.sent ? "Sent" : snapshotCaptured ? "Ready" : "Capture"}
+              </div>
+            </div>
+          </header>
 
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-800/50">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Camera Capture</p>
-                {visitorForm.snapshotDataUrl ? (
+          {error ? (
+            <div className="mb-4 rounded-3xl border border-rose-400/25 bg-rose-500/10 px-4 py-4 text-sm text-rose-100 shadow-[0_18px_50px_rgba(0,0,0,0.18)] backdrop-blur">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black uppercase tracking-[0.26em] text-rose-200/70">Submission error</p>
+                  <p className="mt-1 leading-relaxed">{error}</p>
+                </div>
+                {canReacceptConsent ? (
                   <button
                     type="button"
                     onClick={() => {
-                      setVisitorForm((prev) => ({ ...prev, snapshotDataUrl: "" }));
-                      setCameraState({ starting: false, ready: false, error: "" });
-                      startCamera();
+                      setError("");
+                      setShowConsent(true);
                     }}
-                    className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                    className="shrink-0 rounded-full border border-rose-200/30 bg-white/10 px-3 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-white transition hover:bg-white/15"
                   >
-                    Retake
+                    Re-accept
                   </button>
                 ) : null}
               </div>
+            </div>
+          ) : null}
 
-              {cameraState.error ? (
-                <p className="mt-3 text-xs text-danger">{cameraState.error}</p>
-              ) : null}
-
-              {!visitorForm.snapshotDataUrl ? (
-                <div className="mt-3">
-                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-black/90 dark:border-slate-700">
-                    <video ref={videoRef} className="h-64 w-full object-cover" playsInline muted />
+          {!loading && qr && !requestState.sent ? (
+            <form onSubmit={onSubmit} className="grid flex-1 gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+              <section className="rounded-[2rem] border border-white/10 bg-white/8 p-4 shadow-[0_30px_100px_rgba(0,0,0,0.22)] backdrop-blur-xl sm:p-6">
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="rounded-full border border-cyan-300/20 bg-cyan-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-cyan-100">
+                    Live photo required
                   </div>
-                  <canvas ref={canvasRef} className="hidden" />
-
-                  <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-                    <button
-                      type="button"
-                      onClick={startCamera}
-                      disabled={cameraState.starting || cameraState.ready}
-                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-800 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-                    >
-                      {cameraState.ready ? "Camera ready" : cameraState.starting ? "Starting camera..." : "Start camera"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={captureSnapshot}
-                      disabled={!cameraState.ready}
-                      className="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900"
-                    >
-                      Capture snapshot
-                    </button>
+                  <div className="rounded-full border border-white/10 bg-white/6 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-200">
+                    {qrMeta.label}: {qrMeta.value}
                   </div>
-                  <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                    Required. Make sure your face is clearly visible.
-                  </p>
                 </div>
-              ) : (
-                <div className="mt-3">
-                  <img
-                    src={visitorForm.snapshotDataUrl}
-                    alt="Visitor snapshot preview"
-                    className="h-64 w-full rounded-2xl border border-slate-200 object-cover dark:border-slate-700"
-                  />
-                  <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-900 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-100">
-                    <div className="flex items-start gap-3">
-                      <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold">Snapshot captured</p>
-                        <p className="mt-1 text-xs leading-relaxed text-emerald-800/90 dark:text-emerald-100/80">
-                          This image is locked in and will be sent with your visitor details when you submit the request.
-                        </p>
+
+                <div className="mt-4 grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+                  <div className="space-y-4">
+                    <div className="overflow-hidden rounded-[1.7rem] border border-white/10 bg-[#07111f] shadow-[0_20px_60px_rgba(0,0,0,0.28)]">
+                      <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-400">Camera deck</p>
+                          <p className="mt-1 text-sm font-semibold text-white">
+                            {snapshotCaptured ? "Snapshot locked" : cameraState.ready ? "Frame ready" : cameraState.starting ? "Opening camera..." : "Waiting for camera"}
+                          </p>
+                        </div>
+                        <div className="rounded-full border border-white/10 bg-white/6 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-200">
+                          {cameraState.error ? "Needs attention" : cameraState.ready ? "Live" : "Idle"}
+                        </div>
                       </div>
+
+                      {cameraState.error ? (
+                        <div className="border-b border-white/10 bg-amber-400/10 px-4 py-3 text-xs text-amber-100">
+                          {cameraState.error}
+                        </div>
+                      ) : null}
+
+                      {!snapshotCaptured ? (
+                        <div className="relative">
+                          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(34,211,238,0.12),transparent_40%)]" />
+                          <div className="aspect-[4/3] overflow-hidden">
+                            <video ref={videoRef} className="h-full w-full object-cover" playsInline muted />
+                          </div>
+                          <canvas ref={canvasRef} className="hidden" />
+                          <div className="absolute inset-0 border-2 border-dashed border-white/10" />
+                          <div className="absolute inset-x-4 bottom-4 rounded-2xl border border-white/10 bg-black/35 px-4 py-3 backdrop-blur-md">
+                            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-100">Tip</p>
+                            <p className="mt-1 text-xs leading-relaxed text-slate-200">
+                              Center your face, hold steady, and capture one clean frame. The homeowner will see this exact image.
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="relative">
+                          <img
+                            src={visitorForm.snapshotDataUrl}
+                            alt="Visitor snapshot preview"
+                            className="aspect-[4/3] w-full object-cover"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+                          <div className="absolute left-4 top-4 rounded-full border border-emerald-300/20 bg-emerald-400/12 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-emerald-100">
+                            Snapshot captured
+                          </div>
+                          <div className="absolute inset-x-4 bottom-4 rounded-2xl border border-white/10 bg-black/35 px-4 py-3 backdrop-blur-md">
+                            <div className="flex items-start gap-3">
+                              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />
+                              <div>
+                                <p className="text-sm font-semibold text-white">Image locked in</p>
+                                <p className="mt-1 text-xs leading-relaxed text-slate-200">
+                                  This exact capture will be sent with your visitor details.
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        onClick={startCamera}
+                        disabled={cameraState.starting || cameraState.ready || snapshotCaptured}
+                        className="rounded-2xl border border-white/10 bg-white/8 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/12 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {cameraState.ready ? "Camera ready" : cameraState.starting ? "Starting camera..." : "Start camera"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={captureSnapshot}
+                        disabled={!cameraState.ready || snapshotCaptured}
+                        className="rounded-2xl bg-gradient-to-r from-cyan-400 to-emerald-400 px-4 py-3 text-sm font-black text-slate-950 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {snapshotCaptured ? "Retake to replace" : "Capture snapshot"}
+                      </button>
                     </div>
                   </div>
-                  <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                    Preview saved. This will be sent to the homeowner.
-                  </p>
-                </div>
-              )}
-            </div>
 
-            {visitorForm.snapshotDataUrl ? (
-              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-800/50">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Visitor Info</p>
-                <div className="mt-3 grid gap-3">
-                  <label className="block text-sm">
-                    <span className="mb-1 block font-medium">Name (optional)</span>
-                    <input
-                      type="text"
-                      value={visitorForm.name}
-                      onChange={(event) => setVisitorForm((prev) => ({ ...prev, name: event.target.value }))}
-                      className="w-full rounded-xl border border-slate-300 px-3 py-3 dark:border-slate-700 dark:bg-slate-900"
-                      placeholder="Leave blank if you prefer"
-                    />
-                  </label>
-                  <label className="block text-sm">
-                    <span className="mb-1 block font-medium">Phone number (optional)</span>
-                    <input
-                      type="tel"
-                      value={visitorForm.phone}
-                      onChange={(event) => setVisitorForm((prev) => ({ ...prev, phone: event.target.value }))}
-                      className="w-full rounded-xl border border-slate-300 px-3 py-3 dark:border-slate-700 dark:bg-slate-900"
-                      placeholder="+234..."
-                    />
-                  </label>
-                  <label className="block text-sm">
-                    <span className="mb-1 block font-medium">Purpose</span>
-                    <select
-                      value={visitorForm.purpose}
-                      onChange={(event) => setVisitorForm((prev) => ({ ...prev, purpose: event.target.value }))}
-                      className="w-full rounded-xl border border-slate-300 px-3 py-3 dark:border-slate-700 dark:bg-slate-900"
-                      required
-                    >
-                      <option value="visitor">Visitor</option>
-                      <option value="delivery">Delivery</option>
-                      <option value="guest">Guest</option>
-                    </select>
-                  </label>
-                  {visitorForm.purpose === "delivery" ? (
-                    <label className="block text-sm">
-                      <span className="mb-1 block font-medium">Delivery instruction</span>
-                      <select
-                        value={visitorForm.deliveryOption}
-                        onChange={(event) => setVisitorForm((prev) => ({ ...prev, deliveryOption: event.target.value }))}
-                        className="w-full rounded-xl border border-slate-300 px-3 py-3 dark:border-slate-700 dark:bg-slate-900"
-                      >
-                        <option value="allow_entry">Request entry</option>
-                        <option value="drop_at_gate">Drop at gate</option>
-                      </select>
-                    </label>
-                  ) : null}
-                  <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300">
-                    The homeowner can reply by message, audio, or video to you, and can also instruct the gateman directly if needed.
-                  </div>
-                  <label className="block text-sm">
-                    <span className="mb-1 block font-medium">Door</span>
-                    <select
-                      value={doorId}
-                      onChange={(event) => setDoorId(event.target.value)}
-                      className="w-full rounded-xl border border-slate-300 px-3 py-3 dark:border-slate-700 dark:bg-slate-900"
-                      required
-                    >
-                      {(doorOptions.length ? doorOptions : (qr.doors ?? []).map((id) => ({ id, name: id }))).map((door) => (
-                        <option key={door.id} value={door.id}>
-                          {door.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  <aside className="rounded-[1.7rem] border border-white/10 bg-slate-950/60 p-4 sm:p-5">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.24em] text-slate-400">Request summary</p>
+                        <p className="mt-1 text-sm font-semibold text-white">What the homeowner sees</p>
+                      </div>
+                      <div className="rounded-full border border-white/10 bg-white/6 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-200">
+                        {selectedDoor ? "Door selected" : "No door"}
+                      </div>
+                    </div>
+
+                    <div className="mt-4 space-y-3">
+                      <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+                        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-100/80">QR route</p>
+                        <p className="mt-2 break-all text-sm text-slate-100">{qrMeta.value}</p>
+                      </div>
+                      <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+                        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-100/80">Door</p>
+                        <select
+                          value={doorId}
+                          onChange={(event) => setDoorId(event.target.value)}
+                          className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/70 px-3 py-3 text-sm text-white outline-none"
+                          required
+                        >
+                          {(doorOptions.length ? doorOptions : (qr.doors ?? []).map((id) => ({ id, name: id }))).map((door) => (
+                            <option key={door.id} value={door.id}>
+                              {door.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="grid gap-3">
+                        <label className="block">
+                          <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">Name</span>
+                          <input
+                            type="text"
+                            value={visitorForm.name}
+                            onChange={(event) => setVisitorForm((prev) => ({ ...prev, name: event.target.value }))}
+                            className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
+                            placeholder="Optional"
+                          />
+                        </label>
+                        <label className="block">
+                          <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">Phone</span>
+                          <input
+                            type="tel"
+                            value={visitorForm.phone}
+                            onChange={(event) => setVisitorForm((prev) => ({ ...prev, phone: event.target.value }))}
+                            className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
+                            placeholder="Optional"
+                          />
+                        </label>
+                        <label className="block">
+                          <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">Purpose</span>
+                          <select
+                            value={visitorForm.purpose}
+                            onChange={(event) => setVisitorForm((prev) => ({ ...prev, purpose: event.target.value }))}
+                            className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none"
+                            required
+                          >
+                            <option value="visitor">Visitor</option>
+                            <option value="delivery">Delivery</option>
+                            <option value="guest">Guest</option>
+                          </select>
+                        </label>
+                        {visitorForm.purpose === "delivery" ? (
+                          <label className="block">
+                            <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">Delivery instruction</span>
+                            <select
+                              value={visitorForm.deliveryOption}
+                              onChange={(event) => setVisitorForm((prev) => ({ ...prev, deliveryOption: event.target.value }))}
+                              className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none"
+                            >
+                              <option value="allow_entry">Request entry</option>
+                              <option value="drop_at_gate">Drop at gate</option>
+                            </select>
+                          </label>
+                        ) : null}
+                      </div>
+
+                      <div className="rounded-2xl border border-white/10 bg-cyan-400/10 px-4 py-3 text-xs leading-relaxed text-cyan-50">
+                        The request will include your live snapshot, visitor details, and the exact door selected above.
+                      </div>
+                    </div>
+                  </aside>
                 </div>
-                {selectedDoor ? (
-                  <p className="mt-3 text-xs text-slate-500">
-                    Home: {selectedDoor.homeName || "N/A"} | Homeowner: {selectedDoor.homeownerName || "N/A"}
+
+                <div className="mt-4 rounded-[1.5rem] border border-white/10 bg-white/6 px-4 py-3 text-xs text-slate-200">
+                  {requestState.sending ? (
+                    <span>Submitting your request now. If the network blinks, we retry automatically.</span>
+                  ) : snapshotCaptured ? (
+                    <span>Snapshot captured and ready. Review the details on the right, then submit.</span>
+                  ) : (
+                    <span>Capture a clear selfie to unlock the request.</span>
+                  )}
+                </div>
+
+                <div className="mt-4 flex flex-col gap-3 rounded-[1.5rem] border border-white/10 bg-white/8 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-black uppercase tracking-[0.24em] text-slate-400">Submit</p>
+                    <p className="mt-1 text-sm text-slate-100">
+                      {requestState.retrying
+                        ? `Retrying ${requestState.retryAttempt}/${MAX_SUBMIT_RETRIES}`
+                        : requestState.sending
+                          ? "Sending visitor request..."
+                          : "Ready to send to the homeowner"}
+                    </p>
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={!snapshotCaptured || requestState.sending || !doorId}
+                    className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-white to-cyan-100 px-5 py-4 text-sm font-black uppercase tracking-[0.18em] text-slate-950 transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {requestState.retrying
+                      ? `Retrying (${requestState.retryAttempt}/${MAX_SUBMIT_RETRIES})...`
+                      : requestState.sending
+                        ? "Submitting..."
+                        : "Send visitor pass"}
+                  </button>
+                </div>
+
+                {requestState.sending || requestState.lastLatencyMs !== null ? (
+                  <p className="mt-3 text-xs text-slate-400">
+                    Request latency:{" "}
+                    {requestState.sending
+                      ? `${(requestLatencyMs / 1000).toFixed(2)}s live`
+                      : `${((requestState.lastLatencyMs ?? 0) / 1000).toFixed(2)}s`}
                   </p>
                 ) : null}
-              </div>
-            ) : (
-              <div className="rounded-2xl border border-slate-200 bg-white/70 px-4 py-3 text-xs font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300">
-                Take a selfie to unlock the form fields.
-              </div>
-            )}
-            <button
-              type="submit"
-              disabled={!snapshotCaptured || requestState.sending}
-              className="w-full rounded-xl bg-brand-500 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"
-            >
-              {requestState.retrying
-                ? `Retrying (${requestState.retryAttempt}/${MAX_SUBMIT_RETRIES})...`
-                : requestState.sending
-                  ? "Submitting..."
-                  : snapshotCaptured
-                    ? "Submit snapshot request"
-                    : "Capture snapshot first"}
-            </button>
-            {requestState.sending || requestState.lastLatencyMs !== null ? (
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Request latency:{" "}
-                {requestState.sending
-                  ? `${(requestLatencyMs / 1000).toFixed(2)}s (live)`
-                  : `${((requestState.lastLatencyMs ?? 0) / 1000).toFixed(2)}s`}
-              </p>
-            ) : null}
-            {requestState.retrying ? (
-              <p className="text-xs text-amber-600 dark:text-amber-300">
-                Connection unstable. Retrying your request automatically...
-              </p>
-            ) : null}
-          </form>
-        ) : null}
+                {requestState.retrying ? (
+                  <p className="mt-2 text-xs text-amber-300">
+                    Connection unstable. Retrying automatically.
+                  </p>
+                ) : null}
+              </section>
+            </form>
+          ) : null}
 
-        {requestState.sent ? (
-          <div className="mt-6 rounded-2xl bg-slate-100 p-4 dark:bg-slate-800">
-            <p className="text-sm font-semibold">
-              {isVisitorSessionActive(requestState.status)
-                ? "Request approved"
-                : requestState.status === "rejected"
-                  ? "Request rejected by homeowner"
-                  : "Waiting for homeowner approval"}
-            </p>
-            <p className="mt-1 text-xs text-slate-500">Timer: {status}</p>
-            {requestState.sessionId && isVisitorSessionActive(requestState.status) ? (
-              <p className="mt-3 text-xs text-success">Homeowner is ready. Opening session automatically...</p>
-            ) : null}
-            {requestState.status === "rejected" ? (
-              <div className="mt-3 space-y-3">
-                <p className="text-xs font-semibold text-danger">You can retry another request or contact the resident.</p>
-                <button
-                  type="button"
-                  onClick={() => window.location.reload()}
-                  className="rounded-xl border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700"
-                >
-                  Start New Request
-                </button>
+          {requestState.sent ? (
+            <section className="grid flex-1 place-items-center">
+              <div className="w-full max-w-2xl rounded-[2rem] border border-white/10 bg-white/8 p-6 text-white shadow-[0_30px_100px_rgba(0,0,0,0.28)] backdrop-blur-xl sm:p-8">
+                <div className="flex items-start gap-4">
+                  <div className="rounded-2xl border border-emerald-300/20 bg-emerald-400/10 p-3">
+                    <CheckCircle2 className="h-6 w-6 text-emerald-300" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] font-black uppercase tracking-[0.28em] text-emerald-200/75">Request submitted</p>
+                    <h2 className="mt-2 font-heading text-2xl font-semibold tracking-tight">
+                      {isVisitorSessionActive(requestState.status)
+                        ? "Homeowner approved your visit"
+                        : requestState.status === "rejected"
+                          ? "Your request was declined"
+                          : "We sent your request to the homeowner"}
+                    </h2>
+                    <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-300">
+                      {isVisitorSessionActive(requestState.status)
+                        ? "We’re opening the session automatically now."
+                        : "Stay close. The homeowner can approve, reject, or reply with instructions while your request stays active."}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-6 grid gap-3 rounded-[1.5rem] border border-white/10 bg-black/20 p-4 sm:grid-cols-3">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">Status</p>
+                    <p className="mt-1 text-sm font-semibold text-white">{requestState.status || "pending"}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">Timer</p>
+                    <p className="mt-1 text-sm font-semibold text-white">{status}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">Session</p>
+                    <p className="mt-1 truncate text-sm font-semibold text-white">{requestState.sessionId || "Pending"}</p>
+                  </div>
+                </div>
+
+                {requestState.status === "rejected" ? (
+                  <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                    <button
+                      type="button"
+                      onClick={() => window.location.reload()}
+                      className="rounded-2xl bg-white px-4 py-3 text-sm font-black uppercase tracking-[0.18em] text-slate-950"
+                    >
+                      Start new request
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/dashboard/homeowner/messages?sessionId=${encodeURIComponent(requestState.sessionId)}`)}
+                      className="rounded-2xl border border-white/10 bg-white/8 px-4 py-3 text-sm font-semibold text-white"
+                    >
+                      Open message thread
+                    </button>
+                  </div>
+                ) : null}
               </div>
-            ) : null}
-          </div>
-        ) : null}
-      </article>
+            </section>
+          ) : null}
+        </main>
       )}
     </div>
   );

@@ -88,7 +88,7 @@ export default function HomeownerMessagesPage() {
     const sorted = sortThreadsForInbox(normalized);
     setThreads((prev) => mergeThreadCollections(prev, sorted));
     const nextSelectedId = String(focusSessionId || selectedIdRef.current || "").trim();
-    if (nextSelectedId && sorted.some((item) => item.id === nextSelectedId)) {
+    if (nextSelectedId) {
       setSelectedId(nextSelectedId);
     }
     return sorted;
@@ -533,7 +533,12 @@ export default function HomeownerMessagesPage() {
     return sorted.filter((t) => [t.name, t.last].join(" ").toLowerCase().includes(term));
   }, [threads, query]);
 
-  const heroThread = useMemo(() => threads.find(t => t.id === selectedId) || filteredThreads[0], [threads, selectedId, filteredThreads]);
+  const heroThread = useMemo(() => {
+    if (selectedId) {
+      return threads.find((t) => t.id === selectedId) || null;
+    }
+    return filteredThreads[0] || null;
+  }, [threads, selectedId, filteredThreads]);
   const selectedMessages = useMemo(() => messagesByThread[selectedId] || [], [messagesByThread, selectedId]);
   const heroSnapshotUrl = useMemo(() => {
     if (!heroThread) return "";
