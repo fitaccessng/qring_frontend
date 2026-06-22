@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { CheckCircle2 } from "lucide-react";
 import VisitorConsentModal from "../../components/VisitorConsentModal";
 import { apiRequest } from "../../services/apiClient";
 import { env } from "../../config/env";
@@ -487,6 +488,7 @@ export default function ScanPage() {
       reveal: true,
     };
   }, [qrId]);
+  const snapshotCaptured = Boolean(visitorForm.snapshotDataUrl);
   const canReacceptConsent = canReacceptConsentFromError(error);
 
   return (
@@ -591,6 +593,17 @@ export default function ScanPage() {
                     alt="Visitor snapshot preview"
                     className="h-64 w-full rounded-2xl border border-slate-200 object-cover dark:border-slate-700"
                   />
+                  <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-900 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-100">
+                    <div className="flex items-start gap-3">
+                      <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold">Snapshot captured</p>
+                        <p className="mt-1 text-xs leading-relaxed text-emerald-800/90 dark:text-emerald-100/80">
+                          This image is locked in and will be sent with your visitor details when you submit the request.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                   <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
                     Preview saved. This will be sent to the homeowner.
                   </p>
@@ -687,7 +700,9 @@ export default function ScanPage() {
                 ? `Retrying (${requestState.retryAttempt}/${MAX_SUBMIT_RETRIES})...`
                 : requestState.sending
                   ? "Submitting..."
-                  : "Request Access"}
+                  : snapshotCaptured
+                    ? "Submit snapshot request"
+                    : "Request Access"}
             </button>
             {requestState.sending || requestState.lastLatencyMs !== null ? (
               <p className="text-xs text-slate-500 dark:text-slate-400">

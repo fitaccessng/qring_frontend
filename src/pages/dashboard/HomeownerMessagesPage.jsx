@@ -449,6 +449,16 @@ export default function HomeownerMessagesPage() {
       });
   }, [managedIncomingCall]);
 
+  const selectedThreadSnapshot = useMemo(() => threads.find((thread) => thread.id === selectedId) || null, [threads, selectedId]);
+  const selectedThreadSnapshotKey = useMemo(
+    () => [
+      selectedThreadSnapshot?.snapshotUrl || "",
+      selectedThreadSnapshot?.photoUrl || "",
+      selectedThreadSnapshot?.snapshotAuditId || ""
+    ].join("|"),
+    [selectedThreadSnapshot?.snapshotUrl, selectedThreadSnapshot?.photoUrl, selectedThreadSnapshot?.snapshotAuditId]
+  );
+
   useEffect(() => {
     const socket = socketRef.current;
     if (!socket) return;
@@ -468,19 +478,28 @@ export default function HomeownerMessagesPage() {
 
   useEffect(() => {
     if (!selectedId) return;
+    let active = true;
     async function loadConv() {
         setConversationLoading(true);
         try {
             const rows = await getHomeownerSessionMessages(selectedId);
+            if (!active) return;
             const threadSnapshot = threadsRef.current.find((thread) => thread.id === selectedId);
             const mergedRows = ensureSnapshotConversationRows(rows, selectedId, threadSnapshot);
             setMessagesByThread(prev => ({ ...prev, [selectedId]: mergeMessageCollections(prev[selectedId] || [], mergedRows) }));
             setThreads(prev => prev.map(t => t.id === selectedId ? { ...t, unread: 0 } : t));
-        } catch (err) { setError(err.message); }
-        finally { setConversationLoading(false); }
+        } catch (err) {
+          if (!active) return;
+          setError(err.message);
+        } finally {
+          if (active) setConversationLoading(false);
+        }
     }
     loadConv();
-  }, [selectedId]);
+    return () => {
+      active = false;
+    };
+  }, [selectedId, selectedThreadSnapshotKey]);
 
   const filteredThreads = useMemo(() => {
     const term = query.trim().toLowerCase();
