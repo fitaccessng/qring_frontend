@@ -400,6 +400,16 @@ export default function ScanPage() {
     const visitorType = normalizedPurpose === "delivery" ? "delivery" : "guest";
     const startedAt = Date.now();
     const requestId = createVisitorRequestId();
+    const snapshotBase64 = visitorForm.snapshotDataUrl.split(",")[1] || "";
+    const snapshotMime = "image/jpeg";
+    // eslint-disable-next-line no-console
+    console.info("qring.snapshot.submit_payload", {
+      hasSnapshotBase64: Boolean(snapshotBase64),
+      snapshotMime,
+      requestId,
+      qrId,
+      doorId
+    });
     setRequestLatencyMs(0);
     setRequestState((prev) => ({
       ...prev,
@@ -420,8 +430,8 @@ export default function ScanPage() {
           purpose: normalizedPurpose,
           visitorType,
           deliveryOption: visitorType === "delivery" ? visitorForm.deliveryOption : undefined,
-          snapshotBase64: visitorForm.snapshotDataUrl.split(",")[1] || "",
-          snapshotMime: "image/jpeg",
+          snapshotBase64,
+          snapshotMime,
           deviceId: visitorDeviceId,
           ...(buildVisitorConsentPayload(consentState) || {})
         },

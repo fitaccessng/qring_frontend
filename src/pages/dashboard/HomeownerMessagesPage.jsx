@@ -74,6 +74,17 @@ export default function HomeownerMessagesPage() {
     const { focusSessionId = "" } = options;
     const data = await getHomeownerMessages();
     const normalized = (data || []).map((thread) => normalizeInboxThread(thread));
+    // eslint-disable-next-line no-console
+    console.info(
+      "qring.homeowner.messages.snapshot_check",
+      normalized.map((thread) => ({
+        id: thread.id,
+        name: thread.name,
+        snapshotUrl: thread.snapshotUrl,
+        photoUrl: thread.photoUrl,
+        hasSnapshot: Boolean(thread.snapshotUrl || thread.photoUrl)
+      }))
+    );
     const sorted = sortThreadsForInbox(normalized);
     setThreads((prev) => mergeThreadCollections(prev, sorted));
     const nextSelectedId = String(focusSessionId || selectedIdRef.current || "").trim();
@@ -487,6 +498,17 @@ export default function HomeownerMessagesPage() {
         try {
             const rows = await getHomeownerSessionMessages(selectedId);
             if (!active) return;
+            // eslint-disable-next-line no-console
+            console.info("qring.homeowner.conversation.snapshot_check", {
+              selectedId,
+              hasSnapshotMessage: rows.some((row) => String(row?.messageType || "").trim() === "visitor_snapshot" || Boolean(row?.snapshotUrl)),
+              rows: rows.map((row) => ({
+                id: row?.id,
+                messageType: row?.messageType,
+                snapshotUrl: row?.snapshotUrl,
+                photoUrl: row?.photoUrl
+              }))
+            });
             const threadSnapshot = threadsRef.current.find((thread) => thread.id === selectedId);
             const mergedRows = ensureSnapshotConversationRows(rows, selectedId, threadSnapshot);
             setMessagesByThread(prev => ({ ...prev, [selectedId]: mergeMessageCollections(prev[selectedId] || [], mergedRows) }));
@@ -1041,8 +1063,9 @@ function normalizeInboxThread(thread) {
     normalized.visitor ||
     "Visitor";
   normalized.last = previewMessageText(normalized?.last || "");
-  normalized.photoUrl = extractSnapshotUrl(normalized);
-  normalized.snapshotUrl = normalized.photoUrl;
+  const snapshotUrl = extractSnapshotUrl(normalized);
+  normalized.snapshotUrl = snapshotUrl || normalized.snapshotUrl || "";
+  normalized.photoUrl = snapshotUrl || normalized.photoUrl || "";
   normalized.snapshotAuditId = String(
     normalized.snapshotAuditId ||
     normalized.snapshot_audit_id ||
@@ -1168,15 +1191,24 @@ function extractSnapshotUrl(source) {
   return String(
     source?.snapshotUrl ||
     source?.photoUrl ||
+    source?.imageUrl ||
+    source?.image_url ||
     source?.fileUrl ||
     source?.url ||
     source?.photo_url ||
     source?.snapshot_url ||
+    source?.snapshot?.snapshotUrl ||
+    source?.snapshot?.photoUrl ||
+    source?.snapshot?.imageUrl ||
+    source?.snapshot?.image_url ||
     source?.snapshot?.fileUrl ||
     source?.snapshot?.url ||
     source?.requestPayload?.snapshotUrl ||
     source?.requestPayload?.photoUrl ||
+    source?.requestPayload?.imageUrl ||
+    source?.requestPayload?.image_url ||
     source?.requestPayload?.fileUrl ||
+    source?.requestPayload?.snapshot_url ||
     source?.requestPayload?.url ||
     ""
   ).trim();
