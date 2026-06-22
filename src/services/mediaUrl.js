@@ -13,6 +13,10 @@ function getBackendOrigin() {
 }
 
 export function resolveBackendAssetUrl(value) {
+  return resolveSnapshotUrl(value);
+}
+
+export function resolveSnapshotUrl(value) {
   const raw = String(value || "").trim();
   if (!raw) return "";
   if (raw.startsWith("data:") || raw.startsWith("blob:")) return raw;

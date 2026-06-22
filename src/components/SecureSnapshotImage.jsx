@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { getAccessToken } from "../services/authStorage";
 import { apiRequestBinary } from "../services/apiClient";
 import { getVisitorSessionToken } from "../services/visitorSessionToken";
-import { resolveBackendAssetUrl } from "../services/mediaUrl";
+import { resolveSnapshotUrl } from "../services/mediaUrl";
 
 export default function SecureSnapshotImage({
   src,
@@ -30,7 +30,7 @@ export default function SecureSnapshotImage({
       return () => {};
     }
 
-    const assetUrl = resolveBackendAssetUrl(raw);
+    const assetUrl = resolveSnapshotUrl(raw);
     const accessToken = getAccessToken();
     const effectiveVisitorToken = visitorToken || getVisitorSessionToken(visitorSessionId);
     const needsAuthenticatedFetch = assetUrl.includes("/advanced/visitor/snapshots/");

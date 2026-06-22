@@ -73,7 +73,17 @@ export default function HomeownerMessagesPage() {
   async function refreshThreads(options = {}) {
     const { focusSessionId = "" } = options;
     const data = await getHomeownerMessages();
+    // eslint-disable-next-line no-console
+    console.info("QRING_HOMEOWNER_MESSAGES_RAW", data);
     const normalized = (data || []).map((thread) => normalizeInboxThread(thread));
+    // eslint-disable-next-line no-console
+    console.info("QRING_HOMEOWNER_MESSAGES_NORMALIZED", normalized.map((thread) => ({
+      id: thread.id,
+      name: thread.name,
+      snapshotUrl: thread.snapshotUrl,
+      photoUrl: thread.photoUrl,
+      hasSnapshot: Boolean(thread.snapshotUrl || thread.photoUrl)
+    })));
     // eslint-disable-next-line no-console
     console.info(
       "qring.homeowner.messages.snapshot_check",
@@ -497,6 +507,19 @@ export default function HomeownerMessagesPage() {
         try {
             const rows = await getHomeownerSessionMessages(selectedId);
             if (!active) return;
+            // eslint-disable-next-line no-console
+            console.info("QRING_HOMEOWNER_SESSION_MESSAGES_RAW", {
+              selectedId,
+              rows
+            });
+            // eslint-disable-next-line no-console
+            console.info("QRING_HOMEOWNER_SESSION_MESSAGES_SNAPSHOT_CHECK", {
+              selectedId,
+              hasSnapshotMessage: rows.some((row) =>
+                String(row?.messageType || "").trim() === "visitor_snapshot" ||
+                Boolean(row?.snapshotUrl || row?.photoUrl || row?.imageUrl)
+              )
+            });
             // eslint-disable-next-line no-console
             console.info("qring.homeowner.conversation.snapshot_check", {
               selectedId,
@@ -1081,14 +1104,36 @@ function previewMessageText(text) {
 
 function normalizeInboxThread(thread) {
   const normalized = { ...(thread || {}) };
+  const snapshotUrl = extractSnapshotUrl(normalized) || String(
+    normalized.snapshotUrl ||
+    normalized.photoUrl ||
+    normalized.imageUrl ||
+    normalized.fileUrl ||
+    normalized.url ||
+    ""
+  ).trim();
+  normalized.id =
+    normalized.id ||
+    normalized.sessionId ||
+    normalized.visitorSessionId ||
+    "";
   normalized.name =
     normalized.name ||
     normalized.visitorFullName ||
     normalized.visitorName ||
     normalized.visitor ||
     "Visitor";
+  normalized.visitorPhone =
+    normalized.visitorPhone ||
+    normalized.phoneNumber ||
+    normalized.phone ||
+    "";
+  normalized.purpose =
+    normalized.purpose ||
+    normalized.visitPurpose ||
+    normalized.reason ||
+    "";
   normalized.last = previewMessageText(normalized?.last || "");
-  const snapshotUrl = extractSnapshotUrl(normalized);
   normalized.snapshotUrl = snapshotUrl || normalized.snapshotUrl || "";
   normalized.photoUrl = snapshotUrl || normalized.photoUrl || "";
   normalized.snapshotAuditId = String(
@@ -1215,26 +1260,35 @@ function ensureSnapshotConversationRows(rows, sessionId, threadSnapshot) {
 function extractSnapshotUrl(source) {
   return String(
     source?.snapshotUrl ||
-    source?.photoUrl ||
     source?.imageUrl ||
+    source?.photoUrl ||
     source?.image_url ||
     source?.fileUrl ||
+    source?.file_url ||
     source?.url ||
-    source?.photo_url ||
     source?.snapshot_url ||
+    source?.photo_url ||
     source?.snapshot?.snapshotUrl ||
-    source?.snapshot?.photoUrl ||
     source?.snapshot?.imageUrl ||
+    source?.snapshot?.photoUrl ||
     source?.snapshot?.image_url ||
     source?.snapshot?.fileUrl ||
     source?.snapshot?.url ||
     source?.requestPayload?.snapshotUrl ||
-    source?.requestPayload?.photoUrl ||
     source?.requestPayload?.imageUrl ||
+    source?.requestPayload?.photoUrl ||
     source?.requestPayload?.image_url ||
     source?.requestPayload?.fileUrl ||
     source?.requestPayload?.snapshot_url ||
     source?.requestPayload?.url ||
+    source?.metadata?.snapshotUrl ||
+    source?.metadata?.imageUrl ||
+    source?.metadata?.photoUrl ||
+    source?.metadata?.fileUrl ||
+    source?.metadata?.url ||
+    source?.metadata?.snapshot_url ||
+    source?.metadata?.image_url ||
+    source?.metadata?.photo_url ||
     ""
   ).trim();
 }

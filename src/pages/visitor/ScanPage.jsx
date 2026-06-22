@@ -413,9 +413,12 @@ export default function ScanPage() {
     const requestId = createVisitorRequestId();
     const { snapshotBase64, snapshotMime } = getSnapshotPayloadParts(visitorForm.snapshotDataUrl);
     // eslint-disable-next-line no-console
-    console.info("qring.snapshot.submit_payload", {
+    console.info("QRING_SNAPSHOT_SUBMIT_DEBUG", {
+      hasSnapshotDataUrl: Boolean(visitorForm.snapshotDataUrl),
+      snapshotDataUrlLength: visitorForm.snapshotDataUrl?.length || 0,
       hasSnapshotBase64: Boolean(snapshotBase64),
-      snapshotMime,
+      snapshotBase64Length: snapshotBase64?.length || 0,
+      snapshotMime: snapshotMime || "image/jpeg",
       requestId,
       qrId,
       doorId
