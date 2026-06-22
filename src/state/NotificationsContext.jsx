@@ -21,11 +21,12 @@ import { isFirebaseConfigured } from "../config/firebase";
 import { playPanicAlertSound } from "../utils/notificationSound";
 
 const NotificationsContext = createContext(null);
-const POLL_INTERVAL_MS = 45000;
+const POLL_INTERVAL_MS = 10000;
 const SOCKET_EVENTS = new Set([
   "notification.created",
   "notification.updated",
   "notifications.updated",
+  "visitor.snapshot",
   "NOTIFICATION_CREATED",
   "NOTIFICATION_UPDATED",
   "ALERT_CREATED",
@@ -196,7 +197,31 @@ export function NotificationsProvider({ children }) {
       setLastRealtimeEvent({ eventName, payload: nextPayload, at: Date.now() });
     };
     const onVisitorSnapshot = (payload) => {
-      setLastRealtimeEvent({ eventName: "visitor.snapshot", payload: payload?.data ?? payload, at: Date.now() });
+      const snapshotPayload = payload?.data ?? payload ?? {};
+      const syntheticNotification = normalizeNotification(
+        {
+          id: snapshotPayload?.notificationId || snapshotPayload?.id || snapshotPayload?.sessionId || `visitor-snapshot-${Date.now()}`,
+          notificationId: snapshotPayload?.notificationId || snapshotPayload?.id || snapshotPayload?.sessionId || "",
+          eventId: snapshotPayload?.eventId || snapshotPayload?.id || "",
+          kind: "visitor.request",
+          type: "visitor.request",
+          title: "Visitor Request",
+          message: snapshotPayload?.message || "New visitor request",
+          payload: snapshotPayload,
+          createdAt: new Date().toISOString()
+        },
+        resolveNotificationRoute({
+          role: user?.role,
+          kind: "visitor.request",
+          payload: snapshotPayload
+        })
+      );
+      setItems((prev) => {
+        const next = prev.filter((item) => String(item?.notificationId || item?.id || "") !== String(syntheticNotification.notificationId || syntheticNotification.id || ""));
+        return managerRef.current.ingestNotificationList([syntheticNotification, ...next], user?.role);
+      });
+      setLastRealtimeEvent({ eventName: "visitor.snapshot", payload: snapshotPayload, at: Date.now() });
+      void refresh({ silent: true });
     };
 
     socket.on("connect", onConnect);

@@ -15,6 +15,7 @@ function getBackendOrigin() {
 export function resolveBackendAssetUrl(value) {
   const raw = String(value || "").trim();
   if (!raw) return "";
+  if (raw.startsWith("data:") || raw.startsWith("blob:")) return raw;
   if (/^https?:\/\//i.test(raw)) return raw;
   const origin = getBackendOrigin();
   if (!origin) return raw;
