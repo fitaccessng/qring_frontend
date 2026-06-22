@@ -20,6 +20,7 @@ export class ApiError extends Error {
 let refreshPromise = null;
 let capacitorRuntime = null;
 let lastNetworkErrorAt = 0;
+let lastSessionTimeoutAt = 0;
 const GET_CACHE_TTL_MS = 20 * 1000;
 const GET_CACHE_STALE_TTL_MS = 2 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 30000;
@@ -316,9 +317,22 @@ export async function apiRequestBinary(path, options = {}) {
       headers: buildAuthHeaders(options.headers ?? {}, options.token),
       body: options.body,
       cache: options.cache ?? "default",
+      credentials: "include",
       signal: controller.signal
     });
     if (!response.ok) {
+      const shouldHandleSessionTimeout = response.status === 401 && (Boolean(getAccessToken()) || requiresAuthenticatedUser(path));
+      if (shouldHandleSessionTimeout && options.__refreshed !== true) {
+        const newToken = await refreshAccessToken();
+        if (newToken) {
+          return apiRequestBinary(path, {
+            ...options,
+            __refreshed: true,
+            token: newToken,
+            retryCount
+          });
+        }
+      }
       if (retryCount > 0 && shouldRetryResponseStatus(response.status)) {
         return apiRequestBinary(path, { ...options, retryCount: retryCount - 1 });
       }
@@ -391,10 +405,31 @@ function emitBlockingSubscription(detail = {}) {
   );
 }
 
+function emitSessionTimeout(detail = {}) {
+  if (typeof window === "undefined") return;
+  const now = Date.now();
+  if (now - lastSessionTimeoutAt < 10 * 1000) return;
+  lastSessionTimeoutAt = now;
+  window.dispatchEvent(
+    new CustomEvent("qring:session-timeout", {
+      detail: {
+        title: detail.title ?? "Session expired",
+        message: detail.message ?? "Your session expired. Please sign in again to continue.",
+        actionLabel: detail.actionLabel ?? "Sign in",
+        actionRoute: detail.actionRoute ?? "/login"
+      }
+    })
+  );
+}
+
 async function refreshAccessToken() {
   if (refreshPromise) return refreshPromise;
   const refreshToken = getRefreshToken();
-  if (!refreshToken) return null;
+  if (!refreshToken) {
+    clearAuthStorage();
+    emitSessionTimeout();
+    return null;
+  }
 
   refreshPromise = (async () => {
     let response;
@@ -410,11 +445,18 @@ async function refreshAccessToken() {
       return null;
     }
 
-    if (!response.ok) return null;
+    if (!response.ok) {
+      if (response.status === 401) {
+        clearAuthStorage();
+        emitSessionTimeout();
+      }
+      return null;
+    }
     const payload = response.payload;
     const data = payload?.data ?? payload;
     if (!data?.accessToken) return null;
     persistAuthSession({ accessToken: data.accessToken, refreshToken: data.refreshToken, user: getStoredUserSnapshot() });
+    lastSessionTimeoutAt = 0;
     return data.accessToken;
   })();
 
@@ -437,7 +479,16 @@ function getStoredUserSnapshot() {
 function clearAuthStorage() {
   clearAuthSession();
   if (typeof window !== "undefined") {
-    window.dispatchEvent(new Event("qring:session-timeout"));
+    window.dispatchEvent(
+      new CustomEvent("qring:session-timeout", {
+        detail: {
+          title: "Session expired",
+          message: "Your session expired. Please sign in again to continue.",
+          actionLabel: "Sign in",
+          actionRoute: "/login"
+        }
+      })
+    );
   }
 }
 
@@ -565,9 +616,7 @@ export async function apiRequest(path, options = {}, attempt = 0) {
         if (newToken) {
           return apiRequest(path, options, 1);
         }
-        clearAuthStorage();
-        emitFlash("Session timeout. Please login again.", "warning");
-        redirectToLogin(getCurrentAppPath());
+        emitFlash("Session expired. Please sign in again.", "warning");
       }
       const detail = buildHttpErrorDetails({
         path,
@@ -698,6 +747,11 @@ export async function apiUpload(path, formData) {
       apiBaseUrl: env.apiBaseUrl
     });
     const message = detail.message;
+    if (response.status === 401) {
+      clearAuthStorage();
+      emitFlash("Session expired. Please sign in again.", "warning");
+      throw new ApiError("Session expired. Please sign in again.", response.status, detail.payload);
+    }
     emitFlash(message, "error");
     throw new ApiError(message, response.status, detail.payload);
   }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getAccessToken } from "../services/authStorage";
+import { apiRequestBinary } from "../services/apiClient";
 import { getVisitorSessionToken } from "../services/visitorSessionToken";
 import { resolveBackendAssetUrl } from "../services/mediaUrl";
 
@@ -38,12 +39,13 @@ export default function SecureSnapshotImage({
     // eslint-disable-next-line no-console
     console.info("qring.snapshot.fetch.start", { assetUrl, visitorSessionId: visitorSessionId || undefined });
 
-    fetch(assetUrl, {
-      credentials: "include",
+    apiRequestBinary(assetUrl, {
       headers: {
-        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
         ...(effectiveVisitorToken ? { "X-Visitor-Token": effectiveVisitorToken } : {})
-      }
+      },
+      token: accessToken || undefined,
+      timeoutMs: 15000,
+      retryCount: 1
     })
       .then(async (response) => {
         if (!response.ok) {

@@ -15,8 +15,23 @@ export default function BlockingModal() {
       setModal({ title, message, actionLabel, actionRoute });
     };
 
+    const handleSessionTimeout = (event) => {
+      const detail = event?.detail ?? {};
+      const title = String(detail.title ?? "Session expired").trim() || "Session expired";
+      const message =
+        String(detail.message ?? "Your session expired. Please sign in again to continue.").trim() ||
+        "Your session expired. Please sign in again to continue.";
+      const actionLabel = String(detail.actionLabel ?? "Sign in").trim() || "Sign in";
+      const actionRoute = String(detail.actionRoute ?? "/login").trim() || "/login";
+      setModal({ title, message, actionLabel, actionRoute });
+    };
+
     window.addEventListener("qring:blocking", handleOpen);
-    return () => window.removeEventListener("qring:blocking", handleOpen);
+    window.addEventListener("qring:session-timeout", handleSessionTimeout);
+    return () => {
+      window.removeEventListener("qring:blocking", handleOpen);
+      window.removeEventListener("qring:session-timeout", handleSessionTimeout);
+    };
   }, []);
 
   if (!modal) return null;

@@ -7,7 +7,16 @@ import { redirectToLogin } from "../utils/authRouting";
 function clearStoredSession() {
   if (typeof window === "undefined") return;
   clearAuthSession();
-  window.dispatchEvent(new Event("qring:session-timeout"));
+  window.dispatchEvent(
+    new CustomEvent("qring:session-timeout", {
+      detail: {
+        title: "Session expired",
+        message: "Your session expired. Please sign in again to continue.",
+        actionLabel: "Sign in",
+        actionRoute: "/login"
+      }
+    })
+  );
 }
 
 export const api = axios.create({
