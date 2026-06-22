@@ -45,7 +45,12 @@ export default function NotificationsPage() {
     if (item.unread) {
       await markRead(item.id);
     }
-    navigate(getNotificationDetailRoute(item));
+    navigate(getNotificationDetailRoute(item), {
+      state: {
+        fromNotification: true,
+        backTo: "/dashboard/notifications"
+      }
+    });
   }
 
   async function handleVisitorAction(item, action) {

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useSearchParams, useNavigate } from "react-router-dom";
+import { Link, useLocation, useSearchParams, useNavigate } from "react-router-dom";
 import {
-  Bell, ChevronLeft, Search, SendHorizontal, MessageSquare, ArrowLeft
+  Bell, ChevronLeft, Search, SendHorizontal, MessageSquare
 } from "lucide-react";
 import SecureSnapshotImage from "../../components/SecureSnapshotImage";
 import VisitorIncomingCallModal from "../../components/VisitorIncomingCallModal";
@@ -24,6 +24,7 @@ import { useNotifications } from "../../state/NotificationsContext";
 
 export default function HomeownerMessagesPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const {
     unreadCount: globalUnreadCount,
@@ -66,6 +67,8 @@ export default function HomeownerMessagesPage() {
   const incomingCallRef = useRef(null);
   const seenCallInviteIdsRef = useRef(new Set());
   const token = getAccessToken();
+  const notificationBackTarget = String(location.state?.backTo || "").trim();
+  const openedFromNotification = Boolean(location.state?.fromNotification) || notificationBackTarget === "/dashboard/notifications";
 
   async function refreshThreads(options = {}) {
     const { focusSessionId = "" } = options;
@@ -530,6 +533,18 @@ export default function HomeownerMessagesPage() {
     setMobileView("chat");
   };
 
+  const handleMobileBack = () => {
+    if (mobileView === "chat") {
+      if (openedFromNotification && notificationBackTarget) {
+        navigate(notificationBackTarget, { replace: true });
+        return;
+      }
+      setMobileView("list");
+      return;
+    }
+    navigate("/dashboard");
+  };
+
   async function handleSend(e) {
     if (e) e.preventDefault();
     const text = draft.trim();
@@ -665,34 +680,41 @@ export default function HomeownerMessagesPage() {
     <div className="bg-[#f8f9fa] h-screen w-screen flex flex-col overflow-hidden font-sans antialiased text-slate-800">
       
       {/* Dynamic Native Top Header Row Container */}
-      <header className="w-full bg-white border-b border-slate-100 px-4 py-3.5 flex-shrink-0 z-50 shadow-xs">
-        <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            {mobileView === "chat" ? (
-              <button 
-                onClick={() => setMobileView("list")} 
-                className="md:hidden flex items-center gap-1.5 text-indigo-600 text-xs font-black uppercase tracking-tight bg-indigo-50 px-3 py-2 rounded-xl"
-              >
-                <ArrowLeft size={14} />
-                <span>Visitors</span>
-              </button>
-            ) : (
-              <button 
-                onClick={() => navigate("/dashboard")} 
-                className="p-2.5 bg-slate-50 text-slate-600 rounded-full hover:bg-slate-100 transition-colors"
-                aria-label="Back to dashboard"
-              >
-                <ChevronLeft size={18} />
-              </button>
-            )}
-            <div className={mobileView === "chat" ? "hidden md:block" : "block"}>
-              <h1 className="font-extrabold text-base md:text-lg text-slate-900 leading-none">Access Control</h1>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Live Portals</p>
+      <header className="w-full bg-white/90 backdrop-blur-xl border-b border-slate-100 px-3 sm:px-4 py-3 flex-shrink-0 z-50 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+        <div className="max-w-6xl mx-auto flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <button
+              onClick={handleMobileBack}
+              className="md:hidden inline-flex items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-slate-700 shadow-sm transition-transform active:scale-95"
+              aria-label={mobileView === "chat" && openedFromNotification ? "Back to notifications" : "Back"}
+            >
+              <ChevronLeft size={14} />
+              <span>{mobileView === "chat" && openedFromNotification ? "Alerts" : "Back"}</span>
+            </button>
+            <button
+              onClick={() => navigate("/dashboard")}
+              className="hidden md:inline-flex p-2.5 bg-slate-50 text-slate-600 rounded-full hover:bg-slate-100 transition-colors"
+              aria-label="Back to dashboard"
+            >
+              <ChevronLeft size={18} />
+            </button>
+
+            <div className="min-w-0">
+              <h1 className="font-extrabold text-base md:text-lg text-slate-900 leading-none tracking-tight truncate">
+                Access Control
+              </h1>
+              <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 truncate">
+                {mobileView === "chat" ? "Visitor thread open" : "Live Portals"}
+              </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Link to="/dashboard/notifications" className="relative p-2.5 bg-slate-50 text-slate-600 rounded-full hover:bg-slate-100">
+          <div className="flex items-center gap-2 shrink-0">
+            <Link
+              to="/dashboard/notifications"
+              className="relative inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white p-2.5 text-slate-600 shadow-sm transition-colors hover:bg-slate-50"
+              aria-label="Notifications"
+            >
               <Bell size={18} />
               {globalUnreadCount > 0 && (
                 <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-white" />
@@ -703,14 +725,14 @@ export default function HomeownerMessagesPage() {
       </header>
 
       {/* Global Contextual Search Control pinned permanently to Header base */}
-      <div className={`w-full bg-white border-b border-slate-100 p-3 flex-shrink-0 ${mobileView === "chat" ? "hidden md:block" : "block"}`}>
+      <div className={`w-full bg-white/80 backdrop-blur-md border-b border-slate-100 p-3 flex-shrink-0 ${mobileView === "chat" ? "hidden md:block" : "block"}`}>
         <div className="max-w-6xl mx-auto relative">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search entry points, purpose, or visitors..."
-            className="w-full bg-slate-50 border border-slate-100 rounded-xl py-3.5 pl-12 pr-4 text-sm font-medium focus:ring-2 focus:ring-indigo-600/10 outline-none transition-shadow"
+            className="w-full bg-slate-50/90 border border-slate-100 rounded-2xl py-3.5 pl-12 pr-4 text-sm font-medium focus:ring-2 focus:ring-indigo-600/10 outline-none transition-shadow shadow-sm"
           />
         </div>
       </div>
@@ -766,21 +788,28 @@ export default function HomeownerMessagesPage() {
               {/* Context-Aware Header Frame with Impeccable Image Snapshots Rendering */}
               <div className="p-4 border-b border-slate-100 bg-slate-50/60 flex items-center justify-between gap-4 flex-shrink-0">
                 <div className="flex items-center gap-3.5 min-w-0">
-                  <div className="h-12 w-12 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-sm md:h-14 md:w-14 dark:border-slate-700 dark:bg-slate-800">
+                  <div className="w-full max-w-[280px] overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm md:w-64 dark:border-slate-700 dark:bg-slate-800">
                     {heroSnapshotUrl ? (
                       <SecureSnapshotImage
                         src={heroSnapshotUrl}
                         alt="Visitor snapshot"
-                        className="h-full w-full object-cover"
+                        className="h-48 w-full object-cover md:h-56"
+                        onError={({ src }) => {
+                          // eslint-disable-next-line no-console
+                          console.warn("qring.snapshot.render_failed", {
+                            sessionId: heroThread?.id || "",
+                            snapshotUrl: src || heroSnapshotUrl
+                          });
+                        }}
                         fallback={
-                          <div className="grid h-full w-full place-items-center bg-gradient-to-br from-slate-200 to-slate-300 text-[10px] font-black text-slate-500 dark:from-slate-700 dark:to-slate-800 dark:text-slate-300">
-                            {(heroThread?.name || "V")[0]}
+                          <div className="grid h-48 w-full place-items-center bg-gradient-to-br from-rose-50 to-amber-50 p-4 text-center text-xs font-semibold text-rose-700 md:h-56">
+                            Snapshot image could not be loaded. Please check image storage or URL access.
                           </div>
                         }
                       />
                     ) : (
-                      <div className="grid h-full w-full place-items-center bg-gradient-to-br from-slate-200 to-slate-300 text-sm font-black text-slate-600 dark:from-slate-700 dark:to-slate-800 dark:text-slate-200">
-                        {(heroThread?.name || "V")[0]}
+                      <div className="grid h-48 w-full place-items-center bg-gradient-to-br from-rose-50 to-amber-50 p-4 text-center text-xs font-semibold text-rose-700 md:h-56">
+                        Snapshot image is missing for this visitor request.
                       </div>
                     )}
                   </div>
@@ -923,6 +952,23 @@ function renderThreadMessageBody(message) {
   const messageType = String(message?.messageType || "text");
   if (messageType === "visitor_snapshot" || Boolean(snapshotUrl)) {
     const footerLabel = getSnapshotFooterLabel(message);
+    const missingSnapshotBox = (
+      <div className="grid h-52 w-full place-items-center rounded-2xl bg-gradient-to-br from-rose-50 to-amber-50 p-4 text-center text-xs font-semibold text-rose-700">
+        Snapshot image is missing for this visitor request.
+      </div>
+    );
+    const failedSnapshotBox = (
+      <div className="grid h-52 w-full place-items-center rounded-2xl bg-gradient-to-br from-rose-50 to-amber-50 p-4 text-center text-xs font-semibold text-rose-700">
+        Snapshot image could not be loaded. Please check image storage or URL access.
+      </div>
+    );
+    if (!snapshotUrl) {
+      // eslint-disable-next-line no-console
+      console.warn("qring.snapshot.missing", {
+        sessionId: message?.sessionId || "",
+        snapshotUrl: ""
+      });
+    }
     return (
       <div className="space-y-3">
         <div className="flex items-center gap-2">
@@ -939,10 +985,17 @@ function renderThreadMessageBody(message) {
               src={snapshotUrl}
               alt="Visitor snapshot"
               className="h-52 w-full object-cover"
-              fallback={<div className="grid h-52 w-full place-items-center bg-gradient-to-br from-slate-200 via-slate-100 to-slate-200 text-xs font-bold text-slate-500">Snapshot unavailable</div>}
+              onError={({ src }) => {
+                // eslint-disable-next-line no-console
+                console.warn("qring.snapshot.render_failed", {
+                  sessionId: message?.sessionId || "",
+                  snapshotUrl: src || snapshotUrl
+                });
+              }}
+              fallback={failedSnapshotBox}
             />
           ) : (
-            <div className="grid h-52 w-full place-items-center bg-gradient-to-br from-slate-200 via-slate-100 to-slate-200 text-xs font-bold text-slate-500">Snapshot unavailable</div>
+            missingSnapshotBox
           )}
         </div>
         <div className="grid gap-2 rounded-2xl bg-slate-50 p-3 text-[11px] text-slate-600">

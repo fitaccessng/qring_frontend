@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getAccessToken } from "../services/authStorage";
 import { apiRequestBinary } from "../services/apiClient";
 import { getVisitorSessionToken } from "../services/visitorSessionToken";
@@ -10,10 +10,16 @@ export default function SecureSnapshotImage({
   className = "",
   visitorSessionId = "",
   visitorToken = "",
+  onError = null,
   fallback = null
 }) {
   const [resolvedSrc, setResolvedSrc] = useState("");
   const [loading, setLoading] = useState(false);
+  const onErrorRef = useRef(onError);
+
+  useEffect(() => {
+    onErrorRef.current = onError;
+  }, [onError]);
 
   useEffect(() => {
     let active = true;
@@ -66,6 +72,12 @@ export default function SecureSnapshotImage({
           assetUrl,
           error: error?.message || "unknown_snapshot_error"
         });
+        if (typeof onErrorRef.current === "function") {
+          onErrorRef.current({
+            src: assetUrl,
+            error
+          });
+        }
       })
       .finally(() => {
         if (active) setLoading(false);

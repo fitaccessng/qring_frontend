@@ -55,6 +55,9 @@ function createVisitorRequestId() {
 
 function getVisitorSubmitErrorMessage(error) {
   const code = String(error?.payload?.code || "").trim();
+  if (code === "SNAPSHOT_SAVE_FAILED") {
+    return "Snapshot could not be saved. Please retake the photo and try again.";
+  }
   if (code === "VISITOR_CONSENT_EXPIRED" || code === "VISITOR_CONSENT_REQUIRED" || code === "VISITOR_CONSENT_TIMESTAMP_REQUIRED") {
     return "Your privacy notice session expired. Please accept it again, then retry your request.";
   }
@@ -693,7 +696,7 @@ export default function ScanPage() {
             )}
             <button
               type="submit"
-              disabled={requestState.sending}
+              disabled={!snapshotCaptured || requestState.sending}
               className="w-full rounded-xl bg-brand-500 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"
             >
               {requestState.retrying
@@ -702,7 +705,7 @@ export default function ScanPage() {
                   ? "Submitting..."
                   : snapshotCaptured
                     ? "Submit snapshot request"
-                    : "Request Access"}
+                    : "Capture snapshot first"}
             </button>
             {requestState.sending || requestState.lastLatencyMs !== null ? (
               <p className="text-xs text-slate-500 dark:text-slate-400">
