@@ -125,7 +125,7 @@ export default function SecurityDashboardPage() {
 
   useEffect(() => {
     const socket = getDashboardSocket();
-    const terminalCallEvents = ["call.accepted", "call.rejected", "call.ended"];
+    const terminalCallEvents = ["call.accepted", "call.rejected", "call.ended", "call.failed", "call.cancelled", "call.missed"];
     const terminalCallListeners = new Map();
     function handleIncomingCall(payload) {
       setIncomingCall(payload?.data ?? payload ?? null);

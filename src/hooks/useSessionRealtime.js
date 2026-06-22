@@ -2074,6 +2074,35 @@ export function useSessionRealtime(sessionId) {
       });
     };
 
+    const handleCallFailed = (payload) => {
+      if (String(payload?.sessionId || "") !== String(sessionId || "")) return;
+      const eventId = String(payload?.eventId || payload?.callSessionId || "").trim();
+      if (eventId && seenCallLifecycleEventIdsRef.current.has(`failed:${eventId}`)) {
+        pushLog("Duplicate call failed suppressed", {
+          eventId,
+          callSessionId: payload?.callSessionId || callSessionRef.current
+        });
+        return;
+      }
+      if (eventId) {
+        seenCallLifecycleEventIdsRef.current.add(`failed:${eventId}`);
+      }
+      setStatus("Call failed");
+      transitionIncomingCall("idle", {
+        callSessionId: String(payload?.callSessionId || callSessionRef.current || ""),
+        sessionId,
+        visitorId: callVisitorIdRef.current || sessionId,
+        eventId: String(payload?.callSessionId || callSessionRef.current || "")
+      }, "remote_call_failed");
+      pushLog("Remote call failed", {
+        callSessionId: payload?.callSessionId || callSessionRef.current
+      });
+      void endCall(false, {
+        incomingPhase: "idle",
+        statusMessage: "Call failed"
+      });
+    };
+
     const handleCallEnded = (payload) => {
       if (String(payload?.sessionId || "") !== String(sessionId || "") && String(payload?.callSessionId || "") !== callSessionRef.current) {
         return;
@@ -2267,6 +2296,9 @@ export function useSessionRealtime(sessionId) {
     socket.on(RealtimeEvent.CALL_ACCEPTED, handleCallAccepted);
     socket.on(RealtimeEvent.CALL_REJECTED, handleCallRejected);
     socket.on(RealtimeEvent.CALL_ENDED, handleCallEnded);
+    socket.on(RealtimeEvent.CALL_FAILED, handleCallFailed);
+    socket.on("call.cancelled", handleCallFailed);
+    socket.on("call.missed", handleCallEnded);
     socket.on(RealtimeEvent.SESSION_CONTROL, handleSessionControl);
     socket.on(RealtimeEvent.SESSION_STATUS, handleSessionStatus);
     socket.on(RealtimeEvent.SESSION_ACTIVATED, handleSessionActivated);
@@ -2302,6 +2334,9 @@ export function useSessionRealtime(sessionId) {
       socket.off(RealtimeEvent.CALL_ACCEPTED, handleCallAccepted);
       socket.off(RealtimeEvent.CALL_REJECTED, handleCallRejected);
       socket.off(RealtimeEvent.CALL_ENDED, handleCallEnded);
+      socket.off(RealtimeEvent.CALL_FAILED, handleCallFailed);
+      socket.off("call.cancelled", handleCallFailed);
+      socket.off("call.missed", handleCallEnded);
       socket.off(RealtimeEvent.SESSION_CONTROL, handleSessionControl);
       socket.off(RealtimeEvent.SESSION_STATUS, handleSessionStatus);
       socket.off(RealtimeEvent.SESSION_ACTIVATED, handleSessionActivated);

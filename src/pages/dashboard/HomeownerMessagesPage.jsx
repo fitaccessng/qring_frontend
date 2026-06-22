@@ -12,6 +12,7 @@ import { RealtimeEvent } from "../../services/realtimeEvents";
 import { grantSessionCallAccess } from "../../services/sessionCallAccess";
 import { createRealtimeSocket, releaseRealtimeSocket } from "../../services/socketClient";
 import { playMessageNotificationSound } from "../../utils/notificationSound";
+import { parseNotificationPayload } from "../../utils/notificationMeta";
 import {
   decideVisit,
   getHomeownerMessages,
@@ -27,6 +28,7 @@ export default function HomeownerMessagesPage() {
   const location = useLocation();
   const { user } = useAuth();
   const {
+    items: notifications,
     unreadCount: globalUnreadCount,
     activeIncomingCall: managedIncomingCall,
     dismissIncomingCall,
@@ -66,6 +68,7 @@ export default function HomeownerMessagesPage() {
   const callBusyRef = useRef("");
   const incomingCallRef = useRef(null);
   const seenCallInviteIdsRef = useRef(new Set());
+  const seenRequestNotificationIdsRef = useRef(new Set());
   const token = getAccessToken();
   const notificationBackTarget = String(location.state?.backTo || "").trim();
   const openedFromNotification = Boolean(location.state?.fromNotification) || notificationBackTarget === "/dashboard/notifications";
@@ -125,6 +128,41 @@ export default function HomeownerMessagesPage() {
       return next;
     });
   }, [threads]);
+
+  useEffect(() => {
+    const currentNotifications = Array.isArray(notifications) ? notifications : [];
+    const nextSessionIds = new Set();
+    let hasVisitorRequest = false;
+    let hasSnapshotUpdate = false;
+    let sawNewRelevantNotification = false;
+
+    currentNotifications.forEach((item) => {
+      const kind = String(item?.kind || item?.type || "").trim().toLowerCase();
+      const payload = parseNotificationPayload(item?.payload);
+      const sessionId = String(payload?.sessionId || item?.sessionId || "").trim();
+      const notificationId = String(item?.notificationId || item?.id || "").trim();
+      if (
+        notificationId &&
+        (kind === "visitor.request" || kind === "visitor.snapshot") &&
+        !seenRequestNotificationIdsRef.current.has(notificationId)
+      ) {
+        seenRequestNotificationIdsRef.current.add(notificationId);
+        sawNewRelevantNotification = true;
+      }
+      if (kind === "visitor.request" && sessionId) {
+        hasVisitorRequest = true;
+        nextSessionIds.add(sessionId);
+      }
+      if ((kind === "visitor.snapshot" || eventLooksLikeSnapshot(payload)) && sessionId) {
+        hasSnapshotUpdate = true;
+        nextSessionIds.add(sessionId);
+      }
+    });
+
+    if (!sawNewRelevantNotification || (!hasVisitorRequest && !hasSnapshotUpdate)) return;
+    const focusSessionId = nextSessionIds.values().next().value || "";
+    void refreshThreads({ focusSessionId }).catch(() => {});
+  }, [notifications]);
 
   // Keep chat scrolled down smoothly
   useEffect(() => {
@@ -445,6 +483,13 @@ export default function HomeownerMessagesPage() {
           });
         }
       }
+      void refreshThreads({ focusSessionId: visitorSessionId }).catch(() => {});
+      return;
+    }
+
+    if (eventName === "visitor.request") {
+      const payload = lastRealtimeEvent?.payload || {};
+      const visitorSessionId = String(payload?.visitorSessionId || payload?.sessionId || "").trim();
       void refreshThreads({ focusSessionId: visitorSessionId }).catch(() => {});
       return;
     }
@@ -1107,6 +1152,15 @@ function roleLabel(role) {
 
 function previewMessageText(text) {
   return text;
+}
+
+function eventLooksLikeSnapshot(payload) {
+  return Boolean(
+    extractSnapshotUrl(payload) ||
+    extractSnapshotUrl(payload?.payload) ||
+    extractSnapshotUrl(payload?.requestPayload) ||
+    extractSnapshotUrl(payload?.metadata)
+  );
 }
 
 function normalizeInboxThread(thread) {

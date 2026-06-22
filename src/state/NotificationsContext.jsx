@@ -132,7 +132,7 @@ export function NotificationsProvider({ children }) {
     if (!user?.id || !user?.role) return () => {};
 
     const socket = getDashboardSocket();
-    const terminalCallEvents = ["call.accepted", "call.rejected", "call.ended"];
+    const terminalCallEvents = ["call.accepted", "call.rejected", "call.ended", "call.failed", "call.cancelled", "call.missed"];
     const terminalCallListeners = new Map();
 
     const subscribe = () => {

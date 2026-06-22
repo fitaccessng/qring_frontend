@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, PhoneCall, Video } from "lucide-react";
 import SecureSnapshotImage from "../../components/SecureSnapshotImage";
 import SessionNetworkBadge from "../../components/SessionNetworkBadge";
 import VisitorIncomingCallModal from "../../components/VisitorIncomingCallModal";
