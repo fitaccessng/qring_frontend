@@ -1,4 +1,5 @@
-import { apiRequest, apiUpload } from "./apiClient";
+import { ApiError, apiRequest, apiUpload } from "./apiClient";
+import { buildStartSessionCallPlan } from "./callRoutePlanner";
 import { getStoredUser } from "./authStorage";
 import { getVisitorSessionToken } from "./visitorSessionToken";
 
@@ -112,6 +113,21 @@ function filterAssignedHomeownerDoors(doors, options = {}) {
 // Backwards-compatible export name.
 function filterAssignedResidentDoors(doors, options = {}) {
   return filterAssignedHomeownerDoors(doors, options);
+}
+
+function isLegacyRouteFallbackError(error) {
+  return error instanceof ApiError && (error.status === 404 || error.status === 405);
+}
+
+async function withLegacyFallback(primary, fallback) {
+  try {
+    return await primary();
+  } catch (error) {
+    if (!isLegacyRouteFallbackError(error)) {
+      throw error;
+    }
+    return fallback();
+  }
 }
 
 export async function generateHomeownerDoorQr(doorId, payload = {}) {
@@ -292,32 +308,115 @@ export async function decideVisit(sessionId, action, options = {}) {
 
 export async function getVisitorSessionStatus(sessionId) {
   const token = getVisitorSessionToken(sessionId);
-  const response = await apiRequest(`/visitor/sessions/${sessionId}`, {
-    headers: token ? { "X-Visitor-Token": token } : undefined
-  });
-  return response?.data ?? null;
+  return withLegacyFallback(
+    async () => {
+      const response = await apiRequest(`/visitor-sessions/${sessionId}`, {
+        headers: token ? { "X-Visitor-Token": token } : undefined
+      });
+      return response?.data ?? null;
+    },
+    async () => {
+      const response = await apiRequest(`/visitor/sessions/${sessionId}`, {
+        headers: token ? { "X-Visitor-Token": token } : undefined
+      });
+      return response?.data ?? null;
+    }
+  );
 }
 
 export async function getVisitorSessionMessages(sessionId) {
   const token = getVisitorSessionToken(sessionId);
-  const response = await apiRequest(`/visitor/sessions/${sessionId}/messages`, {
-    headers: token ? { "X-Visitor-Token": token } : undefined
-  });
-  return Array.isArray(response?.data) ? response.data : [];
+  return withLegacyFallback(
+    async () => {
+      const response = await apiRequest(`/visitor-sessions/${sessionId}`, {
+        headers: token ? { "X-Visitor-Token": token } : undefined
+      });
+      return Array.isArray(response?.data?.messages) ? response.data.messages : [];
+    },
+    async () => {
+      const response = await apiRequest(`/visitor/sessions/${sessionId}/messages`, {
+        headers: token ? { "X-Visitor-Token": token } : undefined
+      });
+      return Array.isArray(response?.data) ? response.data : [];
+    }
+  );
 }
 
 export async function sendVisitorSessionMessage(sessionId, text, clientId) {
   const token = getVisitorSessionToken(sessionId);
-  const response = await apiRequest(`/visitor/sessions/${sessionId}/messages`, {
-    method: "POST",
-    headers: token ? { "X-Visitor-Token": token } : undefined,
-    body: JSON.stringify({
-      text,
-      clientId
-    })
-  });
-  return response?.data ?? null;
+  return withLegacyFallback(
+    async () => {
+      const response = await apiRequest(`/visitor-sessions/${sessionId}/messages`, {
+        method: "POST",
+        headers: token ? { "X-Visitor-Token": token } : undefined,
+        body: JSON.stringify({
+          text,
+          clientId
+        })
+      });
+      return response?.data ?? null;
+    },
+    async () => {
+      const response = await apiRequest(`/visitor/sessions/${sessionId}/messages`, {
+        method: "POST",
+        headers: token ? { "X-Visitor-Token": token } : undefined,
+        body: JSON.stringify({
+          text,
+          clientId
+        })
+      });
+      return response?.data ?? null;
+    }
+  );
 }
+
+export async function startSessionCall({
+  sessionId,
+  visitorSessionId,
+  visitorRequestId,
+  visitorName,
+  type,
+  hasVideo,
+  visitorToken
+} = {}) {
+  const plan = buildStartSessionCallPlan({
+    sessionId,
+    visitorSessionId,
+    visitorRequestId,
+    visitorName,
+    type,
+    hasVideo,
+    visitorToken
+  });
+
+  const legacyRequest = async () => {
+    const response = await apiRequest("/calls/start", {
+      method: "POST",
+      body: JSON.stringify(plan.legacyBody)
+    });
+    return response?.data ?? null;
+  };
+
+  if (!plan.canUseCanonicalRoute) {
+    return legacyRequest();
+  }
+
+  return withLegacyFallback(
+    async () => {
+      const response = await apiRequest("/calls/request", {
+        method: "POST",
+        body: JSON.stringify(plan.canonicalBody)
+      });
+      return response?.data ?? null;
+    },
+    legacyRequest
+  );
+}
+
+export async function requestHomeownerCall(options = {}) {
+  return startSessionCall(options);
+}
+
 export async function resolveVisitorAppointment(shareToken) {
   const response = await apiRequest(`/visitor/appointments/resolve/${encodeURIComponent(shareToken)}`);
   return response?.data ?? null;

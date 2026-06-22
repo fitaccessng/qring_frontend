@@ -14,7 +14,8 @@
     "sync:android:mobile": "npm run build:mobile && VITE_APP_BUILD_TARGET=mobile npx cap sync android",
     "android:apk": "zsh scripts/android-release-build.sh assembleRelease",
     "android:aab": "zsh scripts/android-release-build.sh bundleRelease",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:contracts": "node --test tests/callRoutePlanner.test.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.2.0",

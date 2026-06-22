@@ -16,10 +16,10 @@ import {
   enqueueSecurityAction, flushQueuedSecurityActions,
   listQueuedSecurityActions
 } from "../../services/securityOfflineQueue";
-import { apiRequest } from "../../services/apiClient";
 import { useSocketEvents } from "../../hooks/useSocketEvents";
 import { getDashboardSocket } from "../../services/socketClient";
 import { showSuccess } from "../../utils/flash";
+import { startSessionCall } from "../../services/homeownerService";
 
 const SECTIONS = [
   { key: "newRequests", label: "New", accentColor: "#f59e0b", emptyText: "No new requests." },
@@ -211,7 +211,7 @@ export default function SecurityDashboardPage() {
     setBusyKey(key); setError("");
     try {
       const nextMode = type === "video" ? "video" : "audio";
-      const response = await apiRequest("/calls/start", { method: "POST", body: JSON.stringify({ sessionId, type, hasVideo: type === "video" }) });
+      const response = await startSessionCall({ sessionId, type: nextMode, hasVideo: type === "video" });
       const data = response?.data ?? response ?? {};
       window.sessionStorage.setItem(
         "qring_call_start_intent",

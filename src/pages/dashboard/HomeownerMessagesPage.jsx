@@ -16,6 +16,7 @@ import {
   decideVisit,
   getHomeownerMessages,
   getHomeownerSessionMessages,
+  requestHomeownerCall,
   sendHomeownerSessionMessage
 } from "../../services/homeownerService";
 import { useAuth } from "../../state/AuthContext";
@@ -572,9 +573,10 @@ export default function HomeownerMessagesPage() {
     const mode = type === "video" ? "video" : "audio";
     setCallBusy(`${selectedId}:${mode}`);
     try {
-      const response = await apiRequest("/calls/start", {
-        method: "POST",
-        body: JSON.stringify({ sessionId: selectedId, type: mode, hasVideo: mode === "video" })
+      const response = await requestHomeownerCall({
+        visitorSessionId: selectedId,
+        type: mode,
+        hasVideo: mode === "video"
       });
       const data = response?.data ?? response ?? {};
       window.sessionStorage.setItem("qring_call_start_intent", JSON.stringify({

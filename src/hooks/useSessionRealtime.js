@@ -19,6 +19,7 @@ import { reportRtcEvent } from "../services/rtcMonitoring";
 import {
   getHomeownerSessionMessages,
   getVisitorSessionMessages,
+  startSessionCall,
   sendHomeownerSessionMessage,
   sendVisitorSessionMessage
 } from "../services/homeownerService";
@@ -1321,14 +1322,11 @@ export function useSessionRealtime(sessionId) {
 
     try {
       if (!restart || !callSessionRef.current) {
-        const response = await apiRequest("/calls/start", {
-          method: "POST",
-          body: JSON.stringify({
-            sessionId,
-            type: nextMode,
-            hasVideo: video,
-            visitorToken: participantType === "visitor" ? getVisitorSessionToken(sessionId) || undefined : undefined
-          })
+        const response = await startSessionCall({
+          sessionId,
+          type: nextMode,
+          hasVideo: video,
+          visitorToken: participantType === "visitor" ? getVisitorSessionToken(sessionId) || undefined : undefined
         });
         const data = response?.data ?? null;
         if (String(data?.status || "").toLowerCase() === "ok" || String(data?.state || "").toLowerCase() === "connecting") {

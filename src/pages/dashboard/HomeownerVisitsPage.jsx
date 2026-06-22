@@ -6,8 +6,7 @@ import {
   Search
 } from "lucide-react";
 
-import { apiRequest } from "../../services/apiClient";
-import { decideVisit, endHomeownerSession, getHomeownerAppointments, getHomeownerVisits } from "../../services/homeownerService";
+import { decideVisit, endHomeownerSession, getHomeownerAppointments, getHomeownerVisits, startSessionCall } from "../../services/homeownerService";
 import { useNotifications } from "../../state/NotificationsContext";
 
 export default function HomeownerVisitsPage() {
@@ -102,9 +101,10 @@ export default function HomeownerVisitsPage() {
     const busyKey = `${sessionId}:${nextType}`;
     setCallBusyId(busyKey);
     try {
-      const response = await apiRequest("/calls/start", {
-        method: "POST",
-        body: JSON.stringify({ sessionId, type: nextType, hasVideo: nextType === "video" })
+      const response = await startSessionCall({
+        sessionId,
+        type: nextType,
+        hasVideo: nextType === "video"
       });
       const data = response?.data ?? response ?? {};
       window.sessionStorage.setItem(

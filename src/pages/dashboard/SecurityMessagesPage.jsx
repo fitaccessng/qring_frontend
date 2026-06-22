@@ -13,7 +13,7 @@ import {
   getSecuritySessionMessages,
   sendSecuritySessionMessage
 } from "../../services/securityService";
-import { apiRequest } from "../../services/apiClient";
+import { startSessionCall } from "../../services/homeownerService";
 
 export default function SecurityMessagesPage() {
   const navigate = useNavigate();
@@ -254,7 +254,7 @@ export default function SecurityMessagesPage() {
     setCallBusy(key);
     try {
       const nextMode = type === "video" ? "video" : "audio";
-      const response = await apiRequest("/calls/start", { method: "POST", body: JSON.stringify({ sessionId: selectedId, type, hasVideo: type === "video" }) });
+      const response = await startSessionCall({ sessionId: selectedId, type: nextMode, hasVideo: nextMode === "video" });
       const data = response?.data ?? response ?? {};
       window.sessionStorage.setItem(
         "qring_call_start_intent",
