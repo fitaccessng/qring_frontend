@@ -838,6 +838,9 @@ export default function HomeownerMessagesPage() {
                       <span className="text-[9px] font-bold tracking-tighter opacity-70">{formatClockTime(thread.time)}</span>
                     </div>
                     <p className="text-xs truncate opacity-80 mb-1">{thread.last || "Awaiting entry verification snapshot..."}</p>
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400 truncate">
+                      {thread.doorName || thread.gateLabel || thread.door || "Entry Unit Gate"}
+                    </p>
                     <p className={`text-[9px] font-bold uppercase tracking-wider ${isActive ? 'text-indigo-200' : 'text-indigo-600'}`}>
                       {thread.gateLabel || "Entry Unit Gate"}
                     </p>
@@ -888,6 +891,9 @@ export default function HomeownerMessagesPage() {
                     <h2 className="text-sm font-black text-slate-900 truncate leading-tight uppercase tracking-tight">{heroThread?.name || "Visitor Identification"}</h2>
                     <p className="text-xs text-slate-500 truncate mt-0.5 font-medium">
                       Purpose: <span className="text-slate-700 font-bold">{heroThread?.purpose || "Unprovided verification metrics"}</span>
+                    </p>
+                    <p className="text-[10px] font-extrabold text-indigo-600 mt-0.5 tracking-wide uppercase truncate">
+                      Door: {heroThread?.doorName || heroThread?.gateLabel || heroThread?.door || "Unknown Door"}
                     </p>
                     <p className="text-[10px] font-extrabold text-indigo-600 mt-0.5 tracking-wide uppercase">
                       {heroThread?.gateLabel || "Intercom Link"} • {heroThread?.visitorPhone || "No Mobile Record"}
@@ -1072,6 +1078,7 @@ function renderThreadMessageBody(message) {
           <div className="flex flex-wrap gap-2">
             {message?.visitorName ? <span className="rounded-full bg-white px-2.5 py-1 font-semibold text-slate-700 shadow-sm">Name: {message.visitorName}</span> : null}
             {message?.visitorPhone ? <span className="rounded-full bg-white px-2.5 py-1 font-semibold text-slate-700 shadow-sm">Phone: {message.visitorPhone}</span> : null}
+            {message?.doorName ? <span className="rounded-full bg-white px-2.5 py-1 font-semibold text-slate-700 shadow-sm">Door: {message.doorName}</span> : null}
           </div>
           {message?.purpose ? (
             <p className="leading-relaxed">
@@ -1127,6 +1134,13 @@ function normalizeInboxThread(thread) {
     normalized.visitorPhone ||
     normalized.phoneNumber ||
     normalized.phone ||
+    "";
+  normalized.doorName =
+    normalized.doorName ||
+    normalized.door ||
+    normalized.gateLabel ||
+    normalized.requestPayload?.doorName ||
+    normalized.metadata?.doorName ||
     "";
   normalized.purpose =
     normalized.purpose ||

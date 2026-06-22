@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { CheckCircle2 } from "lucide-react";
+import { Camera, CheckCircle2, ChevronLeft, RefreshCcw, SendHorizontal } from "lucide-react";
 import VisitorConsentModal from "../../components/VisitorConsentModal";
 import { apiRequest } from "../../services/apiClient";
 import { env } from "../../config/env";
@@ -8,7 +8,12 @@ import { RealtimeEvent } from "../../services/realtimeEvents";
 import { createRealtimeSocket, releaseRealtimeSocket } from "../../services/socketClient";
 import { getVisitorSessionStatus } from "../../services/homeownerService";
 import { storeVisitorSessionToken, getVisitorSessionToken } from "../../services/visitorSessionToken";
-import { buildVisitorConsentPayload, getVisitorConsent, hasVisitorConsent, recordVisitorConsent } from "../../services/visitorConsent";
+import {
+  buildVisitorConsentPayload,
+  getVisitorConsent,
+  hasVisitorConsent,
+  recordVisitorConsent
+} from "../../services/visitorConsent";
 
 const RETRYABLE_STATUSES = new Set([0, 502, 503, 504]);
 const MAX_SUBMIT_RETRIES = 2;
@@ -48,7 +53,7 @@ function createVisitorRequestId() {
       return `vrq_${crypto.randomUUID()}`;
     }
   } catch {
-    // Fall back to pseudo-random ID.
+    // Ignore and fall through to the fallback ID.
   }
   return `vrq_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`;
 }
@@ -91,7 +96,7 @@ function canReacceptConsentFromError(message) {
   const normalized = String(message || "").toLowerCase();
   return (
     normalized.includes("privacy notice session expired") ||
-    normalized.includes("accept the privacy notice again") ||
+    normalized.includes("accept it again") ||
     normalized.includes("visitor consent") ||
     normalized.includes("consent")
   );
@@ -127,12 +132,23 @@ async function submitVisitorRequestWithRetry(payload, onRetry) {
   throw lastError;
 }
 
+function getDoorList(qr) {
+  const doorOptions = Array.isArray(qr?.doorOptions) ? qr.doorOptions : [];
+  if (doorOptions.length > 0) return doorOptions;
+  return (Array.isArray(qr?.doors) ? qr.doors : []).map((doorId) => ({ id: doorId, name: doorId }));
+}
+
+function getDoorLabel(door, fallbackId = "") {
+  return String(door?.name || door?.label || door?.doorName || fallbackId || "").trim();
+}
+
 export default function ScanPage() {
+  const { qrId } = useParams();
+  const navigate = useNavigate();
+
   const [consentState, setConsentState] = useState(() => getVisitorConsent());
   const consentAccepted = Boolean(consentState?.consentAccepted);
   const [showConsent, setShowConsent] = useState(() => !hasVisitorConsent());
-  const { qrId } = useParams();
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [qr, setQr] = useState(null);
@@ -147,40 +163,59 @@ export default function ScanPage() {
     sessionId: "",
     status: ""
   });
-  const [seconds, setSeconds] = useState(0);
-  const [requestLatencyMs, setRequestLatencyMs] = useState(0);
-  const visitorDeviceId = useMemo(() => (consentAccepted ? getOrCreateVisitorDeviceId() : ""), [consentAccepted]);
-  const socketRef = useRef(null);
-  const cameraStreamRef = useRef(null);
-  const videoRef = useRef(null);
-  const canvasRef = useRef(null);
   const [cameraState, setCameraState] = useState({
     starting: false,
     ready: false,
-    error: "",
+    error: ""
   });
   const [visitorForm, setVisitorForm] = useState({
     name: "",
     phone: "",
-    purpose: "visitor",
+    purpose: "",
     deliveryOption: "allow_entry",
-    snapshotDataUrl: "",
+    snapshotDataUrl: ""
   });
 
-  useEffect(() => {
-    if (!qrId) return;
-    try {
-      sessionStorage.setItem("qring_visitor_last_qr_id", String(qrId).trim());
-    } catch {
-      // ignore storage failures
+  const [seconds, setSeconds] = useState(0);
+  const [requestLatencyMs, setRequestLatencyMs] = useState(0);
+  const socketRef = useRef(null);
+  const cameraStreamRef = useRef(null);
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+
+  const visitorDeviceId = useMemo(() => (consentAccepted ? getOrCreateVisitorDeviceId() : ""), [consentAccepted]);
+  const selectedDoor = useMemo(() => getDoorList(qr).find((item) => item.id === doorId) ?? null, [qr, doorId]);
+  const selectedDoorName = useMemo(
+    () => getDoorLabel(selectedDoor, doorId || qr?.doorName || qr?.unitName || ""),
+    [selectedDoor, doorId, qr]
+  );
+  const doorOptions = useMemo(() => getDoorList(qr), [qr]);
+  const snapshotCaptured = Boolean(visitorForm.snapshotDataUrl);
+  const canReacceptConsent = canReacceptConsentFromError(error);
+  const status = useMemo(() => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`, [seconds]);
+  const qrMeta = useMemo(() => {
+    const raw = String(qrId || "").trim();
+    const isSecureToken = raw.startsWith("qt1.") || raw.startsWith("qt2.");
+    if (isSecureToken) {
+      return {
+        label: "Secure Access Token",
+        value: `Protected token (${raw.length} chars)`
+      };
     }
+    if (raw.length <= 28) {
+      return { label: "QR ID", value: raw };
+    }
+    return {
+      label: "QR ID",
+      value: `${raw.slice(0, 12)}...${raw.slice(-10)}`
+    };
   }, [qrId]);
 
   async function stopCamera() {
     const stream = cameraStreamRef.current;
     cameraStreamRef.current = null;
     if (stream) {
-      stream.getTracks().forEach((t) => t.stop());
+      stream.getTracks().forEach((track) => track.stop());
     }
     setCameraState((prev) => ({ ...prev, ready: false, starting: false }));
   }
@@ -192,7 +227,7 @@ export default function ScanPage() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
-        audio: false,
+        audio: false
       });
       cameraStreamRef.current = stream;
       if (videoRef.current) {
@@ -200,11 +235,11 @@ export default function ScanPage() {
         await videoRef.current.play();
       }
       setCameraState({ starting: false, ready: true, error: "" });
-    } catch (err) {
+    } catch (cameraError) {
       setCameraState({
         starting: false,
         ready: false,
-        error: err?.message || "Camera access was blocked. Please allow camera permission and try again.",
+        error: cameraError?.message || "Camera access was blocked. Please allow camera permission and try again."
       });
     }
   }
@@ -218,7 +253,6 @@ export default function ScanPage() {
       setCameraState((prev) => ({ ...prev, error: "Camera not ready yet. Try again in a second." }));
       return;
     }
-
     const maxWidth = 640;
     const scale = Math.min(1, maxWidth / vw);
     const targetW = Math.round(vw * scale);
@@ -231,12 +265,21 @@ export default function ScanPage() {
     ctx.drawImage(video, 0, 0, targetW, targetH);
     const dataUrl = canvas.toDataURL("image/jpeg", 0.68);
     setVisitorForm((prev) => ({ ...prev, snapshotDataUrl: dataUrl }));
-    stopCamera();
+    void stopCamera();
   }
 
   useEffect(() => {
+    if (!qrId) return;
+    try {
+      sessionStorage.setItem("qring_visitor_last_qr_id", String(qrId).trim());
+    } catch {
+      // ignore storage failures
+    }
+  }, [qrId]);
+
+  useEffect(() => {
     return () => {
-      stopCamera();
+      void stopCamera();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -255,7 +298,8 @@ export default function ScanPage() {
         const data = response?.data ?? response;
         if (!mounted) return;
         setQr(data);
-        setDoorId(data?.doors?.[0] ?? "");
+        const nextDoorOptions = getDoorList(data);
+        setDoorId(nextDoorOptions[0]?.id || "");
       } catch (fetchError) {
         if (!mounted) return;
         setError(fetchError.message ?? "QR could not be resolved");
@@ -275,22 +319,22 @@ export default function ScanPage() {
     if (!qr) return;
     if (visitorForm.snapshotDataUrl) return;
     if (cameraState.ready || cameraState.starting) return;
-    startCamera();
+    void startCamera();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [consentAccepted, loading, qr, requestState.sent, visitorForm.snapshotDataUrl]);
 
   useEffect(() => {
     if (!requestState.sent) return;
-    const id = setInterval(() => setSeconds((prev) => prev + 1), 1000);
-    return () => clearInterval(id);
+    const id = window.setInterval(() => setSeconds((prev) => prev + 1), 1000);
+    return () => window.clearInterval(id);
   }, [requestState.sent]);
 
   useEffect(() => {
     if (!requestState.sending || !requestState.requestStartedAt) return;
     const tick = () => setRequestLatencyMs(Date.now() - requestState.requestStartedAt);
     tick();
-    const id = setInterval(tick, 150);
-    return () => clearInterval(id);
+    const id = window.setInterval(tick, 150);
+    return () => window.clearInterval(id);
   }, [requestState.sending, requestState.requestStartedAt]);
 
   useEffect(() => {
@@ -301,29 +345,22 @@ export default function ScanPage() {
         const data = await getVisitorSessionStatus(requestState.sessionId);
         if (!active || !data?.status) return;
         const nextStatus = normalizeSessionStatus(data.status);
-        // eslint-disable-next-line no-console
-        console.info("qring.visitor.session.poll", { sessionId: requestState.sessionId, status: nextStatus });
         setRequestState((prev) => ({ ...prev, status: nextStatus }));
       } catch {
-        // silent poll failures
+        // Keep polling silently.
       }
     };
-    poll();
-    const id = setInterval(poll, 1000);
+    void poll();
+    const id = window.setInterval(poll, 1000);
     return () => {
       active = false;
-      clearInterval(id);
+      window.clearInterval(id);
     };
   }, [requestState.sent, requestState.sessionId]);
 
   useEffect(() => {
     if (!requestState.sessionId) return;
     if (!isVisitorSessionActive(requestState.status)) return;
-    // eslint-disable-next-line no-console
-    console.info("qring.visitor.session.navigate", {
-      sessionId: requestState.sessionId,
-      status: requestState.status
-    });
     navigate(`/session/${requestState.sessionId}/message`, { replace: true });
   }, [navigate, requestState.sessionId, requestState.status]);
 
@@ -337,36 +374,36 @@ export default function ScanPage() {
 
     const handleConnect = () => {
       const visitorToken = getVisitorSessionToken(requestState.sessionId);
-      socket.timeout(5000).emit(RealtimeEvent.SESSION_JOIN, {
-        sessionId: requestState.sessionId,
-        displayName: "Visitor",
-        visitorToken: visitorToken || undefined
-      }, () => {});
+      socket.timeout(5000).emit(
+        RealtimeEvent.SESSION_JOIN,
+        {
+          sessionId: requestState.sessionId,
+          displayName: "Visitor",
+          visitorToken: visitorToken || undefined
+        },
+        () => {}
+      );
     };
 
     const handleSessionStatus = (payload) => {
       if (payload?.sessionId !== requestState.sessionId) return;
-      const status = normalizeSessionStatus(payload?.status || payload?.sessionStatus);
-      if (!status) return;
-      // eslint-disable-next-line no-console
-      console.info("qring.visitor.session.status", { sessionId: requestState.sessionId, status });
-      setRequestState((prev) => ({ ...prev, status }));
+      const nextStatus = normalizeSessionStatus(payload?.status || payload?.sessionStatus);
+      if (!nextStatus) return;
+      setRequestState((prev) => ({ ...prev, status: nextStatus }));
     };
 
     const handleSessionActivated = (payload) => {
       const incomingSessionId = String(payload?.sessionId || payload?.data?.id || "").trim();
       if (incomingSessionId !== requestState.sessionId) return;
-      // eslint-disable-next-line no-console
-      console.info("qring.visitor.session.activated", { sessionId: requestState.sessionId });
       setRequestState((prev) => ({ ...prev, status: "approved" }));
     };
 
     const handleSessionSnapshot = (payload) => {
       const incomingSessionId = String(payload?.sessionId || "").trim();
       if (incomingSessionId !== requestState.sessionId) return;
-      const status = normalizeSessionStatus(payload?.status);
-      if (!status) return;
-      setRequestState((prev) => ({ ...prev, status }));
+      const nextStatus = normalizeSessionStatus(payload?.status);
+      if (!nextStatus) return;
+      setRequestState((prev) => ({ ...prev, status: nextStatus }));
     };
 
     socket.on("connect", handleConnect);
@@ -388,9 +425,10 @@ export default function ScanPage() {
     };
   }, [requestState.sent, requestState.sessionId]);
 
-  const onSubmit = async (event) => {
+  async function handleSubmit(event) {
     event.preventDefault();
     setError("");
+
     if (!consentAccepted) {
       setError("Please accept the privacy notice before continuing.");
       return;
@@ -403,15 +441,23 @@ export default function ScanPage() {
       setError("Please capture a live snapshot before submitting.");
       return;
     }
-    if (!visitorForm.purpose.trim()) {
-      setError("Please choose a visit purpose before submitting.");
+    if (!visitorForm.name.trim()) {
+      setError("Please enter your name.");
       return;
     }
-    const normalizedPurpose = visitorForm.purpose.trim().toLowerCase();
-    const visitorType = normalizedPurpose === "delivery" ? "delivery" : "guest";
+    if (!visitorForm.phone.trim()) {
+      setError("Please enter your phone number.");
+      return;
+    }
+    if (!visitorForm.purpose.trim()) {
+      setError("Please enter the purpose of your visit.");
+      return;
+    }
+
     const startedAt = Date.now();
     const requestId = createVisitorRequestId();
     const { snapshotBase64, snapshotMime } = getSnapshotPayloadParts(visitorForm.snapshotDataUrl);
+
     // eslint-disable-next-line no-console
     console.info("QRING_SNAPSHOT_SUBMIT_DEBUG", {
       hasSnapshotDataUrl: Boolean(visitorForm.snapshotDataUrl),
@@ -421,8 +467,10 @@ export default function ScanPage() {
       snapshotMime: snapshotMime || "image/jpeg",
       requestId,
       qrId,
-      doorId
+      doorId,
+      doorName: selectedDoorName
     });
+
     setRequestLatencyMs(0);
     setRequestState((prev) => ({
       ...prev,
@@ -432,14 +480,19 @@ export default function ScanPage() {
       requestStartedAt: startedAt,
       lastLatencyMs: null
     }));
+
+    const normalizedPurpose = visitorForm.purpose.trim();
+    const visitorType = normalizedPurpose.toLowerCase() === "delivery" ? "delivery" : "guest";
+
     try {
       const response = await submitVisitorRequestWithRetry(
         {
           requestId,
           qrId,
-          doorId: doorId || undefined,
-          name: visitorForm.name.trim() || undefined,
-          phoneNumber: visitorForm.phone.trim() || undefined,
+          doorId,
+          doorName: selectedDoorName,
+          name: visitorForm.name.trim(),
+          phoneNumber: visitorForm.phone.trim(),
           purpose: normalizedPurpose,
           visitorType,
           deliveryOption: visitorType === "delivery" ? visitorForm.deliveryOption : undefined,
@@ -457,6 +510,7 @@ export default function ScanPage() {
           }));
         }
       );
+
       const data = response?.data ?? response;
       const latencyMs = Date.now() - startedAt;
       if (data?.sessionId && data?.visitorToken) {
@@ -486,36 +540,17 @@ export default function ScanPage() {
       setRequestLatencyMs(latencyMs);
       setError(getVisitorSubmitErrorMessage(submitError));
     }
-  };
+  }
 
-  const doorOptions = qr?.doorOptions ?? [];
-  const selectedDoor = doorOptions.find((item) => item.id === doorId) ?? null;
-
-  const status = useMemo(
-    () => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`,
-    [seconds]
+  const canSubmit = Boolean(
+    consentAccepted &&
+      doorId &&
+      visitorForm.name.trim() &&
+      visitorForm.phone.trim() &&
+      visitorForm.purpose.trim() &&
+      visitorForm.snapshotDataUrl &&
+      !requestState.sending
   );
-  const qrMeta = useMemo(() => {
-    const raw = String(qrId || "").trim();
-    const isSecureToken = raw.startsWith("qt1.") || raw.startsWith("qt2.");
-    if (isSecureToken) {
-      return {
-        label: "Secure Access Token",
-        value: `Protected token (${raw.length} chars)`,
-        reveal: false,
-      };
-    }
-    if (raw.length <= 28) {
-      return { label: "QR ID", value: raw, reveal: true };
-    }
-    return {
-      label: "QR ID",
-      value: `${raw.slice(0, 12)}...${raw.slice(-10)}`,
-      reveal: true,
-    };
-  }, [qrId]);
-  const snapshotCaptured = Boolean(visitorForm.snapshotDataUrl);
-  const canReacceptConsent = canReacceptConsentFromError(error);
 
   return (
     <div className="relative min-h-[100dvh] overflow-hidden bg-[#07111f] text-white">
@@ -538,16 +573,24 @@ export default function ScanPage() {
       {showConsent ? null : (
         <main className="relative mx-auto flex min-h-[100dvh] w-full max-w-6xl flex-col px-3 py-4 sm:px-4 lg:px-6 lg:py-6">
           <header className="mb-4 flex items-center justify-between gap-3 rounded-[1.75rem] border border-white/10 bg-white/6 px-4 py-3 shadow-[0_24px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl sm:px-5">
-            <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-[0.34em] text-cyan-200/80">Visitor capture</p>
-              <h1 className="mt-1 truncate font-heading text-2xl font-semibold tracking-tight text-white sm:text-3xl">
-                Qring Camera Pass
-              </h1>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <div className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-emerald-200">
-                {requestState.sent ? "Sent" : snapshotCaptured ? "Ready" : "Capture"}
+            <div className="flex min-w-0 items-center gap-3">
+              <button
+                type="button"
+                onClick={() => navigate(-1)}
+                className="inline-flex items-center gap-1.5 rounded-2xl border border-white/10 bg-white/8 px-3 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-white transition hover:bg-white/12"
+              >
+                <ChevronLeft size={14} />
+                Back
+              </button>
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-[0.34em] text-cyan-200/80">Visitor capture</p>
+                <h1 className="mt-1 truncate font-heading text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+                  Qring Camera Pass
+                </h1>
               </div>
+            </div>
+            <div className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-emerald-200">
+              {requestState.sent ? "Sent" : snapshotCaptured ? "Ready" : "Capture"}
             </div>
           </header>
 
@@ -575,7 +618,7 @@ export default function ScanPage() {
           ) : null}
 
           {!loading && qr && !requestState.sent ? (
-            <form onSubmit={onSubmit} className="grid flex-1 gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+            <form onSubmit={handleSubmit} className="grid flex-1 gap-4 lg:grid-cols-[1.15fr_0.85fr]">
               <section className="rounded-[2rem] border border-white/10 bg-white/8 p-4 shadow-[0_30px_100px_rgba(0,0,0,0.22)] backdrop-blur-xl sm:p-6">
                 <div className="flex flex-wrap items-center gap-3">
                   <div className="rounded-full border border-cyan-300/20 bg-cyan-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-cyan-100">
@@ -584,9 +627,12 @@ export default function ScanPage() {
                   <div className="rounded-full border border-white/10 bg-white/6 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-200">
                     {qrMeta.label}: {qrMeta.value}
                   </div>
+                  <div className="rounded-full border border-white/10 bg-white/6 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-200">
+                    Door: {selectedDoorName || "Select a door"}
+                  </div>
                 </div>
 
-                <div className="mt-4 grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+                <div className="mt-4 grid gap-4 xl:grid-cols-[1.02fr_0.98fr]">
                   <div className="space-y-4">
                     <div className="overflow-hidden rounded-[1.7rem] border border-white/10 bg-[#07111f] shadow-[0_20px_60px_rgba(0,0,0,0.28)]">
                       <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
@@ -653,16 +699,18 @@ export default function ScanPage() {
                         type="button"
                         onClick={startCamera}
                         disabled={cameraState.starting || cameraState.ready || snapshotCaptured}
-                        className="rounded-2xl border border-white/10 bg-white/8 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/12 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/8 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/12 disabled:cursor-not-allowed disabled:opacity-50"
                       >
+                        <Camera size={16} />
                         {cameraState.ready ? "Camera ready" : cameraState.starting ? "Starting camera..." : "Start camera"}
                       </button>
                       <button
                         type="button"
                         onClick={captureSnapshot}
                         disabled={!cameraState.ready || snapshotCaptured}
-                        className="rounded-2xl bg-gradient-to-r from-cyan-400 to-emerald-400 px-4 py-3 text-sm font-black text-slate-950 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-400 to-emerald-400 px-4 py-3 text-sm font-black text-slate-950 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
                       >
+                        <RefreshCcw size={16} />
                         {snapshotCaptured ? "Retake to replace" : "Capture snapshot"}
                       </button>
                     </div>
@@ -684,6 +732,7 @@ export default function ScanPage() {
                         <p className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-100/80">QR route</p>
                         <p className="mt-2 break-all text-sm text-slate-100">{qrMeta.value}</p>
                       </div>
+
                       <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
                         <p className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-100/80">Door</p>
                         <select
@@ -692,9 +741,12 @@ export default function ScanPage() {
                           className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/70 px-3 py-3 text-sm text-white outline-none"
                           required
                         >
-                          {(doorOptions.length ? doorOptions : (qr.doors ?? []).map((id) => ({ id, name: id }))).map((door) => (
+                          {doorOptions.length === 0 ? (
+                            <option value="">No doors available</option>
+                          ) : null}
+                          {doorOptions.map((door) => (
                             <option key={door.id} value={door.id}>
-                              {door.name}
+                              {getDoorLabel(door, door.id)}
                             </option>
                           ))}
                         </select>
@@ -708,9 +760,11 @@ export default function ScanPage() {
                             value={visitorForm.name}
                             onChange={(event) => setVisitorForm((prev) => ({ ...prev, name: event.target.value }))}
                             className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
-                            placeholder="Optional"
+                            placeholder="Your full name"
+                            required
                           />
                         </label>
+
                         <label className="block">
                           <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">Phone</span>
                           <input
@@ -718,155 +772,80 @@ export default function ScanPage() {
                             value={visitorForm.phone}
                             onChange={(event) => setVisitorForm((prev) => ({ ...prev, phone: event.target.value }))}
                             className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
-                            placeholder="Optional"
+                            placeholder="Your phone number"
+                            required
                           />
                         </label>
+
                         <label className="block">
-                          <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">Purpose</span>
-                          <select
+                          <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">Purpose of visit</span>
+                          <input
+                            type="text"
                             value={visitorForm.purpose}
                             onChange={(event) => setVisitorForm((prev) => ({ ...prev, purpose: event.target.value }))}
-                            className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none"
+                            className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
+                            placeholder="Why are you visiting?"
                             required
+                          />
+                        </label>
+
+                        <label className="block">
+                          <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">Delivery instruction</span>
+                          <select
+                            value={visitorForm.deliveryOption}
+                            onChange={(event) => setVisitorForm((prev) => ({ ...prev, deliveryOption: event.target.value }))}
+                            className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none"
                           >
-                            <option value="visitor">Visitor</option>
-                            <option value="delivery">Delivery</option>
-                            <option value="guest">Guest</option>
+                            <option value="allow_entry">Request entry</option>
+                            <option value="drop_at_gate">Drop at gate</option>
                           </select>
                         </label>
-                        {visitorForm.purpose === "delivery" ? (
-                          <label className="block">
-                            <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">Delivery instruction</span>
-                            <select
-                              value={visitorForm.deliveryOption}
-                              onChange={(event) => setVisitorForm((prev) => ({ ...prev, deliveryOption: event.target.value }))}
-                              className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none"
-                            >
-                              <option value="allow_entry">Request entry</option>
-                              <option value="drop_at_gate">Drop at gate</option>
-                            </select>
-                          </label>
-                        ) : null}
                       </div>
 
                       <div className="rounded-2xl border border-white/10 bg-cyan-400/10 px-4 py-3 text-xs leading-relaxed text-cyan-50">
-                        The request will include your live snapshot, visitor details, and the exact door selected above.
+                        The request will include your live snapshot, name, phone number, purpose of visit, and the exact door selected above.
                       </div>
                     </div>
                   </aside>
                 </div>
 
-                <div className="mt-4 rounded-[1.5rem] border border-white/10 bg-white/6 px-4 py-3 text-xs text-slate-200">
-                  {requestState.sending ? (
-                    <span>Submitting your request now. If the network blinks, we retry automatically.</span>
-                  ) : snapshotCaptured ? (
-                    <span>Snapshot captured and ready. Review the details on the right, then submit.</span>
-                  ) : (
-                    <span>Capture a clear selfie to unlock the request.</span>
-                  )}
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/6 px-4 py-3 text-[11px] font-medium text-slate-200">
+                  <span>Status: {requestState.sending ? (requestState.retrying ? `Retrying ${requestState.retryAttempt}/${MAX_SUBMIT_RETRIES}` : "Sending request") : requestState.sent ? "Submitted" : "Ready"}</span>
+                  <span>Latency: {requestState.lastLatencyMs != null ? `${requestState.lastLatencyMs}ms` : requestLatencyMs ? `${requestLatencyMs}ms` : "—"}</span>
+                  <span>Timer: {requestState.sent ? status : "0:00"}</span>
                 </div>
 
-                <div className="mt-4 flex flex-col gap-3 rounded-[1.5rem] border border-white/10 bg-white/8 p-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-black uppercase tracking-[0.24em] text-slate-400">Submit</p>
-                    <p className="mt-1 text-sm text-slate-100">
-                      {requestState.retrying
-                        ? `Retrying ${requestState.retryAttempt}/${MAX_SUBMIT_RETRIES}`
-                        : requestState.sending
-                          ? "Sending visitor request..."
-                          : "Ready to send to the homeowner"}
-                    </p>
-                  </div>
+                <div className="mt-4 flex justify-end">
                   <button
                     type="submit"
-                    disabled={!snapshotCaptured || requestState.sending || !doorId}
-                    className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-white to-cyan-100 px-5 py-4 text-sm font-black uppercase tracking-[0.18em] text-slate-950 transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={!canSubmit}
+                    className="inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-black uppercase tracking-[0.16em] text-slate-950 transition hover:bg-cyan-50 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {requestState.retrying
-                      ? `Retrying (${requestState.retryAttempt}/${MAX_SUBMIT_RETRIES})...`
-                      : requestState.sending
-                        ? "Submitting..."
-                        : "Send visitor pass"}
+                    <SendHorizontal size={16} />
+                    Submit visitor request
                   </button>
                 </div>
-
-                {requestState.sending || requestState.lastLatencyMs !== null ? (
-                  <p className="mt-3 text-xs text-slate-400">
-                    Request latency:{" "}
-                    {requestState.sending
-                      ? `${(requestLatencyMs / 1000).toFixed(2)}s live`
-                      : `${((requestState.lastLatencyMs ?? 0) / 1000).toFixed(2)}s`}
-                  </p>
-                ) : null}
-                {requestState.retrying ? (
-                  <p className="mt-2 text-xs text-amber-300">
-                    Connection unstable. Retrying automatically.
-                  </p>
-                ) : null}
               </section>
             </form>
-          ) : null}
-
-          {requestState.sent ? (
-            <section className="grid flex-1 place-items-center">
-              <div className="w-full max-w-2xl rounded-[2rem] border border-white/10 bg-white/8 p-6 text-white shadow-[0_30px_100px_rgba(0,0,0,0.28)] backdrop-blur-xl sm:p-8">
-                <div className="flex items-start gap-4">
-                  <div className="rounded-2xl border border-emerald-300/20 bg-emerald-400/10 p-3">
-                    <CheckCircle2 className="h-6 w-6 text-emerald-300" />
+          ) : (
+            <section className="grid flex-1 place-items-center rounded-[2rem] border border-white/10 bg-white/8 p-8 text-center shadow-[0_30px_100px_rgba(0,0,0,0.22)] backdrop-blur-xl">
+              <div className="max-w-md">
+                <p className="text-[10px] font-black uppercase tracking-[0.34em] text-cyan-200/80">Visitor capture</p>
+                <h2 className="mt-3 font-heading text-3xl font-semibold tracking-tight text-white">Preparing your QR request</h2>
+                <p className="mt-3 text-sm leading-relaxed text-slate-300">
+                  {loading ? "Resolving your QR code..." : "Choose a door, capture a live photo, and submit the visitor details so the homeowner can see everything in one place."}
+                </p>
+                <div className="mt-5 flex justify-center gap-3">
+                  <div className="rounded-full border border-white/10 bg-white/8 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-slate-200">
+                    {loading ? "Loading" : "Waiting"}
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[10px] font-black uppercase tracking-[0.28em] text-emerald-200/75">Request submitted</p>
-                    <h2 className="mt-2 font-heading text-2xl font-semibold tracking-tight">
-                      {isVisitorSessionActive(requestState.status)
-                        ? "Homeowner approved your visit"
-                        : requestState.status === "rejected"
-                          ? "Your request was declined"
-                          : "We sent your request to the homeowner"}
-                    </h2>
-                    <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-300">
-                      {isVisitorSessionActive(requestState.status)
-                        ? "We’re opening the session automatically now."
-                        : "Stay close. The homeowner can approve, reject, or reply with instructions while your request stays active."}
-                    </p>
+                  <div className="rounded-full border border-white/10 bg-white/8 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-slate-200">
+                    {requestState.sent ? "Sent" : "Not sent"}
                   </div>
                 </div>
-
-                <div className="mt-6 grid gap-3 rounded-[1.5rem] border border-white/10 bg-black/20 p-4 sm:grid-cols-3">
-                  <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">Status</p>
-                    <p className="mt-1 text-sm font-semibold text-white">{requestState.status || "pending"}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">Timer</p>
-                    <p className="mt-1 text-sm font-semibold text-white">{status}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">Session</p>
-                    <p className="mt-1 truncate text-sm font-semibold text-white">{requestState.sessionId || "Pending"}</p>
-                  </div>
-                </div>
-
-                {requestState.status === "rejected" ? (
-                  <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-                    <button
-                      type="button"
-                      onClick={() => window.location.reload()}
-                      className="rounded-2xl bg-white px-4 py-3 text-sm font-black uppercase tracking-[0.18em] text-slate-950"
-                    >
-                      Start new request
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/dashboard/homeowner/messages?sessionId=${encodeURIComponent(requestState.sessionId)}`)}
-                      className="rounded-2xl border border-white/10 bg-white/8 px-4 py-3 text-sm font-semibold text-white"
-                    >
-                      Open message thread
-                    </button>
-                  </div>
-                ) : null}
               </div>
             </section>
-          ) : null}
+          )}
         </main>
       )}
     </div>
