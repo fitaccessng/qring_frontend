@@ -133,11 +133,10 @@ export default function HomeownerMessagesPage() {
         const data = await refreshThreads({ focusSessionId: preferredSessionId });
         if (!active) return;
         const preferredExists = preferredSessionId && data.some((item) => item.id === preferredSessionId);
-        const targetId = preferredExists ? preferredSessionId : data[0]?.id || "";
-        
+        const targetId = preferredSessionId || data[0]?.id || "";
         if (targetId) {
           setSelectedId(targetId);
-          if (preferredExists) {
+          if (preferredSessionId) {
             setMobileView("chat");
           }
         }
