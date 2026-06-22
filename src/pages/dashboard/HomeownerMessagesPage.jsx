@@ -510,6 +510,21 @@ export default function HomeownerMessagesPage() {
             });
             const threadSnapshot = threadsRef.current.find((thread) => thread.id === selectedId);
             const mergedRows = ensureSnapshotConversationRows(rows, selectedId, threadSnapshot);
+            const conversationSnapshotUrl = getConversationSnapshotUrl(mergedRows);
+            if (conversationSnapshotUrl) {
+              setThreads((prev) =>
+                prev.map((thread) =>
+                  thread.id === selectedId
+                    ? {
+                        ...thread,
+                        photoUrl: conversationSnapshotUrl,
+                        snapshotUrl: conversationSnapshotUrl,
+                        snapshotAuditId: thread.snapshotAuditId || getConversationSnapshotAuditId(mergedRows)
+                      }
+                    : thread
+                )
+              );
+            }
             setMessagesByThread(prev => ({ ...prev, [selectedId]: mergeMessageCollections(prev[selectedId] || [], mergedRows) }));
             setThreads(prev => prev.map(t => t.id === selectedId ? { ...t, unread: 0 } : t));
         } catch (err) {
@@ -541,8 +556,14 @@ export default function HomeownerMessagesPage() {
   const selectedMessages = useMemo(() => messagesByThread[selectedId] || [], [messagesByThread, selectedId]);
   const heroSnapshotUrl = useMemo(() => {
     if (!heroThread) return "";
-    return String(snapshotUrls[heroThread.id] || heroThread.snapshotUrl || heroThread.photoUrl || "").trim();
-  }, [heroThread, snapshotUrls]);
+    return String(
+      snapshotUrls[heroThread.id] ||
+      heroThread.snapshotUrl ||
+      heroThread.photoUrl ||
+      getConversationSnapshotUrl(selectedMessages) ||
+      ""
+    ).trim();
+  }, [heroThread, snapshotUrls, selectedMessages]);
   const heroThreadState = String(heroThread?.sessionStatus || "").trim().toLowerCase();
   
   const accessAlreadyGranted = useMemo(() => {
@@ -1238,4 +1259,22 @@ function safeParsePayload(value) {
   } catch {
     return {};
   }
+}
+
+function getConversationSnapshotUrl(rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  for (const row of list) {
+    const snapshotUrl = extractSnapshotUrl(row);
+    if (snapshotUrl) return snapshotUrl;
+  }
+  return "";
+}
+
+function getConversationSnapshotAuditId(rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  for (const row of list) {
+    const auditId = String(row?.snapshotAuditId || row?.snapshot_audit_id || "").trim();
+    if (auditId) return auditId;
+  }
+  return "";
 }
