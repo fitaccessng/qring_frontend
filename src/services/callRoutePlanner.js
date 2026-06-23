@@ -9,7 +9,7 @@ export function buildStartSessionCallPlan({
 } = {}) {
   const safeSessionId = String(sessionId || visitorSessionId || "").trim();
   const explicitVisitorSessionId = String(visitorSessionId || "").trim() || undefined;
-  const explicitVisitorRequestId = String(visitorRequestId || "").trim() || undefined;
+  const explicitVisitorRequestId = String(visitorRequestId || visitorSessionId || "").trim() || undefined;
   const normalizedType = type === "video" ? "video" : "audio";
   const normalizedVisitorName = typeof visitorName === "string" ? visitorName.trim() || undefined : undefined;
   const normalizedVisitorToken = String(visitorToken || "").trim() || undefined;

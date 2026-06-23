@@ -26,6 +26,13 @@ import {
 import { addNativeAppStateListener, addNativeNetworkListener } from "../services/nativeAppService";
 import { getSecuritySessionMessages, sendSecuritySessionMessage } from "../services/securityService";
 import { getVisitorSessionToken } from "../services/visitorSessionToken";
+import {
+  applyRemoteTrackEvent,
+  bindStreamToMediaElement,
+  remoteMediaIsAttached,
+  shouldStartCallTimer,
+  stopStreamTracks
+} from "../services/sessionCallRuntime";
 import { playIncomingCallNotificationSound, playMessageNotificationSound } from "../utils/notificationSound";
 
 const LOW_BANDWIDTH_STORAGE_KEY = "qring_low_bandwidth_mode";
@@ -615,15 +622,17 @@ export function useSessionRealtime(sessionId) {
 
   function updateRemoteMediaBindings() {
     if (remoteAudioRef.current) {
-      remoteAudioRef.current.srcObject = remoteStreamRef.current.getAudioTracks().length ? remoteStreamRef.current : null;
-      remoteAudioRef.current.muted = !speakerOn;
+      bindStreamToMediaElement(remoteAudioRef.current, remoteStreamRef.current.getAudioTracks().length ? remoteStreamRef.current : null, {
+        muted: !speakerOn
+      });
       void safePlayMedia(remoteAudioRef.current).then(() => setAudioPlaybackBlocked(false)).catch(() => {
         setAudioPlaybackBlocked(true);
       });
     }
     if (remoteVideoRef.current) {
-      remoteVideoRef.current.srcObject = remoteStreamRef.current.getVideoTracks().length ? remoteStreamRef.current : null;
-      remoteVideoRef.current.muted = true;
+      bindStreamToMediaElement(remoteVideoRef.current, remoteStreamRef.current.getVideoTracks().length ? remoteStreamRef.current : null, {
+        muted: true
+      });
       void safePlayMedia(remoteVideoRef.current);
     }
   }
@@ -669,7 +678,7 @@ export function useSessionRealtime(sessionId) {
 
   function stopLocalStream() {
     if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach((track) => track.stop());
+      stopStreamTracks(localStreamRef.current);
       localStreamRef.current = null;
     }
     if (localVideoRef.current) {
@@ -790,17 +799,13 @@ export function useSessionRealtime(sessionId) {
     updateRemoteMediaBindings();
 
     pc.ontrack = (event) => {
-      const [stream] = event.streams;
-      const targetStream = stream || remoteStreamRef.current;
-      if (!stream && event.track) {
-        remoteStreamRef.current.addTrack(event.track);
-      } else if (stream && remoteStreamRef.current !== stream) {
-        remoteStreamRef.current = stream;
-      }
+      const { remoteStream: nextStream } = applyRemoteTrackEvent(remoteStreamRef.current, event);
+      remoteStreamRef.current = nextStream;
+      const targetStream = remoteStreamRef.current;
       setRemoteMuted(!targetStream.getAudioTracks().some((track) => track.enabled));
       setRemoteVideoActive(targetStream.getVideoTracks().length > 0);
       updateRemoteMediaBindings();
-      if (!callConnectedAt) {
+      if (shouldStartCallTimer({ callState: "connected", remoteMediaAttached: remoteMediaIsAttached(targetStream) }) && !callConnectedAt) {
         setCallConnectedAt(Date.now());
       }
       setCallStateSafe("connected");
@@ -829,7 +834,6 @@ export function useSessionRealtime(sessionId) {
       if (state === "connected") {
         clearConnectTimers();
         setCallStateSafe("connected");
-        setCallConnectedAt((current) => current || Date.now());
         updateNetwork("good", shouldForceRelayRef.current ? "Connected through TURN relay" : "Direct media connected");
       } else if (state === "connecting") {
         setCallStateSafe("connecting");
@@ -912,8 +916,9 @@ export function useSessionRealtime(sessionId) {
       lastGrantedAt: Date.now(),
     });
     if (localVideoRef.current) {
-      localVideoRef.current.srcObject = wantsVideo ? stream : null;
-      localVideoRef.current.muted = true;
+      bindStreamToMediaElement(localVideoRef.current, wantsVideo ? stream : null, {
+        muted: true
+      });
       void safePlayMedia(localVideoRef.current);
     }
     void refreshAudioRoute("local_stream_ready");
@@ -1274,7 +1279,22 @@ export function useSessionRealtime(sessionId) {
           return;
         }
         setStatus(fallback.detail);
-        setCallStateSafe("ended");
+        setCallStateSafe("failed");
+        transitionIncomingCall("idle", {
+          callSessionId: callSessionRef.current || "",
+          sessionId,
+          visitorId: callVisitorIdRef.current || sessionId,
+          eventId: callSessionRef.current || ""
+        }, "call_failed_fallback");
+        if (socketRef.current && callSessionRef.current) {
+          socketRef.current.emit(RealtimeEvent.CALL_FAILED, {
+            sessionId,
+            callSessionId: callSessionRef.current,
+            visitorId: callVisitorIdRef.current || sessionId,
+            reason,
+            idempotencyKey: `${callSessionRef.current}:failed:${reason}`
+          });
+        }
         clearTerminalCallState({ clearAccess: true });
         cleanupMedia({ preserveCallSession: false });
         return;
@@ -2097,10 +2117,9 @@ export function useSessionRealtime(sessionId) {
       pushLog("Remote call failed", {
         callSessionId: payload?.callSessionId || callSessionRef.current
       });
-      void endCall(false, {
-        incomingPhase: "idle",
-        statusMessage: "Call failed"
-      });
+      setCallStateSafe("failed");
+      clearTerminalCallState({ clearAccess: true });
+      cleanupMedia({ preserveCallSession: false });
     };
 
     const handleCallEnded = (payload) => {

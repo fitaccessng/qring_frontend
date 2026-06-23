@@ -720,10 +720,24 @@ export default function HomeownerMessagesPage() {
   async function handleStartCall(type) {
     if (!selectedId || callBusy) return;
     const mode = type === "video" ? "video" : "audio";
+    const selectedThread = threadsRef.current.find((thread) => String(thread?.id || "").trim() === selectedId) || null;
+    const visitorRequestId = String(
+      selectedThread?.visitorRequestId ||
+      selectedThread?.requestId ||
+      selectedThread?.request_id ||
+      ""
+    ).trim();
+    const communicationTarget = String(
+      selectedThread?.preferredCommunicationTarget ||
+      selectedThread?.communicationTarget ||
+      ""
+    ).trim();
     setCallBusy(`${selectedId}:${mode}`);
     try {
       const response = await requestHomeownerCall({
         visitorSessionId: selectedId,
+        visitorRequestId,
+        communicationTarget: communicationTarget || undefined,
         type: mode,
         hasVideo: mode === "video"
       });

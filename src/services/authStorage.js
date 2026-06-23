@@ -1,4 +1,4 @@
-import { isMobileAppRuntime, isNativeApp } from "../utils/nativeRuntime";
+import { isMobileAppRuntime, isNativeApp } from "../utils/nativeRuntime.js";
 
 export const AUTH_STORAGE_KEYS = {
   accessToken: "qring_access_token",

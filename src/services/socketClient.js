@@ -1,19 +1,25 @@
 import { io } from "socket.io-client";
-import { env } from "../config/env";
-import { realtimeTransportOptions } from "./socketConfig";
-import { getAccessToken } from "./authStorage";
+import { env } from "../config/env.js";
+import { realtimeTransportOptions } from "./socketConfig.js";
+import { getAccessToken } from "./authStorage.js";
 
 let socket;
 const namespaceSockets = new Map();
 const SOCKET_RELEASE_GRACE_MS = 1500;
 
-function buildNamespaceSocketKey(namespace, options = {}) {
+export function buildNamespaceSocketKey(namespace, options = {}) {
   const {
     autoConnect = true,
     reconnection = true,
     withCredentials = true
   } = options;
   return JSON.stringify([namespace, Boolean(autoConnect), Boolean(withCredentials), Boolean(reconnection)]);
+}
+
+function getSocketFactory() {
+  return typeof globalThis !== "undefined" && typeof globalThis.__QRING_SOCKET_IO_FACTORY__ === "function"
+    ? globalThis.__QRING_SOCKET_IO_FACTORY__
+    : io;
 }
 
 export function createRealtimeSocket(namespace, options = {}) {
@@ -53,7 +59,7 @@ export function createRealtimeSocket(namespace, options = {}) {
     target: socketTarget
   });
 
-  const nextSocket = io(socketTarget, {
+  const nextSocket = getSocketFactory()(socketTarget, {
     path: env.socketPath,
     ...realtimeTransportOptions,
     reconnection,
@@ -96,6 +102,16 @@ export function createRealtimeSocket(namespace, options = {}) {
     console.info("qring.socket.reconnect_attempt", { namespace, attempt, target: socketTarget });
   });
   return nextSocket;
+}
+
+export function __resetRealtimeSocketCacheForTests() {
+  for (const entry of namespaceSockets.values()) {
+    if (entry?.releaseTimer) {
+      window.clearTimeout(entry.releaseTimer);
+    }
+  }
+  namespaceSockets.clear();
+  socket = undefined;
 }
 
 export function releaseRealtimeSocket(namespace, options = {}) {

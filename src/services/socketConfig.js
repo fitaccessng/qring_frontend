@@ -8,7 +8,8 @@ function isPrivateOrLocalHost(hostname) {
 }
 
 function shouldForceWebsocketInDev() {
-  if (!import.meta.env.DEV) return false;
+  const importMetaEnv = (typeof import.meta !== "undefined" && import.meta.env) ? import.meta.env : {};
+  if (!importMetaEnv.DEV) return false;
   if (typeof window === "undefined") return false;
   if (window.location.protocol !== "http:") return false;
   return isPrivateOrLocalHost(window.location.hostname);

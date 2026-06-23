@@ -12,6 +12,7 @@ export default function SessionMessagePage() {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const [acceptingCall, setAcceptingCall] = useState(false);
+  const requestMediaPermissionsRef = useRef(null);
   const isHomeowner = getStoredUserRole() === "homeowner";
   const requestedCallMode = resolveRequestedCallMode(location.pathname, searchParams);
   const backButtonLabel =
@@ -72,6 +73,10 @@ export default function SessionMessagePage() {
     rejectIncomingCall
   } = useSessionRealtime(sessionId);
 
+  useEffect(() => {
+    requestMediaPermissionsRef.current = requestMediaPermissions;
+  }, [requestMediaPermissions]);
+
   function onSubmit(event) {
     event.preventDefault();
     if (!sendMessage(text)) return;
@@ -123,10 +128,10 @@ export default function SessionMessagePage() {
 
   useEffect(() => {
     if (!sessionId) return;
-    void requestMediaPermissions({ video: false, silent: true }).catch(() => {
+    void requestMediaPermissionsRef.current?.({ video: false, silent: true }).catch(() => {
       // Permission state is reflected through the hook.
     });
-  }, [requestMediaPermissions, sessionId]);
+  }, [sessionId]);
 
   function resolveServerCallState(value) {
     if (value === "ringing") return "ringing";

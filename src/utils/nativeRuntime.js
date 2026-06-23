@@ -1,6 +1,7 @@
 import { Capacitor } from "@capacitor/core";
 
-const MOBILE_BUILD_TARGET = String(import.meta.env.VITE_APP_BUILD_TARGET ?? "").trim().toLowerCase() === "mobile";
+const importMetaEnv = (typeof import.meta !== "undefined" && import.meta.env) ? import.meta.env : {};
+const MOBILE_BUILD_TARGET = String(importMetaEnv.VITE_APP_BUILD_TARGET ?? "").trim().toLowerCase() === "mobile";
 
 export function getCapacitorPlatform() {
   try {

@@ -1,5 +1,5 @@
-import { getAccessToken, getStoredUser } from "../services/authStorage";
-import { isNativeApp } from "./nativeRuntime";
+import { getAccessToken, getStoredUser } from "../services/authStorage.js";
+import { isNativeApp } from "./nativeRuntime.js";
 
 const ROLE_HOME = {
   homeowner: "/dashboard/homeowner/overview",

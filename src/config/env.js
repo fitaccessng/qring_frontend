@@ -1,8 +1,12 @@
+import {
+  isRelativeProductionUrl,
+  resolveApiBaseUrl as resolveApiBaseUrlValue,
+  resolvePublicAppUrl as resolvePublicAppUrlValue,
+  resolveSocketUrl as resolveSocketUrlValue
+} from "../services/runtimeEndpointResolver.js";
+
 const trimTrailingSlash = (value) => value?.replace(/\/+$/, "") ?? "";
-const hasHttpProtocol = (value) => /^https?:\/\//i.test(value ?? "");
-const looksLikeDomain = (value) => /^[a-z0-9.-]+\.[a-z]{2,}(\/.*)?$/i.test(value ?? "");
-const isRelativePath = (value) => typeof value === "string" && value.trim().startsWith("/");
-const normalizeLocalBackendHost = (value) => (value ?? "").replace(/:\/\/0\.0\.0\.0(?=[:/]|$)/i, "://localhost");
+const importMetaEnv = (typeof import.meta !== "undefined" && import.meta.env) ? import.meta.env : {};
 const readGlobalEnvValue = (key) => {
   if (typeof globalThis === "undefined") return "";
   try {
@@ -23,13 +27,13 @@ const toInteger = (value, fallback) => {
 const productionBackendOrigin = "https://qring-backend-production.up.railway.app";
 const productionFrontendOrigin = "https://www.useqring.online";
 const buildId = String(
-  import.meta.env.VITE_BUILD_ID ??
-  import.meta.env.VERCEL_GIT_COMMIT_SHA ??
-  import.meta.env.RENDER_GIT_COMMIT ??
+  importMetaEnv.VITE_BUILD_ID ??
+  importMetaEnv.VERCEL_GIT_COMMIT_SHA ??
+  importMetaEnv.RENDER_GIT_COMMIT ??
   ""
 ).trim();
-const isDev = Boolean(import.meta.env.DEV);
-const isMobileAppBuild = String(import.meta.env.VITE_APP_BUILD_TARGET ?? "").trim().toLowerCase() === "mobile";
+const isDev = Boolean(importMetaEnv.DEV);
+const isMobileAppBuild = String(importMetaEnv.VITE_APP_BUILD_TARGET ?? "").trim().toLowerCase() === "mobile";
 const isNativeRuntime = (() => {
   try {
     return Boolean(globalThis?.Capacitor?.isNativePlatform?.());
@@ -46,31 +50,18 @@ const defaultSocketUrl =
   typeof window !== "undefined" && isDev
     ? `http://localhost:8000`
     : productionBackendOrigin;
+const windowOrigin = typeof window !== "undefined" && window.location ? window.location.origin : "";
 const defaultPublicAppUrl =
-  typeof window !== "undefined" && !isNativeRuntime && !isMobileAppBuild
-    ? window.location.origin
+  windowOrigin && !isNativeRuntime && !isMobileAppBuild
+    ? windowOrigin
     : productionFrontendOrigin;
 
 function resolveApiBaseUrl(rawValue) {
-  const value = normalizeLocalBackendHost((rawValue ?? "").trim());
-  if (!value) return defaultApiBase;
-  if (hasHttpProtocol(value)) return trimTrailingSlash(value);
-  if (looksLikeDomain(value)) return trimTrailingSlash(`https://${value}`);
-  if (value.startsWith("/") && typeof window !== "undefined") {
-    return trimTrailingSlash(`${window.location.origin}${value}`);
-  }
-  return defaultApiBase;
+  return resolveApiBaseUrlValue(rawValue, defaultApiBase, { windowOrigin });
 }
 
 function resolveSocketUrl(rawValue) {
-  const value = normalizeLocalBackendHost((rawValue ?? "").trim());
-  if (!value) return defaultSocketUrl;
-  if (hasHttpProtocol(value)) return trimTrailingSlash(value);
-  if (looksLikeDomain(value)) return trimTrailingSlash(`https://${value}`);
-  if (value.startsWith("/") && typeof window !== "undefined") {
-    return trimTrailingSlash(`${window.location.origin}${value}`);
-  }
-  return defaultSocketUrl;
+  return resolveSocketUrlValue(rawValue, defaultSocketUrl, { windowOrigin });
 }
 
 function originFromUrl(value) {
@@ -84,14 +75,14 @@ function originFromUrl(value) {
 
 function resolveRuntimeApiBaseSource() {
   const nativeCandidate =
-    import.meta.env.VITE_NATIVE_API_BASE_URL ||
+    importMetaEnv.VITE_NATIVE_API_BASE_URL ||
     readGlobalEnvValue("VITE_NATIVE_API_BASE_URL") ||
     readGlobalEnvValue("NEXT_PUBLIC_NATIVE_API_BASE_URL");
   const standardCandidate =
-    import.meta.env.VITE_API_BASE_URL ||
+    importMetaEnv.VITE_API_BASE_URL ||
     readGlobalEnvValue("VITE_API_BASE_URL") ||
     readGlobalEnvValue("NEXT_PUBLIC_API_BASE_URL") ||
-    import.meta.env.VITE_API_URL;
+    importMetaEnv.VITE_API_URL;
 
   if (isNativeRuntime || isMobileAppBuild) {
     return nativeCandidate ?? standardCandidate;
@@ -100,7 +91,7 @@ function resolveRuntimeApiBaseSource() {
   if (typeof window !== "undefined" && !isDev) {
     const explicit = String(standardCandidate ?? "").trim();
     if (!explicit) return `${productionBackendOrigin}/api/v1`;
-    if (isRelativePath(explicit)) {
+    if (isRelativeProductionUrl(explicit)) {
       console.warn("qring.env.invalid_api_base_url", {
         reason: "relative-path-not-allowed-in-production",
         value: explicit
@@ -114,14 +105,7 @@ function resolveRuntimeApiBaseSource() {
 }
 
 function resolvePublicAppUrl(rawValue) {
-  const value = normalizeLocalBackendHost((rawValue ?? "").trim());
-  if (!value) return trimTrailingSlash(defaultPublicAppUrl);
-  if (hasHttpProtocol(value)) return trimTrailingSlash(value);
-  if (looksLikeDomain(value)) return trimTrailingSlash(`https://${value}`);
-  if (value.startsWith("/") && typeof window !== "undefined") {
-    return trimTrailingSlash(`${window.location.origin}${value}`);
-  }
-  return trimTrailingSlash(defaultPublicAppUrl);
+  return resolvePublicAppUrlValue(rawValue, defaultPublicAppUrl, { windowOrigin });
 }
 
 function parseIceServers(rawValue) {
@@ -168,14 +152,14 @@ const runtimeApiBaseSource = resolveRuntimeApiBaseSource();
 
 const resolvedApiBaseUrl = resolveApiBaseUrl(runtimeApiBaseSource);
 const resolvedSocketUrl = (() => {
-  if (isDev && typeof window !== "undefined" && !(import.meta.env.VITE_SOCKET_URL ?? "").trim()) {
+  if (isDev && typeof window !== "undefined" && !(importMetaEnv.VITE_SOCKET_URL ?? "").trim()) {
     // Keep Socket.IO same-origin in local dev so Vite proxy handles upstream CORS safely.
     return trimTrailingSlash(window.location.origin);
   }
-  const explicit = resolveSocketUrl(import.meta.env.VITE_SOCKET_URL);
-  if ((import.meta.env.VITE_SOCKET_URL ?? "").trim()) return explicit;
+  const explicit = resolveSocketUrl(importMetaEnv.VITE_SOCKET_URL);
+  if ((importMetaEnv.VITE_SOCKET_URL ?? "").trim()) return explicit;
   const apiOrigin = originFromUrl(resolvedApiBaseUrl);
-  if (apiOrigin && typeof window !== "undefined" && apiOrigin !== trimTrailingSlash(window.location.origin)) {
+  if (apiOrigin && windowOrigin && apiOrigin !== trimTrailingSlash(windowOrigin)) {
     return apiOrigin;
   }
   return explicit;
@@ -184,19 +168,19 @@ const resolvedSocketUrl = (() => {
 export const env = {
   apiBaseUrl: resolvedApiBaseUrl,
   socketUrl: resolvedSocketUrl,
-  publicAppUrl: resolvePublicAppUrl(import.meta.env.VITE_PUBLIC_APP_URL),
+  publicAppUrl: resolvePublicAppUrl(importMetaEnv.VITE_PUBLIC_APP_URL),
   buildId,
-  socketPath: import.meta.env.VITE_SOCKET_PATH ?? "/socket.io",
+  socketPath: importMetaEnv.VITE_SOCKET_PATH ?? "/socket.io",
   dashboardNamespace:
-    import.meta.env.VITE_DASHBOARD_NAMESPACE ?? "/realtime/dashboard",
+    importMetaEnv.VITE_DASHBOARD_NAMESPACE ?? "/realtime/dashboard",
   signalingNamespace:
-    import.meta.env.VITE_SIGNALING_NAMESPACE ?? "/realtime/signaling",
-  webRtcIceServers: parseIceServers(import.meta.env.VITE_WEBRTC_ICE_SERVERS),
-  rtcMonitoringUrl: String(import.meta.env.VITE_RTC_MONITORING_URL ?? "").trim(),
-  callConnectTimeoutMs: toInteger(import.meta.env.VITE_CALL_CONNECT_TIMEOUT_MS, 8000),
-  callRingTimeoutMs: toInteger(import.meta.env.VITE_CALL_RING_TIMEOUT_MS, 30000),
-  enableRealtimeInDev: String(import.meta.env.VITE_ENABLE_REALTIME_IN_DEV ?? "true").toLowerCase() !== "false",
-  routerMode: String(import.meta.env.VITE_ROUTER_MODE ?? "auto").trim().toLowerCase()
+    importMetaEnv.VITE_SIGNALING_NAMESPACE ?? "/realtime/signaling",
+  webRtcIceServers: parseIceServers(importMetaEnv.VITE_WEBRTC_ICE_SERVERS),
+  rtcMonitoringUrl: String(importMetaEnv.VITE_RTC_MONITORING_URL ?? "").trim(),
+  callConnectTimeoutMs: toInteger(importMetaEnv.VITE_CALL_CONNECT_TIMEOUT_MS, 8000),
+  callRingTimeoutMs: toInteger(importMetaEnv.VITE_CALL_RING_TIMEOUT_MS, 30000),
+  enableRealtimeInDev: String(importMetaEnv.VITE_ENABLE_REALTIME_IN_DEV ?? "true").toLowerCase() !== "false",
+  routerMode: String(importMetaEnv.VITE_ROUTER_MODE ?? "auto").trim().toLowerCase()
 };
 
 if (typeof window !== "undefined") {
