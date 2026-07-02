@@ -4,6 +4,7 @@ import react from "@vitejs/plugin-react";
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const appBuildTarget = String(process.env.VITE_APP_BUILD_TARGET ?? env.VITE_APP_BUILD_TARGET ?? "").trim().toLowerCase();
+  const backendTarget = "http://localhost:8000";
 
   return {
     plugins: [react()],
@@ -19,7 +20,22 @@ export default defineConfig(({ mode }) => {
         : undefined
     },
     server: {
-      host: "0.0.0.0"
+      host: "0.0.0.0",
+      proxy: {
+        "/api/v1": {
+          target: backendTarget,
+          changeOrigin: true
+        },
+        "/socket.io": {
+          target: backendTarget,
+          changeOrigin: true,
+          ws: true
+        },
+        "/uploads": {
+          target: backendTarget,
+          changeOrigin: true
+        }
+      }
     },
     build: {
       chunkSizeWarningLimit: 1000,

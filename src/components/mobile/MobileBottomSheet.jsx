@@ -1,10 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import {
-  motion,
-  useMotionValue,
-  animate,
-  useDragControls,
-} from "framer-motion";
+import { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
 
 export default function BottomSheet({
@@ -14,206 +9,138 @@ export default function BottomSheet({
   children,
   footer,
 }) {
-  const y = useMotionValue(0);
-  const dragControls = useDragControls();
-  const contentRef = useRef(null);
-
-  const [vh, setVh] = useState(0);
   const [isMobile, setIsMobile] = useState(true);
-  const [atTop, setAtTop] = useState(true);
 
-  // ✅ TRUE viewport height (fixes mobile bugs)
+  // Handle responsive check purely on mount/resize
   useEffect(() => {
-    const update = () => {
-      const height =
-        window.visualViewport?.height || window.innerHeight;
-
-      setVh(height);
-      setIsMobile(window.innerWidth < 768);
-    };
-
-    update();
-    window.visualViewport?.addEventListener("resize", update);
-    window.addEventListener("resize", update);
-
-    return () => {
-      window.visualViewport?.removeEventListener("resize", update);
-      window.removeEventListener("resize", update);
-    };
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // ✅ open/close animation
-  useEffect(() => {
-    if (open) {
-      y.set(vh);
-      requestAnimationFrame(() => {
-        animate(y, 0, {
-          type: "spring",
-          stiffness: 260,
-          damping: 28,
-        });
-      });
-    } else {
-      animate(y, vh);
-    }
-  }, [open, vh]);
-
-  // ✅ lock scroll
+  // Prevent body scroll when open
   useEffect(() => {
     if (open) {
       document.body.style.overflow = "hidden";
-      return () => (document.body.style.overflow = "");
+      return () => {
+        document.body.style.overflow = "";
+      };
     }
   }, [open]);
 
-  // ✅ ESC support
+  // ESC key support
   useEffect(() => {
-    const handler = (e) => {
+    const handleKeyDown = (e) => {
       if (e.key === "Escape") onClose();
     };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
-  if (!open) return null;
-
-  // ======================
-  // 💻 DESKTOP MODAL
-  // ======================
-  if (!isMobile) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-        <div
-          className="absolute inset-0 bg-black/40"
-          onClick={onClose}
-        />
-
-        <motion.div
-          initial={{ scale: 0.96, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="
-            relative w-full max-w-lg 
-            bg-white rounded-2xl shadow-xl 
-            flex flex-col overflow-hidden
-            max-h-[90dvh]
-          "
-        >
-          <div className="flex justify-between p-4 border-b">
-            <h3>{title}</h3>
-            <button onClick={onClose}>
-              <X />
-            </button>
-          </div>
-
-          <div className="p-4 overflow-y-auto flex-1">
-            {children}
-          </div>
-
-          {footer && (
-            <div className="p-4 border-t">
-              {footer}
-            </div>
-          )}
-        </motion.div>
-      </div>
-    );
-  }
-
-  // ======================
-  // 📱 MOBILE SHEET (ELITE)
-  // ======================
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end"
-      style={{ height: vh }}
-    >
-      {/* backdrop */}
-      <div
-        className="absolute inset-0 bg-black/40"
-        onClick={onClose}
-      />
+    <AnimatePresence>
+      {open && (
+        <div className="fixed inset-0 z-50 flex justify-center items-end md:items-center">
+          {/* Backdrop Blur & Fade */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="absolute inset-0 bg-neutral-900/50 backdrop-blur-sm"
+            onClick={onClose}
+          />
 
-      <motion.div
-        style={{
-          y,
-          height: vh, // 🔥 CRITICAL FIX
-        }}
-        drag="y"
-        dragControls={dragControls}
-        dragListener={false}
-        dragConstraints={{ top: 0, bottom: vh }}
-        dragElastic={0.08}
-        onDragEnd={(e, info) => {
-          if (info.offset.y > 120 || info.velocity.y > 500) {
-            onClose();
-          } else {
-            animate(y, 0, {
-              type: "spring",
-              stiffness: 260,
-              damping: 28,
-            });
-          }
-        }}
-        className="
-          w-full bg-white 
-          rounded-t-[20px]
-          shadow-xl
-          flex flex-col
-          overflow-hidden
-        "
-      >
-        {/* HANDLE */}
-        <div
-          onPointerDown={(e) => dragControls.start(e)}
-          className="py-3 flex justify-center"
-        >
-          <div className="w-10 h-1.5 bg-gray-300 rounded-full" />
+          {isMobile ? (
+            /* ========================================== */
+            /* 📱 MOBILE BOTTOM SHEET                     */
+            /* ========================================== */
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 350 }}
+              className="
+                relative w-full max-h-[92dvh] 
+                bg-white rounded-t-[24px] shadow-2xl 
+                flex flex-col overflow-hidden 
+                isolate z-10
+              "
+            >
+              {/* Premium Pill Indicator */}
+              <div className="pt-3 pb-2 flex justify-center w-full">
+                <div className="w-12 h-1 bg-neutral-200 rounded-full" />
+              </div>
+
+              {/* Header */}
+              <div className="flex justify-between items-center px-5 pb-4 pt-1">
+                <h3 className="text-lg font-semibold text-neutral-900">{title}</h3>
+                <button 
+                  onClick={onClose}
+                  className="p-1.5 rounded-full bg-neutral-100 text-neutral-500 hover:bg-neutral-200 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Scrollable Content */}
+              <div className="flex-1 overflow-y-auto px-5 pb-6 text-neutral-600 overscroll-contain">
+                {children}
+              </div>
+
+              {/* Footer */}
+              {footer && (
+                <div className="border-t border-neutral-100 p-4 bg-white sticky bottom-0">
+                  {footer}
+                </div>
+              )}
+
+              {/* iOS Safe Area Padding */}
+              <div className="h-[env(safe-area-inset-bottom)] bg-white" />
+            </motion.div>
+          ) : (
+            /* ========================================== */
+            /* 💻 DESKTOP MODAL                           */
+            /* ========================================== */
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              transition={{ duration: 0.15, ease: "easeOut" }}
+              className="
+                relative w-full max-w-lg max-h-[85dvh] 
+                bg-white rounded-2xl shadow-2xl 
+                flex flex-col overflow-hidden 
+                isolate z-10 m-4
+              "
+            >
+              {/* Header */}
+              <div className="flex justify-between items-center p-5 border-b border-neutral-100">
+                <h3 className="text-lg font-semibold text-neutral-900">{title}</h3>
+                <button 
+                  onClick={onClose}
+                  className="p-1.5 rounded-full text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Scrollable Content */}
+              <div className="flex-1 overflow-y-auto p-5 text-neutral-600">
+                {children}
+              </div>
+
+              {/* Footer */}
+              {footer && (
+                <div className="p-4 border-t border-neutral-100 bg-neutral-50/50">
+                  {footer}
+                </div>
+              )}
+            </motion.div>
+          )}
         </div>
-
-        {/* HEADER */}
-        <div
-          onPointerDown={(e) => dragControls.start(e)}
-          className="flex justify-between items-center px-4 pb-3"
-        >
-          <h3 className="font-semibold">{title}</h3>
-          <button onClick={onClose}>
-            <X />
-          </button>
-        </div>
-
-        {/* CONTENT (ONLY SCROLL AREA) */}
-        <div
-          ref={contentRef}
-          onScroll={(e) =>
-            setAtTop(e.currentTarget.scrollTop <= 0)
-          }
-          onPointerDown={(e) => {
-            if (atTop) dragControls.start(e);
-          }}
-          className="
-            flex-1 overflow-y-auto 
-            px-4 pb-4 
-            overscroll-contain
-          "
-        >
-          {children}
-        </div>
-
-        {/* FOOTER (ALWAYS VISIBLE) */}
-        {footer && (
-          <div
-            className="
-              border-t p-4 
-              bg-white
-            "
-          >
-            {footer}
-          </div>
-        )}
-
-        {/* SAFE AREA */}
-        <div className="h-[env(safe-area-inset-bottom)] bg-white" />
-      </motion.div>
-    </div>
+      )}
+    </AnimatePresence>
   );
 }

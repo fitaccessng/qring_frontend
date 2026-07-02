@@ -44,11 +44,11 @@ const isNativeRuntime = (() => {
 
 const defaultApiBase =
   typeof window !== "undefined" && isDev
-    ? `http://localhost:8000/api/v1`
+    ? `/api/v1`
     : `${productionBackendOrigin}/api/v1`;
 const defaultSocketUrl =
   typeof window !== "undefined" && isDev
-    ? `http://localhost:8000`
+    ? ``
     : productionBackendOrigin;
 const windowOrigin = typeof window !== "undefined" && window.location ? window.location.origin : "";
 const defaultPublicAppUrl =
@@ -165,6 +165,22 @@ const resolvedSocketUrl = (() => {
   return explicit;
 })();
 
+const resolvedApiOrigin = (() => {
+  try {
+    return trimTrailingSlash(new URL(resolvedApiBaseUrl).origin);
+  } catch {
+    return "";
+  }
+})();
+
+const resolvedSocketOrigin = (() => {
+  try {
+    return trimTrailingSlash(new URL(resolvedSocketUrl).origin);
+  } catch {
+    return "";
+  }
+})();
+
 export const env = {
   apiBaseUrl: resolvedApiBaseUrl,
   socketUrl: resolvedSocketUrl,
@@ -190,7 +206,12 @@ if (typeof window !== "undefined") {
     buildId: buildId || "unknown",
     apiBaseSource: runtimeApiBaseSource || "(default)",
     apiBaseUrl: env.apiBaseUrl,
+    apiBaseOrigin: resolvedApiOrigin || "(relative-or-invalid)",
+    apiBaseUsesProxy: isDev && String(env.apiBaseUrl || "").startsWith("/"),
+    windowOrigin,
     socketUrl: env.socketUrl,
-    socketPath: env.socketPath
+    socketOrigin: resolvedSocketOrigin || "(relative-or-invalid)",
+    socketPath: env.socketPath,
+    socketUsesProxy: isDev && !String(env.socketUrl || "").trim()
   });
 }

@@ -1,28 +1,12 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useAuth } from "../../state/AuthContext";
-import { getHomeownerContext } from "../../services/homeownerService";
-
-const ROOT_DASHBOARD_ROUTES = new Set([
-  "/dashboard/homeowner/overview",
-  "/dashboard/estate",
-  "/dashboard/security",
-  "/dashboard/admin"
-]);
 
 const homeownerNav = [
-  { to: "/dashboard/homeowner/overview", label: "Home", icon: "overview" },
+  { to: "/dashboard/homeowner/overview", label: "Dashboard", icon: "overview" },
   { to: "/dashboard/homeowner/visits", label: "Visits", icon: "visits" },
-  { to: "/dashboard/homeowner/appointments", label: "Appointments", icon: "appointments" },
   { to: "/dashboard/homeowner/messages", label: "Messages", icon: "messages" },
-  { to: "/dashboard/homeowner/doors", label: "Doors", icon: "doors" }
-];
-
-const estateManagedHomeownerNav = [
-  { to: "/dashboard/homeowner/overview", label: "Home", icon: "overview" },
-  { to: "/dashboard/homeowner/estate-alerts", label: "Estate", icon: "broadcast" },
-  { to: "/dashboard/homeowner/estate-dues", label: "Dues", icon: "dues" },
-  { to: "/dashboard/homeowner/estate-messages", label: "Messages", icon: "messages" },
+  { to: "/dashboard/homeowner/doors", label: "Doors", icon: "doors" },
   { to: "/dashboard/homeowner/settings", label: "Settings", icon: "settings" }
 ];
 
@@ -50,7 +34,6 @@ const adminNav = [
 export default function PersistentAppMobileNav() {
   const location = useLocation();
   const { user, isAuthenticated, ready } = useAuth();
-  const [homeownerContext, setHomeownerContext] = useState(null);
   const pathname = location.pathname || "/";
 
   const routeRole = useMemo(() => {
@@ -62,75 +45,71 @@ export default function PersistentAppMobileNav() {
     return user?.role ?? null;
   }, [pathname, user?.role]);
 
-  useEffect(() => {
-    let active = true;
-
-    async function loadHomeownerContext() {
-      if (routeRole !== "homeowner") {
-        setHomeownerContext(null);
-        return;
-      }
-      try {
-        const data = await getHomeownerContext();
-        if (!active) return;
-        setHomeownerContext(data);
-      } catch {
-        if (!active) return;
-        setHomeownerContext(null);
-      }
-    }
-
-    void loadHomeownerContext();
-    return () => {
-      active = false;
-    };
-  }, [routeRole]);
-
-  const isManagedHomeowner = Boolean(homeownerContext?.managedByEstate);
   const items = useMemo(() => {
-    if (routeRole === "homeowner") return isManagedHomeowner ? estateManagedHomeownerNav : homeownerNav;
+    if (routeRole === "homeowner") return homeownerNav;
     if (routeRole === "estate") return estateNav;
     if (routeRole === "security") return securityNav;
     if (routeRole === "admin") return adminNav;
     return [];
-  }, [isManagedHomeowner, routeRole]);
+  }, [routeRole]);
 
-  const shouldShow = ready && isAuthenticated && items.length > 0 && ROOT_DASHBOARD_ROUTES.has(pathname);
+  const shouldShow = ready && isAuthenticated && routeRole === "homeowner" && pathname.startsWith("/dashboard/homeowner") && items.length > 0;
   if (!shouldShow) return null;
 
   return (
     <>
-      <div className="h-24 lg:hidden" aria-hidden="true" />
-      <nav className="fixed inset-x-0 bottom-0 z-[9999] border-t border-slate-100 bg-white px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-[0_-10px_30px_rgba(15,23,42,0.06)] lg:hidden">
-        <div className="mx-auto flex max-w-4xl items-center justify-between text-slate-400">
-            {items.map((item) => (
-              <NavLink
-                key={`persistent-mobile-${item.to}`}
-                to={item.to}
-                end={item.to === "/dashboard/homeowner/overview" || item.to === "/dashboard/estate" || item.to === "/dashboard/admin"}
-                className={({ isActive }) =>
-                  `flex min-w-0 flex-1 flex-col items-center gap-1 rounded-xl px-1 py-1 text-[9px] font-bold uppercase tracking-wider transition-all duration-200 active:scale-95 ${
-                    isActive ? "text-indigo-600" : "text-slate-400"
-                  }`
-                }
-              >
-                {({ isActive }) => (
-                  <>
-                    <span className={`grid place-items-center rounded-xl p-2 transition-all duration-200 ${isActive ? "bg-indigo-50 text-indigo-600" : "text-slate-400"}`}>
-                      <NavIcon name={item.icon} />
-                    </span>
-                    <span>{item.label}</span>
-                  </>
-                )}
-              </NavLink>
-            ))}
+      {/* Content spacer area avoiding fixed overlap */}
+      <div className="h-[68px] lg:hidden" aria-hidden="true" />
+      
+      {/* Premium Static Bottom Nav Block */}
+      <nav className="fixed inset-x-0 bottom-0 z-[10000] px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2 lg:hidden pointer-events-auto">
+        <div className="mx-auto flex w-full max-w-md items-center justify-between rounded-[24px] border border-neutral-200/50 bg-white/80 px-2 py-[5px] shadow-[0_16px_40px_-12px_rgba(0,0,0,0.12)] backdrop-blur-md dark:border-neutral-800/60 dark:bg-neutral-950/80">
+          {items.map((item) => (
+            <NavLink
+              key={`persistent-mobile-${item.to}`}
+              to={item.to}
+              end={item.to === "/dashboard/homeowner/overview" || item.to === "/dashboard/estate" || item.to === "/dashboard/admin"}
+              className="relative flex flex-1 flex-col items-center justify-center py-1 select-none"
+            >
+              {({ isActive }) => (
+                <div className="flex flex-col items-center justify-center">
+                  {/* Icon Wrapper */}
+                  <div
+                    className={`flex items-center justify-center transition-colors duration-200 ${
+                      isActive
+                        ? "text-neutral-950 dark:text-white"
+                        : "text-neutral-400 dark:text-neutral-500"
+                    }`}
+                  >
+                    <NavIcon name={item.icon} isActive={isActive} />
+                  </div>
+                  
+                  {/* Clear Clean Modern Text Labels */}
+                  <span 
+                    className={`mt-0.5 text-[10px] font-medium tracking-normal transition-colors duration-200 ${
+                      isActive 
+                        ? "text-neutral-950 font-semibold dark:text-white" 
+                        : "text-neutral-400 dark:text-neutral-500"
+                    }`}
+                  >
+                    {item.label}
+                  </span>
+
+                  {/* Elegant static dot accent replacing huge block boxes */}
+                  {isActive && (
+                    <div className="absolute -bottom-1 w-1 h-1 rounded-full bg-neutral-950 dark:bg-white" />
+                  )}
+                </div>
+              )}
+            </NavLink>
+          ))}
         </div>
       </nav>
     </>
   );
 }
 
-function NavIcon({ name }) {
+function NavIcon({ name, isActive }) {
   const paths = {
     overview: <path d="M3 3h8v8H3zM13 3h8v5h-8zM13 10h8v11h-8zM3 13h8v8H3z" />,
     appointments: <path d="M7 2v3M17 2v3M4 8h16M5 5h14a1 1 0 0 1 1 1v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a1 1 0 0 1 1-1zM9 12h6M9 16h4" />,
@@ -149,11 +128,19 @@ function NavIcon({ name }) {
     sessions: <path d="M8 7h13M8 12h13M8 17h13M3 7h.01M3 12h.01M3 17h.01" />,
     broadcast: <path d="M4 12h16M4 7h10M4 17h10M18 7v10" />,
     dues: <path d="M3 7h18v10H3zM3 11h18M7 15h2" />,
-    settings: <path d="M12 8.5A3.5 3.5 0 1 0 12 15.5A3.5 3.5 0 1 0 12 8.5zM19.4 15a1 1 0 0 0 .2 1.1l.1.1a1 1 0 0 1 0 1.4l-1.2 1.2a1 1 0 0 1-1.4 0l-.1-.1a1 1 0 0 0-1.1-.2a1 1 0 0 0-.6.9V20a1 1 0 0 1-1 1h-1.7a1 1 0 0 1-1-1v-.2a1 1 0 0 0-.6-.9a1 1 0 0 0-1.1.2l-.1.1a1 1 0 0 1-1.4 0L4.3 17.9a1 1 0 0 1 0-1.4l.1-.1a1 1 0 0 0 .2-1.1a1 1 0 0 0-.9-.6H3.5a1 1 0 0 1-1-1v-1.7a1 1 0 0 1 1-1h.2a1 1 0 0 0 .9-.6a1 1 0 0 0-.2-1.1l-.1-.1a1 1 0 0 1 0-1.4L5.5 4.8a1 1 0 0 1 1.4 0l.1.1a1 1 0 0 0 1.1.2a1 1 0 0 0 .6-.9V4a1 1 0 0 1 1-1h1.7a1 1 0 0 1 1 1v.2a1 1 0 0 0 .6.9a1 1 0 0 0 1.1-.2l.1-.1a1 1 0 0 1 1.4 0l1.2 1.2a1 1 0 0 1 0 1.4l-.1.1a1 1 0 0 0-.2 1.1a1 1 0 0 0 .9.6h.2a1 1 0 0 1 1 1v1.7a1 1 0 0 1-1 1h-.2a1 1 0 0 0-.9.6z" />
+    settings: <path d="M12 8.5a3.5 3.5 0 1 0 0 7a3.5 3.5 0 1 0 0-7zm7.4 6.5a1 1 0 0 0 .2 1.1l.1.1a1 1 0 0 1 0 1.4l-1.2 1.2a1 1 0 0 1-1.4 0l-.1-.1a1 1 0 0 0-1.1-.2a1 1 0 0 0-.6.9v.2a1 1 0 0 1-1 1h-1.7a1 1 0 0 1-1-1v-.2a1 1 0 0 0-.6-.9a1 1 0 0 0-1.1.2l-.1.1a1 1 0 0 1-1.4 0L4.3 18.4a1 1 0 0 1 0-1.4l.1-.1a1 1 0 0 0 .2-1.1a1 1 0 0 0-.9-.6h-.2a1 1 0 0 1-1-1v-1.7a1 1 0 0 1 1-1h.2a1 1 0 0 0 .9-.6a1 1 0 0 0-.2-1.1l-.1-.1a1 1 0 0 1 0-1.4L5.5 4.8a1 1 0 0 1 1.4 0l.1.1a1 1 0 0 0 1.1.2a1 1 0 0 0 .6-.9V4a1 1 0 0 1 1-1h1.7a1 1 0 0 1 1 1v.2a1 1 0 0 0 .6.9a1 1 0 0 0 1.1-.2l.1-.1a1 1 0 0 1 1.4 0l1.2 1.2a1 1 0 0 1 0 1.4l-.1.1a1 1 0 0 0-.2 1.1a1 1 0 0 0 .9.6h.2a1 1 0 0 1 1 1v1.7a1 1 0 0 1-1 1h-.2a1 1 0 0 0-.9.6z" />
   };
 
   return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg 
+      viewBox="0 0 24 24" 
+      className="h-[18px] w-[18px] transition-all duration-200" 
+      fill="none" 
+      stroke="currentColor" 
+      strokeWidth={isActive ? 2.5 : 2} 
+      strokeLinecap="round" 
+      strokeLinejoin="round"
+    >
       {paths[name] ?? <circle cx="12" cy="12" r="9" />}
     </svg>
   );

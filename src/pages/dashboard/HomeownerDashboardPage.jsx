@@ -104,14 +104,14 @@ export default function HomeownerDashboardPage() {
       });
     }
     return [
-      { to: "/dashboard/homeowner/messages", icon: <ClipboardCheck size={24} />, label: "Approvals" },
-      { to: "/dashboard/homeowner/visits", icon: <Users size={24} />, label: "Visits" },
-      { to: "/dashboard/homeowner/messages", icon: <MessageSquare size={24} />, label: "Inbox" },
-      { to: "/dashboard/homeowner/doors", icon: <DoorOpen size={24} />, label: "Doors" },
-      { to: "/dashboard/homeowner/emergency-contacts", icon: <PhoneCall size={24} />, label: "Calls" },
-      { to: "/dashboard/homeowner/safety", icon: <ShieldAlert size={24} />, label: "Panic", color: "text-rose-600", bg: "bg-rose-50" },
-      { to: "/dashboard/homeowner/settings", icon: <Settings size={24} />, label: "Settings" },
-      { to: "/billing/paywall", icon: <CreditCard size={24} />, label: "Billing" }
+      { to: "/dashboard/homeowner/messages", icon: <ClipboardCheck size={18} />, label: "Approvals" },
+      { to: "/dashboard/homeowner/visits", icon: <Users size={18} />, label: "Visits" },
+      { to: "/dashboard/homeowner/messages", icon: <MessageSquare size={18} />, label: "Inbox" },
+      { to: "/dashboard/homeowner/doors", icon: <DoorOpen size={18} />, label: "Doors" },
+      { to: "/dashboard/homeowner/emergency-contacts", icon: <PhoneCall size={18} />, label: "Calls" },
+      { to: "/dashboard/homeowner/safety", icon: <ShieldAlert size={18} />, label: "Panic", color: "text-rose-600", bg: "bg-rose-50" },
+      { to: "/dashboard/homeowner/settings", icon: <Settings size={18} />, label: "Settings" },
+      { to: "/billing/paywall", icon: <CreditCard size={18} />, label: "Billing" }
     ].filter((item) => {
       const requiredFeature = quickActionFeatureByRoute[item.to];
       return requiredFeature ? hasFeature(requiredFeature) : true;
@@ -202,7 +202,7 @@ export default function HomeownerDashboardPage() {
         <section className="space-y-4">
           <div className="flex justify-between items-end">
             <h3 className="font-bold text-lg text-slate-800">Action Items</h3>
-            <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">Quick Access</span>
+            <span className="text-[8px] font-bold text-indigo-600 uppercase tracking-widest">Quick Access</span>
           </div>
           <div className={`grid gap-4 ${isEstateManagedHomeowner ? "grid-cols-3 md:grid-cols-6" : "grid-cols-4 md:grid-cols-8"}`}>
             {quickActions.map((item) => (

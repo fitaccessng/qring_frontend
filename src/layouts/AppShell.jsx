@@ -197,7 +197,6 @@ export default function AppShell({ title, children, showTopBar = true, showMobil
       return [
         { to: "/dashboard/homeowner/overview", label: "Home", icon: "overview" },
         { to: "/dashboard/homeowner/visits", label: "Visits", icon: "visits" },
-        { to: "/dashboard/homeowner/appointments", label: "Appointments", icon: "appointments" },
         { to: "/dashboard/homeowner/messages", label: "Messages", icon: "messages" },
         { to: "/dashboard/homeowner/doors", label: "Doors", icon: "doors" }
       ];
@@ -527,14 +526,14 @@ export default function AppShell({ title, children, showTopBar = true, showMobil
                 : "max-w-md rounded-[1.35rem]"
             }`}
           >
-            <div className={`flex items-stretch gap-1 ${isEstateMobileNav ? "h-14 sm:h-14" : "h-12 sm:h-12"}`}>
+            <div className={`flex items-stretch gap-1 ${isEstateMobileNav ? "h-14 sm:h-14" : "h-11 sm:h-11"}`}>
               {filteredMobileNavItems.map((item) => (
                 <NavLink
                   key={`mobile-${item.to}`}
                   to={item.to}
                   end
                   className={({ isActive }) =>
-                    `flex min-w-0 flex-1 items-center justify-center rounded-xl px-1 py-1 text-[10px] font-semibold transition-all duration-200 active:scale-95 sm:text-[11px] ${
+                    `flex min-w-0 flex-1 items-center justify-center rounded-xl px-1 py-0.5 text-[10px] font-semibold transition-all duration-200 active:scale-95 sm:text-[10px] ${
                       isActive ? "text-white" : "text-violet-700 dark:text-slate-300"
                     }`
                   }
@@ -544,8 +543,8 @@ export default function AppShell({ title, children, showTopBar = true, showMobil
                       <span
                         className={`grid place-items-center rounded-full transition-all duration-200 ${
                           isActive
-                            ? "h-10 w-10 bg-violet-600 text-white shadow-[0_10px_24px_rgba(124,58,237,0.45)]"
-                            : "h-8 w-8 text-violet-700 opacity-90 dark:text-slate-300"
+                            ? "h-9 w-9 bg-violet-600 text-white shadow-[0_10px_24px_rgba(124,58,237,0.45)]"
+                            : "h-7 w-7 text-violet-700 opacity-90 dark:text-slate-300"
                         }`}
                       >
                         <NavIcon name={item.icon} />

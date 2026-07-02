@@ -1083,7 +1083,7 @@ function renderMessageBody(text) {
 }
 
 function renderThreadMessageBody(message) {
-  const snapshotUrl = extractSnapshotUrl(message);
+  const snapshotUrl = getMessageSnapshotSrc(message);
   const messageType = String(message?.messageType || "text");
   if (messageType === "visitor_snapshot" || Boolean(snapshotUrl)) {
     const footerLabel = getSnapshotFooterLabel(message);
@@ -1282,14 +1282,7 @@ function getThreadSnapshotSrc(thread) {
   if (!thread) return "";
   const photoUrl = extractSnapshotUrl(thread);
   if (photoUrl) return photoUrl;
-  const snapshotAuditId = String(
-    thread.snapshotAuditId ||
-    thread.snapshot_audit_id ||
-    thread.snapshot?.id ||
-    ""
-  ).trim();
-  if (!snapshotAuditId) return "";
-  return `/api/v1/advanced/visitor/snapshots/${encodeURIComponent(snapshotAuditId)}/file`;
+  return getSnapshotUrlFromAuditId(thread.snapshotAuditId || thread.snapshot_audit_id || thread.snapshot?.id || "");
 }
 
 function buildSnapshotMessage(payload, fallbackSessionId = "") {
@@ -1376,7 +1369,11 @@ function extractSnapshotUrl(source) {
 }
 
 function isSnapshotThreadMessage(message) {
-  return String(message?.messageType || "").trim() === "visitor_snapshot" || Boolean(extractSnapshotUrl(message));
+  return (
+    String(message?.messageType || "").trim() === "visitor_snapshot" ||
+    Boolean(extractSnapshotUrl(message)) ||
+    Boolean(getSnapshotUrlFromAuditId(message?.snapshotAuditId || message?.snapshot_audit_id || message?.snapshot?.id || ""))
+  );
 }
 
 function getSnapshotFooterLabel(message) {
@@ -1402,6 +1399,8 @@ function getConversationSnapshotUrl(rows) {
   for (const row of list) {
     const snapshotUrl = extractSnapshotUrl(row);
     if (snapshotUrl) return snapshotUrl;
+    const snapshotAuditUrl = getSnapshotUrlFromAuditId(row?.snapshotAuditId || row?.snapshot_audit_id || row?.snapshot?.id || "");
+    if (snapshotAuditUrl) return snapshotAuditUrl;
   }
   return "";
 }
@@ -1413,4 +1412,16 @@ function getConversationSnapshotAuditId(rows) {
     if (auditId) return auditId;
   }
   return "";
+}
+
+function getSnapshotUrlFromAuditId(snapshotAuditId) {
+  const auditId = String(snapshotAuditId || "").trim();
+  if (!auditId) return "";
+  return `/api/v1/advanced/visitor/snapshots/${encodeURIComponent(auditId)}/file`;
+}
+
+function getMessageSnapshotSrc(message) {
+  const snapshotUrl = extractSnapshotUrl(message);
+  if (snapshotUrl) return snapshotUrl;
+  return getSnapshotUrlFromAuditId(message?.snapshotAuditId || message?.snapshot_audit_id || message?.snapshot?.id || "");
 }
