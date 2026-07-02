@@ -300,7 +300,18 @@ export default function HomeownerMessagesPage() {
     const handleSessionSnapshot = (payload) => {
       const incomingSessionId = String(payload?.sessionId || "").trim();
       if (!incomingSessionId) return;
-      const snapshotAuditId = String(payload?.snapshotAuditId || payload?.snapshot_audit_id || payload?.id || "").trim();
+      const snapshotAuditId = String(
+        payload?.snapshotAuditId ||
+        payload?.snapshot_audit_id ||
+        payload?.id ||
+        payload?.data?.snapshotAuditId ||
+        payload?.data?.snapshot_audit_id ||
+        payload?.data?.snapshot?.id ||
+        payload?.data?.payload?.snapshotAuditId ||
+        payload?.data?.payload?.snapshot_audit_id ||
+        payload?.data?.payload?.snapshot?.id ||
+        ""
+      ).trim();
       const snapshotUrl = extractSnapshotUrl(payload) || getSnapshotUrlFromAuditId(snapshotAuditId);
       const snapshotMessage = buildSnapshotMessage({ ...payload, snapshotUrl, snapshotAuditId }, incomingSessionId);
       setThreads((prev) =>
@@ -456,7 +467,18 @@ export default function HomeownerMessagesPage() {
     if (eventName === "visitor.snapshot") {
       const data = lastRealtimeEvent?.payload || {};
       const visitorSessionId = String(data?.visitorSessionId || data?.sessionId || "").trim();
-      const snapshotAuditId = String(data?.snapshotAuditId || data?.snapshot_audit_id || data?.id || "").trim();
+      const snapshotAuditId = String(
+        data?.snapshotAuditId ||
+        data?.snapshot_audit_id ||
+        data?.id ||
+        data?.data?.snapshotAuditId ||
+        data?.data?.snapshot_audit_id ||
+        data?.data?.snapshot?.id ||
+        data?.data?.payload?.snapshotAuditId ||
+        data?.data?.payload?.snapshot_audit_id ||
+        data?.data?.payload?.snapshot?.id ||
+        ""
+      ).trim();
       const nextUrl = extractSnapshotUrl(data) || getSnapshotUrlFromAuditId(snapshotAuditId);
       if (visitorSessionId && (nextUrl || snapshotAuditId)) {
         setThreads((prev) =>
@@ -1189,6 +1211,12 @@ function normalizeInboxThread(thread) {
     normalized.snapshot_audit_id ||
     normalized.snapshot?.id ||
     normalized.requestPayload?.snapshotAuditId ||
+    normalized.data?.snapshotAuditId ||
+    normalized.data?.snapshot_audit_id ||
+    normalized.data?.snapshot?.id ||
+    normalized.data?.payload?.snapshotAuditId ||
+    normalized.data?.payload?.snapshot_audit_id ||
+    normalized.data?.payload?.snapshot?.id ||
     ""
   ).trim();
   const snapshotUrl = extractSnapshotUrl(normalized) || getSnapshotUrlFromAuditId(snapshotAuditId) || String(
@@ -1299,6 +1327,12 @@ function buildSnapshotMessage(payload, fallbackSessionId = "") {
     payload?.snapshot_audit_id ||
     payload?.snapshot?.id ||
     payload?.requestPayload?.snapshotAuditId ||
+    payload?.data?.snapshotAuditId ||
+    payload?.data?.snapshot_audit_id ||
+    payload?.data?.snapshot?.id ||
+    payload?.data?.payload?.snapshotAuditId ||
+    payload?.data?.payload?.snapshot_audit_id ||
+    payload?.data?.payload?.snapshot?.id ||
     ""
   ).trim();
   const snapshotUrl = extractSnapshotUrl(payload) || getSnapshotUrlFromAuditId(snapshotAuditId);
@@ -1378,6 +1412,24 @@ function extractSnapshotUrl(source) {
     source?.metadata?.snapshot_url ||
     source?.metadata?.image_url ||
     source?.metadata?.photo_url ||
+    source?.data?.snapshotUrl ||
+    source?.data?.imageUrl ||
+    source?.data?.photoUrl ||
+    source?.data?.fileUrl ||
+    source?.data?.url ||
+    source?.data?.snapshot_url ||
+    source?.data?.image_url ||
+    source?.data?.photo_url ||
+    source?.data?.file_url ||
+    source?.data?.payload?.snapshotUrl ||
+    source?.data?.payload?.imageUrl ||
+    source?.data?.payload?.photoUrl ||
+    source?.data?.payload?.fileUrl ||
+    source?.data?.payload?.url ||
+    source?.data?.payload?.snapshot_url ||
+    source?.data?.payload?.image_url ||
+    source?.data?.payload?.photo_url ||
+    source?.data?.payload?.file_url ||
     ""
   ).trim();
 }
