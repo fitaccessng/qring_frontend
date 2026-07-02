@@ -102,7 +102,6 @@ function canReacceptConsentFromError(message) {
   );
 }
 
-// Function helper to check if errors can be retried
 function isRetryableSubmitError(error) {
   const status = Number(error?.status ?? -1);
   return RETRYABLE_STATUSES.has(status);
@@ -193,72 +192,6 @@ export default function ScanPage() {
   const doorOptions = useMemo(() => getDoorList(qr), [qr]);
   const snapshotCaptured = Boolean(visitorForm.snapshotDataUrl);
   const canReacceptConsent = canReacceptConsentFromError(error);
-
-  const qrMeta = useMemo(() => {
-    const raw = String(qrId || "").trim();
-    const isSecureToken = raw.startsWith("qt1.") || raw.startsWith("qt2.");
-    if (isSecureToken) return { label: "Secure Access", value: `Protected Token` };
-    if (raw.length <= 28) return { label: "QR ID", value: raw };
-    return { label: "QR ID", value: `${raw.slice(0, 12)}...` };
-  }, [qrId]);
-
-  async function stopCamera() {
-    const stream = cameraStreamRef.current;
-    cameraStreamRef.current = null;
-    if (stream) {
-      stream.getTracks().forEach((track) => track.stop());
-    }
-    setCameraState((prev) => ({ ...prev, ready: false, starting: false }));
-  }
-
-  async function startCamera() {
-    if (!consentAccepted) return;
-    if (cameraStreamRef.current || cameraState.starting) return;
-    setCameraState({ starting: true, ready: false, error: "" });
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
-        audio: false
-      });
-      cameraStreamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
-      setCameraState({ starting: false, ready: true, error: "" });
-    } catch (cameraError) {
-      setCameraState({
-        starting: false,
-        ready: false,
-        error: cameraError?.message || "Camera access blocked. Please allow camera permissions."
-      });
-    }
-  }
-
-  function captureSnapshot() {
-    const video = videoRef.current;
-    if (!video) return;
-    const vw = video.videoWidth || 0;
-    const vh = video.videoHeight || 0;
-    if (!vw || !vh) {
-      setCameraState((prev) => ({ ...prev, error: "Camera frame processing. Try again." }));
-      return;
-    }
-    const canvas = canvasRef.current || document.createElement("canvas");
-    canvas.width = 640;
-    canvas.height = 480;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.drawImage(video, 0, 0, 640, 480);
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.75);
-    setVisitorForm((prev) => ({ ...prev, snapshotDataUrl: dataUrl }));
-    void stopCamera();
-  }
-
-  function clearSnapshot() {
-    setVisitorForm((prev) => ({ ...prev, snapshotDataUrl: "" }));
-    void startCamera();
-  }
 
   useEffect(() => {
     if (!qrId) return;
@@ -385,6 +318,64 @@ export default function ScanPage() {
     };
   }, [requestState.sent, requestState.sessionId]);
 
+  async function stopCamera() {
+    const stream = cameraStreamRef.current;
+    cameraStreamRef.current = null;
+    if (stream) {
+      stream.getTracks().forEach((track) => track.stop());
+    }
+    setCameraState((prev) => ({ ...prev, ready: false, starting: false }));
+  }
+
+  async function startCamera() {
+    if (!consentAccepted) return;
+    if (cameraStreamRef.current || cameraState.starting) return;
+    setCameraState({ starting: true, ready: false, error: "" });
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false
+      });
+      cameraStreamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+      setCameraState({ starting: false, ready: true, error: "" });
+    } catch (cameraError) {
+      setCameraState({
+        starting: false,
+        ready: false,
+        error: cameraError?.message || "Camera access blocked. Please allow camera permissions."
+      });
+    }
+  }
+
+  function captureSnapshot() {
+    const video = videoRef.current;
+    if (!video) return;
+    const vw = video.videoWidth || 0;
+    const vh = video.videoHeight || 0;
+    if (!vw || !vh) {
+      setCameraState((prev) => ({ ...prev, error: "Camera frame processing. Try again." }));
+      return;
+    }
+    const canvas = canvasRef.current || document.createElement("canvas");
+    canvas.width = 480;
+    canvas.height = 640;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0, 480, 640);
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.75);
+    setVisitorForm((prev) => ({ ...prev, snapshotDataUrl: dataUrl }));
+    void stopCamera();
+  }
+
+  function clearSnapshot() {
+    setVisitorForm((prev) => ({ ...prev, snapshotDataUrl: "" }));
+    void startCamera();
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     setError("");
@@ -478,7 +469,6 @@ export default function ScanPage() {
       {showConsent ? null : (
         <main className="relative mx-auto max-w-6xl px-4 py-4 sm:py-8">
           
-          {/* Header Bar */}
           <header className="mb-6 flex items-center justify-between gap-4 rounded-2xl bg-white border border-slate-200/80 p-4 shadow-xs">
             <div className="flex items-center gap-3 min-w-0">
               <button
@@ -523,10 +513,9 @@ export default function ScanPage() {
               <p className="mt-3 text-sm font-medium text-slate-500">Resolving security endpoint profile...</p>
             </div>
           ) : qr && !requestState.sent ? (
-            /* Responsive Adaptive Flex Pipeline Grid Wrapper */
             <form onSubmit={handleSubmit} className="flex flex-col lg:flex-row gap-6 items-start">
               
-              {/* Camera Deck Layout Side Column */}
+              {/* Taller Premium Portrait Layout Camera Side Column */}
               <div className="w-full lg:w-[42%] order-first lg:order-none space-y-4 shrink-0">
                 <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
                   <div className="mb-3 flex items-center justify-between border-b border-slate-100 pb-2.5">
@@ -543,8 +532,8 @@ export default function ScanPage() {
                     </span>
                   </div>
 
-                  {/* 16:9 Aspect Ratio Container for proper HD rendering */}
-                  <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-slate-900 border border-slate-200 shadow-inner max-h-[320px]">
+                  {/* Enhanced 3:4 aspect ratio view for an elongated premium native-mobile layout aspect without distortion */}
+                  <div className="relative aspect-[3/4] w-full overflow-hidden rounded-xl bg-slate-900 border border-slate-200 shadow-inner max-h-[420px]">
                     {!snapshotCaptured ? (
                       <>
                         <video ref={videoRef} className="h-full w-full object-cover scale-x-[-1]" playsInline muted />
@@ -576,7 +565,6 @@ export default function ScanPage() {
                     )}
                   </div>
 
-                  {/* Camera validation triggers */}
                   <div className="mt-3">
                     {!snapshotCaptured ? (
                       <button
@@ -698,7 +686,6 @@ export default function ScanPage() {
               </div>
             </form>
           ) : (
-            /* Request Success Box View State */
             <div className="mx-auto max-w-md rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm space-y-4 my-10">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-sky-50 border border-sky-100 text-sky-600">
                 <Check size={24} />

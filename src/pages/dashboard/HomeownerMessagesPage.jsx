@@ -300,8 +300,9 @@ export default function HomeownerMessagesPage() {
     const handleSessionSnapshot = (payload) => {
       const incomingSessionId = String(payload?.sessionId || "").trim();
       if (!incomingSessionId) return;
-      const snapshotUrl = extractSnapshotUrl(payload);
-      const snapshotMessage = buildSnapshotMessage({ ...payload, snapshotUrl }, incomingSessionId);
+      const snapshotAuditId = String(payload?.snapshotAuditId || payload?.snapshot_audit_id || payload?.id || "").trim();
+      const snapshotUrl = extractSnapshotUrl(payload) || getSnapshotUrlFromAuditId(snapshotAuditId);
+      const snapshotMessage = buildSnapshotMessage({ ...payload, snapshotUrl, snapshotAuditId }, incomingSessionId);
       setThreads((prev) =>
         prev.map((thread) =>
           thread.id === incomingSessionId
@@ -455,12 +456,13 @@ export default function HomeownerMessagesPage() {
     if (eventName === "visitor.snapshot") {
       const data = lastRealtimeEvent?.payload || {};
       const visitorSessionId = String(data?.visitorSessionId || data?.sessionId || "").trim();
-      const nextUrl = extractSnapshotUrl(data);
-      if (visitorSessionId && nextUrl) {
+      const snapshotAuditId = String(data?.snapshotAuditId || data?.snapshot_audit_id || data?.id || "").trim();
+      const nextUrl = extractSnapshotUrl(data) || getSnapshotUrlFromAuditId(snapshotAuditId);
+      if (visitorSessionId && (nextUrl || snapshotAuditId)) {
         setThreads((prev) =>
           prev.map((thread) =>
             thread.id === visitorSessionId
-              ? { ...thread, photoUrl: nextUrl, snapshotUrl: nextUrl, snapshotAuditId: data?.id || thread.snapshotAuditId }
+              ? { ...thread, photoUrl: nextUrl || thread.photoUrl, snapshotUrl: nextUrl || thread.snapshotUrl, snapshotAuditId: snapshotAuditId || thread.snapshotAuditId }
               : thread
           )
         );
@@ -469,7 +471,8 @@ export default function HomeownerMessagesPage() {
             ...data,
             sessionId: visitorSessionId,
             photoUrl: nextUrl,
-            snapshotUrl: nextUrl
+            snapshotUrl: nextUrl,
+            snapshotAuditId
           },
           visitorSessionId
         );
@@ -1101,6 +1104,8 @@ function renderThreadMessageBody(message) {
       // eslint-disable-next-line no-console
       console.warn("qring.snapshot.missing", {
         sessionId: message?.sessionId || "",
+        messageId: message?.messageId || message?.id || "",
+        snapshotAuditId: message?.snapshotAuditId || message?.snapshot_audit_id || message?.snapshot?.id || "",
         snapshotUrl: ""
       });
     }
@@ -1179,7 +1184,14 @@ function eventLooksLikeSnapshot(payload) {
 
 function normalizeInboxThread(thread) {
   const normalized = { ...(thread || {}) };
-  const snapshotUrl = extractSnapshotUrl(normalized) || String(
+  const snapshotAuditId = String(
+    normalized.snapshotAuditId ||
+    normalized.snapshot_audit_id ||
+    normalized.snapshot?.id ||
+    normalized.requestPayload?.snapshotAuditId ||
+    ""
+  ).trim();
+  const snapshotUrl = extractSnapshotUrl(normalized) || getSnapshotUrlFromAuditId(snapshotAuditId) || String(
     normalized.snapshotUrl ||
     normalized.photoUrl ||
     normalized.imageUrl ||
@@ -1218,13 +1230,7 @@ function normalizeInboxThread(thread) {
   normalized.last = previewMessageText(normalized?.last || "");
   normalized.snapshotUrl = snapshotUrl || normalized.snapshotUrl || "";
   normalized.photoUrl = snapshotUrl || normalized.photoUrl || "";
-  normalized.snapshotAuditId = String(
-    normalized.snapshotAuditId ||
-    normalized.snapshot_audit_id ||
-    normalized.snapshot?.id ||
-    normalized.requestPayload?.snapshotAuditId ||
-    ""
-  ).trim();
+  normalized.snapshotAuditId = snapshotAuditId;
   return normalized;
 }
 
@@ -1288,7 +1294,14 @@ function getThreadSnapshotSrc(thread) {
 function buildSnapshotMessage(payload, fallbackSessionId = "") {
   const sessionId = String(payload?.sessionId || fallbackSessionId || "").trim();
   if (!sessionId) return null;
-  const snapshotUrl = extractSnapshotUrl(payload);
+  const snapshotAuditId = String(
+    payload?.snapshotAuditId ||
+    payload?.snapshot_audit_id ||
+    payload?.snapshot?.id ||
+    payload?.requestPayload?.snapshotAuditId ||
+    ""
+  ).trim();
+  const snapshotUrl = extractSnapshotUrl(payload) || getSnapshotUrlFromAuditId(snapshotAuditId);
   return {
     id: `snapshot:${sessionId}`,
     messageId: `snapshot:${sessionId}`,
@@ -1305,20 +1318,21 @@ function buildSnapshotMessage(payload, fallbackSessionId = "") {
     purpose: payload?.purpose || "",
     requestSource: String(payload?.requestSource || payload?.source || payload?.requestPayload?.requestSource || "").trim(),
     creatorRole: String(payload?.creatorRole || payload?.requestPayload?.creatorRole || "").trim(),
+    snapshotAuditId,
     at: payload?.at || payload?.timestamp || new Date().toISOString()
   };
 }
 
 function ensureSnapshotConversationRows(rows, sessionId, threadSnapshot) {
   const list = Array.isArray(rows) ? [...rows] : [];
-  const hasSnapshotMessage = list.some((item) => String(item?.messageType || "").trim() === "visitor_snapshot" || Boolean(extractSnapshotUrl(item)));
+  const hasSnapshotMessage = list.some((item) => isSnapshotThreadMessage(item));
   if (hasSnapshotMessage) return list;
-  const source = threadSnapshot && extractSnapshotUrl(threadSnapshot)
+  const source = threadSnapshot && (extractSnapshotUrl(threadSnapshot) || getSnapshotUrlFromAuditId(threadSnapshot?.snapshotAuditId || threadSnapshot?.snapshot_audit_id || threadSnapshot?.snapshot?.id || ""))
     ? {
         sessionId,
-        snapshotUrl: extractSnapshotUrl(threadSnapshot),
-        photoUrl: extractSnapshotUrl(threadSnapshot),
-        snapshotAuditId: threadSnapshot?.snapshotAuditId || "",
+        snapshotUrl: extractSnapshotUrl(threadSnapshot) || getSnapshotUrlFromAuditId(threadSnapshot?.snapshotAuditId || threadSnapshot?.snapshot_audit_id || threadSnapshot?.snapshot?.id || ""),
+        photoUrl: extractSnapshotUrl(threadSnapshot) || getSnapshotUrlFromAuditId(threadSnapshot?.snapshotAuditId || threadSnapshot?.snapshot_audit_id || threadSnapshot?.snapshot?.id || ""),
+        snapshotAuditId: threadSnapshot?.snapshotAuditId || threadSnapshot?.snapshot_audit_id || threadSnapshot?.snapshot?.id || "",
         visitorName: threadSnapshot?.name || threadSnapshot?.visitorName || "Visitor",
         visitorPhone: threadSnapshot?.visitorPhone || "",
         purpose: threadSnapshot?.purpose || "",
