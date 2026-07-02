@@ -33,7 +33,9 @@ export default function SecureSnapshotImage({
     const assetUrl = resolveSnapshotUrl(raw);
     const accessToken = getAccessToken();
     const effectiveVisitorToken = visitorToken || getVisitorSessionToken(visitorSessionId);
-    const needsAuthenticatedFetch = assetUrl.includes("/advanced/visitor/snapshots/");
+    const needsAuthenticatedFetch =
+      assetUrl.includes("/advanced/visitor/snapshots/") ||
+      assetUrl.includes("/uploads/");
 
     if (!needsAuthenticatedFetch) {
       setResolvedSrc(assetUrl);
