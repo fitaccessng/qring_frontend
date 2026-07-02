@@ -102,6 +102,7 @@ function canReacceptConsentFromError(message) {
   );
 }
 
+// Function helper to check if errors can be retried
 function isRetryableSubmitError(error) {
   const status = Number(error?.status ?? -1);
   return RETRYABLE_STATUSES.has(status);
@@ -463,7 +464,6 @@ export default function ScanPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800 antialiased selection:bg-sky-200">
-      {/* Decorative Sky Blue subtle ambient backdrops */}
       <div className="absolute top-0 inset-x-0 h-64 bg-gradient-to-b from-sky-100/50 to-transparent pointer-events-none" />
 
       <VisitorConsentModal
@@ -476,10 +476,10 @@ export default function ScanPage() {
       />
 
       {showConsent ? null : (
-        <main className="relative mx-auto max-w-5xl px-4 py-6 sm:py-8">
+        <main className="relative mx-auto max-w-6xl px-4 py-4 sm:py-8">
           
           {/* Header Bar */}
-          <header className="mb-6 flex items-center justify-between gap-4 rounded-2xl bg-white border border-slate-200/80 p-4 shadow-sm">
+          <header className="mb-6 flex items-center justify-between gap-4 rounded-2xl bg-white border border-slate-200/80 p-4 shadow-xs">
             <div className="flex items-center gap-3 min-w-0">
               <button
                 type="button"
@@ -490,16 +490,15 @@ export default function ScanPage() {
                 Back
               </button>
               <div className="min-w-0">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-sky-600">Secure Entrypoint</span>
-                <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">Qring Digital Pass</h1>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-sky-600 block">Secure Entrypoint</span>
+                <h1 className="text-lg font-bold tracking-tight text-slate-900 sm:text-2xl truncate">Qring Digital Pass</h1>
               </div>
             </div>
             <div className="shrink-0 rounded-full bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700 border border-sky-100">
-              {requestState.sent ? "Request Sent" : snapshotCaptured ? "Verification Armed" : "Step 1: Snap Photo"}
+              {requestState.sent ? "Request Sent" : snapshotCaptured ? "Armed" : "Step 1: Photo"}
             </div>
           </header>
 
-          {/* Actionable Error Alert Box */}
           {error && (
             <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 shadow-xs flex items-center justify-between gap-4">
               <div>
@@ -518,19 +517,19 @@ export default function ScanPage() {
             </div>
           )}
 
-          {/* Core Content Loading or Core Framework View */}
           {loading ? (
             <div className="flex flex-col items-center justify-center py-20 rounded-2xl bg-white border border-slate-200 shadow-xs">
               <div className="h-8 w-8 animate-spin rounded-full border-4 border-sky-200 border-t-sky-600" />
               <p className="mt-3 text-sm font-medium text-slate-500">Resolving security endpoint profile...</p>
             </div>
           ) : qr && !requestState.sent ? (
-            <form onSubmit={handleSubmit} className="grid gap-6 md:grid-cols-12 items-start">
+            /* Responsive Adaptive Flex Pipeline Grid Wrapper */
+            <form onSubmit={handleSubmit} className="flex flex-col lg:flex-row gap-6 items-start">
               
-              {/* Left Column: Camera Feed Interaction Deck */}
-              <div className="md:col-span-6 lg:col-span-5 space-y-4">
-                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-                  <div className="mb-3 flex items-center justify-between border-b border-slate-100 pb-2.5 px-1">
+              {/* Camera Deck Layout Side Column */}
+              <div className="w-full lg:w-[42%] order-first lg:order-none space-y-4 shrink-0">
+                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
+                  <div className="mb-3 flex items-center justify-between border-b border-slate-100 pb-2.5">
                     <div>
                       <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400">Identity Capture</h2>
                       <p className="text-xs font-medium text-slate-600">
@@ -544,26 +543,31 @@ export default function ScanPage() {
                     </span>
                   </div>
 
-                  {/* Dynamic Video Viewport Window Box */}
-                  <div className="relative aspect-[4/3] overflow-hidden rounded-xl bg-slate-900 border border-slate-200 shadow-inner">
+                  {/* 16:9 Aspect Ratio Container for proper HD rendering */}
+                  <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-slate-900 border border-slate-200 shadow-inner max-h-[320px]">
                     {!snapshotCaptured ? (
                       <>
                         <video ref={videoRef} className="h-full w-full object-cover scale-x-[-1]" playsInline muted />
                         <canvas ref={canvasRef} className="hidden" />
-                        <div className="absolute inset-0 border-[3px] border-dashed border-white/20 pointer-events-none rounded-lg" />
+                        <div className="absolute inset-0 border-2 border-dashed border-white/20 pointer-events-none rounded-lg" />
                         {cameraState.starting && (
                           <div className="absolute inset-0 flex items-center justify-center bg-slate-900/80 text-white text-xs">
                             Launching camera hardware stream...
                           </div>
                         )}
+                        {cameraState.error && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-slate-950 px-4 text-center text-xs text-red-400">
+                            {cameraState.error}
+                          </div>
+                        )}
                       </>
                     ) : (
                       <div className="relative h-full w-full">
-                        <img src={visitorForm.snapshotDataUrl} alt="Visitor" className="h-full w-full object-cover" />
+                        <img src={visitorForm.snapshotDataUrl} alt="Visitor snapshot preview" className="h-full w-full object-cover" />
                         <button
                           type="button"
                           onClick={clearSnapshot}
-                          className="absolute right-3 top-3 rounded-full bg-slate-900/80 p-2 text-white hover:bg-slate-900 transition backdrop-blur-xs"
+                          className="absolute right-3 top-3 rounded-full bg-slate-900/80 p-2 text-white hover:bg-slate-900 transition backdrop-blur-xs shadow-md"
                           title="Clear and retake picture"
                         >
                           <RefreshCcw size={14} />
@@ -572,7 +576,7 @@ export default function ScanPage() {
                     )}
                   </div>
 
-                  {/* Immediate Functional Camera Call-to-Actions */}
+                  {/* Camera validation triggers */}
                   <div className="mt-3">
                     {!snapshotCaptured ? (
                       <button
@@ -585,10 +589,10 @@ export default function ScanPage() {
                         Capture Live Validation Photo
                       </button>
                     ) : (
-                      <div className="p-2 bg-slate-50 rounded-xl border border-slate-200/60 flex items-start gap-2.5">
+                      <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/60 flex items-start gap-2.5">
                         <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
                         <p className="text-xs text-slate-600 leading-relaxed">
-                          <strong className="text-slate-800 block font-semibold">Photo Attached Securely</strong>
+                          <strong className="text-slate-800 block font-semibold mb-0.5">Photo Attached Securely</strong>
                           This real-time picture will be shared instantly with the resident upon form transmission.
                         </p>
                       </div>
@@ -597,15 +601,14 @@ export default function ScanPage() {
                 </div>
               </div>
 
-              {/* Right Column: Visitor Form Metadata Profile */}
-              <div className="md:col-span-6 lg:col-span-7 bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-5">
+              {/* Form Input Deck Side Column */}
+              <div className="w-full lg:flex-1 bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-5">
                 <div>
                   <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Visitor Credentials</h3>
                   <p className="text-xs text-slate-500">Provide authentic background details for instant verification</p>
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-2">
-                  {/* Dropdown Route Configuration Selector */}
                   <div className="sm:col-span-2">
                     <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
                       <Building2 size={14} className="text-slate-400" /> Target Entry Gate/Door
@@ -625,7 +628,6 @@ export default function ScanPage() {
                     </select>
                   </div>
 
-                  {/* Name Input field */}
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
                       <User size={14} className="text-slate-400" /> Full Name
@@ -640,7 +642,6 @@ export default function ScanPage() {
                     />
                   </div>
 
-                  {/* Phone Line field */}
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
                       <Phone size={14} className="text-slate-400" /> Phone Contact Number
@@ -655,7 +656,6 @@ export default function ScanPage() {
                     />
                   </div>
 
-                  {/* Core Visit Intention Context */}
                   <div className="sm:col-span-2">
                     <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
                       <FileText size={14} className="text-slate-400" /> Detailed Purpose of Visit
@@ -671,7 +671,6 @@ export default function ScanPage() {
                   </div>
                 </div>
 
-                {/* Submit Action Pipeline System */}
                 <div className="pt-2">
                   <button
                     type="submit"
@@ -699,7 +698,7 @@ export default function ScanPage() {
               </div>
             </form>
           ) : (
-            /* Request Transmission Awaiting Feedback Hub Stage */
+            /* Request Success Box View State */
             <div className="mx-auto max-w-md rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm space-y-4 my-10">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-sky-50 border border-sky-100 text-sky-600">
                 <Check size={24} />
