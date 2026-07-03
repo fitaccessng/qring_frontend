@@ -46,6 +46,15 @@ const navByRole = {
     { to: "/dashboard/estate/homes", label: "Multi-Home", icon: "homes" },
     { to: "/dashboard/estate/settings", label: "Settings", icon: "settings" }
   ],
+  office: [
+    { to: "/dashboard/office/overview", label: "Overview", icon: "overview" },
+    { to: "/dashboard/office/queue", label: "Queue", icon: "queue" },
+    { to: "/dashboard/office/visitors", label: "Visitors", icon: "visits" },
+    { to: "/dashboard/office/messages", label: "Messages", icon: "messages" },
+    { to: "/dashboard/office/employees", label: "Employees", icon: "user_admin" },
+    { to: "/dashboard/office/qr", label: "QR", icon: "qr" },
+    { to: "/dashboard/office/settings", label: "Settings", icon: "settings" }
+  ],
   security: [
     { to: "/dashboard/security", label: "Gate Hub", icon: "shield" },
     { to: "/dashboard/security/emergency", label: "Emergency", icon: "bell_ring" },
@@ -139,6 +148,7 @@ export default function AppShell({ title, children, showTopBar = true, showMobil
   const routeRole = useMemo(() => {
     if (pathname.startsWith("/dashboard/estate")) return "estate";
     if (pathname.startsWith("/dashboard/homeowner")) return "homeowner";
+    if (pathname.startsWith("/dashboard/office")) return "office";
     if (pathname.startsWith("/dashboard/security")) return "security";
     if (pathname.startsWith("/dashboard/admin")) return "admin";
     return user?.role ?? null;
@@ -150,7 +160,7 @@ export default function AppShell({ title, children, showTopBar = true, showMobil
   const showBackHeader = useMemo(() => {
     if (!showTopBar) return false;
     if (showProfileHeader) return false;
-    return routeRole === "estate" || routeRole === "homeowner" || routeRole === "security";
+    return routeRole === "estate" || routeRole === "homeowner" || routeRole === "security" || routeRole === "office";
   }, [showTopBar, showProfileHeader, routeRole]);
   const isEstateManagedHomeowner = useMemo(
     () =>
@@ -210,6 +220,14 @@ export default function AppShell({ title, children, showTopBar = true, showMobil
         { to: "/dashboard/estate/assign", label: "Assign", icon: "assign" }
       ];
     }
+    if (routeRole === "office") {
+      return [
+        { to: "/dashboard/office/overview", label: "Home", icon: "overview" },
+        { to: "/dashboard/office/queue", label: "Queue", icon: "queue" },
+        { to: "/dashboard/office/visitors", label: "Visitors", icon: "visits" },
+        { to: "/dashboard/office/messages", label: "Messages", icon: "messages" }
+      ];
+    }
     if (routeRole === "security") {
       return [
         { to: "/dashboard/security", label: "Gate", icon: "shield" },
@@ -238,13 +256,16 @@ export default function AppShell({ title, children, showTopBar = true, showMobil
     });
   }, [hasFeature, isEstateManagedHomeowner, mobileNavItems, routeRole]);
   const isEstateMobileNav = routeRole === "estate";
+  const isOfficeMobileNav = routeRole === "office";
   const showHelpButton = routeRole === "estate" || routeRole === "security";
   const mobileContentBottomPaddingClass = !showMobileNav
     ? "pb-8 sm:pb-8"
     : isEstateMobileNav
       ? "pb-[calc(11.5rem+env(safe-area-inset-bottom))] sm:pb-[calc(10rem+env(safe-area-inset-bottom))]"
+      : isOfficeMobileNav
+        ? "pb-[calc(9.25rem+env(safe-area-inset-bottom))] sm:pb-[calc(8.75rem+env(safe-area-inset-bottom))]"
       : "pb-[calc(9.5rem+env(safe-area-inset-bottom))] sm:pb-[calc(9rem+env(safe-area-inset-bottom))]";
-  const mobileBottomSpacerClass = !showMobileNav ? "hidden" : isEstateMobileNav ? "h-28 lg:hidden" : "h-20 lg:hidden";
+  const mobileBottomSpacerClass = !showMobileNav ? "hidden" : isEstateMobileNav ? "h-28 lg:hidden" : isOfficeMobileNav ? "h-24 lg:hidden" : "h-20 lg:hidden";
   const showEstateCreateDoorFab = showMobileNav && isEstateMobileNav && normalizedPathname === "/dashboard/estate";
   const canGoBack = typeof window !== "undefined" && window.history.length > 1;
   const isNativeApp = useMemo(() => {
@@ -338,6 +359,8 @@ export default function AppShell({ title, children, showTopBar = true, showMobil
     const fallback =
       user?.role === "estate"
         ? "/dashboard/estate"
+        : user?.role === "office"
+          ? "/dashboard/office/overview"
         : user?.role === "admin"
           ? "/dashboard/admin"
           : user?.role === "security"
@@ -488,10 +511,12 @@ export default function AppShell({ title, children, showTopBar = true, showMobil
       </div>
       {showMobileNav && filteredMobileNavItems.length > 0 ? (
         <Link
-          to="/dashboard/estate/doors"
+          to={isOfficeMobileNav ? "/dashboard/office/qr" : "/dashboard/estate/doors"}
           className={`fixed right-4 z-[10000] flex h-14 w-14 items-center justify-center rounded-full bg-[linear-gradient(135deg,#00346f_0%,#004a99_100%)] text-white shadow-[0_18px_40px_rgba(0,52,111,0.28)] transition active:scale-95 sm:right-6 lg:hidden ${
             isEstateMobileNav
               ? "bottom-[calc(6.6rem+env(safe-area-inset-bottom))]"
+              : isOfficeMobileNav
+                ? "bottom-[calc(5.9rem+env(safe-area-inset-bottom))]"
               : "bottom-[calc(5.7rem+env(safe-area-inset-bottom))]"
           } ${
             showEstateCreateDoorFab ? "opacity-100" : "pointer-events-none opacity-0"
@@ -523,6 +548,8 @@ export default function AppShell({ title, children, showTopBar = true, showMobil
             className={`relative mx-auto border border-slate-200/60 bg-[#ebe8f8]/95 px-3 py-2 shadow-[0_12px_32px_rgba(76,29,149,0.16)] backdrop-blur-md dark:border-slate-700 dark:bg-slate-900/90 ${
               isEstateMobileNav
                 ? "max-w-none rounded-none rounded-t-[1.35rem] pb-[max(0.65rem,env(safe-area-inset-bottom))]"
+                : isOfficeMobileNav
+                  ? "max-w-md rounded-[1.35rem]"
                 : "max-w-md rounded-[1.35rem]"
             }`}
           >
@@ -560,7 +587,7 @@ export default function AppShell({ title, children, showTopBar = true, showMobil
                   )}
                 </NavLink>
               ))}
-              {showHelpButton && !isEstateMobileNav ? (
+              {showHelpButton && !isEstateMobileNav && !isOfficeMobileNav ? (
                 <button
                   type="button"
                   onClick={() => navigate("/onboarding")}
@@ -617,6 +644,7 @@ function NavIcon({ name }) {
     plans: <path d="M4 20V8l8-4 8 4v12M4 12h16" />,
     queue: <path d="M4 7h14M4 12h10M4 17h8M18 7v10M15 14l3 3 3-3" />,
     receipt: <path d="M6 3h12v18l-2-1-2 1-2-1-2 1-2-1-2 1zM9 8h6M9 12h6M9 16h4" />,
+    qr: <path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM13 13h2v2h-2zM16 13h4v2h-4zM13 16h2v4h-2zM16 16h2v2h2v2h-4z" />,
     community: <path d="M4 5h16v10H8l-4 4zM9 9h6M9 12h4" />,
     broadcast: <path d="M4 12h16M4 7h10M4 17h10M18 7v10" />,
     meeting: <path d="M7 2v3M17 2v3M4 8h16M5 5h14a1 1 0 0 1 1 1v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a1 1 0 0 1 1-1zM8 12h8M8 15h5" />,

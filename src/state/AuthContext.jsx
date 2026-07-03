@@ -143,7 +143,18 @@ export function AuthProvider({ children }) {
   const signup = async (payload) => {
     setLoading(true);
     try {
-      return await authService.signup(payload);
+      const response = await authService.signup(payload);
+      const data = normalizeAuthData(response);
+      if (data.accessToken) {
+        const resolved = requireAccessToken(
+          data,
+          response,
+          "Signup did not return an access token."
+        );
+        persistAuth(resolved);
+        return resolved;
+      }
+      return response;
     } finally {
       setLoading(false);
     }

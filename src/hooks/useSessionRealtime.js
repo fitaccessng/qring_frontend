@@ -25,6 +25,7 @@ import {
 } from "../services/homeownerService";
 import { addNativeAppStateListener, addNativeNetworkListener } from "../services/nativeAppService";
 import { getSecuritySessionMessages, sendSecuritySessionMessage } from "../services/securityService";
+import { requestOfficeCall } from "../services/officeService";
 import { getVisitorSessionToken } from "../services/visitorSessionToken";
 import {
   applyRemoteTrackEvent,
@@ -191,6 +192,15 @@ function getParticipantContext() {
       polite: false
     };
   }
+  if (role === "office") {
+    return {
+      user,
+      participantType: "security",
+      canStartCall: true,
+      displayName: user?.fullName || "Office",
+      polite: false
+    };
+  }
   return {
     user,
     participantType: "visitor",
@@ -209,7 +219,11 @@ function canVisitorInitiateCall(status, activeCallStatus) {
 }
 
 function isMineBySenderType(senderType, participantType) {
-  return String(senderType || "").toLowerCase() === participantType;
+  const normalizedSenderType = String(senderType || "").toLowerCase();
+  if (participantType === "security") {
+    return normalizedSenderType === "security" || normalizedSenderType === "office";
+  }
+  return normalizedSenderType === participantType;
 }
 
 function normalizeMessage(payload, participantType) {
@@ -386,7 +400,8 @@ function normalizeMediaPermissionError(error, wantsVideo) {
 
 export function useSessionRealtime(sessionId) {
   const context = useMemo(() => getParticipantContext(), []);
-  const { participantType, canStartCall: baseCanStartCall, displayName, polite } = context;
+  const { participantType, canStartCall: baseCanStartCall, displayName, polite, user } = context;
+  const currentUserRole = String(user?.role || "").toLowerCase();
   const supportsWebRTC = typeof window !== "undefined" && typeof window.RTCPeerConnection !== "undefined";
   const supportsUserMedia =
     typeof navigator !== "undefined" && typeof navigator.mediaDevices?.getUserMedia === "function";
@@ -749,6 +764,11 @@ export function useSessionRealtime(sessionId) {
       setMessages((prev) => mergeMessages(prev, normalizedRows));
       return normalizedRows;
     } catch (error) {
+      const errorMessage = String(error?.message || "").toLowerCase();
+      if (participantType === "security" && (error?.status === 404 || errorMessage.includes("not found") || errorMessage.includes("conversation not found"))) {
+        setMessages([]);
+        return [];
+      }
       setStatus(error?.message || "Failed to load session messages");
       return [];
     }
@@ -1342,18 +1362,26 @@ export function useSessionRealtime(sessionId) {
 
     try {
       if (!restart || !callSessionRef.current) {
-        const response = await startSessionCall({
-          sessionId,
-          type: nextMode,
-          hasVideo: video,
-          visitorToken: participantType === "visitor" ? getVisitorSessionToken(sessionId) || undefined : undefined
-        });
-        const data = response?.data ?? null;
+        const response =
+          currentUserRole === "office"
+            ? await requestOfficeCall({
+                visitorSessionId: sessionId,
+                type: nextMode,
+                hasVideo: video,
+                targetRole: "visitor"
+              })
+            : await startSessionCall({
+                sessionId,
+                type: nextMode,
+                hasVideo: video,
+                visitorToken: participantType === "visitor" ? getVisitorSessionToken(sessionId) || undefined : undefined
+              });
+        const data = currentUserRole === "office" ? response : response?.data ?? null;
         if (String(data?.status || "").toLowerCase() === "ok" || String(data?.state || "").toLowerCase() === "connecting") {
           setCallStateSafe("connecting");
         }
         callSessionRef.current = data?.callSessionId || callSessionRef.current;
-        callVisitorIdRef.current = data?.visitorId || callVisitorIdRef.current || sessionId;
+        callVisitorIdRef.current = data?.visitorId || data?.visitorSessionId || callVisitorIdRef.current || sessionId;
         currentRtcConfigRef.current = data?.rtcConfig || currentRtcConfigRef.current;
       } else {
         await fetchCallSessionConfig();

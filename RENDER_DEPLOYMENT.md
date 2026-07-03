@@ -22,6 +22,8 @@ Set these in the Railway frontend service or in your frontend host's environment
 
 ```env
 VITE_API_BASE_URL=https://qring-backend-production.up.railway.app/api/v1
+# Important: VITE_SOCKET_URL must be the backend origin only.
+# Do not append /api/v1 here or Socket.IO will connect to the wrong path.
 VITE_SOCKET_URL=https://qring-backend-production.up.railway.app
 VITE_PUBLIC_APP_URL=https://www.useqring.online
 VITE_SOCKET_PATH=/socket.io

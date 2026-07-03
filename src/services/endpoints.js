@@ -20,6 +20,14 @@ export const endpoints = {
   estate: {
     overview: "/estate/overview"
   },
+  office: {
+    overview: "/office/overview",
+    queue: "/office/queue",
+    visitors: "/office/visitors",
+    employees: "/office/employees",
+    conversations: "/office/conversations",
+    conversationMessages: (sessionId) => `/office/conversations/${encodeURIComponent(sessionId)}/messages`
+  },
   security: {
     dashboard: "/security/dashboard",
     messages: "/security/messages"

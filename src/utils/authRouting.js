@@ -4,6 +4,7 @@ import { isNativeApp } from "./nativeRuntime.js";
 const ROLE_HOME = {
   homeowner: "/dashboard/homeowner/overview",
   estate: "/dashboard/estate",
+  office: "/dashboard/office/overview",
   admin: "/dashboard/admin",
   security: "/dashboard/security",
 };

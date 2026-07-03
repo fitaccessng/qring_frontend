@@ -71,6 +71,13 @@ const EstateStatsPage = lazy(() => import("./pages/dashboard/EstateStatsPage"));
 const SecurityDashboardPage = lazy(() => import("./pages/dashboard/SecurityDashboardPage"));
 const SecurityEmergencyPage = lazy(() => import("./pages/dashboard/SecurityEmergencyPage"));
 const SecurityMessagesPage = lazy(() => import("./pages/dashboard/SecurityMessagesPage"));
+const OfficeOverviewPage = lazy(() => import("./pages/dashboard/office/OfficeOverviewPage"));
+const OfficeQueuePage = lazy(() => import("./pages/dashboard/office/OfficeQueuePage"));
+const OfficeVisitorsPage = lazy(() => import("./pages/dashboard/office/OfficeVisitorsPage"));
+const OfficeMessagesPage = lazy(() => import("./pages/dashboard/office/OfficeMessagesPage"));
+const OfficeEmployeesPage = lazy(() => import("./pages/dashboard/office/OfficeEmployeesPage"));
+const OfficeQrPage = lazy(() => import("./pages/dashboard/office/OfficeQrPage"));
+const OfficeSettingsPage = lazy(() => import("./pages/dashboard/office/OfficeSettingsPage"));
 const AdminDashboardPage = lazy(() => import("./pages/dashboard/AdminDashboardPage"));
 const AdminPaymentsPage = lazy(() => import("./pages/dashboard/AdminPaymentsPage"));
 const AdminUsersPage = lazy(() => import("./pages/dashboard/AdminUsersPage"));
@@ -253,8 +260,18 @@ function AppRoutes() {
                   <Route path="/billing/callback" element={<LazyRoute><BillingCallbackPage /></LazyRoute>} />
                   <Route path="/onboarding" element={<LazyRoute><OnboardingPage /></LazyRoute>} />
                 </Route>
-                <Route element={<RoleRoute allowedRoles={["homeowner", "estate", "admin", "security"]} />}>
+                <Route element={<RoleRoute allowedRoles={["homeowner", "estate", "office", "admin", "security"]} />}>
                   <Route path="/dashboard/notifications" element={<LazyRoute><NotificationsPage /></LazyRoute>} />
+                </Route>
+                <Route element={<RoleRoute allowedRoles={["office"]} />}>
+                  <Route path="/dashboard/office" element={<Navigate to="/dashboard/office/overview" replace />} />
+                  <Route path="/dashboard/office/overview" element={<LazyRoute><OfficeOverviewPage /></LazyRoute>} />
+                  <Route path="/dashboard/office/queue" element={<LazyRoute><OfficeQueuePage /></LazyRoute>} />
+                  <Route path="/dashboard/office/visitors" element={<LazyRoute><OfficeVisitorsPage /></LazyRoute>} />
+                  <Route path="/dashboard/office/messages" element={<LazyRoute><OfficeMessagesPage /></LazyRoute>} />
+                  <Route path="/dashboard/office/employees" element={<LazyRoute><OfficeEmployeesPage /></LazyRoute>} />
+                  <Route path="/dashboard/office/qr" element={<LazyRoute><OfficeQrPage /></LazyRoute>} />
+                  <Route path="/dashboard/office/settings" element={<LazyRoute><OfficeSettingsPage /></LazyRoute>} />
                 </Route>
                 <Route element={<RoleRoute allowedRoles={["homeowner"]} />}>
                   <Route path="/dashboard/homeowner" element={<Navigate to="/dashboard/homeowner/overview" replace />} />
@@ -334,7 +351,7 @@ function AppRoutes() {
               </Route>
 
               <Route path="/unauthorized" element={<UnauthorizedPage />} />
-              <Route path="/dashboard" element={<Navigate to="/dashboard/homeowner/overview" replace />} />
+              <Route path="/dashboard" element={<Navigate to={nativeEntryRoute} replace />} />
               <Route path="*" element={<Navigate to={nativeEntryRoute} replace />} />
             </Routes>
           </div>
@@ -396,6 +413,7 @@ function getNativeEntryRoute() {
     const role = String(user.role).toLowerCase();
     if (role === "homeowner") return "/dashboard/homeowner/overview";
     if (role === "estate") return "/dashboard/estate";
+    if (role === "office") return "/dashboard/office/overview";
     if (role === "security") return "/dashboard/security";
     if (role === "admin") return "/dashboard/admin";
   } catch {

@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { Building2, Home, User, Mail, Lock, Gift, ChevronRight, Eye, EyeOff } from "lucide-react";
+import { Building2, Home, User, Mail, Lock, Gift, ChevronRight, Eye, EyeOff, BriefcaseBusiness, MapPin, Globe, Users } from "lucide-react";
 import { useAuth } from "../../state/AuthContext";
 import quickdropLogo from "../../assets/qring_logo.jpeg";
 import { shouldUseGoogleAuth } from "../../utils/nativeRuntime";
@@ -19,7 +19,19 @@ export default function SignupPage() {
     email: "",
     password: "",
     role: "homeowner",
-    referralCode: ""
+    referralCode: "",
+    companyName: "",
+    businessEmail: "",
+    phoneNumber: "",
+    officeAddress: "",
+    country: "",
+    state: "",
+    city: "",
+    officeSize: "",
+    industry: "",
+    numberOfEmployees: "",
+    timezone: "",
+    administratorName: ""
   });
 
   const [error, setError] = useState("");
@@ -69,7 +81,17 @@ export default function SignupPage() {
         setSubmitting(true);
         try {
           const normalizedEmail = form.email.trim().toLowerCase();
-          await signup({ ...form, email: normalizedEmail });
+          const payload = {
+            ...form,
+            email: normalizedEmail,
+            numberOfEmployees: form.numberOfEmployees ? Number(form.numberOfEmployees) : undefined,
+          };
+          const data = await signup(payload);
+          const role = String(data?.user?.role || form.role || "").toLowerCase();
+          if (role === "office" || data?.accessToken) {
+            navigate("/dashboard/office/overview", { replace: true });
+            return;
+          }
           navigate(`/verify-email?email=${encodeURIComponent(normalizedEmail)}`, {
             replace: true,
           });
@@ -138,7 +160,7 @@ export default function SignupPage() {
           <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-10 -mt-4" />
 
           {/* Role Selection Cluster */}
-          <div className="grid grid-cols-2 gap-3 mb-8">
+          <div className="grid grid-cols-3 gap-3 mb-8">
             <RoleTab 
               active={form.role === "homeowner"} 
               onClick={() => setForm({ ...form, role: "homeowner" })}
@@ -150,6 +172,12 @@ export default function SignupPage() {
               onClick={() => setForm({ ...form, role: "estate" })}
               icon={Building2}
               label="Estate"
+            />
+            <RoleTab 
+              active={form.role === "office"} 
+              onClick={() => setForm({ ...form, role: "office" })}
+              icon={BriefcaseBusiness}
+              label="Office"
             />
           </div>
 
@@ -204,6 +232,91 @@ export default function SignupPage() {
               onChange={(v) => setForm({ ...form, referralCode: v })} 
             />
 
+            {form.role === "office" ? (
+              <div className="grid gap-4 pt-2">
+                <InputField
+                  icon={Building2}
+                  placeholder="Company Name"
+                  value={form.companyName}
+                  onChange={(v) => setForm({ ...form, companyName: v })}
+                />
+                <InputField
+                  icon={Mail}
+                  type="email"
+                  placeholder="Business Email"
+                  value={form.businessEmail}
+                  onChange={(v) => setForm({ ...form, businessEmail: v })}
+                />
+                <InputField
+                  icon={User}
+                  placeholder="Phone Number"
+                  value={form.phoneNumber}
+                  onChange={(v) => setForm({ ...form, phoneNumber: v })}
+                />
+                <InputField
+                  icon={MapPin}
+                  placeholder="Office Address"
+                  value={form.officeAddress}
+                  onChange={(v) => setForm({ ...form, officeAddress: v })}
+                />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <InputField
+                    icon={Globe}
+                    placeholder="Country"
+                    value={form.country}
+                    onChange={(v) => setForm({ ...form, country: v })}
+                  />
+                  <InputField
+                    icon={Globe}
+                    placeholder="State"
+                    value={form.state}
+                    onChange={(v) => setForm({ ...form, state: v })}
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <InputField
+                    icon={MapPin}
+                    placeholder="City"
+                    value={form.city}
+                    onChange={(v) => setForm({ ...form, city: v })}
+                  />
+                  <InputField
+                    icon={Users}
+                    placeholder="Office Size"
+                    value={form.officeSize}
+                    onChange={(v) => setForm({ ...form, officeSize: v })}
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <InputField
+                    icon={BriefcaseBusiness}
+                    placeholder="Industry"
+                    value={form.industry}
+                    onChange={(v) => setForm({ ...form, industry: v })}
+                  />
+                  <InputField
+                    icon={Users}
+                    placeholder="Number of Employees"
+                    type="number"
+                    value={form.numberOfEmployees}
+                    onChange={(v) => setForm({ ...form, numberOfEmployees: v })}
+                  />
+                </div>
+                <InputField
+                  icon={Globe}
+                  placeholder="Timezone"
+                  value={form.timezone}
+                  onChange={(v) => setForm({ ...form, timezone: v })}
+                />
+                <InputField
+                  icon={User}
+                  placeholder="Administrator Name"
+                  value={form.administratorName}
+                  onChange={(v) => setForm({ ...form, administratorName: v })}
+                />
+              </div>
+            ) : null}
+
             <div className="flex items-center gap-3 px-1 pt-2">
               <input
                 id="terms"
@@ -236,7 +349,7 @@ export default function SignupPage() {
             </button>
           </form>
 
-          {googleAuthEnabled ? (
+          {googleAuthEnabled && form.role !== "office" ? (
             <>
               <div className="relative flex py-8 items-center">
                 <div className="flex-grow border-t border-slate-100"></div>
