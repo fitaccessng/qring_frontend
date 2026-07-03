@@ -56,6 +56,19 @@ const defaultPublicAppUrl =
     ? windowOrigin
     : productionFrontendOrigin;
 
+const rawSocketEnvValue = String(
+  importMetaEnv.VITE_SOCKET_URL ??
+  readGlobalEnvValue("VITE_SOCKET_URL") ??
+  ""
+).trim();
+if (rawSocketEnvValue && /\/api\/v1(?:\/)?$/i.test(rawSocketEnvValue)) {
+  console.warn("qring.env.invalid_socket_url", {
+    reason: "socket-url-must-be-backend-origin",
+    value: rawSocketEnvValue,
+    expectedExample: productionBackendOrigin
+  });
+}
+
 function resolveApiBaseUrl(rawValue) {
   return resolveApiBaseUrlValue(rawValue, defaultApiBase, { windowOrigin });
 }
