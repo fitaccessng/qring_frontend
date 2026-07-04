@@ -20,6 +20,10 @@ import {
   requestHomeownerCall,
   sendHomeownerSessionMessage
 } from "../../services/homeownerService";
+import {
+  getConversationMessageText,
+  getConversationPreviewText
+} from "../../utils/messageDisplay";
 import { useAuth } from "../../state/AuthContext";
 import { useNotifications } from "../../state/NotificationsContext";
 
@@ -243,11 +247,11 @@ export default function HomeownerMessagesPage() {
       const incomingSessionId = payload?.sessionId;
       if (!incomingSessionId) return;
       const snapshotUrl = extractSnapshotUrl(payload);
-      const normalized = {
-        id: payload?.messageId || payload?.id || `${payload?.at || Date.now()}-${Math.random()}`,
-        messageId: payload?.messageId || payload?.id || "",
-        sessionId: incomingSessionId,
-        text: payload?.text || "",
+    const normalized = {
+      id: payload?.messageId || payload?.id || `${payload?.at || Date.now()}-${Math.random()}`,
+      messageId: payload?.messageId || payload?.id || "",
+      sessionId: incomingSessionId,
+      text: payload?.text || payload?.body || payload?.message || "",
         messageType: payload?.messageType || "text",
         snapshotUrl,
         senderRole: payload?.senderRole || payload?.senderType || "visitor",
@@ -831,7 +835,7 @@ export default function HomeownerMessagesPage() {
   }
 
   return (
-    <div className="bg-[#f8f9fa] h-screen w-screen flex flex-col overflow-hidden font-sans antialiased text-slate-800">
+    <div className="bg-[#f8f9fa] min-h-[100dvh] w-screen flex flex-col overflow-hidden font-sans antialiased text-slate-800">
       
       {/* Dynamic Native Top Header Row Container */}
       <header className="w-full bg-white/90 backdrop-blur-xl border-b border-slate-100 px-3 sm:px-4 py-3 flex-shrink-0 z-50 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
@@ -840,7 +844,7 @@ export default function HomeownerMessagesPage() {
             <button
               onClick={handleMobileBack}
               className="md:hidden inline-flex items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-slate-700 shadow-sm transition-transform active:scale-95"
-              aria-label={mobileView === "chat" && openedFromNotification ? "Back to notifications" : "Back"}
+              aria-label={mobileView === "chat" && openedFromNotification ? "Back to notifications" : ""}
             >
               <ChevronLeft size={14} />
               <span>{mobileView === "chat" && openedFromNotification ? "Alerts" : "Back"}</span>
@@ -898,10 +902,10 @@ export default function HomeownerMessagesPage() {
       )}
 
       {/* Master Workspace Distribution Interface Panel */}
-      <main className="flex-1 max-w-6xl w-full mx-auto flex overflow-hidden p-0 md:p-4 gap-4">
+      <main className="flex-1 min-h-0 max-w-6xl w-full mx-auto flex overflow-hidden p-0 md:p-4 gap-4">
         
         {/* SIDEBAR VIEWPORT: Interactive Directory Feed Logs */}
-        <section className={`w-full md:w-80 flex flex-col flex-shrink-0 bg-white md:bg-transparent ${mobileView === "chat" ? "hidden md:flex" : "flex"}`}>
+        <section className={`w-full md:w-80 flex flex-col flex-shrink-0 bg-white md:bg-transparent min-w-0 ${mobileView === "chat" ? "hidden md:flex" : "flex"}`}>
           <div className="flex-1 overflow-y-auto p-4 md:p-0 space-y-2.5">
             {filteredThreads.map((thread) => {
               const isActive = selectedId === thread.id;
@@ -909,7 +913,7 @@ export default function HomeownerMessagesPage() {
                 <button
                   key={thread.id}
                   onClick={() => handleSelectThread(thread.id)}
-                  className={`w-full flex items-center gap-3.5 p-3.5 rounded-xl transition-all border text-left ${
+                  className={`w-full flex items-center gap-3.5 p-3.5 rounded-xl transition-all border text-left min-w-0 ${
                     isActive ? "bg-indigo-600 border-indigo-600 text-white shadow-md" : "bg-white border-slate-100 text-slate-600 hover:bg-slate-50"
                   }`}
                 >
@@ -921,7 +925,7 @@ export default function HomeownerMessagesPage() {
                       <p className="text-xs font-extrabold uppercase tracking-tight truncate pr-2">{thread.name || "Visitor"}</p>
                       <span className="text-[9px] font-bold tracking-tighter opacity-70">{formatClockTime(thread.time)}</span>
                     </div>
-                    <p className="text-xs truncate opacity-80 mb-1">{thread.last || "Awaiting entry verification snapshot..."}</p>
+                    <p className="text-xs line-clamp-2 opacity-80 mb-1">{thread.last || "Awaiting entry verification snapshot..."}</p>
                     <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400 truncate">
                       {thread.doorName || thread.gateLabel || thread.door || "Entry Unit Gate"}
                     </p>
@@ -939,7 +943,7 @@ export default function HomeownerMessagesPage() {
         </section>
 
         {/* WORKSPACE VIEWPORT: Active Interactive Feed Stream */}
-        <section className={`flex-1 bg-white md:rounded-2xl border-0 md:border border-slate-100 shadow-xs overflow-hidden flex flex-col h-full ${mobileView === "list" ? "hidden md:flex" : "flex"}`}>
+        <section className={`flex-1 bg-white md:rounded-2xl border-0 md:border border-slate-100 shadow-xs overflow-hidden flex flex-col min-w-0 h-full ${mobileView === "list" ? "hidden md:flex" : "flex"}`}>
           {heroThread ? (
             <>
               {/* Context-Aware Header Frame with Impeccable Image Snapshots Rendering */}
@@ -1025,12 +1029,12 @@ export default function HomeownerMessagesPage() {
               {/* Secure Bottom Transaction Actions Terminal Panel */}
               <div className="p-3 md:p-4 bg-white border-t border-slate-100 flex-shrink-0">
                 {accessAlreadyGranted ? (
-                  <div className="mb-3 flex gap-2">
+                  <div className="mb-3 flex flex-col gap-2 sm:flex-row">
                     <button
                       type="button"
                       onClick={() => handleStartCall("audio")}
                       disabled={Boolean(callBusy)}
-                      className="flex-1 rounded-xl bg-slate-100 hover:bg-indigo-50 py-3 text-xs font-extrabold uppercase text-indigo-600 transition-all disabled:opacity-50"
+                      className="flex-1 rounded-xl bg-slate-100 hover:bg-indigo-50 py-3 text-[11px] font-extrabold uppercase text-indigo-600 transition-all disabled:opacity-50"
                     >
                       Audio Call
                     </button>
@@ -1038,13 +1042,13 @@ export default function HomeownerMessagesPage() {
                       type="button"
                       onClick={() => handleStartCall("video")}
                       disabled={Boolean(callBusy)}
-                      className="flex-1 rounded-xl bg-slate-900 hover:bg-slate-800 py-3 text-xs font-extrabold uppercase text-white transition-all disabled:opacity-50"
+                      className="flex-1 rounded-xl bg-slate-900 hover:bg-slate-800 py-3 text-[11px] font-extrabold uppercase text-white transition-all disabled:opacity-50"
                     >
                       Video Link
                     </button>
                   </div>
                 ) : (
-                  <div className="mb-3 flex gap-2">
+                  <div className="mb-3 flex flex-col gap-2 sm:flex-row">
                     <button type="button" onClick={() => handleQuickReply("Please stand by.")} disabled={sending || decisionBusy} className="flex-1 py-3 bg-slate-100 rounded-xl text-xs font-extrabold uppercase tracking-tight text-slate-600 hover:bg-slate-200 transition-all">Standby</button>
                     <button type="button" onClick={handleRejectAccess} disabled={sending || decisionBusy} className="flex-1 py-3 bg-rose-50 rounded-xl text-xs font-extrabold uppercase tracking-tight text-rose-600 hover:bg-rose-100 transition-all">{decisionAction === "reject" ? "Declining..." : "Deny Access"}</button>
                     <button type="button" onClick={handleGrantAccess} disabled={sending || decisionBusy} className="flex-1 py-3 bg-emerald-600 rounded-xl text-xs font-extrabold uppercase tracking-tight text-white shadow-sm hover:bg-emerald-700 transition-all">{decisionAction === "approve" ? "Opening..." : "Approve Pass"}</button>
@@ -1180,7 +1184,7 @@ function renderThreadMessageBody(message) {
       </div>
     );
   }
-  return renderMessageBody(message?.text);
+  return renderMessageBody(getConversationMessageText(message));
 }
 
 function roleLabel(role) {
@@ -1189,10 +1193,6 @@ function roleLabel(role) {
   if (normalized === "security") return "Security";
   if (normalized === "visitor") return "Visitor";
   return "";
-}
-
-function previewMessageText(text) {
-  return text;
 }
 
 function eventLooksLikeSnapshot(payload) {
@@ -1255,7 +1255,7 @@ function normalizeInboxThread(thread) {
     normalized.visitPurpose ||
     normalized.reason ||
     "";
-  normalized.last = previewMessageText(normalized?.last || "");
+  normalized.last = getConversationPreviewText(normalized);
   normalized.snapshotUrl = snapshotUrl || normalized.snapshotUrl || "";
   normalized.photoUrl = snapshotUrl || normalized.photoUrl || "";
   normalized.snapshotAuditId = snapshotAuditId;
@@ -1303,12 +1303,13 @@ function mergeThreadCollections(old, next) {
 function upsertThreadPreview(msg, setThreads, selectedId, extra = {}) {
   setThreads((prev) => {
     const found = prev.find(t => t.id === msg.sessionId);
+    const previewText = getConversationPreviewText(msg);
     if (found) {
       return prev.map(t => t.id === msg.sessionId ? {
-        ...t, last: msg.text, time: msg.at, unread: t.id === selectedId ? 0 : (t.unread || 0) + 1, ...extra
+        ...t, last: previewText || t.last, time: msg.at, unread: t.id === selectedId ? 0 : (t.unread || 0) + 1, ...extra
       } : t);
     }
-    return [{ id: msg.sessionId, last: msg.text, time: msg.at, unread: 1, ...extra }, ...prev];
+    return [{ id: msg.sessionId, last: previewText, time: msg.at, unread: 1, ...extra }, ...prev];
   });
 }
 

@@ -25,7 +25,11 @@ import {
 } from "../services/homeownerService";
 import { addNativeAppStateListener, addNativeNetworkListener } from "../services/nativeAppService";
 import { getSecuritySessionMessages, sendSecuritySessionMessage } from "../services/securityService";
-import { requestOfficeCall } from "../services/officeService";
+import {
+  getOfficeConversationMessages,
+  requestOfficeCall,
+  sendOfficeConversationMessage
+} from "../services/officeService";
 import { getVisitorSessionToken } from "../services/visitorSessionToken";
 import {
   applyRemoteTrackEvent,
@@ -233,7 +237,7 @@ function normalizeMessage(payload, participantType) {
     messageId: payload?.messageId || payload?.id || "",
     clientId: payload?.clientId || "",
     sessionId: payload?.sessionId || "",
-    text: String(payload?.text || ""),
+    text: String(payload?.text || payload?.body || payload?.message || ""),
     messageType: payload?.messageType || "text",
     snapshotUrl: String(payload?.snapshotUrl || payload?.photoUrl || "").trim(),
     photoUrl: String(payload?.photoUrl || payload?.snapshotUrl || "").trim(),
@@ -755,6 +759,8 @@ export function useSessionRealtime(sessionId) {
       let rows = [];
       if (participantType === "homeowner") {
         rows = await getHomeownerSessionMessages(sessionId);
+      } else if (participantType === "office") {
+        rows = await getOfficeConversationMessages(sessionId);
       } else if (participantType === "security") {
         rows = await getSecuritySessionMessages(sessionId);
       } else {
@@ -777,6 +783,9 @@ export function useSessionRealtime(sessionId) {
   async function persistMessageFallback(messageId, text) {
     if (participantType === "homeowner") {
       return sendHomeownerSessionMessage(sessionId, text);
+    }
+    if (participantType === "office") {
+      return sendOfficeConversationMessage(sessionId, text);
     }
     if (participantType === "security") {
       return sendSecuritySessionMessage(sessionId, text);

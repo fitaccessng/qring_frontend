@@ -8,6 +8,19 @@ export async function requestOfficeCall(payload) {
   return response?.data ?? null;
 }
 
+export async function getOfficeConversationMessages(sessionId) {
+  const response = await apiRequest(`/office/conversations/${encodeURIComponent(sessionId)}/messages`);
+  return Array.isArray(response?.data) ? response.data : [];
+}
+
+export async function sendOfficeConversationMessage(sessionId, text) {
+  const response = await apiRequest(`/office/conversations/${encodeURIComponent(sessionId)}/messages`, {
+    method: "POST",
+    body: JSON.stringify({ text })
+  });
+  return response?.data ?? null;
+}
+
 export async function acceptOfficeCall(callSessionId) {
   const response = await apiRequest(`/office/calls/${encodeURIComponent(callSessionId)}/accept`, {
     method: "POST"

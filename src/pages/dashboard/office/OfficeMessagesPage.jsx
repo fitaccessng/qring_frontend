@@ -15,6 +15,10 @@ import OfficeActiveVideoCall from "../../../components/office/OfficeActiveVideoC
 import { OfficeEmptyState, OfficeErrorBanner, OfficeLoadingState } from "../../../components/office/OfficeStates";
 import { officeTabs } from "./officeNav";
 import { useSessionRealtime } from "../../../hooks/useSessionRealtime";
+import {
+  getConversationMessageText,
+  getConversationPreviewText
+} from "../../../utils/messageDisplay";
 
 const CONVERSATION_KEY = ["office", "conversations"];
 
@@ -43,6 +47,7 @@ export default function OfficeMessagesPage() {
   const canCall = Boolean(selectedId && realtime.canStartCall);
   const isVideoCall = realtime.acceptedCallMode === "video" || Boolean(realtime.remoteVideoActive);
   const isActiveCall = ["ringing", "connecting", "reconnecting", "connected"].includes(String(realtime.callState || "").toLowerCase());
+  const conversationPreview = getConversationPreviewText(selectedConversation);
 
   if (isLoading) {
     return (
@@ -54,7 +59,7 @@ export default function OfficeMessagesPage() {
 
   return (
     <AppShell title="Office Messages" showMobileNav>
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 pb-10">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 pb-10 sm:px-6 lg:px-8">
         {isError ? <OfficeErrorBanner message={error?.message || "Unable to load office conversations."} onRetry={() => refetch()} /> : null}
 
         <OfficePageHeader
@@ -72,7 +77,7 @@ export default function OfficeMessagesPage() {
           ]}
         />
 
-        <section className="grid gap-6 xl:grid-cols-[0.95fr_1.3fr]">
+        <section className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.3fr)]">
           <OfficePanel title="Conversations" subtitle="Recent office threads">
             <div className="grid gap-3">
               {conversations.length > 0 ? conversations.map((thread) => {
@@ -94,7 +99,7 @@ export default function OfficeMessagesPage() {
             </div>
           </OfficePanel>
 
-          <div className="space-y-4">
+          <div className="min-w-0 space-y-4">
             {isActiveCall ? (
               isVideoCall ? (
                 <OfficeActiveVideoCall
@@ -151,6 +156,10 @@ export default function OfficeMessagesPage() {
                   <ContextField label="Purpose" value={selectedConversation.purpose || "Office visit"} />
                   <ContextField label="Status" value={selectedConversation.status || "pending"} />
                   <ContextField label="Unread" value={String(selectedConversation.unread ?? 0)} />
+                  <ContextField
+                    label="Latest message"
+                    value={conversationPreview || getConversationMessageText(selectedConversation) || "No message text yet."}
+                  />
                 </div>
               </OfficePanel>
             ) : null}
