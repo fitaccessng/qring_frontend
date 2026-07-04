@@ -2,8 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useSearchParams, useNavigate } from "react-router-dom";
 import {
   Bell, ChevronLeft, Search, SendHorizontal, MessageSquare,
-  Video, Phone, ShieldCheck, ShieldAlert, CheckCircle2, XCircle,
-  MoreVertical, Clock, User, PhoneCall, ArrowLeft, Loader2
+  Phone, Video, Check, X, Clock, User, DoorOpen, Image,
+  MoreVertical, ArrowLeft, Shield, Sparkles
 } from "lucide-react";
 import SecureSnapshotImage from "../../components/SecureSnapshotImage";
 import VisitorIncomingCallModal from "../../components/VisitorIncomingCallModal";
@@ -28,89 +28,6 @@ import {
 } from "../../utils/messageDisplay";
 import { useAuth } from "../../state/AuthContext";
 import { useNotifications } from "../../state/NotificationsContext";
-
-// --- Helper Functions to support internal component execution ---
-function normalizeInboxThread(thread) {
-  return {
-    id: String(thread?.id || thread?.sessionId || "").trim(),
-    name: String(thread?.visitorName || thread?.name || "Visitor").trim(),
-    last: String(thread?.lastMessage?.text || thread?.last || "").trim(),
-    time: String(thread?.updatedAt || thread?.time || new Date().toISOString()),
-    unread: Number(thread?.unreadCount || thread?.unread || 0),
-    sessionStatus: String(thread?.status || thread?.sessionStatus || "pending").trim(),
-    snapshotUrl: String(thread?.snapshotUrl || "").trim(),
-    photoUrl: String(thread?.photoUrl || "").trim(),
-    purpose: String(thread?.purpose || "").trim(),
-    visitorPhone: String(thread?.visitorPhone || "").trim(),
-    ...thread
-  };
-}
-function sortThreadsForInbox(list) {
-  return [...list].sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
-}
-function mergeThreadCollections(prev, next) {
-  const map = new Map(prev.map(t => [t.id, t]));
-  next.forEach(t => map.set(t.id, { ...map.get(t.id), ...t }));
-  return Array.from(map.values());
-}
-function getThreadSnapshotSrc(t) { return t?.snapshotUrl || t?.photoUrl || ""; }
-function eventLooksLikeSnapshot(p) { return Boolean(p?.snapshotUrl || p?.photoUrl || p?.snapshotAuditId); }
-function extractSnapshotUrl(p) { return p?.snapshotUrl || p?.photoUrl || p?.data?.snapshotUrl || p?.data?.photoUrl || ""; }
-function mergeMessageCollections(prev, next) {
-  const map = new Map(prev.map(m => [m.id, m]));
-  next.forEach(m => map.set(m.id, { ...map.get(m.id), ...m }));
-  return Array.from(map.values()).sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
-}
-function upsertThreadPreview(msg, setThreads, selectedId, extra = {}) {
-  setThreads(prev => prev.map(t => t.id === msg.sessionId ? {
-    ...t,
-    last: msg.text || "Sent an attachment",
-    time: msg.at,
-    unread: t.id === selectedId ? 0 : t.unread + 1,
-    ...extra
-  } : t));
-}
-function getSnapshotUrlFromAuditId(id) { return id ? `/api/snapshots/${id}/view` : ""; }
-function buildSnapshotMessage(p, sId) {
-  if (!p?.snapshotUrl && !p?.snapshotAuditId) return null;
-  return {
-    id: p?.id || `snap-${Date.now()}`,
-    sessionId: sId,
-    text: p?.purpose ? `Visitor purpose: ${p.purpose}` : "Visitor Snapshot Captured",
-    messageType: "visitor_snapshot",
-    snapshotUrl: p.snapshotUrl || getSnapshotUrlFromAuditId(p.snapshotAuditId),
-    senderType: "visitor",
-    at: p?.at || new Date().toISOString()
-  };
-}
-function ensureSnapshotConversationRows(rows, sId, thread) {
-  const arr = rows.map(r => ({
-    id: r.id || r.messageId || `${Date.now()}-${Math.random()}`,
-    sessionId: sId,
-    text: r.text || r.body || "",
-    messageType: r.messageType || "text",
-    snapshotUrl: r.snapshotUrl || r.photoUrl || "",
-    senderType: r.senderRole || r.senderType || "visitor",
-    at: r.at || new Date().toISOString(),
-    ...r
-  }));
-  if (thread?.snapshotUrl && !arr.some(r => r.messageType === "visitor_snapshot")) {
-    arr.unshift({
-      id: `initial-snap-${sId}`,
-      sessionId: sId,
-      text: thread.purpose ? `Purpose: ${thread.purpose}` : "Initial visitor image captured",
-      messageType: "visitor_snapshot",
-      snapshotUrl: thread.snapshotUrl,
-      senderType: "visitor",
-      at: thread.time
-    });
-  }
-  return arr;
-}
-function getConversationSnapshotUrl(arr) { return arr.find(r => r.snapshotUrl)?.snapshotUrl || ""; }
-function getConversationSnapshotAuditId(arr) { return arr.find(r => r.snapshotAuditId)?.snapshotAuditId || ""; }
-function safeParsePayload(str) { try { return JSON.parse(str); } catch { return {}; } }
-function roleLabel(r) { return r === "homeowner" ? "Homeowner" : r === "visitor" ? "Visitor" : r; }
 
 export default function HomeownerMessagesPage() {
   const navigate = useNavigate();
@@ -140,7 +57,7 @@ export default function HomeownerMessagesPage() {
   const [incomingCallBusy, setIncomingCallBusy] = useState(false);
   const [snapshotUrls, setSnapshotUrls] = useState({});
   const [typingByThread, setTypingByThread] = useState({});
-  const [mobileView, setMobileView] = useState("list"); // "list" | "chat"
+  const [mobileView, setMobileView] = useState("list");
   const [incomingCall, setIncomingCall] = useState({
     pending: false,
     hasVideo: false,
@@ -148,6 +65,7 @@ export default function HomeownerMessagesPage() {
     visitorId: "",
     sessionId: ""
   });
+  const [isTyping, setIsTyping] = useState(false);
 
   const messagesRef = useRef(null);
   const selectedIdRef = useRef("");
@@ -246,6 +164,7 @@ export default function HomeownerMessagesPage() {
       try {
         const data = await refreshThreads({ focusSessionId: preferredSessionId });
         if (!active) return;
+        const preferredExists = preferredSessionId && data.some((item) => item.id === preferredSessionId);
         const targetId = preferredSessionId || data[0]?.id || "";
         if (targetId) {
           setSelectedId(targetId);
@@ -269,9 +188,10 @@ export default function HomeownerMessagesPage() {
       try {
         await refreshThreads();
       } catch {
-        // Poll background data silently
+        // Keep polling background data silently
       }
     }, 10000);
+
     return () => window.clearInterval(intervalId);
   }, []);
 
@@ -304,11 +224,11 @@ export default function HomeownerMessagesPage() {
       const incomingSessionId = payload?.sessionId;
       if (!incomingSessionId) return;
       const snapshotUrl = extractSnapshotUrl(payload);
-      const normalized = {
-        id: payload?.messageId || payload?.id || `${payload?.at || Date.now()}-${Math.random()}`,
-        messageId: payload?.messageId || payload?.id || "",
-        sessionId: incomingSessionId,
-        text: payload?.text || payload?.body || payload?.message || "",
+    const normalized = {
+      id: payload?.messageId || payload?.id || `${payload?.at || Date.now()}-${Math.random()}`,
+      messageId: payload?.messageId || payload?.id || "",
+      sessionId: incomingSessionId,
+      text: payload?.text || payload?.body || payload?.message || "",
         messageType: payload?.messageType || "text",
         snapshotUrl,
         senderRole: payload?.senderRole || payload?.senderType || "visitor",
@@ -356,7 +276,16 @@ export default function HomeownerMessagesPage() {
       const incomingSessionId = String(payload?.sessionId || "").trim();
       if (!incomingSessionId) return;
       const snapshotAuditId = String(
-        payload?.snapshotAuditId || payload?.snapshot_audit_id || payload?.id || ""
+        payload?.snapshotAuditId ||
+        payload?.snapshot_audit_id ||
+        payload?.id ||
+        payload?.data?.snapshotAuditId ||
+        payload?.data?.snapshot_audit_id ||
+        payload?.data?.snapshot?.id ||
+        payload?.data?.payload?.snapshotAuditId ||
+        payload?.data?.payload?.snapshot_audit_id ||
+        payload?.data?.payload?.snapshot?.id ||
+        ""
       ).trim();
       const snapshotUrl = extractSnapshotUrl(payload) || getSnapshotUrlFromAuditId(snapshotAuditId);
       const snapshotMessage = buildSnapshotMessage({ ...payload, snapshotUrl, snapshotAuditId }, incomingSessionId);
@@ -378,7 +307,10 @@ export default function HomeownerMessagesPage() {
       if (snapshotMessage) {
         setMessagesByThread((prev) => {
           const current = prev[incomingSessionId] ?? [];
-          return { ...prev, [incomingSessionId]: mergeMessageCollections(current, [snapshotMessage]) };
+          return {
+            ...prev,
+            [incomingSessionId]: mergeMessageCollections(current, [snapshotMessage])
+          };
         });
       }
     };
@@ -418,7 +350,11 @@ export default function HomeownerMessagesPage() {
       setThreads((prev) =>
         prev.map((thread) =>
           thread.id === incomingSessionId
-            ? { ...thread, last: payload?.message || thread.last, time: payload?.at || new Date().toISOString() }
+            ? {
+                ...thread,
+                last: payload?.message || thread.last,
+                time: payload?.at || new Date().toISOString()
+              }
             : thread
         )
       );
@@ -438,28 +374,28 @@ export default function HomeownerMessagesPage() {
         callSessionId,
         visitorId: String(payload?.visitorId || incomingSessionId),
         sessionId: incomingSessionId,
-        callerName: String(payload?.callerName || roleLabel(payload?.callerRole) || payload?.visitorName || "Caller"),
+        callerName: String(payload?.callerName || roleLabel(payload?.callerRole) || payload?.homeownerName || payload?.visitorName || "Caller"),
         callerOrigin: String(payload?.callerOrigin || "").trim(),
         callerRole: String(payload?.callerRole || "").trim()
       });
       setIncomingCallBusy(false);
     };
-
     const handleCallTerminal = (payload) => {
       const nextPayload = payload?.data ?? payload ?? {};
       const nextCallId = String(nextPayload?.callSessionId || nextPayload?.eventId || "").trim();
       const nextSessionId = String(nextPayload?.sessionId || "").trim();
       const activeIncoming = incomingCallRef.current;
-      const currentCallId = String(activeIncoming?.callSessionId || "").trim();
+      const currentCallId = String(activeIncoming?.callSessionId || activeIncoming?.eventId || "").trim();
       const currentSessionId = String(activeIncoming?.sessionId || "").trim();
-      if (
+      const matchesIncoming =
         Boolean(activeIncoming?.pending) &&
-        ((currentCallId && nextCallId && currentCallId === nextCallId) ||
-         (currentSessionId && nextSessionId && currentSessionId === nextSessionId))
-      ) {
-        setIncomingCall({ pending: false, hasVideo: false, callSessionId: "", visitorId: "", sessionId: "" });
-        setIncomingCallBusy(false);
-      }
+        (
+          (currentCallId && nextCallId && currentCallId === nextCallId) ||
+          (currentSessionId && nextSessionId && currentSessionId === nextSessionId)
+        );
+      if (!matchesIncoming) return;
+      setIncomingCall({ pending: false, hasVideo: false, callSessionId: "", visitorId: "", sessionId: "" });
+      setIncomingCallBusy(false);
     };
 
     socket.on("connect", joinKnownSessions);
@@ -498,7 +434,18 @@ export default function HomeownerMessagesPage() {
     if (eventName === "visitor.snapshot") {
       const data = lastRealtimeEvent?.payload || {};
       const visitorSessionId = String(data?.visitorSessionId || data?.sessionId || "").trim();
-      const snapshotAuditId = String(data?.snapshotAuditId || data?.id || "").trim();
+      const snapshotAuditId = String(
+        data?.snapshotAuditId ||
+        data?.snapshot_audit_id ||
+        data?.id ||
+        data?.data?.snapshotAuditId ||
+        data?.data?.snapshot_audit_id ||
+        data?.data?.snapshot?.id ||
+        data?.data?.payload?.snapshotAuditId ||
+        data?.data?.payload?.snapshot_audit_id ||
+        data?.data?.payload?.snapshot?.id ||
+        ""
+      ).trim();
       const nextUrl = extractSnapshotUrl(data) || getSnapshotUrlFromAuditId(snapshotAuditId);
       if (visitorSessionId && (nextUrl || snapshotAuditId)) {
         setThreads((prev) =>
@@ -508,11 +455,23 @@ export default function HomeownerMessagesPage() {
               : thread
           )
         );
-        const snapshotMessage = buildSnapshotMessage({ ...data, sessionId: visitorSessionId, photoUrl: nextUrl, snapshotUrl: nextUrl, snapshotAuditId }, visitorSessionId);
+        const snapshotMessage = buildSnapshotMessage(
+          {
+            ...data,
+            sessionId: visitorSessionId,
+            photoUrl: nextUrl,
+            snapshotUrl: nextUrl,
+            snapshotAuditId
+          },
+          visitorSessionId
+        );
         if (snapshotMessage) {
           setMessagesByThread((prev) => {
             const current = prev[visitorSessionId] ?? [];
-            return { ...prev, [visitorSessionId]: mergeMessageCollections(current, [snapshotMessage]) };
+            return {
+              ...prev,
+              [visitorSessionId]: mergeMessageCollections(current, [snapshotMessage])
+            };
           });
         }
       }
@@ -529,93 +488,124 @@ export default function HomeownerMessagesPage() {
 
     if (eventName === "notifications.updated" || eventName === "incoming-call") {
       const payload = lastRealtimeEvent?.payload || {};
-      const parsedPayload = typeof payload?.payload === "string" ? safeParsePayload(payload.payload) : payload?.data || payload || {};
-      const focusSessionId = String(parsedPayload?.sessionId || payload?.sessionId || "").trim();
+      const parsedPayload =
+        typeof payload?.payload === "string" ? safeParsePayload(payload.payload) : payload?.data || payload || {};
+      const focusSessionId = String(parsedPayload?.sessionId || payload?.sessionId || payload?.visitorSessionId || "").trim();
       void refreshThreads({ focusSessionId }).catch(() => {});
     }
   }, [lastRealtimeEvent]);
 
   useEffect(() => {
     if (!managedIncomingCall?.sessionId || !managedIncomingCall?.callSessionId) return;
-    setIncomingCall({
-      pending: true,
-      hasVideo: Boolean(managedIncomingCall?.hasVideo),
-      callSessionId: String(managedIncomingCall?.callSessionId || ""),
-      visitorId: String(managedIncomingCall?.visitorId || managedIncomingCall?.sessionId || ""),
-      sessionId: String(managedIncomingCall?.sessionId || ""),
-      callerName: String(managedIncomingCall?.callerName || roleLabel(managedIncomingCall?.callerRole) || "Caller"),
-      callerOrigin: String(managedIncomingCall?.callerOrigin || "").trim(),
-      callerRole: String(managedIncomingCall?.callerRole || "").trim()
-    });
+      setIncomingCall({
+        pending: true,
+        hasVideo: Boolean(managedIncomingCall?.hasVideo),
+        callSessionId: String(managedIncomingCall?.callSessionId || ""),
+        visitorId: String(managedIncomingCall?.visitorId || managedIncomingCall?.sessionId || ""),
+        sessionId: String(managedIncomingCall?.sessionId || ""),
+        callerName: String(managedIncomingCall?.callerName || roleLabel(managedIncomingCall?.callerRole) || managedIncomingCall?.homeownerName || managedIncomingCall?.visitorName || "Caller"),
+        callerOrigin: String(managedIncomingCall?.callerOrigin || "").trim(),
+        callerRole: String(managedIncomingCall?.callerRole || "").trim()
+      });
   }, [managedIncomingCall]);
 
   const selectedThreadSnapshot = useMemo(() => threads.find((thread) => thread.id === selectedId) || null, [threads, selectedId]);
   const selectedThreadSnapshotKey = useMemo(
-    () => [selectedThreadSnapshot?.snapshotUrl || "", selectedThreadSnapshot?.photoUrl || "", selectedThreadSnapshot?.snapshotAuditId || ""].join("|"),
+    () => [
+      selectedThreadSnapshot?.snapshotUrl || "",
+      selectedThreadSnapshot?.photoUrl || "",
+      selectedThreadSnapshot?.snapshotAuditId || ""
+    ].join("|"),
     [selectedThreadSnapshot?.snapshotUrl, selectedThreadSnapshot?.photoUrl, selectedThreadSnapshot?.snapshotAuditId]
   );
+
+  useEffect(() => {
+    const socket = socketRef.current;
+    if (!socket) return;
+    const joinSession = (sessionId) => {
+      const normalizedId = String(sessionId || "").trim();
+      if (!normalizedId || joinedSessionIdsRef.current.has(normalizedId)) return;
+      socket.emit(RealtimeEvent.SESSION_JOIN, {
+        sessionId: normalizedId,
+        displayName: user?.fullName || "Homeowner"
+      });
+      joinedSessionIdsRef.current.add(normalizedId);
+    };
+
+    threads.forEach((thread) => joinSession(thread.id));
+    if (selectedId) joinSession(selectedId);
+  }, [selectedId, threads, user?.fullName]);
 
   useEffect(() => {
     if (!selectedId) return;
     let active = true;
     async function loadConv() {
-      setConversationLoading(true);
-      try {
-        const rows = await getHomeownerSessionMessages(selectedId);
-        if (!active) return;
-        const threadSnapshot = threadsRef.current.find((thread) => thread.id === selectedId);
-        const mergedRows = ensureSnapshotConversationRows(rows, selectedId, threadSnapshot);
-        const conversationSnapshotUrl = getConversationSnapshotUrl(mergedRows);
-        if (conversationSnapshotUrl) {
-          setThreads((prev) =>
-            prev.map((thread) =>
-              thread.id === selectedId
-                ? {
-                    ...thread,
-                    photoUrl: conversationSnapshotUrl,
-                    snapshotUrl: conversationSnapshotUrl,
-                    snapshotAuditId: thread.snapshotAuditId || getConversationSnapshotAuditId(mergedRows)
-                  }
-                : thread
-            )
-          );
+        setConversationLoading(true);
+        try {
+            const rows = await getHomeownerSessionMessages(selectedId);
+            if (!active) return;
+            const threadSnapshot = threadsRef.current.find((thread) => thread.id === selectedId);
+            const mergedRows = ensureSnapshotConversationRows(rows, selectedId, threadSnapshot);
+            const conversationSnapshotUrl = getConversationSnapshotUrl(mergedRows);
+            if (conversationSnapshotUrl) {
+              setThreads((prev) =>
+                prev.map((thread) =>
+                  thread.id === selectedId
+                    ? {
+                        ...thread,
+                        photoUrl: conversationSnapshotUrl,
+                        snapshotUrl: conversationSnapshotUrl,
+                        snapshotAuditId: thread.snapshotAuditId || getConversationSnapshotAuditId(mergedRows)
+                      }
+                    : thread
+                )
+              );
+            }
+            setMessagesByThread(prev => ({ ...prev, [selectedId]: mergeMessageCollections(prev[selectedId] || [], mergedRows) }));
+            setThreads(prev => prev.map(t => t.id === selectedId ? { ...t, unread: 0 } : t));
+        } catch (err) {
+          if (!active) return;
+          setError(err.message);
+        } finally {
+          if (active) setConversationLoading(false);
         }
-        setMessagesByThread(prev => ({ ...prev, [selectedId]: mergeMessageCollections(prev[selectedId] || [], mergedRows) }));
-        setThreads(prev => prev.map(t => t.id === selectedId ? { ...t, unread: 0 } : t));
-      } catch (err) {
-        if (!active) return;
-        setError(err.message);
-      } finally {
-        if (active) setConversationLoading(false);
-      }
     }
     loadConv();
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [selectedId, selectedThreadSnapshotKey]);
 
   const filteredThreads = useMemo(() => {
     const term = query.trim().toLowerCase();
     const sorted = sortThreadsForInbox(threads);
     if (!term) return sorted;
-    return sorted.filter((t) => [t.name, t.last].join(" ").toLowerCase().includes(term));
+    return sorted.filter((t) => [t.name, t.last, t.doorName, t.purpose].join(" ").toLowerCase().includes(term));
   }, [threads, query]);
 
   const heroThread = useMemo(() => {
-    if (selectedId) return threads.find((t) => t.id === selectedId) || null;
+    if (selectedId) {
+      return threads.find((t) => t.id === selectedId) || null;
+    }
     return filteredThreads[0] || null;
   }, [threads, selectedId, filteredThreads]);
-
   const selectedMessages = useMemo(() => messagesByThread[selectedId] || [], [messagesByThread, selectedId]);
-  
   const heroSnapshotUrl = useMemo(() => {
     if (!heroThread) return "";
-    return String(snapshotUrls[heroThread.id] || heroThread.snapshotUrl || heroThread.photoUrl || getConversationSnapshotUrl(selectedMessages) || "").trim();
+    return String(
+      snapshotUrls[heroThread.id] ||
+      heroThread.snapshotUrl ||
+      heroThread.photoUrl ||
+      getConversationSnapshotUrl(selectedMessages) ||
+      ""
+    ).trim();
   }, [heroThread, snapshotUrls, selectedMessages]);
-  
   const heroThreadState = String(heroThread?.sessionStatus || "").trim().toLowerCase();
   
   const accessAlreadyGranted = useMemo(() => {
-    if (["approved", "accepted", "gate_confirmed", "completed", "closed"].includes(heroThreadState)) return true;
+    if (["approved", "accepted", "gate_confirmed", "completed", "closed"].includes(heroThreadState)) {
+      return true;
+    }
     return selectedMessages.some((msg) => String(msg?.text || "").trim().toLowerCase() === "access granted.");
   }, [heroThreadState, selectedMessages]);
 
@@ -650,6 +640,13 @@ export default function HomeownerMessagesPage() {
         upsertThreadPreview(saved, setThreads, selectedId);
       }
       setDraft("");
+      setIsTyping(false);
+      socketRef.current?.emit("chat.typing", {
+        sessionId: selectedId,
+        senderType: "homeowner",
+        displayName: user?.fullName || "Homeowner",
+        isTyping: false
+      });
     } catch (err) { setError(err.message); }
     finally { setSending(false); }
   }
@@ -699,8 +696,17 @@ export default function HomeownerMessagesPage() {
     if (!selectedId || callBusy) return;
     const mode = type === "video" ? "video" : "audio";
     const selectedThread = threadsRef.current.find((thread) => String(thread?.id || "").trim() === selectedId) || null;
-    const visitorRequestId = String(selectedThread?.visitorRequestId || selectedThread?.requestId || "").trim();
-    const communicationTarget = String(selectedThread?.preferredCommunicationTarget || selectedThread?.communicationTarget || "").trim();
+    const visitorRequestId = String(
+      selectedThread?.visitorRequestId ||
+      selectedThread?.requestId ||
+      selectedThread?.request_id ||
+      ""
+    ).trim();
+    const communicationTarget = String(
+      selectedThread?.preferredCommunicationTarget ||
+      selectedThread?.communicationTarget ||
+      ""
+    ).trim();
     setCallBusy(`${selectedId}:${mode}`);
     try {
       const response = await requestHomeownerCall({
@@ -729,355 +735,841 @@ export default function HomeownerMessagesPage() {
       callSessionId: incomingCall.callSessionId,
       visitorId: incomingCall.visitorId
     };
+    grantSessionCallAccess(incomingCall.sessionId, "incoming");
     window.sessionStorage.setItem("qring_call_accept_intent", JSON.stringify(acceptIntent));
-    grantSessionCallAccess(incomingCall.sessionId, incomingCall.callSessionId)
-      .then(() => {
-        setIncomingCall({ pending: false, hasVideo: false, callSessionId: "", visitorId: "", sessionId: "" });
-        navigate(`/session/${incomingCall.sessionId}/${mode}`);
-      })
-      .catch((err) => {
-        setError(err?.message || "Failed to accept incoming call");
-        setIncomingCallBusy(false);
+    setSelectedId(incomingCall.sessionId);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("sessionId", incomingCall.sessionId);
+      return next;
+    });
+    setIncomingCall({ pending: false, hasVideo: false, callSessionId: "", visitorId: "", sessionId: "" });
+    dismissIncomingCall(acceptIntent);
+    navigate(`/session/${incomingCall.sessionId}/${mode}`);
+  }
+
+  async function handleRejectIncomingCall() {
+    if (!incomingCall.sessionId || !incomingCall.callSessionId || incomingCallBusy) return;
+    setIncomingCallBusy(true);
+    const rejectPayload = {
+      sessionId: incomingCall.sessionId,
+      callSessionId: incomingCall.callSessionId,
+      hasVideo: incomingCall.hasVideo,
+      visitorId: incomingCall.visitorId
+    };
+    try {
+      socketRef.current?.emit(RealtimeEvent.CALL_REJECTED, {
+        sessionId: incomingCall.sessionId,
+        callSessionId: incomingCall.callSessionId,
+        hasVideo: incomingCall.hasVideo,
+        idempotencyKey: incomingCall.callSessionId
       });
+      await apiRequest("/calls/end", {
+        method: "POST",
+        body: JSON.stringify({
+          callSessionId: incomingCall.callSessionId,
+          participantType: "homeowner"
+        })
+      });
+    } catch (err) {
+      setError(err?.message || "Unable to reject call");
+    } finally {
+      dismissIncomingCall(rejectPayload);
+      setIncomingCall({ pending: false, hasVideo: false, callSessionId: "", visitorId: "", sessionId: "" });
+      setIncomingCallBusy(false);
+    }
   }
 
   return (
-    <div className="flex h-screen w-full bg-slate-950 font-sans text-slate-100 overflow-hidden">
+    <div className="bg-slate-50 min-h-[100dvh] w-screen flex flex-col overflow-hidden font-sans antialiased text-slate-800">
       
-      {/* LEFT SIDEBAR: Threads List */}
-      <aside className={`w-full md:w-80 lg:w-96 border-r border-slate-800 flex flex-col bg-slate-900/40 backdrop-blur-md transition-all duration-300 ${mobileView === "chat" ? "hidden md:flex" : "flex"}`}>
-        
-        {/* Sidebar Header */}
-        <div className="p-4 border-b border-slate-800 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button onClick={handleMobileBack} className="p-2 hover:bg-slate-800 rounded-lg transition text-slate-400 hover:text-white">
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-            <h1 className="text-xl font-bold tracking-tight bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">
-              Gate Activity
-            </h1>
-          </div>
-          {globalUnreadCount > 0 && (
-            <span className="bg-rose-500 text-white text-xs px-2 py-1 rounded-full font-bold animate-pulse">
-              {globalUnreadCount} new
-            </span>
-          )}
-        </div>
-
-        {/* Search Control */}
-        <div className="p-3 border-b border-slate-800/60">
-          <div className="relative">
-            <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
-            <input
-              type="text"
-              placeholder="Search visitors..."
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="w-full bg-slate-950/80 border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition"
-            />
-          </div>
-        </div>
-
-        {/* Threads List Wrapper */}
-        <div className="flex-1 overflow-y-auto divide-y divide-slate-800/40 custom-scrollbar">
-          {loading ? (
-            <div className="flex flex-col items-center justify-center h-48 gap-3 text-slate-500">
-              <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
-              <p className="text-sm">Loading activity logs...</p>
-            </div>
-          ) : filteredThreads.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-48 text-slate-500 p-4 text-center">
-              <MessageSquare className="w-8 h-8 mb-2 text-slate-600" />
-              <p className="text-sm">No visitor interactions found.</p>
-            </div>
-          ) : (
-            filteredThreads.map((thread) => {
-              const isSelected = thread.id === selectedId;
-              const hasSnapshot = Boolean(thread.snapshotUrl || thread.photoUrl);
-              const isTyping = typingByThread[thread.id]?.isTyping;
-
-              return (
-                <button
-                  key={thread.id}
-                  onClick={() => handleSelectThread(thread.id)}
-                  className={`w-full text-left p-4 flex gap-3 items-start hover:bg-slate-800/40 transition relative ${isSelected ? "bg-slate-800/60 border-l-4 border-emerald-500" : ""}`}
-                >
-                  <div className="relative flex-shrink-0 w-12 h-12 bg-slate-800 rounded-xl overflow-hidden border border-slate-700">
-                    {hasSnapshot ? (
-                      <SecureSnapshotImage
-                        snapshotUrl={thread.snapshotUrl || thread.photoUrl}
-                        auditId={thread.snapshotAuditId}
-                        className="w-full h-full object-cover"
-                        alt=""
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-slate-400">
-                        <User className="w-5 h-5" />
-                      </div>
-                    )}
-                    {thread.unread > 0 && (
-                      <div className="absolute top-0 right-0 w-3 h-3 bg-rose-500 border-2 border-slate-900 rounded-full" />
-                    )}
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-0.5">
-                      <p className="text-sm font-semibold text-slate-200 truncate">{thread.name}</p>
-                      <span className="text-xs text-slate-500 whitespace-nowrap">
-                        {new Date(thread.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </div>
-                    {thread.purpose && (
-                      <span className="inline-block text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded mb-1 border border-slate-700/50">
-                        {thread.purpose}
-                      </span>
-                    )}
-                    <p className={`text-xs truncate ${isTyping ? "text-emerald-400 font-medium" : isSelected ? "text-slate-300" : "text-slate-400"}`}>
-                      {isTyping ? "Typing..." : thread.last || "No messages yet"}
-                    </p>
-                  </div>
-                </button>
-              );
-            })
-          )}
-        </div>
-      </aside>
-
-      {/* RIGHT CHAT WINDOW CONTAINER */}
-      <main className={`flex-1 flex flex-col bg-slate-950 relative ${mobileView === "list" ? "hidden md:flex" : "flex"}`}>
-        {heroThread ? (
-          <>
-            {/* Chat Top Header Workspace */}
-            <header className="p-4 border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-md flex items-center justify-between z-10">
-              <div className="flex items-center gap-3 min-w-0">
-                <button onClick={handleMobileBack} className="p-2 hover:bg-slate-800 rounded-xl transition md:hidden text-slate-400">
-                  <ArrowLeft className="w-5 h-5" />
-                </button>
-                
-                <div className="relative w-10 h-10 bg-slate-800 border border-slate-700 rounded-xl overflow-hidden flex-shrink-0">
-                  {heroSnapshotUrl ? (
-                    <SecureSnapshotImage
-                      snapshotUrl={heroSnapshotUrl}
-                      auditId={heroThread.snapshotAuditId}
-                      className="w-full h-full object-cover"
-                      alt=""
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-slate-400">
-                      <User className="w-4 h-4" />
-                    </div>
-                  )}
-                </div>
-
-                <div className="min-w-0">
-                  <h2 className="text-sm font-bold text-slate-100 truncate">{heroThread.name}</h2>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className={`inline-flex items-center w-2 h-2 rounded-full ${
-                      heroThreadState === "approved" ? "bg-emerald-500" : heroThreadState === "rejected" ? "bg-rose-500" : "bg-amber-500 animate-pulse"
-                    }`} />
-                    <p className="text-xs text-slate-400 capitalize truncate">
-                      {heroThreadState === "approved" ? "Access Approved" : heroThreadState === "rejected" ? "Access Declined" : "Awaiting Decision"}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Call Controls & Action Row */}
-              <div className="flex items-center gap-1.5">
-                <button
-                  disabled={Boolean(callBusy)}
-                  onClick={() => handleStartCall("audio")}
-                  className="p-2.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-40 border border-slate-800 rounded-xl text-slate-300 transition"
-                  title="Voice Call"
-                >
-                  <Phone className="w-4 h-4" />
-                </button>
-                <button
-                  disabled={Boolean(callBusy)}
-                  onClick={() => handleStartCall("video")}
-                  className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 disabled:opacity-40 rounded-xl transition"
-                  title="Video Call"
-                >
-                  <Video className="w-4 h-4" />
-                </button>
-              </div>
-            </header>
-
-            {/* ERROR TOAST BAR */}
-            {error && (
-              <div className="bg-rose-900/40 border-b border-rose-800/50 text-rose-200 px-4 py-2.5 text-xs flex justify-between items-center backdrop-blur-sm animate-fade-in">
-                <span>{error}</span>
-                <button onClick={() => setError("")} className="text-rose-400 hover:text-white underline font-medium">Dismiss</button>
-              </div>
-            )}
-
-            {/* MAIN MESSAGES DISPLAY PORTAL */}
-            <div
-              ref={messagesRef}
-              className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar bg-gradient-to-b from-slate-950 to-slate-900/50"
+      {/* Header */}
+      <header className="w-full bg-white/95 backdrop-blur-xl border-b border-slate-200/60 px-4 sm:px-6 py-4 flex-shrink-0 z-50 shadow-sm">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <button
+              onClick={handleMobileBack}
+              className="md:hidden inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50 transition-all active:scale-95"
             >
-              {conversationLoading ? (
-                <div className="flex items-center justify-center h-full text-slate-500 gap-2">
-                  <Loader2 className="w-5 h-5 animate-spin text-emerald-500" />
-                  <span className="text-xs font-medium">Syncing timeline records...</span>
-                </div>
-              ) : selectedMessages.length === 0 ? (
-                <div className="flex items-center justify-center h-full text-slate-500 text-xs">
-                  Timeline initialized. Send a message to get started.
-                </div>
-              ) : (
-                selectedMessages.map((msg) => {
-                  const isMe = msg.senderType === "homeowner";
-                  const isSnapshotType = msg.messageType === "visitor_snapshot";
+              <ChevronLeft size={16} />
+              <span>{mobileView === "chat" && openedFromNotification ? "Alerts" : "Back"}</span>
+            </button>
+            <button
+              onClick={() => navigate("/dashboard")}
+              className="hidden md:inline-flex p-2.5 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-colors"
+            >
+              <ChevronLeft size={18} />
+            </button>
 
-                  if (isSnapshotType) {
+            <div className="min-w-0">
+              <h1 className="font-bold text-lg md:text-xl text-slate-900 leading-none tracking-tight truncate flex items-center gap-2">
+                <Shield size={20} className="text-indigo-600" />
+                Access Control
+              </h1>
+              <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-slate-400 truncate">
+                {mobileView === "chat" ? "Active Conversation" : `${filteredThreads.length} Active Portals`}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <Link
+              to="/dashboard/notifications"
+              className="relative inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white p-2.5 text-slate-600 shadow-sm hover:bg-slate-50 transition-all"
+            >
+              <Bell size={18} />
+              {globalUnreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center border-2 border-white">
+                  {globalUnreadCount > 9 ? '9+' : globalUnreadCount}
+                </span>
+              )}
+            </Link>
+          </div>
+        </div>
+      </header>
+
+      {/* Search Bar */}
+      <div className={`w-full bg-white/80 backdrop-blur-sm border-b border-slate-200/60 px-4 py-3 flex-shrink-0 ${mobileView === "chat" ? "hidden md:block" : "block"}`}>
+        <div className="max-w-7xl mx-auto relative">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by visitor, purpose, or door..."
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3.5 pl-12 pr-4 text-sm font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+          />
+        </div>
+      </div>
+
+      {error && (
+        <div className="mx-4 mt-4 bg-rose-50 text-rose-700 p-4 rounded-xl text-sm font-medium border border-rose-200 flex items-center gap-2 flex-shrink-0">
+          <X size={16} className="text-rose-500" />
+          {error}
+        </div>
+      )}
+
+      {/* Main Layout */}
+      <main className="flex-1 min-h-0 max-w-7xl w-full mx-auto flex overflow-hidden px-4 pb-4 gap-4">
+        
+        {/* Thread List */}
+        <section className={`w-full md:w-80 lg:w-96 flex flex-col flex-shrink-0 bg-white md:bg-transparent rounded-2xl md:rounded-none border-0 md:border-none min-w-0 ${mobileView === "chat" ? "hidden md:flex" : "flex"}`}>
+          <div className="flex-1 overflow-y-auto space-y-2 pr-0 md:pr-2">
+            {filteredThreads.length === 0 ? (
+              <div className="text-center py-16">
+                <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <MessageSquare size={24} className="text-slate-400" />
+                </div>
+                <p className="text-sm font-semibold text-slate-600">No Active Portals</p>
+                <p className="text-xs text-slate-400 mt-1">Waiting for visitor requests</p>
+              </div>
+            ) : (
+              filteredThreads.map((thread) => {
+                const isActive = selectedId === thread.id;
+                const threadSnapshot = snapshotUrls[thread.id] || thread.snapshotUrl || thread.photoUrl;
+                const hasUnread = thread.unread > 0;
+                
+                return (
+                  <button
+                    key={thread.id}
+                    onClick={() => handleSelectThread(thread.id)}
+                    className={`w-full flex items-start gap-3.5 p-4 rounded-xl transition-all text-left border ${
+                      isActive 
+                        ? "bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-600/20" 
+                        : "bg-white border-slate-200/80 text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-sm"
+                    }`}
+                  >
+                    <div className="relative flex-shrink-0">
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-sm font-bold overflow-hidden ${
+                        isActive ? 'bg-white/20' : 'bg-slate-100'
+                      }`}>
+                        {threadSnapshot ? (
+                          <img src={threadSnapshot} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          (thread.name || "V")[0].toUpperCase()
+                        )}
+                      </div>
+                      {hasUnread && !isActive && (
+                        <span className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center border-2 border-white">
+                          {thread.unread}
+                        </span>
+                      )}
+                    </div>
+                    
+                    <div className="min-w-0 flex-1">
+                      <div className="flex justify-between items-baseline gap-2">
+                        <p className={`text-sm font-bold truncate ${isActive ? 'text-white' : 'text-slate-800'}`}>
+                          {thread.name || "Visitor"}
+                        </p>
+                        <span className={`text-[9px] font-semibold tracking-wide flex-shrink-0 ${isActive ? 'text-indigo-200' : 'text-slate-400'}`}>
+                          {formatClockTime(thread.time)}
+                        </span>
+                      </div>
+                      <p className={`text-xs line-clamp-2 mt-0.5 ${isActive ? 'text-indigo-100' : 'text-slate-500'}`}>
+                        {thread.last || "Awaiting verification..."}
+                      </p>
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <span className={`text-[9px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                          isActive ? 'bg-white/10 text-indigo-100' : 'bg-slate-100 text-slate-500'
+                        }`}>
+                          {thread.doorName || thread.gateLabel || "Entry"}
+                        </span>
+                        {thread.sessionStatus === "approved" && (
+                          <span className="text-[9px] font-bold uppercase text-emerald-500 flex items-center gap-1">
+                            <Check size={10} /> Access Granted
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </section>
+
+        {/* Chat View */}
+        <section className={`flex-1 bg-white md:rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden flex flex-col min-w-0 h-full ${mobileView === "list" ? "hidden md:flex" : "flex"}`}>
+          {heroThread ? (
+            <>
+              {/* Chat Header */}
+              <div className="px-4 md:px-6 py-4 border-b border-slate-200/60 bg-white flex items-center justify-between gap-4 flex-shrink-0">
+                <div className="flex items-center gap-4 min-w-0">
+                  <button
+                    onClick={handleMobileBack}
+                    className="md:hidden p-2 -ml-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
+                  >
+                    <ArrowLeft size={20} />
+                  </button>
+                  
+                  <div className="relative flex-shrink-0">
+                    <div className="w-12 h-12 rounded-xl overflow-hidden bg-slate-100">
+                      {heroSnapshotUrl ? (
+                        <SecureSnapshotImage
+                          src={heroSnapshotUrl}
+                          alt="Visitor"
+                          className="w-full h-full object-cover"
+                          fallback={<div className="w-full h-full flex items-center justify-center bg-slate-200 text-slate-400"><Image size={20} /></div>}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-indigo-100 text-indigo-600 text-lg font-bold">
+                          {(heroThread.name || "V")[0].toUpperCase()}
+                        </div>
+                      )}
+                    </div>
+                    {heroThread.sessionStatus === "approved" && (
+                      <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-white" />
+                    )}
+                  </div>
+                  
+                  <div className="min-w-0">
+                    <h2 className="font-bold text-slate-900 truncate flex items-center gap-2">
+                      {heroThread.name || "Visitor"}
+                      {heroThread.sessionStatus === "approved" && (
+                        <span className="text-[8px] font-black uppercase bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">Verified</span>
+                      )}
+                    </h2>
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                      <span className="flex items-center gap-1">
+                        <DoorOpen size={12} />
+                        {heroThread.doorName || heroThread.gateLabel || "Entry"}
+                      </span>
+                      {heroThread.purpose && (
+                        <>
+                          <span className="w-1 h-1 rounded-full bg-slate-300" />
+                          <span className="truncate max-w-[120px]">{heroThread.purpose}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {typingByThread[selectedId]?.isTyping && (
+                  <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-full">
+                    <span className="flex gap-1">
+                      <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </span>
+                    <span className="text-[9px] font-bold text-amber-700 uppercase tracking-wide">Typing...</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Messages */}
+              <div ref={messagesRef} className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/50">
+                {conversationLoading ? (
+                  <div className="flex justify-center py-16">
+                    <div className="w-8 h-8 border-3 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                  </div>
+                ) : selectedMessages.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-slate-400">
+                    <MessageSquare size={32} className="text-slate-300 mb-3" />
+                    <p className="text-sm font-medium">No messages yet</p>
+                    <p className="text-xs">Start the conversation</p>
+                  </div>
+                ) : (
+                  selectedMessages.map((msg, i) => {
+                    const isOwn = msg.senderType === 'homeowner';
+                    const isSnapshot = isSnapshotThreadMessage(msg);
+                    
                     return (
-                      <div key={msg.id} className="flex flex-col items-center justify-center my-6 max-w-sm mx-auto animate-fade-in">
-                        <div className="bg-slate-900/90 border border-slate-800/80 rounded-2xl p-3 shadow-xl w-full">
-                          <p className="text-xs text-slate-400 font-medium mb-2.5 flex items-center gap-1.5">
-                            <Clock className="w-3 h-3 text-emerald-400" /> Snapshot Event Triggered
-                          </p>
-                          <div className="aspect-[4/3] rounded-xl overflow-hidden bg-slate-950 border border-slate-800 relative group">
-                            <SecureSnapshotImage
-                              snapshotUrl={msg.snapshotUrl}
-                              auditId={msg.snapshotAuditId || heroThread.snapshotAuditId}
-                              className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
-                              alt="Visitor verification capture"
-                            />
-                          </div>
-                          {msg.text && (
-                            <p className="text-xs text-slate-300 mt-2.5 bg-slate-950/60 p-2 rounded-lg border border-slate-800/40 italic">
-                              {msg.text}
-                            </p>
+                      <div key={msg.messageId || msg.id || i} className={`flex ${isOwn ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-200`}>
+                        <div className={`max-w-[85%] md:max-w-[70%] ${!isOwn && !isSnapshot ? 'pl-3' : ''}`}>
+                          {isSnapshot ? (
+                            <div className="bg-white rounded-2xl rounded-tl-none border border-slate-200/90 shadow-md overflow-hidden">
+                              <div className="p-3 bg-slate-50/80 border-b border-slate-200/60">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[9px] font-black uppercase tracking-[0.15em] text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full">Snapshot</span>
+                                  <span className="text-[9px] font-semibold text-slate-400">{formatClockTime(msg.at)}</span>
+                                </div>
+                              </div>
+                              <div className="p-3 space-y-3">
+                                {getMessageSnapshotSrc(msg) ? (
+                                  <SecureSnapshotImage
+                                    src={getMessageSnapshotSrc(msg)}
+                                    alt="Visitor snapshot"
+                                    className="w-full max-h-64 object-cover rounded-lg"
+                                    fallback={<div className="w-full h-48 flex items-center justify-center bg-slate-100 text-slate-400 rounded-lg">Failed to load</div>}
+                                  />
+                                ) : (
+                                  <div className="w-full h-48 flex items-center justify-center bg-slate-100 text-slate-400 rounded-lg">No image available</div>
+                                )}
+                                <div className="grid gap-1.5 text-xs">
+                                  {msg.visitorName && (
+                                    <p><span className="font-semibold text-slate-500">Name:</span> {msg.visitorName}</p>
+                                  )}
+                                  {msg.visitorPhone && (
+                                    <p><span className="font-semibold text-slate-500">Phone:</span> {msg.visitorPhone}</p>
+                                  )}
+                                  {msg.purpose && (
+                                    <p><span className="font-semibold text-slate-500">Purpose:</span> {msg.purpose}</p>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className={`rounded-2xl px-4 py-3 text-sm break-words ${
+                              isOwn 
+                                ? 'bg-indigo-600 text-white rounded-tr-none shadow-md shadow-indigo-600/20' 
+                                : 'bg-white text-slate-700 rounded-tl-none border border-slate-200/70 shadow-sm'
+                            }`}>
+                              <p className="whitespace-pre-wrap leading-relaxed">{getConversationMessageText(msg)}</p>
+                              <p className={`text-[8px] mt-1.5 font-semibold tracking-wide text-right ${
+                                isOwn ? 'text-indigo-200' : 'text-slate-400'
+                              }`}>
+                                {formatClockTime(msg.at)}
+                              </p>
+                            </div>
                           )}
                         </div>
                       </div>
                     );
-                  }
-
-                  return (
-                    <div key={msg.id} className={`flex w-full ${isMe ? "justify-end" : "justify-start"} animate-fade-in`}>
-                      <div className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm shadow-md transition-all ${
-                        isMe
-                          ? "bg-gradient-to-br from-emerald-600 to-teal-600 text-white rounded-br-none"
-                          : "bg-slate-900 border border-slate-800 text-slate-200 rounded-bl-none"
-                      }`}>
-                        <p className="leading-relaxed break-words">{msg.text}</p>
-                        <div className="flex items-center justify-end gap-1.5 mt-1">
-                          <span className={`text-[10px] ${isMe ? "text-emerald-200" : "text-slate-500"}`}>
-                            {new Date(msg.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-
-              {/* Dynamic Interactivity Realtime Status Alert Indicator */}
-              {typingByThread[selectedId]?.isTyping && (
-                <div className="flex items-center gap-2 text-slate-500 text-xs px-2 animate-pulse">
-                  <div className="flex space-x-1">
-                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                  </div>
-                  <span>{typingByThread[selectedId]?.displayName || "Visitor"} is preparing standard reply...</span>
-                </div>
-              )}
-            </div>
-
-            {/* CRITICAL GATE KEEPER CALL TO ACTIONS DECISION ROW */}
-            {!accessAlreadyGranted && heroThreadState !== "rejected" && (
-              <div className="p-4 bg-slate-900/90 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-2xl z-10">
-                <div className="text-center sm:text-left">
-                  <h4 className="text-xs font-bold text-slate-300 tracking-wide uppercase">Gate Access Protocol Required</h4>
-                  <p className="text-xs text-slate-400 mt-0.5">Please confirm identity metrics before approving property clearance.</p>
-                </div>
-                <div className="flex items-center gap-2 w-full sm:w-auto">
-                  <button
-                    disabled={decisionBusy}
-                    onClick={handleRejectAccess}
-                    className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl hover:bg-rose-500/20 disabled:opacity-40 transition text-xs font-semibold"
-                  >
-                    {decisionAction === "reject" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldAlert className="w-3.5 h-3.5" />}
-                    Decline
-                  </button>
-                  <button
-                    disabled={decisionBusy}
-                    onClick={handleGrantAccess}
-                    className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-bold rounded-xl hover:from-emerald-400 hover:to-teal-400 disabled:opacity-40 transition text-xs shadow-lg shadow-emerald-500/10"
-                  >
-                    {decisionAction === "approve" ? <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-950" /> : <ShieldCheck className="w-3.5 h-3.5 text-slate-950" />}
-                    Grant Access
-                  </button>
-                </div>
+                  })
+                )}
               </div>
-            )}
 
-            {/* Quick Smart Suggestion Replies Row */}
-            <div className="px-4 py-2 bg-slate-950/40 border-t border-slate-900 flex items-center gap-2 overflow-x-auto no-scrollbar">
-              {["Give me a moment.", "Please wait there.", "I will be right down.", "Leave it at the door."].map((reply) => (
-                <button
-                  key={reply}
-                  disabled={sending}
-                  onClick={() => handleQuickReply(reply)}
-                  className="whitespace-nowrap bg-slate-900 hover:bg-slate-800 border border-slate-800/80 text-slate-300 px-3 py-1.5 rounded-xl text-xs transition disabled:opacity-40"
-                >
-                  {reply}
-                </button>
-              ))}
-            </div>
+              {/* Action Buttons + Input */}
+              <div className="p-4 border-t border-slate-200/60 bg-white flex-shrink-0 space-y-3">
+                {!accessAlreadyGranted && heroThread.sessionStatus !== "rejected" && (
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleQuickReply("Please stand by.")}
+                      disabled={sending || decisionBusy}
+                      className="py-2.5 bg-slate-100 hover:bg-slate-200 rounded-xl text-xs font-bold uppercase tracking-wide text-slate-600 transition-all disabled:opacity-50"
+                    >
+                      Standby
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleRejectAccess}
+                      disabled={sending || decisionBusy}
+                      className="py-2.5 bg-rose-50 hover:bg-rose-100 rounded-xl text-xs font-bold uppercase tracking-wide text-rose-600 transition-all disabled:opacity-50 flex items-center justify-center gap-1"
+                    >
+                      <X size={14} />
+                      {decisionAction === "reject" ? "Declining..." : "Deny"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleGrantAccess}
+                      disabled={sending || decisionBusy}
+                      className="py-2.5 bg-emerald-600 hover:bg-emerald-700 rounded-xl text-xs font-bold uppercase tracking-wide text-white shadow-sm transition-all disabled:opacity-50 flex items-center justify-center gap-1"
+                    >
+                      <Check size={14} />
+                      {decisionAction === "approve" ? "Opening..." : "Approve"}
+                    </button>
+                  </div>
+                )}
 
-            {/* LOWER FORM CONTROL SUBMISSION INPUT DECK */}
-            <footer className="p-4 bg-slate-950 border-t border-slate-900">
-              <form onSubmit={handleSend} className="flex gap-2 items-center">
-                <input
-                  type="text"
-                  placeholder="Type a response message..."
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  className="flex-1 bg-slate-900 border border-slate-800/80 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition"
-                />
-                <button
-                  type="submit"
-                  disabled={!draft.trim() || sending}
-                  className="p-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 disabled:opacity-30 rounded-xl transition shadow-lg shadow-emerald-500/5 flex items-center justify-center"
-                >
-                  {sending ? <Loader2 className="w-5 h-5 animate-spin text-slate-950" /> : <SendHorizontal className="w-5 h-5 text-slate-950" />}
-                </button>
-              </form>
-            </footer>
-          </>
-        ) : (
-          <div className="flex flex-col items-center justify-center h-full text-slate-500 p-6 text-center">
-            <div className="w-16 h-16 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-center text-slate-400 mb-4 shadow-xl">
-              <MessageSquare className="w-6 h-6 text-emerald-500" />
+                {accessAlreadyGranted && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleStartCall("audio")}
+                      disabled={Boolean(callBusy)}
+                      className="py-3 bg-slate-100 hover:bg-indigo-50 rounded-xl text-xs font-bold uppercase text-indigo-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      <Phone size={16} />
+                      Audio
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleStartCall("video")}
+                      disabled={Boolean(callBusy)}
+                      className="py-3 bg-slate-900 hover:bg-slate-800 rounded-xl text-xs font-bold uppercase text-white transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      <Video size={16} />
+                      Video
+                    </button>
+                  </div>
+                )}
+
+                {heroThread.sessionStatus === "rejected" && (
+                  <div className="text-center py-2 bg-rose-50 text-rose-600 text-xs font-semibold rounded-xl border border-rose-200">
+                    Access declined — this visitor cannot enter
+                  </div>
+                )}
+
+                <form onSubmit={handleSend} className="relative flex items-center gap-2">
+                  <input
+                    value={draft}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setDraft(value);
+                      setIsTyping(Boolean(value.trim()));
+                      socketRef.current?.emit("chat.typing", {
+                        sessionId: selectedId,
+                        senderType: "homeowner",
+                        displayName: user?.fullName || "Homeowner",
+                        isTyping: Boolean(value.trim())
+                      });
+                    }}
+                    placeholder="Type a message..."
+                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl py-3.5 px-4 pr-14 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!draft.trim() || sending}
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 p-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg disabled:opacity-40 transition-all"
+                  >
+                    <SendHorizontal size={16} />
+                  </button>
+                </form>
+              </div>
+            </>
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center text-slate-400 p-6">
+              <div className="w-20 h-20 bg-slate-100 rounded-2xl flex items-center justify-center mb-4">
+                <MessageSquare size={28} className="text-slate-300" />
+              </div>
+              <p className="text-sm font-semibold text-slate-600">No Conversation Selected</p>
+              <p className="text-xs text-slate-400 mt-1">Choose a visitor request from the list</p>
             </div>
-            <h3 className="text-base font-bold text-slate-300">No Active Channel Selected</h3>
-            <p className="text-xs text-slate-500 max-w-xs mt-1">
-              Select a session track from the left terminal monitor matrix pane to handle communications.
-            </p>
-          </div>
-        )}
+          )}
+        </section>
       </main>
 
-      {/* VISITOR TELEPHONY STANDBY MODAL CALL ROUTER */}
-      {incomingCall.pending && (
-        <VisitorIncomingCallModal
-          isOpen={incomingCall.pending}
-          hasVideo={incomingCall.hasVideo}
-          callerName={incomingCall.callerName}
-          callerOrigin={incomingCall.callerOrigin}
-          callerRole={incomingCall.callerRole}
-          onAccept={handleAcceptIncomingCall}
-          onReject={() => {
-            setIncomingCall({ pending: false, hasVideo: false, callSessionId: "", visitorId: "", sessionId: "" });
-            dismissIncomingCall();
-          }}
-          busy={incomingCallBusy}
-        />
-      )}
+      <VisitorIncomingCallModal
+        open={incomingCall.pending}
+        hasVideo={incomingCall.hasVideo}
+        busy={incomingCallBusy}
+        callerLabel={incomingCall.callerName || roleLabel(incomingCall.callerRole) || incomingCall.homeownerName || incomingCall.visitorName || "Caller"}
+        sourceLabel={incomingCall.callerOrigin || ""}
+        onAccept={handleAcceptIncomingCall}
+        onReject={handleRejectIncomingCall}
+      />
     </div>
   );
+}
+
+// --- Helper Functions ---
+function formatClockTime(v) {
+  if (!v) return "";
+  return new Date(v).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function renderMessageBody(text) {
+  return <p className="whitespace-pre-wrap break-words leading-relaxed font-medium">{text}</p>;
+}
+
+function renderThreadMessageBody(message) {
+  const snapshotUrl = getMessageSnapshotSrc(message);
+  const messageType = String(message?.messageType || "text");
+  if (messageType === "visitor_snapshot" || Boolean(snapshotUrl)) {
+    const footerLabel = getSnapshotFooterLabel(message);
+    const missingSnapshotBox = (
+      <div className="grid h-52 w-full place-items-center rounded-2xl bg-gradient-to-br from-rose-50 to-amber-50 p-4 text-center text-xs font-semibold text-rose-700">
+        Snapshot image is missing for this visitor request.
+      </div>
+    );
+    const failedSnapshotBox = (
+      <div className="grid h-52 w-full place-items-center rounded-2xl bg-gradient-to-br from-rose-50 to-amber-50 p-4 text-center text-xs font-semibold text-rose-700">
+        Snapshot image could not be loaded. Please check image storage or URL access.
+      </div>
+    );
+    if (!snapshotUrl) {
+      // eslint-disable-next-line no-console
+      console.warn("qring.snapshot.missing", {
+        sessionId: message?.sessionId || "",
+        messageId: message?.messageId || message?.id || "",
+        snapshotAuditId: message?.snapshotAuditId || message?.snapshot_audit_id || message?.snapshot?.id || "",
+        snapshotUrl: ""
+      });
+    }
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-amber-900">
+            Visitor snapshot
+          </span>
+          <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+            Photo + details
+          </span>
+        </div>
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-sm">
+          {snapshotUrl ? (
+            <SecureSnapshotImage
+              src={snapshotUrl}
+              alt="Visitor snapshot"
+              className="h-52 w-full object-cover"
+              onError={({ src }) => {
+                // eslint-disable-next-line no-console
+                console.warn("qring.snapshot.render_failed", {
+                  sessionId: message?.sessionId || "",
+                  snapshotUrl: src || snapshotUrl
+                });
+              }}
+              fallback={failedSnapshotBox}
+            />
+          ) : (
+            missingSnapshotBox
+          )}
+        </div>
+        <div className="grid gap-2 rounded-2xl bg-slate-50 p-3 text-[11px] text-slate-600">
+          <div className="flex flex-wrap gap-2">
+            {message?.visitorName ? <span className="rounded-full bg-white px-2.5 py-1 font-semibold text-slate-700 shadow-sm">Name: {message.visitorName}</span> : null}
+            {message?.visitorPhone ? <span className="rounded-full bg-white px-2.5 py-1 font-semibold text-slate-700 shadow-sm">Phone: {message.visitorPhone}</span> : null}
+            {message?.doorName ? <span className="rounded-full bg-white px-2.5 py-1 font-semibold text-slate-700 shadow-sm">Door: {message.doorName}</span> : null}
+          </div>
+          {message?.purpose ? (
+            <p className="leading-relaxed">
+              <span className="font-black uppercase tracking-[0.16em] text-slate-400">Purpose</span>
+              <span className="ml-2 font-semibold text-slate-700">{message.purpose}</span>
+            </p>
+          ) : null}
+        </div>
+        <div className="flex items-center justify-between gap-3 rounded-full border border-slate-200 bg-white px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500 shadow-sm">
+          <span>{footerLabel}</span>
+          <span>{formatClockTime(message?.at) || "Just now"}</span>
+        </div>
+      </div>
+    );
+  }
+  return renderMessageBody(getConversationMessageText(message));
+}
+
+function roleLabel(role) {
+  const normalized = String(role || "").trim().toLowerCase();
+  if (normalized === "homeowner") return "Homeowner";
+  if (normalized === "security") return "Security";
+  if (normalized === "visitor") return "Visitor";
+  return "";
+}
+
+function eventLooksLikeSnapshot(payload) {
+  return Boolean(
+    extractSnapshotUrl(payload) ||
+    extractSnapshotUrl(payload?.payload) ||
+    extractSnapshotUrl(payload?.requestPayload) ||
+    extractSnapshotUrl(payload?.metadata)
+  );
+}
+
+function normalizeInboxThread(thread) {
+  const normalized = { ...(thread || {}) };
+  const snapshotAuditId = String(
+    normalized.snapshotAuditId ||
+    normalized.snapshot_audit_id ||
+    normalized.snapshot?.id ||
+    normalized.requestPayload?.snapshotAuditId ||
+    normalized.data?.snapshotAuditId ||
+    normalized.data?.snapshot_audit_id ||
+    normalized.data?.snapshot?.id ||
+    normalized.data?.payload?.snapshotAuditId ||
+    normalized.data?.payload?.snapshot_audit_id ||
+    normalized.data?.payload?.snapshot?.id ||
+    ""
+  ).trim();
+  const snapshotUrl = extractSnapshotUrl(normalized) || getSnapshotUrlFromAuditId(snapshotAuditId) || String(
+    normalized.snapshotUrl ||
+    normalized.photoUrl ||
+    normalized.imageUrl ||
+    normalized.fileUrl ||
+    normalized.url ||
+    ""
+  ).trim();
+  normalized.id =
+    normalized.id ||
+    normalized.sessionId ||
+    normalized.visitorSessionId ||
+    "";
+  normalized.name =
+    normalized.name ||
+    normalized.visitorFullName ||
+    normalized.visitorName ||
+    normalized.visitor ||
+    "Visitor";
+  normalized.visitorPhone =
+    normalized.visitorPhone ||
+    normalized.phoneNumber ||
+    normalized.phone ||
+    "";
+  normalized.doorName =
+    normalized.doorName ||
+    normalized.door ||
+    normalized.gateLabel ||
+    normalized.requestPayload?.doorName ||
+    normalized.metadata?.doorName ||
+    "";
+  normalized.purpose =
+    normalized.purpose ||
+    normalized.visitPurpose ||
+    normalized.reason ||
+    "";
+  normalized.last = getConversationPreviewText(normalized);
+  normalized.snapshotUrl = snapshotUrl || normalized.snapshotUrl || "";
+  normalized.photoUrl = snapshotUrl || normalized.photoUrl || "";
+  normalized.snapshotAuditId = snapshotAuditId;
+  return normalized;
+}
+
+function isLikelyDuplicateMessage(a, b) {
+  if (!a || !b) return false;
+  if (a.id && b.id && a.id === b.id) return true;
+  if (a.clientId && b.clientId && a.clientId === b.clientId) return true;
+  if ((a.sessionId || "") !== (b.sessionId || "")) return false;
+  if (String(a.senderType || "").toLowerCase() !== String(b.senderType || "").toLowerCase()) return false;
+  if (String(a.text || "").trim() !== String(b.text || "").trim()) return false;
+  const left = new Date(a.at).getTime();
+  const right = new Date(b.at).getTime();
+  return Math.abs(left - right) < 8000;
+}
+
+function mergeMessageCollections(current, incoming) {
+  const merged = [...(current || [])];
+  for (const candidate of incoming || []) {
+    if (!candidate) continue;
+    const normalized = { ...candidate, sessionId: candidate.sessionId || candidate.session_id || "" };
+    const idx = merged.findIndex((item) => isLikelyDuplicateMessage(item, normalized));
+    if (idx === -1) { merged.push(normalized); }
+    else { merged[idx] = { ...merged[idx], ...normalized }; }
+  }
+  return merged.sort((l, r) => new Date(l.at || 0) - new Date(r.at || 0));
+}
+
+function sortThreadsForInbox(arr) {
+  if (!Array.isArray(arr)) return [];
+  return [...arr].sort((a, b) => new Date(b.time || 0) - new Date(a.time || 0));
+}
+
+function mergeThreadCollections(old, next) {
+  const map = new Map(old.map(t => [t.id, t]));
+  next.forEach(t => {
+    const prev = map.get(t.id);
+    map.set(t.id, prev ? { ...prev, ...t } : t);
+  });
+  return Array.from(map.values());
+}
+
+function upsertThreadPreview(msg, setThreads, selectedId, extra = {}) {
+  setThreads((prev) => {
+    const found = prev.find(t => t.id === msg.sessionId);
+    const previewText = getConversationPreviewText(msg);
+    if (found) {
+      return prev.map(t => t.id === msg.sessionId ? {
+        ...t, last: previewText || t.last, time: msg.at, unread: t.id === selectedId ? 0 : (t.unread || 0) + 1, ...extra
+      } : t);
+    }
+    return [{ id: msg.sessionId, last: previewText, time: msg.at, unread: 1, ...extra }, ...prev];
+  });
+}
+
+function getThreadSnapshotSrc(thread) {
+  if (!thread) return "";
+  const photoUrl = extractSnapshotUrl(thread);
+  if (photoUrl) return photoUrl;
+  return getSnapshotUrlFromAuditId(thread.snapshotAuditId || thread.snapshot_audit_id || thread.snapshot?.id || "");
+}
+
+function buildSnapshotMessage(payload, fallbackSessionId = "") {
+  const sessionId = String(payload?.sessionId || fallbackSessionId || "").trim();
+  if (!sessionId) return null;
+  const snapshotAuditId = String(
+    payload?.snapshotAuditId ||
+    payload?.snapshot_audit_id ||
+    payload?.snapshot?.id ||
+    payload?.requestPayload?.snapshotAuditId ||
+    payload?.data?.snapshotAuditId ||
+    payload?.data?.snapshot_audit_id ||
+    payload?.data?.snapshot?.id ||
+    payload?.data?.payload?.snapshotAuditId ||
+    payload?.data?.payload?.snapshot_audit_id ||
+    payload?.data?.payload?.snapshot?.id ||
+    ""
+  ).trim();
+  const snapshotUrl = extractSnapshotUrl(payload) || getSnapshotUrlFromAuditId(snapshotAuditId);
+  return {
+    id: `snapshot:${sessionId}`,
+    messageId: `snapshot:${sessionId}`,
+    sessionId,
+    text: payload?.message || "Visitor snapshot submitted.",
+    messageType: "visitor_snapshot",
+    snapshotUrl,
+    photoUrl: snapshotUrl,
+    senderRole: "visitor",
+    senderType: "visitor",
+    displayName: payload?.visitorName || "Visitor",
+    visitorName: payload?.visitorName || "Visitor",
+    visitorPhone: payload?.visitorPhone || "",
+    purpose: payload?.purpose || "",
+    requestSource: String(payload?.requestSource || payload?.source || payload?.requestPayload?.requestSource || "").trim(),
+    creatorRole: String(payload?.creatorRole || payload?.requestPayload?.creatorRole || "").trim(),
+    snapshotAuditId,
+    at: payload?.at || payload?.timestamp || new Date().toISOString()
+  };
+}
+
+function ensureSnapshotConversationRows(rows, sessionId, threadSnapshot) {
+  const list = Array.isArray(rows) ? [...rows] : [];
+  const hasSnapshotMessage = list.some((item) => isSnapshotThreadMessage(item));
+  if (hasSnapshotMessage) return list;
+  const source = threadSnapshot && (extractSnapshotUrl(threadSnapshot) || getSnapshotUrlFromAuditId(threadSnapshot?.snapshotAuditId || threadSnapshot?.snapshot_audit_id || threadSnapshot?.snapshot?.id || ""))
+    ? {
+        sessionId,
+        snapshotUrl: extractSnapshotUrl(threadSnapshot) || getSnapshotUrlFromAuditId(threadSnapshot?.snapshotAuditId || threadSnapshot?.snapshot_audit_id || threadSnapshot?.snapshot?.id || ""),
+        photoUrl: extractSnapshotUrl(threadSnapshot) || getSnapshotUrlFromAuditId(threadSnapshot?.snapshotAuditId || threadSnapshot?.snapshot_audit_id || threadSnapshot?.snapshot?.id || ""),
+        snapshotAuditId: threadSnapshot?.snapshotAuditId || threadSnapshot?.snapshot_audit_id || threadSnapshot?.snapshot?.id || "",
+        visitorName: threadSnapshot?.name || threadSnapshot?.visitorName || "Visitor",
+        visitorPhone: threadSnapshot?.visitorPhone || "",
+        purpose: threadSnapshot?.purpose || "",
+        requestSource: threadSnapshot?.requestSource || threadSnapshot?.request_source || "",
+        creatorRole: threadSnapshot?.creatorRole || threadSnapshot?.creator_role || "",
+        at: threadSnapshot?.timestamp || threadSnapshot?.time || new Date().toISOString()
+    }
+    : null;
+  if (!source) return list;
+  const snapshotMessage = buildSnapshotMessage(source, sessionId);
+  return snapshotMessage ? [snapshotMessage, ...list] : list;
+}
+
+function extractSnapshotUrl(source) {
+  return String(
+    source?.snapshotUrl ||
+    source?.imageUrl ||
+    source?.photoUrl ||
+    source?.image_url ||
+    source?.fileUrl ||
+    source?.file_url ||
+    source?.url ||
+    source?.snapshot_url ||
+    source?.photo_url ||
+    source?.snapshot?.snapshotUrl ||
+    source?.snapshot?.imageUrl ||
+    source?.snapshot?.photoUrl ||
+    source?.snapshot?.image_url ||
+    source?.snapshot?.fileUrl ||
+    source?.snapshot?.url ||
+    source?.requestPayload?.snapshotUrl ||
+    source?.requestPayload?.imageUrl ||
+    source?.requestPayload?.photoUrl ||
+    source?.requestPayload?.image_url ||
+    source?.requestPayload?.fileUrl ||
+    source?.requestPayload?.snapshot_url ||
+    source?.requestPayload?.url ||
+    source?.metadata?.snapshotUrl ||
+    source?.metadata?.imageUrl ||
+    source?.metadata?.photoUrl ||
+    source?.metadata?.fileUrl ||
+    source?.metadata?.url ||
+    source?.metadata?.snapshot_url ||
+    source?.metadata?.image_url ||
+    source?.metadata?.photo_url ||
+    source?.data?.snapshotUrl ||
+    source?.data?.imageUrl ||
+    source?.data?.photoUrl ||
+    source?.data?.fileUrl ||
+    source?.data?.url ||
+    source?.data?.snapshot_url ||
+    source?.data?.image_url ||
+    source?.data?.photo_url ||
+    source?.data?.file_url ||
+    source?.data?.payload?.snapshotUrl ||
+    source?.data?.payload?.imageUrl ||
+    source?.data?.payload?.photoUrl ||
+    source?.data?.payload?.fileUrl ||
+    source?.data?.payload?.url ||
+    source?.data?.payload?.snapshot_url ||
+    source?.data?.payload?.image_url ||
+    source?.data?.payload?.photo_url ||
+    source?.data?.payload?.file_url ||
+    ""
+  ).trim();
+}
+
+function isSnapshotThreadMessage(message) {
+  return (
+    String(message?.messageType || "").trim() === "visitor_snapshot" ||
+    Boolean(extractSnapshotUrl(message)) ||
+    Boolean(getSnapshotUrlFromAuditId(message?.snapshotAuditId || message?.snapshot_audit_id || message?.snapshot?.id || ""))
+  );
+}
+
+function getSnapshotFooterLabel(message) {
+  const requestSource = String(message?.requestSource || message?.source || "").trim().toLowerCase();
+  const creatorRole = String(message?.creatorRole || message?.senderRole || message?.senderType || "").trim().toLowerCase();
+  if (requestSource.includes("visitor_form") || (requestSource.includes("visitor") && requestSource.includes("form"))) return "Uploaded from visitor form";
+  if (requestSource.includes("visitor_qr")) return "Captured from visitor scan";
+  if (requestSource.includes("security")) return "Registered by security";
+  if (creatorRole === "security") return "Registered by security";
+  return "Captured snapshot";
+}
+
+function safeParsePayload(value) {
+  try {
+    return JSON.parse(value || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function getConversationSnapshotUrl(rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  for (const row of list) {
+    const snapshotUrl = extractSnapshotUrl(row);
+    if (snapshotUrl) return snapshotUrl;
+    const snapshotAuditUrl = getSnapshotUrlFromAuditId(row?.snapshotAuditId || row?.snapshot_audit_id || row?.snapshot?.id || "");
+    if (snapshotAuditUrl) return snapshotAuditUrl;
+  }
+  return "";
+}
+
+function getConversationSnapshotAuditId(rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  for (const row of list) {
+    const auditId = String(row?.snapshotAuditId || row?.snapshot_audit_id || "").trim();
+    if (auditId) return auditId;
+  }
+  return "";
+}
+
+function getSnapshotUrlFromAuditId(snapshotAuditId) {
+  const auditId = String(snapshotAuditId || "").trim();
+  if (!auditId) return "";
+  return `/api/v1/advanced/visitor/snapshots/${encodeURIComponent(auditId)}/file`;
+}
+
+function getMessageSnapshotSrc(message) {
+  const snapshotUrl = extractSnapshotUrl(message);
+  if (snapshotUrl) return snapshotUrl;
+  return getSnapshotUrlFromAuditId(message?.snapshotAuditId || message?.snapshot_audit_id || message?.snapshot?.id || "");
 }
