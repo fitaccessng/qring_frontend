@@ -90,7 +90,16 @@ const HomeownerAlertsPage = lazy(() => import("./pages/dashboard/HomeownerAlerts
 const HomeownerSafetyPage = lazy(() => import("./pages/dashboard/HomeownerSafetyPage"));
 const HomeownerEmergencyContactsPage = lazy(() => import("./pages/dashboard/HomeownerEmergencyContactsPage"));
 const HomeownerMaintenancePage = lazy(() => import("./pages/dashboard/HomeownerMaintenancePage"));
-const EstateManagedHomeownerModulePage = lazy(() => import("./pages/dashboard/EstateManagedHomeownerModulePage"));
+const HomeownerEstateBroadcastsPage = lazy(() => import("./pages/dashboard/HomeownerEstateBroadcastsPage"));
+const HomeownerEstateMeetingsPage = lazy(() => import("./pages/dashboard/HomeownerEstateMeetingsPage"));
+const HomeownerEstatePollsPage = lazy(() => import("./pages/dashboard/HomeownerEstatePollsPage"));
+const HomeownerEstateDuesPage = lazy(() => import("./pages/dashboard/HomeownerEstateDuesPage"));
+const HomeownerEstateMaintenancePage = lazy(() => import("./pages/dashboard/HomeownerEstateMaintenancePage"));
+const HomeownerEstateAlertsPage = lazy(() => import("./pages/dashboard/HomeownerEstateAlertsPage"));
+const HomeownerEstateApprovalsPage = lazy(() => import("./pages/dashboard/HomeownerEstateApprovalsPage"));
+const HomeownerEstateVideoCallsPage = lazy(() => import("./pages/dashboard/HomeownerEstateVideoCallsPage"));
+const HomeownerEstateAudioCallsPage = lazy(() => import("./pages/dashboard/HomeownerEstateAudioCallsPage"));
+const HomeownerEstatePanicPage = lazy(() => import("./pages/dashboard/HomeownerEstatePanicPage"));
 const EstateDashboardPage = lazy(() => import("./pages/dashboard/EstateDashboardPage"));
 const EstateCreatePage = lazy(() => import("./pages/dashboard/EstateCreatePage"));
 const EstateDoorsPage = lazy(() => import("./pages/dashboard/EstateDoorsPage"));
@@ -101,6 +110,9 @@ const EstateLogsPage = lazy(() => import("./pages/dashboard/EstateLogsPage"));
 const EstatePlanPage = lazy(() => import("./pages/dashboard/EstatePlanPage"));
 const EstateHomesPage = lazy(() => import("./pages/dashboard/EstateHomesPage"));
 const EstateSecurityPage = lazy(() => import("./pages/dashboard/EstateSecurityPage"));
+const EstateSecurityTeamPage = lazy(() => import("./pages/dashboard/estateSecurity/EstateSecurityTeamPage"));
+const EstateSecurityRulesPage = lazy(() => import("./pages/dashboard/estateSecurity/EstateSecurityRulesPage"));
+const EstateSecurityMonitoringPage = lazy(() => import("./pages/dashboard/estateSecurity/EstateSecurityMonitoringPage"));
 const EstateEmergencyPage = lazy(() => import("./pages/dashboard/EstateEmergencyPage"));
 const EstateSettingsPage = lazy(() => import("./pages/dashboard/EstateSettingsPage"));
 const EstateCommunityBoardPage = lazy(() => import("./pages/dashboard/EstateCommunityBoardPage"));
@@ -110,12 +122,14 @@ const EstatePollsPage = lazy(() => import("./pages/dashboard/EstatePollsPage"));
 const EstateDuesPage = lazy(() => import("./pages/dashboard/EstateDuesPage"));
 const EstateMaintenancePage = lazy(() => import("./pages/dashboard/EstateMaintenancePage"));
 const EstateStatsPage = lazy(() => import("./pages/dashboard/EstateStatsPage"));
+const EstateArtisansPage = lazy(() => import("./pages/dashboard/EstateArtisansPage"));
 const SecurityDashboardPage = lazy(() => import("./pages/dashboard/SecurityDashboardPage"));
 const SecurityEmergencyPage = lazy(() => import("./pages/dashboard/SecurityEmergencyPage"));
 const SecurityMessagesPage = lazy(() => import("./pages/dashboard/SecurityMessagesPage"));
 const OfficeOverviewPage = lazy(() => import("./pages/dashboard/office/OfficeOverviewPage"));
 const OfficeQueuePage = lazy(() => import("./pages/dashboard/office/OfficeQueuePage"));
 const OfficeVisitorsPage = lazy(() => import("./pages/dashboard/office/OfficeVisitorsPage"));
+const OfficeAttendancePage = lazy(() => import("./pages/dashboard/office/OfficeAttendancePage"));
 const OfficeMessagesPage = lazy(() => import("./pages/dashboard/office/OfficeMessagesPage"));
 const OfficeEmployeesPage = lazy(() => import("./pages/dashboard/office/OfficeEmployeesPage"));
 const OfficeQrPage = lazy(() => import("./pages/dashboard/office/OfficeQrPage"));
@@ -329,14 +343,15 @@ function AppRoutes() {
                   <Route path="/billing/callback" element={<LazyRoute><BillingCallbackPage /></LazyRoute>} />
                   <Route path="/onboarding" element={<LazyRoute><OnboardingPage /></LazyRoute>} />
                 </Route>
-                <Route element={<RoleRoute allowedRoles={["homeowner", "estate", "office", "admin", "security"]} />}>
+                <Route element={<RoleRoute allowedRoles={["homeowner", "estate", "office", "office_staff", "admin", "security"]} />}>
                   <Route path="/dashboard/notifications" element={<LazyRoute><NotificationsPage /></LazyRoute>} />
                 </Route>
-                <Route element={<RoleRoute allowedRoles={["office"]} />}>
+                <Route element={<RoleRoute allowedRoles={["office", "office_staff"]} />}>
                   <Route path="/dashboard/office" element={<Navigate to="/dashboard/office/overview" replace />} />
                   <Route path="/dashboard/office/overview" element={<LazyRoute><OfficeOverviewPage /></LazyRoute>} />
                   <Route path="/dashboard/office/queue" element={<LazyRoute><OfficeQueuePage /></LazyRoute>} />
                   <Route path="/dashboard/office/visitors" element={<LazyRoute><OfficeVisitorsPage /></LazyRoute>} />
+                  <Route path="/dashboard/office/attendance" element={<LazyRoute><OfficeAttendancePage /></LazyRoute>} />
                   <Route path="/dashboard/office/messages" element={<LazyRoute><OfficeMessagesPage /></LazyRoute>} />
                   <Route path="/dashboard/office/employees" element={<LazyRoute><OfficeEmployeesPage /></LazyRoute>} />
                   <Route path="/dashboard/office/qr" element={<LazyRoute><OfficeQrPage /></LazyRoute>} />
@@ -362,20 +377,21 @@ function AppRoutes() {
                     <Route path="/dashboard/homeowner/receipts" element={<LazyRoute><HomeownerReceiptsPage /></LazyRoute>} />
                     <Route path="/dashboard/homeowner/alerts" element={<LazyRoute><HomeownerAlertsPage /></LazyRoute>} />
                     <Route path="/dashboard/homeowner/maintenance" element={<LazyRoute><HomeownerMaintenancePage /></LazyRoute>} />
-                    <Route path="/dashboard/homeowner/estate-broadcasts" element={<LazyRoute><EstateManagedHomeownerModulePage /></LazyRoute>} />
-                    <Route path="/dashboard/homeowner/estate-meetings" element={<LazyRoute><EstateManagedHomeownerModulePage /></LazyRoute>} />
-                    <Route path="/dashboard/homeowner/estate-polls" element={<LazyRoute><EstateManagedHomeownerModulePage /></LazyRoute>} />
-                    <Route path="/dashboard/homeowner/estate-dues" element={<LazyRoute><EstateManagedHomeownerModulePage /></LazyRoute>} />
-                    <Route path="/dashboard/homeowner/estate-maintenance" element={<LazyRoute><EstateManagedHomeownerModulePage /></LazyRoute>} />
-                    <Route path="/dashboard/homeowner/estate-doors" element={<LazyRoute><EstateManagedHomeownerModulePage /></LazyRoute>} />
-                    <Route path="/dashboard/homeowner/estate-approvals" element={<LazyRoute><EstateManagedHomeownerModulePage /></LazyRoute>} />
-                    <Route path="/dashboard/homeowner/estate-messages" element={<LazyRoute><EstateManagedHomeownerModulePage /></LazyRoute>} />
-                    <Route path="/dashboard/homeowner/estate-video-calls" element={<LazyRoute><EstateManagedHomeownerModulePage /></LazyRoute>} />
-                    <Route path="/dashboard/homeowner/estate-audio-calls" element={<LazyRoute><EstateManagedHomeownerModulePage /></LazyRoute>} />
-                    <Route path="/dashboard/homeowner/estate-alerts" element={<LazyRoute><EstateManagedHomeownerModulePage /></LazyRoute>} />
-                    <Route path="/dashboard/homeowner/estate-panic" element={<LazyRoute><EstateManagedHomeownerModulePage /></LazyRoute>} />
+                    <Route path="/dashboard/homeowner/estate-broadcasts" element={<LazyRoute><HomeownerEstateBroadcastsPage /></LazyRoute>} />
+                    <Route path="/dashboard/homeowner/estate-meetings" element={<LazyRoute><HomeownerEstateMeetingsPage /></LazyRoute>} />
+                    <Route path="/dashboard/homeowner/estate-polls" element={<LazyRoute><HomeownerEstatePollsPage /></LazyRoute>} />
+                    <Route path="/dashboard/homeowner/estate-dues" element={<LazyRoute><HomeownerEstateDuesPage /></LazyRoute>} />
+                    <Route path="/dashboard/homeowner/estate-maintenance" element={<LazyRoute><HomeownerEstateMaintenancePage /></LazyRoute>} />
+                    <Route path="/dashboard/homeowner/estate-doors" element={<LazyRoute><HomeownerDoorsPage /></LazyRoute>} />
+                    <Route path="/dashboard/homeowner/estate-approvals" element={<LazyRoute><HomeownerEstateApprovalsPage /></LazyRoute>} />
+                    <Route path="/dashboard/homeowner/estate-messages" element={<Navigate to="/dashboard/homeowner/messages" replace />} />
+                    <Route path="/dashboard/homeowner/estate-video-calls" element={<LazyRoute><HomeownerEstateVideoCallsPage /></LazyRoute>} />
+                    <Route path="/dashboard/homeowner/estate-audio-calls" element={<LazyRoute><HomeownerEstateAudioCallsPage /></LazyRoute>} />
+                    <Route path="/dashboard/homeowner/estate-alerts" element={<LazyRoute><HomeownerEstateAlertsPage /></LazyRoute>} />
+                    <Route path="/dashboard/homeowner/estate-panic" element={<LazyRoute><HomeownerEstatePanicPage /></LazyRoute>} />
                   </Route>
                   <Route path="/dashboard/homeowner/settings" element={<LazyRoute><HomeownerSettingsPage /></LazyRoute>} />
+                  <Route path="/dashboard/homeowner/artisans" element={<LazyRoute><EstateArtisansPage /></LazyRoute>} />
                 </Route>
                 <Route element={<RoleRoute allowedRoles={["estate"]} />}>
                   <Route path="/dashboard/estate" element={<LazyRoute><EstateDashboardPage /></LazyRoute>} />
@@ -391,10 +407,14 @@ function AppRoutes() {
                   <Route path="/dashboard/estate/homes" element={<LazyRoute><EstateHomesPage /></LazyRoute>} />
                   <Route element={<HomeownerSubscriptionRoute requiredFeature="multi_admin_roles" />}>
                     <Route path="/dashboard/estate/security" element={<LazyRoute><EstateSecurityPage /></LazyRoute>} />
+                    <Route path="/dashboard/estate/security/team" element={<LazyRoute><EstateSecurityTeamPage /></LazyRoute>} />
+                    <Route path="/dashboard/estate/security/rules" element={<LazyRoute><EstateSecurityRulesPage /></LazyRoute>} />
+                    <Route path="/dashboard/estate/security/monitoring" element={<LazyRoute><EstateSecurityMonitoringPage /></LazyRoute>} />
                   </Route>
                   <Route path="/dashboard/estate/emergency" element={<LazyRoute><EstateEmergencyPage /></LazyRoute>} />
                   <Route path="/dashboard/estate/community" element={<LazyRoute><EstateCommunityBoardPage /></LazyRoute>} />
                   <Route path="/dashboard/estate/settings" element={<LazyRoute><EstateSettingsPage /></LazyRoute>} />
+                  <Route path="/dashboard/estate/artisans" element={<LazyRoute><EstateArtisansPage /></LazyRoute>} />
                   <Route path="/dashboard/estate/broadcasts" element={<LazyRoute><EstateBroadcastsPage /></LazyRoute>} />
                   <Route path="/dashboard/estate/meetings" element={<LazyRoute><EstateMeetingsPage /></LazyRoute>} />
                   <Route path="/dashboard/estate/polls" element={<LazyRoute><EstatePollsPage /></LazyRoute>} />
@@ -407,6 +427,8 @@ function AppRoutes() {
                 <Route element={<RoleRoute allowedRoles={["security"]} />}>
                   <Route path="/dashboard/security" element={<LazyRoute><SecurityDashboardPage /></LazyRoute>} />
                   <Route path="/dashboard/security/emergency" element={<LazyRoute><SecurityEmergencyPage /></LazyRoute>} />
+                </Route>
+                <Route element={<RoleRoute allowedRoles={["security", "office_staff"]} />}>
                   <Route path="/dashboard/security/messages" element={<LazyRoute><SecurityMessagesPage /></LazyRoute>} />
                 </Route>
                 <Route element={<RoleRoute allowedRoles={["admin"]} />}>

@@ -6,7 +6,7 @@ const homeownerNav = [
   { to: "/dashboard/homeowner/overview", label: "Dashboard", icon: "overview" },
   { to: "/dashboard/homeowner/visits", label: "Visits", icon: "visits" },
   { to: "/dashboard/homeowner/messages", label: "Messages", icon: "messages" },
-  { to: "/dashboard/homeowner/doors", label: "Doors", icon: "doors" },
+  // { to: "/dashboard/homeowner/doors", label: "Doors", icon: "doors" },
   { to: "/dashboard/homeowner/settings", label: "Settings", icon: "settings" }
 ];
 
@@ -15,7 +15,7 @@ const estateNav = [
   { to: "/dashboard/estate/invites", label: "Owners", icon: "invite" },
   { to: "/dashboard/estate/homes", label: "Homes", icon: "homes" },
   { to: "/dashboard/estate/doors", label: "Doors", icon: "doors" },
-  { to: "/dashboard/estate/assign", label: "Assign", icon: "assign" }
+  // { to: "/dashboard/estate/assign", label: "Assign", icon: "assign" }
 ];
 
 const securityNav = [
@@ -53,7 +53,7 @@ export default function PersistentAppMobileNav() {
     return [];
   }, [routeRole]);
 
-  const shouldShow = ready && isAuthenticated && routeRole === "homeowner" && pathname.startsWith("/dashboard/homeowner") && items.length > 0;
+  const shouldShow = ready && isAuthenticated && routeRole === "homeowner" && pathname === "/dashboard/homeowner/overview" && items.length > 0;
   if (!shouldShow) return null;
 
   return (
@@ -69,7 +69,7 @@ export default function PersistentAppMobileNav() {
               key={`persistent-mobile-${item.to}`}
               to={item.to}
               end={item.to === "/dashboard/homeowner/overview" || item.to === "/dashboard/estate" || item.to === "/dashboard/admin"}
-              className="relative flex flex-1 flex-col items-center justify-center py-1 select-none"
+              className="relative flex flex-1 flex-col items-center justify-center py-0.5 select-none"
             >
               {({ isActive }) => (
                 <div className="flex flex-col items-center justify-center">
@@ -86,7 +86,7 @@ export default function PersistentAppMobileNav() {
                   
                   {/* Clear Clean Modern Text Labels */}
                   <span 
-                    className={`mt-0.5 text-[10px] font-medium tracking-normal transition-colors duration-200 ${
+                    className={`mt-0.25 text-[12px] font-medium tracking-normal transition-colors duration-200 ${
                       isActive 
                         ? "text-neutral-950 font-semibold dark:text-white" 
                         : "text-neutral-400 dark:text-neutral-500"
@@ -134,7 +134,7 @@ function NavIcon({ name, isActive }) {
   return (
     <svg 
       viewBox="0 0 24 24" 
-      className="h-[18px] w-[18px] transition-all duration-200" 
+      className="h-[22px] w-[22px] transition-all duration-200" 
       fill="none" 
       stroke="currentColor" 
       strokeWidth={isActive ? 2.5 : 2} 

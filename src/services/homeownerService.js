@@ -165,14 +165,21 @@ export async function shareHomeownerAppointment(appointmentId) {
 }
 
 export async function getHomeownerContext() {
-  const response = await apiRequest("/homeowner/settings", { retryCount: 2, timeoutMs: 12000 });
+  const response = await apiRequest("/homeowner/context", { noCache: true, retryCount: 2, timeoutMs: 12000 });
   const data = response?.data ?? null;
   return {
     managedByEstate: Boolean(data?.managedByEstate),
     estateId: data?.estateId ?? null,
     estateName: data?.estateName ?? null,
-    estateOwnerId: data?.subscription?.subscriptionOwnerId ?? null
+    estateOwnerId: data?.estateOwnerId ?? null,
+    home: data?.home ?? null,
+    unitLabel: data?.unitLabel ?? data?.home?.name ?? null
   };
+}
+
+export async function listHomeownerArtisans() {
+  const response = await apiRequest("/homeowner/artisans", { noCache: true });
+  return Array.isArray(response?.data) ? response.data : [];
 }
 
 export async function joinEstate(payload) {

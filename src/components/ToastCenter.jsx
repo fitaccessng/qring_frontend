@@ -1,18 +1,26 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { AlertTriangle, CheckCircle2, Info, X, XCircle } from "lucide-react";
 
 const paletteByType = {
-  success: "border-emerald-300 bg-emerald-100 text-emerald-950",
-  error: "border-rose-300 bg-rose-100 text-rose-950",
-  warning: "border-amber-300 bg-amber-100 text-amber-950",
-  info: "border-sky-300 bg-sky-100 text-sky-950"
+  success: "border-emerald-200 bg-white text-slate-950 shadow-emerald-950/10 dark:border-emerald-900/50 dark:bg-slate-900 dark:text-white",
+  error: "border-rose-200 bg-white text-slate-950 shadow-rose-950/10 dark:border-rose-900/50 dark:bg-slate-900 dark:text-white",
+  warning: "border-amber-200 bg-white text-slate-950 shadow-amber-950/10 dark:border-amber-900/50 dark:bg-slate-900 dark:text-white",
+  info: "border-cyan-200 bg-white text-slate-950 shadow-cyan-950/10 dark:border-cyan-900/50 dark:bg-slate-900 dark:text-white"
 };
 
 const iconByType = {
-  success: "✓",
-  error: "!",
-  warning: "!",
-  info: "i"
+  success: CheckCircle2,
+  error: XCircle,
+  warning: AlertTriangle,
+  info: Info
+};
+
+const accentByType = {
+  success: "bg-emerald-500 text-emerald-600",
+  error: "bg-rose-500 text-rose-600",
+  warning: "bg-amber-500 text-amber-600",
+  info: "bg-cyan-500 text-cyan-600"
 };
 
 function normalizeToast(detail) {
@@ -135,7 +143,8 @@ export default function ToastCenter() {
       <div className="flex w-full max-w-md flex-col gap-2 sm:max-w-sm">
         {toasts.map((toast) => {
           const palette = paletteByType[toast.type] ?? paletteByType.info;
-          const icon = iconByType[toast.type] ?? iconByType.info;
+          const Icon = iconByType[toast.type] ?? iconByType.info;
+          const accent = accentByType[toast.type] ?? accentByType.info;
           const canNavigate = Boolean(toast.route && toast.route.startsWith("/"));
           const actionLabel = toast.actionLabel || (canNavigate ? "Open" : "");
 
@@ -143,15 +152,16 @@ export default function ToastCenter() {
             <div
               key={toast.id}
               role="status"
-              className={`pointer-events-auto w-full overflow-hidden rounded-2xl border p-3 shadow-2xl backdrop-blur-sm transition-all ${palette}`}
+              className={`pointer-events-auto w-full overflow-hidden rounded-2xl border shadow-2xl backdrop-blur-sm transition-all ${palette}`}
             >
-              <div className="flex items-start gap-3">
-                <div className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-white/65 text-xs font-black text-inherit ring-1 ring-black/5">
-                  {icon}
+              <div className={`h-1 w-full ${accent.split(" ")[0]}`} />
+              <div className="flex items-start gap-3 p-3">
+                <div className={`mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-slate-100 ${accent.split(" ")[1]} ring-1 ring-black/5 dark:bg-slate-800`}>
+                  <Icon className="h-4 w-4" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-bold uppercase tracking-wide text-inherit opacity-90">{toast.title}</p>
-                  <p className="mt-1 break-words text-sm font-semibold text-inherit">{toast.message}</p>
+                  <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">{toast.title}</p>
+                  <p className="mt-1 break-words text-sm font-bold leading-5 text-slate-900 dark:text-white">{toast.message}</p>
                   {actionLabel ? (
                     <div className="mt-2 flex items-center gap-2">
                       <button
@@ -162,14 +172,14 @@ export default function ToastCenter() {
                           }
                           removeToast(toast.id, toast);
                         }}
-                        className="rounded-full bg-white/70 px-3 py-1 text-[12px] font-semibold text-inherit ring-1 ring-black/5 transition hover:bg-white/90 active:scale-[0.99]"
+                        className="rounded-lg bg-slate-950 px-3 py-1.5 text-[12px] font-black text-white ring-1 ring-black/5 transition hover:bg-slate-800 active:scale-[0.99] dark:bg-white dark:text-slate-950"
                       >
                         {actionLabel}
                       </button>
                       <button
                         type="button"
                         onClick={() => removeToast(toast.id, toast)}
-                        className="rounded-full px-2 py-1 text-[12px] font-semibold text-inherit opacity-75 transition hover:opacity-100"
+                        className="rounded-lg px-2 py-1.5 text-[12px] font-bold text-slate-500 transition hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
                       >
                         Dismiss
                       </button>
@@ -179,16 +189,16 @@ export default function ToastCenter() {
                 <button
                   type="button"
                   onClick={() => removeToast(toast.id, toast)}
-                  className="rounded-full p-1 text-xs font-bold text-inherit opacity-75 transition hover:bg-white/40 hover:opacity-100 active:scale-95"
+                  className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 active:scale-95 dark:hover:bg-slate-800 dark:hover:text-white"
                   aria-label="Close alert"
                   title="Close"
                 >
-                  ×
+                  <X className="h-4 w-4" />
                 </button>
               </div>
-              <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-white/45 ring-1 ring-black/5">
+              <div className="mx-3 mb-3 h-1 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                 <div
-                  className="h-full bg-black/25"
+                  className={`h-full ${accent.split(" ")[0]}`}
                   style={{
                     animation: `qring_toast_progress ${toast.duration}ms linear forwards`
                   }}

@@ -20,12 +20,12 @@ export default function OfficeQueueRow({ item, actions }) {
             <OfficeStatusPill label={item.status || item.rawStatus} />
           </div>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            {item.company || "Visitor"}{item.department ? ` · ${item.department}` : ""}{item.employeeToVisit ? ` · ${item.employeeToVisit}` : ""}
+            {item.company || "Visitor"}{item.department ? ` · ${item.department}` : ""}{item.requestedStaffName ? ` · ${item.requestedStaffName}` : ""}{item.assignedStaffName ? ` → ${item.assignedStaffName}` : ""}
           </p>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{item.purpose || "Office visit"}</p>
           <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold text-slate-500 dark:text-slate-400">
             <span className="rounded-full bg-white px-3 py-1 dark:bg-slate-900">{item.visitorPhone || "No phone"}</span>
-            <span className="rounded-full bg-white px-3 py-1 dark:bg-slate-900">{item.hostName || "Reception"}</span>
+            <span className="rounded-full bg-white px-3 py-1 dark:bg-slate-900">{item.hostName || item.requestedStaffName || "Reception"}</span>
             <span className="rounded-full bg-white px-3 py-1 dark:bg-slate-900">{formatTime(item.time)}</span>
           </div>
         </div>

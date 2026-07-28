@@ -5,6 +5,7 @@ const ROLE_HOME = {
   homeowner: "/dashboard/homeowner/overview",
   estate: "/dashboard/estate",
   office: "/dashboard/office/overview",
+  office_staff: "/dashboard/office/overview",
   admin: "/dashboard/admin",
   security: "/dashboard/security",
 };

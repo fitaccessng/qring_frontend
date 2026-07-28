@@ -1,28 +1,21 @@
-import { useMemo, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import { 
-  ArrowLeft, 
-  Settings, 
-  BellRing, 
+import React, { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  ChevronLeft,
+  Settings,
+  BellRing,
   CheckCheck, 
   ShieldAlert, 
   Trash2,
-  Home,
-  ShieldCheck,
-  Bell,
-  Settings2
+  UserRound,
+  Sparkles
 } from "lucide-react";
 import NotificationFeed from "../../components/notifications/NotificationFeed";
-import { useDashboardData } from "../../hooks/useDashboardData";
-import { useAuth } from "../../state/AuthContext";
 import { useNotifications } from "../../state/NotificationsContext";
 import { getNotificationDetailRoute } from "../../utils/notificationMeta";
-import { getUserInitials } from "../../utils/profile";
 
 export default function NotificationsPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const { profile } = useDashboardData();
   const {
     items,
     loading,
@@ -37,8 +30,22 @@ export default function NotificationsPage() {
 
   const [activeActionId, setActiveActionId] = useState("");
   const [actionError, setActionError] = useState("");
-  const profileLabel = profile?.fullName?.trim() || user?.fullName?.trim() || user?.email || "Resident";
-  const initials = getUserInitials(profileLabel);
+  const [filter, setFilter] = useState("all");
+  const filteredItems = useMemo(() => {
+    if (filter === "unread") return items.filter((item) => item.unread);
+    if (filter === "visitor") return items.filter((item) => item.category === "visitor" || item.canRespondToVisit);
+    if (filter === "security") return items.filter((item) => item.category === "security" || item.priority === "critical");
+    if (filter === "system") return items.filter((item) => item.category === "system" || item.category === "payment");
+    return items;
+  }, [filter, items]);
+
+  const filters = useMemo(() => [
+    { key: "all", label: "All", count: items.length, icon: BellRing },
+    { key: "unread", label: "Unread", count: unreadCount, icon: CheckCheck },
+    { key: "visitor", label: "Visitors", count: items.filter((item) => item.category === "visitor" || item.canRespondToVisit).length, icon: UserRound },
+    { key: "security", label: "Security", count: items.filter((item) => item.category === "security" || item.priority === "critical").length, icon: ShieldAlert },
+    { key: "system", label: "System", count: items.filter((item) => item.category === "system" || item.category === "payment").length, icon: Sparkles }
+  ], [items, unreadCount]);
 
   async function handleNotificationClick(item) {
     setActionError("");
@@ -73,81 +80,108 @@ export default function NotificationsPage() {
   }
 
   return (
-    <div className="min-h-[100dvh] bg-[#f8f9fa] text-[#2b3437] font-body">
+    <div className="min-h-screen bg-slate-100 pb-40 font-sans text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100">
       
-      {/* Header: Back Arrow | Title | Settings */}
-      <header className="fixed top-0 left-0 w-full z-50 px-6 py-4 flex justify-between items-center bg-white/80 backdrop-blur-xl shadow-sm border-b border-slate-100">
-        <button 
-          onClick={handleBack}
-          className="p-2 rounded-lg text-indigo-600 hover:bg-indigo-50 transition-all active:scale-90"
-          aria-label="Back"
-        >
-          <ArrowLeft className="h-6 w-6" />
-        </button>
-        
-        <h1 className="font-['Manrope'] text-xl font-bold tracking-tight text-indigo-700">
-          Notifications
-        </h1>
-
-        <button 
-          onClick={() => navigate("/dashboard/homeowner/settings")}
-          className="p-2 rounded-lg text-indigo-600 hover:bg-indigo-50 transition-all active:scale-90"
-          aria-label="Settings"
-        >
-          <Settings className="h-6 w-6" />
-        </button>
+      {/* STATIC STICKY HEADER */}
+      <header className="sticky top-0 z-50 w-full border-b border-slate-200/80 bg-white/95 px-4 py-3.5 backdrop-blur-md dark:border-slate-800 dark:bg-slate-950/95 sm:py-4">
+        <div className="mx-auto flex max-w-2xl items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleBack}
+              className="p-2 bg-slate-50 text-slate-600 rounded-full hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 transition-all active:scale-95"
+              aria-label="Back"
+            >
+              <ChevronLeft size={20} />
+            </button>
+            <h1 className="text-sm font-extrabold leading-none tracking-tight text-slate-900 dark:text-white sm:text-lg">Notifications</h1>
+          </div>
+          <button
+            onClick={() => navigate("/dashboard/homeowner/settings")}
+            className="p-2 bg-slate-50 text-slate-600 rounded-full hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 transition-all active:scale-95"
+            aria-label="Settings"
+          >
+            <Settings size={18} />
+          </button>
+        </div>
       </header>
 
-      <main className="pt-24 pb-32 px-6 max-w-2xl mx-auto space-y-8">
+      <main className="mx-auto mt-6 max-w-3xl space-y-5 px-4 sm:px-6">
         
-        {/* Quick Stats Banner */}
-        <section className="bg-indigo-700 rounded-[2rem] p-6 text-white shadow-lg shadow-indigo-200 flex justify-between items-center">
-          <div>
-            <h2 className="text-sm font-bold uppercase tracking-widest opacity-80">Unread Alerts</h2>
-            <p className="text-4xl font-black mt-1">{unreadCount}</p>
-          </div>
-          <div className="bg-white/20 p-4 rounded-2xl backdrop-blur-md">
-            <BellRing className="h-8 w-8 text-white" />
+        {/* PREMIUM CARD DESIGN: QUICK STATS BANNER */}
+        <section className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex items-center gap-4">
+            <div className="relative shrink-0">
+              <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-slate-950 text-white dark:bg-white dark:text-slate-950">
+                <BellRing size={24} />
+              </div>
+            </div>
+            
+            <div className="min-w-0 flex-1">
+              <h2 className="text-lg font-black tracking-tight text-slate-950 dark:text-white">Command Inbox</h2>
+              <p className="mt-1 text-sm font-medium text-slate-500 dark:text-slate-400">
+                Visitor requests, alerts, and account notices in one place.
+              </p>
+            </div>
+            <div className="rounded-xl bg-slate-100 px-4 py-3 text-center dark:bg-slate-800">
+              <p className="text-2xl font-black leading-none text-slate-950 dark:text-white">{unreadCount}</p>
+              <p className="mt-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Unread</p>
+            </div>
           </div>
         </section>
 
-        {/* Action Toolbar */}
-        <section className="flex gap-2 overflow-x-auto pb-2 [scrollbar-width:none] sm:justify-center">
-          <button
-            onClick={() => markAllRead()}
-            className="flex items-center gap-2 whitespace-nowrap bg-white px-4 py-2.5 rounded-full border border-slate-200 text-xs font-bold uppercase tracking-wider shadow-sm hover:border-indigo-300 transition-all"
-          >
-            <CheckCheck className="h-3.5 w-3.5 text-indigo-600" />
-            Mark Read
-          </button>
-          <button
-            onClick={() => clearAll()}
+        <section className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+          {filters.map((item) => {
+            const Icon = item.icon;
+            const active = filter === item.key;
+            return (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => setFilter(item.key)}
+                className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl border px-3 text-xs font-black transition ${
+                  active
+                    ? "border-slate-950 bg-slate-950 text-white dark:border-white dark:bg-white dark:text-slate-950"
+                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+                {item.label}
+                <span className={`rounded-full px-2 py-0.5 text-[10px] ${active ? "bg-white/15" : "bg-slate-100 dark:bg-slate-800"}`}>{item.count}</span>
+              </button>
+            );
+          })}
+        </section>
+
+        <section className="grid grid-cols-3 gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <ToolbarActionButton 
+            label="Mark Read" 
+            icon={<CheckCheck size={14} />} 
+            onClick={markAllRead} 
+            color="text-indigo-600" 
+          />
+          <ToolbarActionButton 
+            label="Clear" 
+            icon={<Trash2 size={14} />} 
+            onClick={clearAll} 
             disabled={items.length === 0}
-            className="flex items-center gap-2 whitespace-nowrap bg-white px-4 py-2.5 rounded-full border border-slate-200 text-xs font-bold uppercase tracking-wider shadow-sm hover:border-red-300 disabled:opacity-50 transition-all"
-          >
-            <Trash2 className="h-3.5 w-3.5 text-red-500" />
-            Clear
-          </button>
-          <button
-            onClick={() => enableBrowserAlerts()}
+            color="text-rose-500" 
+          />
+          <ToolbarActionButton 
+            label={permission === "granted" ? "Alerts On" : "Enable"} 
+            icon={<ShieldAlert size={14} />} 
+            onClick={enableBrowserAlerts} 
             disabled={permission === "granted"}
-            className="flex items-center gap-2 whitespace-nowrap bg-slate-900 text-white px-4 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider shadow-md hover:bg-black transition-all"
-          >
-            <ShieldAlert className="h-3.5 w-3.5 text-indigo-400" />
-            {permission === "granted" ? "Alerts On" : "Enable Alerts"}
-          </button>
+            color="text-emerald-600" 
+          />
         </section>
 
-        {/* Feed Section */}
-        <section>
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xs font-bold uppercase tracking-[0.15em] text-on-surface-variant">Activity Feed</h2>
-            <div className="h-px flex-1 bg-slate-200 ml-4"></div>
-          </div>
-
-          <div className="bg-white rounded-3xl p-2 shadow-[0_12px_32px_rgba(43,52,55,0.04)] border border-slate-100">
+        {/* FEED SECTION */}
+        <div className="space-y-2">
+          <h3 className="px-2 text-[10px] font-black uppercase tracking-widest text-slate-400">Activity Feed</h3>
+          
+          <div className="min-h-[200px] rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-4">
             <NotificationFeed
-              items={items}
+              items={filteredItems}
               loading={loading}
               activeActionId={activeActionId}
               actionError={actionError}
@@ -156,21 +190,26 @@ export default function NotificationsPage() {
               onVisitorAction={handleVisitorAction}
             />
           </div>
-        </section>
+        </div>
       </main>
 
-      {/* Bottom Navigation Bar (Serene Sentinel Style) */}
-  
-
-      {/* Profile Initials Floating Indicator */}
-      <div className="fixed bottom-28 right-6 hidden sm:block">
-         <div className="flex items-center gap-3 bg-white/90 backdrop-blur-md p-1.5 pl-4 rounded-full shadow-lg border border-indigo-50">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-indigo-900">{user?.fullName || "User"}</span>
-            <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-black shadow-inner">
-               {initials}
-            </div>
-         </div>
-      </div>
     </div>
+  );
+}
+
+// Action Button component within the Toolbar Box
+function ToolbarActionButton({ label, icon, onClick, disabled, color }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="flex w-full flex-col items-center justify-center rounded-xl py-2.5 transition-colors duration-200 hover:bg-slate-50 focus:outline-none disabled:pointer-events-none disabled:opacity-40 dark:hover:bg-slate-800/60"
+    >
+      <div className={`p-1.5 rounded-lg bg-slate-50 dark:bg-slate-800/80 ${color} mb-1 flex items-center justify-center`}>
+        {icon}
+      </div>
+      <span className="mt-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">{label}</span>
+    </button>
   );
 }

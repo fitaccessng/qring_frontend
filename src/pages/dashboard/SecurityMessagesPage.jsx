@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ChevronLeft, Phone, Search, SendHorizontal, Trash2, Video, X, MessageSquare } from "lucide-react";
-import AppShell from "../../layouts/AppShell";
 import { env } from "../../config/env";
 import { getAccessToken } from "../../services/authStorage";
 import { RealtimeEvent } from "../../services/realtimeEvents";
@@ -44,13 +43,51 @@ export default function SecurityMessagesPage() {
   useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
   useEffect(() => { threadsRef.current = threads; }, [threads]);
 
+  async function refreshThreads({ focusSessionId = "", openThread = false, silent = true } = {}) {
+    try {
+      const data = await getSecurityMessages();
+      const normalized = (data || []).map(t => ({ ...t, last: previewText(t?.last || "") }));
+      setThreads(normalized);
+      const targetId = String(focusSessionId || "").trim();
+      if (targetId && normalized.some((row) => row.id === targetId)) {
+        setSelectedId(targetId);
+        if (openThread) setView("chat");
+      } else if (!selectedIdRef.current && normalized[0]?.id) {
+        setSelectedId(normalized[0].id);
+      }
+      return normalized;
+    } catch (e) {
+      if (!silent) setError(e?.message || "Failed to load conversations.");
+      return [];
+    }
+  }
+
+  async function refreshConversation(sessionId, { openThread = false } = {}) {
+    const sid = String(sessionId || "").trim();
+    if (!sid) return;
+    try {
+      const rows = await getSecuritySessionMessages(sid);
+      setMessagesByThread(prev => ({ ...prev, [sid]: mergeMessageCollections(prev[sid] ?? [], rows) }));
+      await refreshThreads({ focusSessionId: sid, openThread, silent: true });
+    } catch (e) {
+      setError(e?.message || "Failed to load conversation.");
+    }
+  }
+
   function upsertThreadPreview(msg) {
     if (!msg?.sessionId) return;
-    setThreads(prev => prev.map(t =>
-      t.id === msg.sessionId
-        ? { ...t, last: previewText(msg.text), time: msg.at, unread: selectedIdRef.current === msg.sessionId || msg.senderType === "security" ? 0 : (t.unread || 0) + 1 }
-        : t
-    ));
+    let found = false;
+    setThreads(prev => {
+      const next = prev.map(t => {
+        if (t.id !== msg.sessionId) return t;
+        found = true;
+        return { ...t, last: previewText(msg.text), time: msg.at, unread: selectedIdRef.current === msg.sessionId || msg.senderType === "security" ? 0 : (t.unread || 0) + 1 };
+      });
+      return next;
+    });
+    if (!found) {
+      refreshThreads({ focusSessionId: msg.sessionId, openThread: preferredSessionId === msg.sessionId }).catch(() => {});
+    }
   }
 
   useEffect(() => {
@@ -58,12 +95,10 @@ export default function SecurityMessagesPage() {
     async function load() {
       setLoading(true); setError("");
       try {
-        const data = await getSecurityMessages();
+        const data = await refreshThreads({ focusSessionId: preferredSessionId, openThread: Boolean(preferredSessionId), silent: false });
         if (!active) return;
-        const normalized = (data || []).map(t => ({ ...t, last: previewText(t?.last || "") }));
-        setThreads(normalized);
-        const firstId = preferredSessionId && normalized.some(r => r.id === preferredSessionId)
-          ? preferredSessionId : normalized[0]?.id || "";
+        const firstId = preferredSessionId && data.some(r => r.id === preferredSessionId)
+          ? preferredSessionId : data[0]?.id || "";
         setSelectedId(prev => prev || firstId);
       } catch (e) {
         if (active) setError(e?.message || "Failed to load conversations.");
@@ -141,6 +176,9 @@ export default function SecurityMessagesPage() {
       });
       if (msg.senderType !== "security") playMessageNotificationSound();
       upsertThreadPreview(msg);
+      if (selectedIdRef.current === sid || preferredSessionId === sid) {
+        refreshConversation(sid, { openThread: preferredSessionId === sid }).catch(() => {});
+      }
     };
 
     const handleChatTyping = (payload) => {
@@ -155,20 +193,14 @@ export default function SecurityMessagesPage() {
       }));
     };
 
-    const handleAnyEvent = (event, data) => {
-      console.log("[SOCKET EVENT]", event, data);
-    };
-
     socket.on("connect", handleConnect);
     socket.on("chat.message", handleChatMessage);
     socket.on("chat.typing", handleChatTyping);
-    socket.onAny(handleAnyEvent);
 
     return () => {
       socket.off("connect", handleConnect);
       socket.off("chat.message", handleChatMessage);
       socket.off("chat.typing", handleChatTyping);
-      socket.offAny(handleAnyEvent);
       socketRef.current = null;
       releaseRealtimeSocket(env.signalingNamespace ?? "/realtime/signaling", {
         autoConnect: true,
@@ -176,6 +208,56 @@ export default function SecurityMessagesPage() {
         withCredentials: true
       });
     };
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) return;
+    const dashboardSocket = createRealtimeSocket(env.dashboardNamespace ?? "/realtime/dashboard", {
+      authBuilder: () => {
+        const t = getAccessToken();
+        return t ? { token: t } : {};
+      }
+    });
+
+    const handleHomeownerMessage = (payload) => {
+      const data = payload?.data ?? payload ?? {};
+      const sid = String(data?.sessionId || "").trim();
+      if (!sid) {
+        refreshThreads({ silent: true }).catch(() => {});
+        return;
+      }
+      refreshConversation(sid, { openThread: preferredSessionId === sid }).catch(() => {});
+      if (data?.senderType !== "security") playMessageNotificationSound();
+    };
+
+    const handleVisitorForwarded = (payload) => {
+      const data = payload?.data ?? payload ?? {};
+      const sid = String(data?.sessionId || data?.visitorSessionId || data?.id || "").trim();
+      refreshThreads({ focusSessionId: sid, openThread: preferredSessionId === sid, silent: true }).catch(() => {});
+    };
+
+    dashboardSocket.on("homeowner.message", handleHomeownerMessage);
+    dashboardSocket.on("visitor_forwarded", handleVisitorForwarded);
+    return () => {
+      dashboardSocket.off("homeowner.message", handleHomeownerMessage);
+      dashboardSocket.off("visitor_forwarded", handleVisitorForwarded);
+      releaseRealtimeSocket(env.dashboardNamespace ?? "/realtime/dashboard", {
+        autoConnect: true,
+        reconnection: true,
+        withCredentials: true
+      });
+    };
+  }, [token, preferredSessionId]);
+
+  useEffect(() => {
+    if (!token) return;
+    const intervalId = window.setInterval(() => {
+      refreshThreads({ focusSessionId: selectedIdRef.current, silent: true }).catch(() => {});
+      if (selectedIdRef.current) {
+        refreshConversation(selectedIdRef.current).catch(() => {});
+      }
+    }, 7000);
+    return () => window.clearInterval(intervalId);
   }, [token]);
 
   useEffect(() => {
@@ -282,29 +364,26 @@ export default function SecurityMessagesPage() {
   const totalUnread = threads.reduce((s, t) => s + (t.unread || 0), 0);
 
   return (
-    <AppShell title="Security Messages">
+    <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;0,9..144,900;1,9..144,400&family=Instrument+Sans:wght@400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500;1,400&display=swap');
-
-        .msg-root { font-family: 'Instrument Sans', sans-serif; background: #f5f4f0; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+        .msg-root { background: #f8fafc; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; color: #0f172a; }
         .msg-root * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        .fraunces { font-family: 'Fraunces', serif; }
-        .dm-mono { font-family: 'DM Mono', monospace; }
+        .dm-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
 
         /* Topbar */
-        .msg-topbar { background: #0c0c0c; flex-shrink: 0; }
+        .msg-topbar { background: rgba(255,255,255,0.78); backdrop-filter: blur(18px); border-bottom: 1px solid rgba(226,232,240,0.8); flex-shrink: 0; padding-top: env(safe-area-inset-top); }
 
         /* Thread list */
         .thread-list { flex: 1; overflow-y: auto; overscroll-behavior: contain; }
         .thread-list::-webkit-scrollbar { display: none; }
-        .thread-item { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border-bottom: 1px solid #ece9e2; background: #fff; cursor: pointer; transition: background 0.12s; }
-        .thread-item:active { background: #f5f4f0; }
-        .thread-item.selected { background: #f0fdf4; border-left: 3px solid #10b981; }
-        .thread-avatar { width: 44px; height: 44px; border-radius: 14px; background: #1a1a1a; display: grid; place-items: center; flex-shrink: 0; }
+        .thread-item { display: flex; gap: 12px; align-items: flex-start; margin: 10px 14px 0; padding: 14px; border: 1px solid rgba(226,232,240,0.9); border-radius: 20px; background: #fff; cursor: pointer; transition: background 0.12s, border-color 0.12s; }
+        .thread-item:active { background: #f1f5f9; }
+        .thread-item.selected { background: #eff6ff; border-color: #2563eb; }
+        .thread-avatar { width: 44px; height: 44px; border-radius: 14px; background: #0f172a; display: grid; place-items: center; flex-shrink: 0; }
 
         /* Chat panel */
-        .chat-panel { display: flex; flex-direction: column; height: 100%; background: #fafaf8; }
-        .chat-header { background: #fff; border-bottom: 1px solid #ece9e2; flex-shrink: 0; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+        .chat-panel { display: flex; flex-direction: column; height: 100%; background: #f8fafc; }
+        .chat-header { background: rgba(255,255,255,0.82); backdrop-filter: blur(18px); border-bottom: 1px solid rgba(226,232,240,0.8); flex-shrink: 0; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: max(12px, env(safe-area-inset-top)); }
         .messages-area { flex: 1; overflow-y: auto; padding: 16px 14px; display: flex; flex-direction: column; gap: 10px; overscroll-behavior: contain; }
         .messages-area::-webkit-scrollbar { width: 3px; }
         .messages-area::-webkit-scrollbar-thumb { background: #ddd; border-radius: 4px; }
@@ -312,32 +391,32 @@ export default function SecurityMessagesPage() {
         /* Bubbles */
         .bubble { max-width: 78%; padding: 10px 13px; border-radius: 18px; position: relative; animation: bubbleIn 0.15s ease; }
         @keyframes bubbleIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
-        .bubble-mine { background: #0c0c0c; color: #fff; border-bottom-right-radius: 4px; align-self: flex-end; }
-        .bubble-theirs { background: #fff; color: #1a1a1a; border-bottom-left-radius: 4px; align-self: flex-start; border: 1px solid #ece9e2; }
+        .bubble-mine { background: #2563eb; color: #fff; border-bottom-right-radius: 4px; align-self: flex-end; box-shadow: 0 12px 24px rgba(37,99,235,0.16); }
+        .bubble-theirs { background: #fff; color: #0f172a; border-bottom-left-radius: 4px; align-self: flex-start; border: 1px solid #e2e8f0; }
 
         /* Compose */
-        .compose-bar { background: #fff; border-top: 1px solid #ece9e2; padding: 10px 14px; flex-shrink: 0; padding-bottom: max(10px, env(safe-area-inset-bottom)); }
-        .compose-inner { display: flex; align-items: flex-end; gap: 8px; background: #f5f4f0; border-radius: 20px; padding: 8px 8px 8px 14px; }
+        .compose-bar { background: #fff; border-top: 1px solid #e2e8f0; padding: 10px 14px; flex-shrink: 0; padding-bottom: max(10px, env(safe-area-inset-bottom)); }
+        .compose-inner { display: flex; align-items: flex-end; gap: 8px; background: #f1f5f9; border-radius: 20px; padding: 8px 8px 8px 14px; border: 1px solid #e2e8f0; }
         .compose-textarea { flex: 1; background: none; border: none; outline: none; font-family: 'Instrument Sans', sans-serif; font-size: 14px; color: #1a1a1a; resize: none; max-height: 120px; min-height: 24px; line-height: 1.5; }
         .compose-textarea::placeholder { color: #a8a29e; }
-        .send-btn { width: 36px; height: 36px; border-radius: 50%; background: #0c0c0c; border: none; display: grid; place-items: center; cursor: pointer; flex-shrink: 0; transition: transform 0.12s, opacity 0.12s; }
+        .send-btn { width: 36px; height: 36px; border-radius: 50%; background: #2563eb; border: none; display: grid; place-items: center; cursor: pointer; flex-shrink: 0; transition: transform 0.12s, opacity 0.12s; }
         .send-btn:not(:disabled):active { transform: scale(0.9); }
         .send-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
         /* Search overlay */
-        .search-bar { background: #0c0c0c; padding: 10px 14px; display: flex; align-items: center; gap: 10px; }
-        .search-input { flex: 1; background: rgba(255,255,255,0.1); border: none; border-radius: 10px; padding: 9px 12px; color: #fff; font-family: 'Instrument Sans', sans-serif; font-size: 14px; outline: none; }
-        .search-input::placeholder { color: rgba(255,255,255,0.4); }
+        .search-bar { background: #fff; padding: 10px 14px; display: flex; align-items: center; gap: 10px; }
+        .search-input { flex: 1; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 12px; padding: 9px 12px; color: #0f172a; font-size: 14px; outline: none; }
+        .search-input::placeholder { color: #94a3b8; }
 
         /* Call buttons */
-        .call-btn { width: 38px; height: 38px; border-radius: 12px; border: 1px solid #ece9e2; background: #f5f4f0; display: grid; place-items: center; cursor: pointer; transition: background 0.12s; }
+        .call-btn { width: 38px; height: 38px; border-radius: 12px; border: 1px solid #e2e8f0; background: #f8fafc; display: grid; place-items: center; cursor: pointer; transition: background 0.12s; }
         .call-btn:active { background: #e5e3dc; }
         .call-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
         /* Mobile nav tabs */
-        .mobile-tabs { display: flex; background: #fff; border-top: 1px solid #ece9e2; flex-shrink: 0; padding-bottom: env(safe-area-inset-bottom); }
+        .mobile-tabs { display: flex; background: #fff; border-top: 1px solid #e2e8f0; flex-shrink: 0; padding-bottom: env(safe-area-inset-bottom); }
         .mobile-tab { flex: 1; padding: 10px; display: flex; flex-direction: column; align-items: center; gap: 3px; cursor: pointer; border: none; background: none; font-family: 'Instrument Sans', sans-serif; font-size: 10px; font-weight: 600; color: #a8a29e; letter-spacing: 0.04em; text-transform: uppercase; }
-        .mobile-tab.active { color: #0c0c0c; }
+        .mobile-tab.active { color: #2563eb; }
 
         /* Empty state */
         .empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: #a8a29e; padding: 32px; text-align: center; }
@@ -348,42 +427,42 @@ export default function SecurityMessagesPage() {
         .delete-btn-always { opacity: 0.6; }
 
         /* Unread dot */
-        .unread-dot { background: #10b981; color: #fff; font-size: 10px; font-weight: 700; min-width: 18px; height: 18px; border-radius: 9px; display: grid; place-items: center; padding: 0 4px; flex-shrink: 0; }
+        .unread-dot { background: #2563eb; color: #fff; font-size: 10px; font-weight: 700; min-width: 18px; height: 18px; border-radius: 9px; display: grid; place-items: center; padding: 0 4px; flex-shrink: 0; }
 
         /* Loading spinner */
-        .spinner { width: 20px; height: 20px; border: 2px solid #e5e3dc; border-top-color: #10b981; border-radius: 50%; animation: spin 0.7s linear infinite; }
+        .spinner { width: 20px; height: 20px; border: 2px solid #e2e8f0; border-top-color: #2563eb; border-radius: 50%; animation: spin 0.7s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
       `}</style>
 
-      <div className="msg-root">
+      <div className="msg-root font-sans antialiased">
 
         {/* ── TOP BAR ── */}
         {view === "list" ? (
           <div className="msg-topbar">
             {!searchOpen ? (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 16px", height: 56 }}>
-                {/* <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <Link to="/dashboard/security" style={{ color: "#6b7280", display: "flex", alignItems: "center" }}>
-                    <ChevronLeft size={18} color="#6b7280" />
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 16px", height: 64 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <Link to="/dashboard/security" className="grid h-9 w-9 place-items-center rounded-xl bg-slate-100 text-slate-700">
+                    <ChevronLeft size={18} />
                   </Link>
-                  <span className="fraunces" style={{ color: "#fff", fontSize: 18, fontWeight: 700 }}>Messages</span>
+                  <span style={{ color: "#0f172a", fontSize: 15, fontWeight: 800 }}>Security Messages</span>
                   {totalUnread > 0 && (
-                    <span style={{ background: "#10b981", color: "#fff", fontSize: 10, fontWeight: 700, borderRadius: 20, padding: "2px 7px" }}>
+                    <span style={{ background: "#2563eb", color: "#fff", fontSize: 10, fontWeight: 700, borderRadius: 20, padding: "2px 7px" }}>
                       {totalUnread}
                     </span>
                   )}
-                </div> */}
+                </div>
                 <button
                   type="button"
                   onClick={() => setSearchOpen(true)}
-                  style={{ background: "rgba(255,255,255,0.08)", border: "none", borderRadius: 10, width: 36, height: 36, display: "grid", placeItems: "center", cursor: "pointer" }}
+                  className="grid h-9 w-9 place-items-center rounded-xl bg-slate-100 text-slate-700"
                 >
-                  <Search size={15} color="#fff" />
+                  <Search size={15} />
                 </button>
               </div>
             ) : (
               <div className="search-bar">
-                <Search size={15} color="rgba(255,255,255,0.5)" />
+                <Search size={15} color="#64748b" />
                 <input
                   autoFocus
                   className="search-input"
@@ -396,41 +475,41 @@ export default function SecurityMessagesPage() {
                   onClick={() => { setSearchOpen(false); setQuery(""); }}
                   style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}
                 >
-                  <X size={15} color="rgba(255,255,255,0.6)" />
+                  <X size={15} color="#64748b" />
                 </button>
               </div>
             )}
           </div>
         ) : (
           /* Chat header */
-          <div className="chat-header" style={{ background: "#0c0c0c", borderBottom: "1px solid #1a1a1a" }}>
+          <div className="chat-header">
             <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
               <button
                 type="button"
                 onClick={() => setView("list")}
-                style={{ background: "rgba(255,255,255,0.08)", border: "none", borderRadius: 10, width: 36, height: 36, display: "grid", placeItems: "center", cursor: "pointer", flexShrink: 0 }}
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-700"
               >
-                <ChevronLeft size={16} color="#fff" />
+                <ChevronLeft size={16} />
               </button>
               {selectedThread ? (
                 <div style={{ minWidth: 0 }}>
-                  <p className="fraunces" style={{ color: "#fff", fontSize: 15, fontWeight: 700, margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  <p style={{ color: "#0f172a", fontSize: 15, fontWeight: 800, margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                     {selectedThread.name}
                   </p>
-                  <p style={{ color: "#6b7280", fontSize: 11, margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  <p style={{ color: "#64748b", fontSize: 11, margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                     {selectedThread.door}
                   </p>
                 </div>
               ) : (
-                <span className="fraunces" style={{ color: "#fff", fontSize: 15, fontWeight: 700 }}>Conversation</span>
+                <span style={{ color: "#0f172a", fontSize: 15, fontWeight: 800 }}>Conversation</span>
               )}
             </div>
             <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-              <button type="button" className="call-btn" onClick={() => startCall("audio")} disabled={callBusy === `${selectedId}:audio`} style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)" }}>
-                <Phone size={15} color="#d1fae5" />
+              <button type="button" className="call-btn" onClick={() => startCall("audio")} disabled={callBusy === `${selectedId}:audio`}>
+                <Phone size={15} color="#2563eb" />
               </button>
-              <button type="button" className="call-btn" onClick={() => startCall("video")} disabled={callBusy === `${selectedId}:video`} style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)" }}>
-                <Video size={15} color="#d1fae5" />
+              <button type="button" className="call-btn" onClick={() => startCall("video")} disabled={callBusy === `${selectedId}:video`}>
+                <Video size={15} color="#2563eb" />
               </button>
             </div>
           </div>
@@ -459,7 +538,7 @@ export default function SecurityMessagesPage() {
               ) : filteredThreads.length === 0 ? (
                 <div className="empty-state">
                   <MessageSquare size={32} strokeWidth={1.2} />
-                  <p className="fraunces" style={{ fontSize: 16, fontWeight: 600, color: "#6b7280", margin: 0 }}>
+                  <p style={{ fontSize: 16, fontWeight: 800, color: "#475569", margin: 0 }}>
                     {query ? "No matches" : "No conversations yet"}
                   </p>
                   <p style={{ fontSize: 13, color: "#a8a29e", margin: 0 }}>
@@ -477,13 +556,13 @@ export default function SecurityMessagesPage() {
                     onKeyDown={e => e.key === "Enter" && openThread(thread.id)}
                   >
                     <div className="thread-avatar">
-                      <span className="fraunces" style={{ color: "#10b981", fontSize: 16, fontWeight: 700 }}>
+                      <span style={{ color: "#60a5fa", fontSize: 16, fontWeight: 800 }}>
                         {(thread.name || "?").charAt(0).toUpperCase()}
                       </span>
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 3 }}>
-                        <p style={{ fontSize: 14, fontWeight: 700, color: "#0c0c0c", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        <p style={{ fontSize: 14, fontWeight: 800, color: "#0f172a", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                           {thread.name}
                         </p>
                         <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
@@ -497,7 +576,7 @@ export default function SecurityMessagesPage() {
                           )}
                         </div>
                       </div>
-                      <p style={{ fontSize: 11, color: "#10b981", fontWeight: 600, margin: "0 0 3px" }}>{thread.door}</p>
+                      <p style={{ fontSize: 11, color: "#2563eb", fontWeight: 700, margin: "0 0 3px" }}>{thread.door}</p>
                       <p style={{ fontSize: 13, color: "#78716c", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                         {thread.last || "No messages yet"}
                       </p>
@@ -514,7 +593,7 @@ export default function SecurityMessagesPage() {
               {!selectedThread ? (
                 <div className="empty-state">
                   <MessageSquare size={32} strokeWidth={1.2} />
-                  <p className="fraunces" style={{ fontSize: 16, fontWeight: 600, color: "#6b7280" }}>Select a conversation</p>
+                  <p style={{ fontSize: 16, fontWeight: 800, color: "#475569" }}>Select a conversation</p>
                 </div>
               ) : (
                 <>
@@ -612,7 +691,7 @@ export default function SecurityMessagesPage() {
             <MessageSquare size={18} strokeWidth={view === "list" ? 2.2 : 1.6} />
             Threads
             {totalUnread > 0 && view !== "list" && (
-              <span style={{ position: "absolute", top: 6, fontSize: 8, background: "#10b981", color: "#fff", borderRadius: 10, padding: "1px 5px", fontWeight: 800 }}>{totalUnread}</span>
+              <span style={{ position: "absolute", top: 6, fontSize: 8, background: "#2563eb", color: "#fff", borderRadius: 10, padding: "1px 5px", fontWeight: 800 }}>{totalUnread}</span>
             )}
           </button>
           <button
@@ -626,7 +705,7 @@ export default function SecurityMessagesPage() {
           </button>
         </div>
       </div>
-    </AppShell>
+    </>
   );
 }
 

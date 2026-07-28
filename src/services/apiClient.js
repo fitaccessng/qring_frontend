@@ -21,6 +21,7 @@ let refreshPromise = null;
 let capacitorRuntime = null;
 let lastNetworkErrorAt = 0;
 let lastSessionTimeoutAt = 0;
+let refreshBlockedUntil = 0;
 const GET_CACHE_TTL_MS = 20 * 1000;
 const GET_CACHE_STALE_TTL_MS = 2 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 30000;
@@ -127,6 +128,7 @@ function shouldRetryAgainstDirectBackend(path, response) {
 export function buildApiUrl(path = "", baseUrl = getCurrentApiBaseUrl()) {
   if (!path) return baseUrl;
   if (/^https?:\/\//i.test(path)) return path;
+  if (String(path).startsWith("/uploads/")) return path;
   return `${baseUrl}${normalizePath(path)}`;
 }
 
@@ -424,10 +426,12 @@ function emitSessionTimeout(detail = {}) {
 
 async function refreshAccessToken() {
   if (refreshPromise) return refreshPromise;
+  if (Date.now() < refreshBlockedUntil) return null;
   const refreshToken = getRefreshToken();
   if (!refreshToken) {
     clearAuthStorage();
     emitSessionTimeout();
+    refreshBlockedUntil = Date.now() + 30 * 1000;
     return null;
   }
 
@@ -447,6 +451,7 @@ async function refreshAccessToken() {
 
     if (!response.ok) {
       if (response.status === 401) {
+        refreshBlockedUntil = Date.now() + 30 * 1000;
         clearAuthStorage();
         emitSessionTimeout();
       }
@@ -456,6 +461,7 @@ async function refreshAccessToken() {
     const data = payload?.data ?? payload;
     if (!data?.accessToken) return null;
     persistAuthSession({ accessToken: data.accessToken, refreshToken: data.refreshToken, user: getStoredUserSnapshot() });
+    refreshBlockedUntil = 0;
     lastSessionTimeoutAt = 0;
     return data.accessToken;
   })();
@@ -477,6 +483,7 @@ function getStoredUserSnapshot() {
 }
 
 function clearAuthStorage() {
+  refreshBlockedUntil = Date.now() + 30 * 1000;
   clearAuthSession();
   if (typeof window !== "undefined") {
     window.dispatchEvent(

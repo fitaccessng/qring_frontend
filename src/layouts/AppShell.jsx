@@ -38,7 +38,10 @@ const navByRole = {
     { to: "/dashboard/estate/stats", label: "Visitor Stats", icon: "stats" },
     { to: "/dashboard/estate/mappings", label: "Mappings", icon: "mappings" },
     { to: "/dashboard/estate/logs", label: "Access Logs", icon: "logs" },
-    { to: "/dashboard/estate/security", label: "Security Team", icon: "shield" },
+    { to: "/dashboard/estate/security", label: "Security Overview", icon: "shield" },
+    { to: "/dashboard/estate/security/team", label: "Security Team", icon: "user_admin" },
+    { to: "/dashboard/estate/security/rules", label: "Approval Rules", icon: "plans" },
+    { to: "/dashboard/estate/security/monitoring", label: "Monitoring", icon: "stats" },
     { to: "/dashboard/estate/emergency", label: "Emergency", icon: "bell_ring" },
     { to: "/dashboard/estate/plan", label: "Plan Rules", icon: "plans" },
     { to: "/dashboard/estate/community", label: "Community", icon: "community" },
@@ -79,8 +82,8 @@ const estateManagedHomeownerNav = [
   { to: "/dashboard/homeowner/estate-dues", label: "Dues", icon: "dues" },
   { to: "/dashboard/homeowner/estate-maintenance", label: "Maintenance", icon: "maintenance" },
   { to: "/dashboard/homeowner/estate-doors", label: "Doors", icon: "doors" },
-  { to: "/dashboard/homeowner/estate-approvals", label: "Approvals", icon: "messages" },
-  { to: "/dashboard/homeowner/estate-messages", label: "Messages", icon: "messages" },
+  { to: "/dashboard/homeowner/estate-approvals", label: "Approval Logs", icon: "logs" },
+  { to: "/dashboard/homeowner/messages", label: "Messages", icon: "messages" },
   { to: "/dashboard/homeowner/estate-video-calls", label: "Video Calls", icon: "messages" },
   { to: "/dashboard/homeowner/estate-audio-calls", label: "Audio Calls", icon: "messages" },
   { to: "/dashboard/homeowner/estate-alerts", label: "Alerts", icon: "bell_ring" },
@@ -92,12 +95,14 @@ const featureRequirementByRoute = {
   "/dashboard/homeowner/appointments": "visitor_scheduling",
   "/dashboard/homeowner/access-passes": "visitor_scheduling",
   "/dashboard/homeowner/messages": "chat_call_verification",
-  "/dashboard/homeowner/estate-messages": "chat_call_verification",
   "/dashboard/homeowner/estate-video-calls": "chat_call_verification",
   "/dashboard/homeowner/estate-audio-calls": "chat_call_verification",
   "/dashboard/estate/stats": "analytics",
   "/dashboard/estate/logs": "visitor_logs",
-  "/dashboard/estate/security": "multi_admin_roles"
+  "/dashboard/estate/security": "multi_admin_roles",
+  "/dashboard/estate/security/team": "multi_admin_roles",
+  "/dashboard/estate/security/rules": "multi_admin_roles",
+  "/dashboard/estate/security/monitoring": "multi_admin_roles"
 };
 
 const HOMEOWNER_CONTEXT_CACHE_TTL_MS = 2 * 60 * 1000;
@@ -162,6 +167,12 @@ export default function AppShell({ title, children, showTopBar = true, showMobil
     if (showProfileHeader) return false;
     return routeRole === "estate" || routeRole === "homeowner" || routeRole === "security" || routeRole === "office";
   }, [showTopBar, showProfileHeader, routeRole]);
+  const showMobileNavShell = useMemo(() => {
+    if (!showMobileNav) return false;
+    if (routeRole === "homeowner") return normalizedPathname === "/dashboard/homeowner/overview";
+    if (routeRole === "estate") return normalizedPathname === "/dashboard/estate";
+    return false;
+  }, [normalizedPathname, routeRole, showMobileNav]);
   const isEstateManagedHomeowner = useMemo(
     () =>
       user?.role === "homeowner" &&
@@ -200,7 +211,7 @@ export default function AppShell({ title, children, showTopBar = true, showMobil
           { to: "/dashboard/homeowner/overview", label: "Home", icon: "overview" },
           { to: "/dashboard/homeowner/estate-alerts", label: "Estate", icon: "broadcast" },
           { to: "/dashboard/homeowner/estate-dues", label: "Dues", icon: "dues" },
-          { to: "/dashboard/homeowner/estate-messages", label: "Messages", icon: "messages" },
+          { to: "/dashboard/homeowner/messages", label: "Messages", icon: "messages" },
           { to: "/dashboard/homeowner/estate-panic", label: "Panic", icon: "shield" }
         ];
       }
@@ -258,15 +269,15 @@ export default function AppShell({ title, children, showTopBar = true, showMobil
   const isEstateMobileNav = routeRole === "estate";
   const isOfficeMobileNav = routeRole === "office";
   const showHelpButton = routeRole === "estate" || routeRole === "security";
-  const mobileContentBottomPaddingClass = !showMobileNav
+  const mobileContentBottomPaddingClass = !showMobileNavShell
     ? "pb-8 sm:pb-8"
     : isEstateMobileNav
       ? "pb-[calc(11.5rem+env(safe-area-inset-bottom))] sm:pb-[calc(10rem+env(safe-area-inset-bottom))]"
       : isOfficeMobileNav
         ? "pb-[calc(9.25rem+env(safe-area-inset-bottom))] sm:pb-[calc(8.75rem+env(safe-area-inset-bottom))]"
       : "pb-[calc(9.5rem+env(safe-area-inset-bottom))] sm:pb-[calc(9rem+env(safe-area-inset-bottom))]";
-  const mobileBottomSpacerClass = !showMobileNav ? "hidden" : isEstateMobileNav ? "h-28 lg:hidden" : isOfficeMobileNav ? "h-24 lg:hidden" : "h-20 lg:hidden";
-  const showEstateCreateDoorFab = showMobileNav && isEstateMobileNav && normalizedPathname === "/dashboard/estate";
+  const mobileBottomSpacerClass = !showMobileNavShell ? "hidden" : isEstateMobileNav ? "h-28 lg:hidden" : isOfficeMobileNav ? "h-24 lg:hidden" : "h-20 lg:hidden";
+  const showEstateCreateDoorFab = showMobileNavShell && isEstateMobileNav && normalizedPathname === "/dashboard/estate";
   const canGoBack = typeof window !== "undefined" && window.history.length > 1;
   const isNativeApp = useMemo(() => {
     try {
@@ -359,7 +370,7 @@ export default function AppShell({ title, children, showTopBar = true, showMobil
     const fallback =
       user?.role === "estate"
         ? "/dashboard/estate"
-        : user?.role === "office"
+        : user?.role === "office" || user?.role === "office_staff"
           ? "/dashboard/office/overview"
         : user?.role === "admin"
           ? "/dashboard/admin"
@@ -509,7 +520,7 @@ export default function AppShell({ title, children, showTopBar = true, showMobil
           </div>
         </main>
       </div>
-      {showMobileNav && filteredMobileNavItems.length > 0 ? (
+      {showMobileNavShell && filteredMobileNavItems.length > 0 ? (
         <Link
           to={isOfficeMobileNav ? "/dashboard/office/qr" : "/dashboard/estate/doors"}
           className={`fixed right-4 z-[10000] flex h-14 w-14 items-center justify-center rounded-full bg-[linear-gradient(135deg,#00346f_0%,#004a99_100%)] text-white shadow-[0_18px_40px_rgba(0,52,111,0.28)] transition active:scale-95 sm:right-6 lg:hidden ${
@@ -532,7 +543,7 @@ export default function AppShell({ title, children, showTopBar = true, showMobil
           </svg>
         </Link>
       ) : null}
-      {showMobileNav && filteredMobileNavItems.length > 0 ? (
+      {showMobileNavShell && filteredMobileNavItems.length > 0 ? (
         <div
           aria-hidden="true"
           className={`pointer-events-none fixed inset-x-0 bottom-0 z-[9998] bg-gradient-to-t from-slate-100/95 via-slate-100/75 to-transparent backdrop-blur-md dark:from-slate-950/95 dark:via-slate-950/75 lg:hidden ${
@@ -542,7 +553,7 @@ export default function AppShell({ title, children, showTopBar = true, showMobil
           }`}
         />
       ) : null}
-      {showMobileNav && filteredMobileNavItems.length > 0 ? (
+      {showMobileNavShell && filteredMobileNavItems.length > 0 ? (
         <nav className={`fixed inset-x-0 bottom-0 z-[9999] lg:hidden ${isEstateMobileNav ? "px-0 pb-0" : "px-3 pb-[max(0.2rem,env(safe-area-inset-bottom))]"}`}>
           <div
             className={`relative mx-auto border border-slate-200/60 bg-[#ebe8f8]/95 px-3 py-2 shadow-[0_12px_32px_rgba(76,29,149,0.16)] backdrop-blur-md dark:border-slate-700 dark:bg-slate-900/90 ${
@@ -560,7 +571,7 @@ export default function AppShell({ title, children, showTopBar = true, showMobil
                   to={item.to}
                   end
                   className={({ isActive }) =>
-                    `flex min-w-0 flex-1 items-center justify-center rounded-xl px-1 py-0.5 text-[10px] font-semibold transition-all duration-200 active:scale-95 sm:text-[10px] ${
+                    `flex min-w-0 flex-1 items-center justify-center rounded-xl px-1 py-0.5 text-[12px] font-semibold transition-all duration-200 active:scale-95 sm:text-[12px] ${
                       isActive ? "text-white" : "text-violet-700 dark:text-slate-300"
                     }`
                   }
@@ -570,8 +581,8 @@ export default function AppShell({ title, children, showTopBar = true, showMobil
                       <span
                         className={`grid place-items-center rounded-full transition-all duration-200 ${
                           isActive
-                            ? "h-9 w-9 bg-violet-600 text-white shadow-[0_10px_24px_rgba(124,58,237,0.45)]"
-                            : "h-7 w-7 text-violet-700 opacity-90 dark:text-slate-300"
+                            ? "h-11 w-11 bg-violet-600 text-white shadow-[0_10px_24px_rgba(124,58,237,0.45)]"
+                            : "h-9 w-9 text-violet-700 opacity-90 dark:text-slate-300"
                         }`}
                       >
                         <NavIcon name={item.icon} />
@@ -591,7 +602,7 @@ export default function AppShell({ title, children, showTopBar = true, showMobil
                 <button
                   type="button"
                   onClick={() => navigate("/onboarding")}
-                  className="flex min-w-0 flex-1 flex-col items-center justify-center rounded-xl px-1 py-1.5 text-[10px] font-semibold text-slate-600 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 sm:text-[11px]"
+                  className="flex min-w-0 flex-1 flex-col items-center justify-center rounded-xl px-1 py-1.25 text-[11px] font-semibold text-slate-600 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 sm:text-[12px]"
                 >
                   <span className="mb-1">
                     <NavIcon name="help" />

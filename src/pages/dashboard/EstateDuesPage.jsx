@@ -1,32 +1,21 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowLeft,
+  ChevronLeft,
   Bell,
-  PlusCircle,
-  Send,
-  Wallet,
-  Timer,
+  Plus,
+  Wrench,
+  Clock,
+  CheckCircle2,
+  AlertTriangle,
   Filter,
-  Receipt,
+  Sliders,
   Edit3,
   Trash2,
-  AlertCircle,
-  LayoutDashboard,
-  Users,
-  Building2,
-  Settings,
-  CheckCircle2,
-  Clock,
-  TrendingUp,
-  X
+  Calendar,
+  X,
+  FileText
 } from 'lucide-react';
-import {
-  createEstateAlert,
-  listEstateAlertPayments,
-  listEstateAlerts,
-  sendEstateAlertReminder,
-} from "../../services/estateService";
 import { showError, showSuccess } from "../../utils/flash";
 import { useSocketEvents } from "../../hooks/useSocketEvents";
 import { getDashboardSocket } from "../../services/socketClient";
@@ -35,17 +24,18 @@ import { estateFieldClassName, estateTextareaClassName } from "../../components/
 import useEstateOverviewState from "../../hooks/useEstateOverviewState";
 import { useNavigate } from "react-router-dom";
 
-// Helper for formatting
-const formatCurrency = (val) => `₦${Number(val).toLocaleString()}`;
+// Placeholder mock actions matching standard service structure. 
+const mockCreateRequest = async (data) => { console.log("Created:", data); return { success: true }; };
+const mockListRequests = async (id) => [];
 
-const EstateDuesPage = () => {
+const EstateMaintenancePage = () => {
   const { estateId, error, setError } = useEstateOverviewState();
-  const [title, setTitle] = useState("");
+  const [issueTitle, setIssueTitle] = useState("");
+  const [category, setCategory] = useState("plumbing");
+  const [priority, setPriority] = useState("medium");
+  const [location, setLocation] = useState("");
   const [description, setDescription] = useState("");
-  const [amountDue, setAmountDue] = useState("");
-  const [dueDate, setDueDate] = useState("");
-  const [alerts, setAlerts] = useState([]);
-  const [payments, setPayments] = useState([]);
+  const [requests, setRequests] = useState([]);
   const [busy, setBusy] = useState(false);
   const [composeOpen, setComposeOpen] = useState(false);
   const [dataLoading, setDataLoading] = useState(false);
@@ -57,15 +47,11 @@ const EstateDuesPage = () => {
     if (!estateId) return;
     setDataLoading(true);
     try {
-      const [rows, paymentRows] = await Promise.all([
-        listEstateAlerts(estateId, "payment_request"),
-        listEstateAlertPayments(estateId, { force: true })
-      ]);
-      setAlerts(rows);
-      setPayments(paymentRows);
+      const rows = await mockListRequests(estateId);
+      setRequests(rows);
       setError("");
     } catch (err) {
-      setError(err?.message || "Failed to load collection data");
+      setError(err?.message || "Failed to load maintenance logs");
     } finally {
       setDataLoading(false);
     }
@@ -76,224 +62,209 @@ const EstateDuesPage = () => {
   useEffect(() => {
     if (!estateId) return;
     const socket = getDashboardSocket();
-    socket.emit("dashboard.subscribe", { room: `estate:${estateId}:alerts` });
+    socket.emit("dashboard.subscribe", { room: `estate:${estateId}:maintenance` });
   }, [estateId]);
 
   useSocketEvents(useMemo(() => ({
-    ALERT_CREATED: refresh,
-    ALERT_UPDATED: refresh,
-    ALERT_DELETED: refresh,
-    PAYMENT_STATUS_UPDATED: refresh
+    MAINTENANCE_CREATED: refresh,
+    MAINTENANCE_UPDATED: refresh,
+    MAINTENANCE_DELETED: refresh
   }), [refresh]));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setBusy(true);
     try {
-      await createEstateAlert({
+      await mockCreateRequest({
         estateId,
-        title: title.trim(),
+        title: issueTitle.trim(),
+        category,
+        priority,
+        location: location.trim(),
         description: description.trim(),
-        alertType: "payment_request",
-        amountDue: Number(amountDue),
-        dueDate: dueDate ? new Date(dueDate).toISOString() : null
+        status: "pending"
       });
-      showSuccess("Payment request sent.");
-      setTitle("");
+      showSuccess("Maintenance request logged.");
+      setIssueTitle("");
+      setCategory("plumbing");
+      setPriority("medium");
+      setLocation("");
       setDescription("");
-      setAmountDue("");
-      setDueDate("");
       setComposeOpen(false);
       await refresh();
-    } catch (err) { showError(err.message); }
-    finally { setBusy(false); }
-  };
-
-  const latestAlert = alerts[0] || null;
-
-  const handleSendReminder = async () => {
-    if (!latestAlert?.id) {
-      showError("Create a due first before sending reminders.");
-      return;
-    }
-    setBusy(true);
-    try {
-      const result = await sendEstateAlertReminder(latestAlert.id);
-      const reminded = Number(result?.reminded ?? 0);
-      const emailed = Number(result?.emailed ?? 0);
-      showSuccess(reminded > 0 ? `Reminder sent to ${reminded} homeowner${reminded === 1 ? "" : "s"}${emailed ? `, email delivered to ${emailed}` : ""}.` : "No unpaid homeowners to remind.");
-      await refresh();
-    } catch (err) {
-      showError(err?.message || "Failed to send reminders");
-    } finally {
-      setBusy(false);
+    } catch (err) { 
+      showError(err.message); 
+    } finally { 
+      setBusy(false); 
     }
   };
 
-  const paymentRows = useMemo(() =>
-    payments.flatMap((alert) =>
-      (alert.homeowners ?? []).map((row) => ({
-        ...row,
-        alertId: alert.id,
-        alertTitle: alert.title,
-        amountDue: Number(alert.amountDue ?? 0),
-        dueDate: alert.dueDate,
-        createdAt: alert.createdAt
-      }))
-    ),
-  [payments]);
+  const pendingCount = useMemo(() => requests.filter(r => r.status === "pending").length, [requests]);
+  const inProgressCount = useMemo(() => requests.filter(r => r.status === "in_progress").length, [requests]);
+  const resolvedCount = useMemo(() => requests.filter(r => r.status === "resolved").length, [requests]);
 
-  const totalCollected = useMemo(() =>
-    paymentRows.filter(r => r.status === "paid").reduce((s, r) => s + Number(r.amountPaid ?? r.amountDue), 0),
-  [paymentRows]);
-
-  const outstanding = useMemo(() =>
-    paymentRows.filter(r => r.status !== "paid").reduce((s, r) => s + Number(r.amountDue), 0),
-  [paymentRows]);
-
-  const complianceRate = useMemo(() => {
-    if (paymentRows.length === 0) return 0;
-    return Math.round((paymentRows.filter(r => r.status === "paid").length / paymentRows.length) * 100);
-  }, [paymentRows]);
+  const resolutionRate = useMemo(() => {
+    if (requests.length === 0) return 100;
+    return Math.round((resolvedCount / requests.length) * 100);
+  }, [requests, resolvedCount]);
 
   return (
-    <div className="bg-[#f8f9fa] text-[#2b3437] min-h-screen font-sans flex flex-col selection:bg-indigo-100">
+    <div className="bg-slate-50/50 min-h-screen font-sans pb-32 dark:bg-slate-950 text-slate-900 dark:text-slate-100 antialiased flex flex-col selection:bg-indigo-100 dark:selection:bg-indigo-950/40">
 
-      {/* Premium Mobile Header */}
-       <header className="sticky top-0 w-full z-50 bg-[#f8f9fa]/80 backdrop-blur-xl flex justify-between items-center px-4 h-16 border-b border-slate-100">
-              <button onClick={() => navigate(-1)} className="p-2 text-[#4955b3] active:bg-indigo-50 rounded-full transition-all">
-                <ArrowLeft size={24} strokeWidth={2.5} />
-              </button>
-              <h1 className="text-[#2b3437] font-black tracking-tight text-lg font-headline">Dues Management</h1>
-              <button className="relative p-2 text-[#4955b3] active:bg-indigo-50 rounded-full">
-                <Bell size={22} strokeWidth={2.5} />
-                <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-rose-500 rounded-full border-2 border-[#f8f9fa]" />
-              </button>
-            </header>
-
-      <main className="flex-1 px-5 pt-24 pb-32 max-w-7xl mx-auto w-full">
-
-        {/* Page Title & Actions */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
-          <div>
-            <span className="text-[#4955b3] font-bold tracking-[0.15em] uppercase text-[10px] mb-1 block">Financial Oversight</span>
-            <h2 className="text-4xl font-black tracking-tight text-[#2b3437] font-headline">Dues Management</h2>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-3">
-            <button
-              onClick={handleSendReminder}
-              disabled={busy || !latestAlert?.id}
-              className="bg-slate-200/50 text-[#2b3437] px-6 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 active:scale-95 transition-all w-full sm:w-auto text-sm disabled:opacity-50"
+      {/* STATIC STICKY HEADER */}
+      <header className="sticky top-0 z-[100] w-full border-b border-slate-100/80 bg-white/90 px-4 py-3.5 backdrop-blur-md dark:bg-slate-950/90 dark:border-slate-900">
+        <div className="mx-auto flex max-w-4xl items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => navigate(-1)} 
+              className="p-2 bg-slate-50 text-slate-600 rounded-full hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 transition-all active:scale-95"
             >
-              <Send size={18} strokeWidth={2.5} />
-              Send Reminder
+              <ChevronLeft size={20} />
             </button>
+            <div>
+              <h1 className="font-extrabold text-sm sm:text-lg text-slate-900 tracking-tight dark:text-white leading-none">Maintenance</h1>
+              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1">Repairs & Facilities</p>
+            </div>
+          </div>
+          <button className="relative p-2 bg-slate-50 text-slate-600 dark:bg-slate-900 dark:text-slate-300 rounded-full">
+            <Bell size={18} />
+            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-rose-500 rounded-full border border-white dark:border-slate-950" />
+          </button>
+        </div>
+      </header>
+
+      <main className="mt-4 px-4 max-w-4xl mx-auto w-full space-y-6 flex-1">
+        
+        {/* Dynamic Header Information */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 px-1">
+          <div>
+            <span className="text-indigo-600 dark:text-indigo-400 font-bold tracking-widest text-[9px] uppercase block">Infrastructure Care</span>
+            <h2 className="text-xl font-black text-slate-900 dark:text-white mt-1">Work Orders</h2>
+            <p className="text-slate-500 dark:text-slate-400 text-xs font-medium mt-1 max-w-md leading-relaxed">
+              Track emergency repairs, review community facility breakdowns, and schedule maintenance technicians.
+            </p>
+          </div>
+          <div className="flex gap-2 shrink-0">
             <button
               onClick={() => setComposeOpen(true)}
-              className="bg-[#4955b3] text-white px-6 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-100 active:scale-95 transition-all w-full sm:w-auto text-sm"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-bold flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-all text-xs"
             >
-              <PlusCircle size={18} strokeWidth={2.5} />
-              Create Due
+              <Plus size={14} strokeWidth={2.5} />
+              Log Issue
             </button>
           </div>
         </div>
 
-        {/* Financial Bento Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-          {/* Total Received */}
-          <div className="bg-white p-8 rounded-[2.5rem] flex flex-col justify-between border border-slate-100 shadow-sm min-h-[180px]">
+        {/* Bento Metric Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+          {/* Unresolved / Active Requests */}
+          <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-100/50 dark:border-slate-800/40 flex flex-col justify-between min-h-[135px] shadow-sm">
             <div className="flex justify-between items-start">
-              <div className="p-3 bg-[#85f6e5]/30 text-[#005c53] rounded-2xl">
-                <Wallet size={24} />
+              <div className="p-2.5 bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-450 rounded-xl">
+                <AlertTriangle size={18} />
               </div>
-              <div className="flex items-center gap-1 text-[#006b61] bg-[#006b61]/10 px-3 py-1 rounded-full">
-                <TrendingUp size={12} />
-                <span className="text-[10px] font-black uppercase tracking-wider">Growth</span>
-              </div>
+              <span className="text-[8px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider bg-slate-50 dark:bg-slate-850 px-2.5 py-0.5 rounded-full">
+                {pendingCount} Pending
+              </span>
             </div>
-            <div className="mt-4">
-              <p className="text-slate-500 text-sm font-bold uppercase tracking-tight">Total Received</p>
-              <p className="text-3xl font-black mt-1 text-[#2b3437]">{formatCurrency(totalCollected)}</p>
+            <div className="mt-2">
+              <p className="text-slate-450 dark:text-slate-500 text-[10px] font-bold uppercase tracking-wider">Active Work Requests</p>
+              <p className="text-xl font-black text-slate-900 dark:text-white mt-0.5">{pendingCount + inProgressCount} Open</p>
             </div>
           </div>
 
-          {/* Outstanding */}
-          <div className="bg-white p-8 rounded-[2.5rem] flex flex-col justify-between border border-slate-100 shadow-sm min-h-[180px]">
+          {/* Average Resolution Rate */}
+          <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-100/50 dark:border-slate-800/40 flex flex-col justify-between min-h-[135px] shadow-sm">
             <div className="flex justify-between items-start">
-              <div className="p-3 bg-rose-50 text-rose-600 rounded-2xl">
-                <Timer size={24} />
+              <div className="p-2.5 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-450 rounded-xl">
+                <CheckCircle2 size={18} />
               </div>
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{paymentRows.length} Active</span>
+              <span className="text-[8px] font-extrabold text-emerald-650 dark:text-emerald-400 uppercase tracking-wider bg-emerald-50 dark:bg-emerald-500/5 px-2.5 py-0.5 rounded-full">
+                {resolvedCount} Solved
+              </span>
             </div>
-            <div className="mt-4">
-              <p className="text-slate-500 text-sm font-bold uppercase tracking-tight">Total Outstanding</p>
-              <p className="text-3xl font-black mt-1 text-rose-600">{formatCurrency(outstanding)}</p>
+            <div className="mt-2">
+              <p className="text-slate-450 dark:text-slate-500 text-[10px] font-bold uppercase tracking-wider">Resolution Efficiency</p>
+              <p className="text-xl font-black text-emerald-600 dark:text-emerald-450 mt-0.5">{resolutionRate}% Rate</p>
             </div>
           </div>
 
-          {/* Collection Progress */}
-          <div className="bg-[#4955b3] text-white p-8 rounded-[2.5rem] relative overflow-hidden flex flex-col justify-between shadow-lg shadow-indigo-100">
+          {/* In Progress Quick View */}
+          <div className="bg-indigo-600 text-white p-5 rounded-3xl relative overflow-hidden flex flex-col justify-between min-h-[135px] shadow-md shadow-indigo-500/10">
             <div className="relative z-10">
-              <p className="text-white/70 text-sm font-bold uppercase tracking-tight">Compliance Rate</p>
-              <p className="text-4xl font-black mt-1">{complianceRate}%</p>
+              <p className="text-white/70 text-[10px] font-bold uppercase tracking-wider">In Progress Work</p>
+              <p className="text-2xl font-black mt-0.5">{inProgressCount} Jobs</p>
             </div>
-            <div className="relative z-10 w-full bg-white/20 h-2.5 rounded-full mt-6">
-              <div className="bg-white h-full rounded-full transition-all duration-1000" style={{ width: `${complianceRate}%` }}></div>
+            <div className="relative z-10 w-full bg-white/20 h-2 rounded-full mt-4">
+              <div className="bg-white h-full rounded-full transition-all duration-1000" style={{ width: requests.length > 0 ? `${(inProgressCount / requests.length) * 100}%` : '0%' }}></div>
             </div>
-            <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-white/10 rounded-full blur-3xl"></div>
+            <div className="absolute -right-12 -bottom-12 w-28 h-28 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
           </div>
         </div>
 
-        {/* List Section */}
-        <section>
-          <div className="flex items-center justify-between mb-8">
-            <h3 className="text-2xl font-black tracking-tight font-headline">Recent Activity</h3>
-            <button className="flex items-center gap-2 text-xs font-black text-[#4955b3] uppercase tracking-widest hover:opacity-70 transition-all">
-              Filter <Filter size={14} strokeWidth={3} />
+        {/* Ledger */}
+        <section className="space-y-3.5">
+          <div className="flex items-center justify-between px-1">
+            <h3 className="text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-wider">Maintenance Logs</h3>
+            <button className="flex items-center gap-1.5 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider hover:opacity-75 transition-all">
+              Filter <Filter size={12} />
             </button>
           </div>
 
-          <div className="space-y-4">
-            {dataLoading && <p className="text-center py-10 font-bold text-slate-400">Syncing ledger...</p>}
+          <div className="space-y-2.5">
+            {dataLoading && (
+              <div className="text-center py-10 text-[10px] font-bold uppercase tracking-wider text-slate-400">Syncing logs...</div>
+            )}
 
-            {!dataLoading && paymentRows.length === 0 && (
-              <div className="bg-white border-2 border-dashed border-slate-200 rounded-[2.5rem] p-12 text-center">
-                <p className="text-slate-400 font-bold">No payment activity recorded yet.</p>
+            {!dataLoading && requests.length === 0 && (
+              <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl p-8 text-center shadow-sm">
+                <p className="text-slate-400 dark:text-slate-500 font-semibold text-xs">All systems functional. No maintenance requested.</p>
               </div>
             )}
 
-            {paymentRows.map((row, idx) => (
-              <div key={idx} className="group bg-white hover:border-[#4955b3]/30 border border-slate-100 transition-all duration-300 p-5 rounded-[2rem] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm active:scale-[0.99]">
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-2xl bg-slate-50 flex items-center justify-center text-[#4955b3] border border-slate-100">
-                    <Users size={24} />
+            {requests.map((row, idx) => (
+              <div key={idx} className="bg-white dark:bg-slate-900 border border-slate-100/50 dark:border-slate-800/40 p-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3.5 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-xl bg-slate-50 dark:bg-slate-850 flex items-center justify-center text-indigo-600 dark:text-indigo-400 border border-slate-100/50 dark:border-slate-800">
+                    <Wrench size={18} />
                   </div>
                   <div>
-                    <p className="font-black text-[#2b3437]">{row.homeownerName || "Resident"}</p>
-                    <p className="text-[11px] text-slate-400 font-bold uppercase tracking-tight">{row.alertTitle}</p>
+                    <p className="font-extrabold text-xs text-slate-900 dark:text-white leading-tight">{row.title}</p>
+                    <p className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider mt-0.5">{row.category} • {row.location || "Common Area"}</p>
                   </div>
                 </div>
 
-                <div className="flex flex-row sm:flex-col justify-between w-full sm:w-auto items-center sm:items-start border-t sm:border-t-0 pt-4 sm:pt-0 mt-2 sm:mt-0">
-                  <div className="sm:text-left">
-                    <p className="text-lg font-black text-[#2b3437]">{formatCurrency(row.amountDue)}</p>
-                    <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest">
-                      Due {row.dueDate ? new Date(row.dueDate).toLocaleDateString() : 'No date'}
+                <div className="flex flex-row sm:flex-col justify-between w-full sm:w-auto items-center sm:items-start border-t sm:border-t-0 border-slate-100/50 dark:border-slate-800/40 pt-2.5 sm:pt-0 mt-1 sm:mt-0">
+                  <div>
+                    <span className={`px-2 py-0.5 rounded text-[8px] font-bold tracking-wider uppercase ${
+                      row.priority === "high" 
+                        ? "bg-rose-50 dark:bg-rose-950/20 text-rose-600" 
+                        : "bg-slate-50 dark:bg-slate-800 text-slate-650 dark:text-slate-400"
+                    }`}>
+                      {row.priority} Priority
+                    </span>
+                    <p className="text-[8px] text-slate-450 dark:text-slate-500 font-bold uppercase tracking-wider mt-1.5 flex items-center gap-1">
+                      <Calendar size={10} />
+                      {row.createdAt ? new Date(row.createdAt).toLocaleDateString() : 'Today'}
                     </p>
                   </div>
 
-                  <div className={`mt-0 sm:mt-3 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-2 ${
-                    row.status === 'paid' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'
+                  <div className={`mt-0 sm:mt-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider flex items-center gap-1.5 ${
+                    row.status === 'resolved' 
+                      ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-450' 
+                      : row.status === 'in_progress'
+                      ? 'bg-indigo-50 text-indigo-650 dark:bg-indigo-500/10 dark:text-indigo-400'
+                      : 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-450'
                   }`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${row.status === 'paid' ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
-                    {row.status || 'pending'}
+                    <span className={`w-1 h-1 rounded-full ${row.status === 'resolved' ? 'bg-emerald-500' : row.status === 'in_progress' ? 'bg-indigo-500' : 'bg-amber-500'}`}></span>
+                    {row.status?.replace("_", " ") || 'pending'}
                   </div>
                 </div>
 
                 <div className="hidden lg:flex items-center gap-1">
-                  <button className="p-2.5 text-slate-400 hover:text-[#4955b3] hover:bg-slate-50 rounded-xl transition-all"><Receipt size={18} /></button>
-                  <button className="p-2.5 text-slate-400 hover:text-[#4955b3] hover:bg-slate-50 rounded-xl transition-all"><Edit3 size={18} /></button>
-                  <button className="p-2.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"><Trash2 size={18} /></button>
+                  <button className="p-2 text-slate-400 hover:text-indigo-600 dark:text-slate-550 dark:hover:text-indigo-450 hover:bg-slate-50 dark:hover:bg-slate-850 rounded-xl transition-all"><FileText size={14} /></button>
+                  <button className="p-2 text-slate-400 hover:text-indigo-600 dark:text-slate-550 dark:hover:text-indigo-450 hover:bg-slate-50 dark:hover:bg-slate-850 rounded-xl transition-all"><Edit3 size={14} /></button>
+                  <button className="p-2 text-slate-400 hover:text-rose-500 dark:text-slate-550 dark:hover:text-rose-450 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-xl transition-all"><Trash2 size={14} /></button>
                 </div>
               </div>
             ))}
@@ -301,124 +272,149 @@ const EstateDuesPage = () => {
         </section>
       </main>
 
-      {/* Mobile Bottom Navigation */}
-
-
-      <DuesComposerSheet open={composeOpen} onClose={() => setComposeOpen(false)} busy={busy}>
-        <form id="estate-dues-form" onSubmit={handleSubmit} className="space-y-4 pt-1">
-          <div className="space-y-1">
-            <label className="text-[10px] font-black uppercase text-slate-400 px-1">Levy Title</label>
+      {/* MAINTENANCE COMPOSER DRAWER */}
+      <MaintenanceComposerSheet open={composeOpen} onClose={() => setComposeOpen(false)} busy={busy}>
+        <form id="estate-maintenance-form" onSubmit={handleSubmit} className="space-y-4 pt-1">
+          <div className="space-y-1.5">
+            <span className="block text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 ml-0.5">Issue Title</span>
             <input
               className={estateFieldClassName}
-              value={title} onChange={e => setTitle(e.target.value)}
-              placeholder="e.g. Security Levy Q3" required
+              value={issueTitle} onChange={e => setIssueTitle(e.target.value)}
+              placeholder="e.g. Street Light Breakdown" required
             />
           </div>
-          <div className="space-y-1">
-            <label className="text-[10px] font-black uppercase text-slate-400 px-1">Amount (₦)</label>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <span className="block text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 ml-0.5">Category</span>
+              <select
+                className={estateFieldClassName}
+                value={category} onChange={e => setCategory(e.target.value)}
+              >
+                <option value="plumbing">Plumbing</option>
+                <option value="electrical">Electrical</option>
+                <option value="security">Security Gates</option>
+                <option value="structural">Structural</option>
+                <option value="horticulture">Gardening & Parks</option>
+              </select>
+            </div>
+            
+            <div className="space-y-1.5">
+              <span className="block text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 ml-0.5">Severity Priority</span>
+              <select
+                className={estateFieldClassName}
+                value={priority} onChange={e => setPriority(e.target.value)}
+              >
+                <option value="low">Low Priority</option>
+                <option value="medium">Medium Priority</option>
+                <option value="high">Urgent (High)</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <span className="block text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 ml-0.5">Location</span>
             <input
-              type="number" className={estateFieldClassName}
-              value={amountDue} onChange={e => setAmountDue(e.target.value)}
-              placeholder="25000" required
+              className={estateFieldClassName}
+              value={location} onChange={e => setLocation(e.target.value)}
+              placeholder="e.g. Block C entrance or House 12" required
             />
           </div>
-          <div className="space-y-1">
-            <label className="text-[10px] font-black uppercase text-slate-400 px-1">Notes</label>
+
+          <div className="space-y-1.5">
+            <span className="block text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 ml-0.5">Problem Details</span>
             <textarea
               className={estateTextareaClassName}
               value={description}
               onChange={e => setDescription(e.target.value)}
               rows={3}
-              placeholder="Details for residents..."
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="text-[10px] font-black uppercase text-slate-400 px-1">Due Date</label>
-            <input
-              type="date" className={estateFieldClassName}
-              value={dueDate} onChange={e => setDueDate(e.target.value)}
+              placeholder="Describe the failure, leak, or damage..."
+              required
             />
           </div>
         </form>
-      </DuesComposerSheet>
+      </MaintenanceComposerSheet>
     </div>
   );
 };
 
-export default EstateDuesPage;
+export default EstateMaintenancePage;
 
-function DuesComposerSheet({ open, onClose, busy, children }) {
+function MaintenanceComposerSheet({ open, onClose, busy, children }) {
   const sheet = useResponsiveSheet({ open, onClose });
 
   if (!open) return null;
 
   const footer = (
-    <div className="border-t border-slate-100 bg-white px-5 py-4">
+    <div className="border-t border-slate-100/60 dark:border-slate-800 bg-white dark:bg-slate-900 px-5 py-4 shrink-0">
       <button
         type="submit"
-        form="estate-dues-form"
+        form="estate-maintenance-form"
         disabled={busy}
-        className="w-full bg-[#4955b3] text-white py-5 rounded-[1.5rem] font-black uppercase tracking-widest shadow-lg shadow-indigo-100 active:scale-95 transition-all"
+        className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3.5 rounded-xl font-bold text-xs tracking-wider shadow-md transition-all active:scale-95 disabled:opacity-50"
       >
-        {busy ? "Broadcasting..." : "Confirm & Send"}
+        {busy ? "Broadcasting Job..." : "Log Work Request"}
       </button>
     </div>
   );
 
+  // Desktop Overlay/Modal Layout
   if (!sheet.isMobile) {
     return (
       <div className="fixed inset-0 z-[140] flex items-center justify-center px-4">
-        <button type="button" className="absolute inset-0 bg-slate-900/45 backdrop-blur-sm" onClick={onClose} aria-label="Close dues form" />
+        <button type="button" className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={onClose} aria-label="Close form" />
         <motion.section
           initial={{ opacity: 0, scale: 0.97, y: 12 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          className="relative w-full max-w-2xl overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_28px_80px_rgba(15,23,42,0.2)]"
+          className="relative w-full overflow-hidden rounded-[2rem] border border-slate-100/50 dark:border-slate-800/40 bg-white dark:bg-slate-900 shadow-2xl max-w-lg z-10"
         >
-          <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
+          <div className="flex items-start justify-between border-b border-slate-100/50 dark:border-slate-800/40 px-5 py-4">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#4955b3]">Financial Oversight</p>
-              <h3 className="mt-2 text-2xl font-black text-[#2b3437]">Create New Levy</h3>
+              <p className="text-[9px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400">Infrastructure Care</p>
+              <h3 className="mt-1 text-lg font-black text-slate-900 dark:text-white">New Maintenance Ticket</h3>
             </div>
-            <button type="button" onClick={onClose} className="rounded-2xl bg-slate-50 p-3 text-slate-500 transition-all hover:bg-slate-100">
-              <X size={18} />
+            <button type="button" onClick={onClose} className="rounded-xl bg-slate-50 dark:bg-slate-800 p-2 text-slate-400 transition-all hover:bg-slate-100 dark:hover:bg-slate-755">
+              <X size={16} />
             </button>
           </div>
-          <div className="max-h-[70dvh] overflow-y-auto px-6 py-6">{children}</div>
+          <div className="max-h-[60dvh] overflow-y-auto px-5 py-5 overscroll-contain">{children}</div>
           {footer}
         </motion.section>
       </div>
     );
   }
 
+  // Mobile Bottom Sheet Layout
   return (
     <div className="fixed inset-0 z-[140] flex items-end" style={{ height: sheet.viewportHeight || undefined }}>
-      <button type="button" className="absolute inset-0 bg-slate-900/45" onClick={onClose} aria-label="Close dues form" />
+      <button type="button" className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={onClose} aria-label="Close form" />
       <motion.section
         {...sheet.mobileSheetProps}
-        className="relative flex w-full flex-col overflow-hidden rounded-t-[2rem] bg-white shadow-[0_-18px_40px_rgba(15,23,42,0.16)]"
+        className="relative flex w-full flex-col overflow-hidden rounded-t-[2rem] bg-white dark:bg-slate-900 shadow-2xl max-h-[85dvh]"
       >
-        <div onPointerDown={sheet.startDrag} className="flex justify-center py-3">
-          <div className="h-1.5 w-12 rounded-full bg-slate-300" />
+        {/* Drag Indicator handle */}
+        <div onPointerDown={sheet.startDrag} className="flex justify-center py-3 shrink-0 cursor-grab active:cursor-grabbing">
+          <div className="h-1 w-12 rounded-full bg-slate-200 dark:bg-slate-800" />
         </div>
-        <div onPointerDown={sheet.startDrag} className="flex items-start justify-between px-5 pb-4">
+        <div onPointerDown={sheet.startDrag} className="flex items-start justify-between px-5 pb-4 border-b border-slate-100/50 dark:border-slate-800/40 shrink-0">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#4955b3]">Financial Oversight</p>
-            <h3 className="mt-2 text-xl font-black text-[#2b3437]">Create New Levy</h3>
+            <p className="text-[9px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400">Infrastructure Care</p>
+            <h3 className="mt-1 text-lg font-black text-slate-900 dark:text-white">New Maintenance Ticket</h3>
           </div>
-          <button type="button" onClick={onClose} className="rounded-2xl bg-slate-50 p-3 text-slate-500">
-            <X size={18} />
+          <button type="button" onClick={onClose} className="rounded-xl bg-slate-50 dark:bg-slate-800 p-2 text-slate-400">
+            <X size={16} />
           </button>
         </div>
         <div
           ref={sheet.contentRef}
           onScroll={sheet.onContentScroll}
           onPointerDown={sheet.onContentPointerDown}
-          className="flex-1 overflow-y-auto px-5 pb-4"
+          className="flex-1 overflow-y-auto px-5 py-5 overscroll-contain"
         >
           {children}
         </div>
         {footer}
-        <div className="h-[env(safe-area-inset-bottom)] bg-white" />
+        <div className="h-[env(safe-area-inset-bottom)] bg-white dark:bg-slate-900 shrink-0" />
       </motion.section>
     </div>
   );

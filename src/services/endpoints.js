@@ -25,6 +25,10 @@ export const endpoints = {
     queue: "/office/queue",
     visitors: "/office/visitors",
     employees: "/office/employees",
+    attendance: "/office/attendance",
+    attendanceExport: "/office/attendance/export",
+    departments: "/office/departments",
+    departmentStaffCounts: "/office/departments/staff-counts",
     conversations: "/office/conversations",
     conversationMessages: (sessionId) => `/office/conversations/${encodeURIComponent(sessionId)}/messages`
   },

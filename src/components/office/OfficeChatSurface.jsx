@@ -17,10 +17,10 @@ export default function OfficeChatSurface({
           <div className="min-w-0">
             <p className="text-sm font-black uppercase tracking-[0.22em] text-brand-500">Conversation</p>
             <h3 className="mt-1 truncate text-lg font-black text-slate-950 dark:text-white">
-              {conversation?.visitorName || conversation?.name || "Office chat"}
+              {conversation?.staffName || conversation?.displayName || conversation?.visitorName || conversation?.name || "Office chat"}
             </h3>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              {conversation?.purpose || "Visitor and employee communication"}
+              {conversation?.department || conversation?.purpose || "Reception and staff communication"}
             </p>
           </div>
           <div className="shrink-0">

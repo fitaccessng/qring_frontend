@@ -12,23 +12,26 @@ import { getDashboardSocket } from "../../services/socketClient";
 import { useAuth } from "../../state/AuthContext";
 import { showError, showSuccess } from "../../utils/flash";
 
+const PANIC_ACTIVE_ROLES = new Set(["homeowner", "security", "estate", "admin"]);
+
 export default function PanicAlertCenter() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [alerts, setAlerts] = useState([]);
   const [busy, setBusy] = useState(false);
   const [dismissedAlertIds, setDismissedAlertIds] = useState([]);
+  const canAccessActivePanicFeed = PANIC_ACTIVE_ROLES.has(String(user?.role || "").toLowerCase());
 
-  async function loadActiveAlerts() {
+  async function loadActiveAlerts(options = {}) {
     try {
-      setAlerts(await getActivePanicAlerts());
+      setAlerts(await getActivePanicAlerts(options));
     } catch {
       // Keep the alert center non-blocking.
     }
   }
 
   useEffect(() => {
-    if (!user) return undefined;
+    if (!user || !canAccessActivePanicFeed) return undefined;
     loadActiveAlerts();
     const socket = getDashboardSocket();
     const sync = () => loadActiveAlerts();
@@ -38,7 +41,7 @@ export default function PanicAlertCenter() {
       socket.off("panic_alert", sync);
       socket.off("panic_alert_update", sync);
     };
-  }, [user]);
+  }, [canAccessActivePanicFeed, user?.id, user?.role]);
 
   useEffect(() => {
     setDismissedAlertIds([]);
@@ -81,13 +84,13 @@ export default function PanicAlertCenter() {
     };
   }, [currentAlert]);
 
-  if (!user || !currentAlert) return null;
+  if (!user || !canAccessActivePanicFeed || !currentAlert) return null;
 
   async function handleAcknowledge() {
     setBusy(true);
     try {
       await acknowledgePanicAlert(currentAlert.id);
-      await loadActiveAlerts();
+      await loadActiveAlerts({ force: true });
     } finally {
       setBusy(false);
     }
@@ -99,7 +102,7 @@ export default function PanicAlertCenter() {
     try {
       await respondToPanicAlert(currentAlert.id);
       showSuccess("You are marked as responding.");
-      await loadActiveAlerts();
+      await loadActiveAlerts({ force: true });
     } catch (error) {
       showError(error?.message || "Unable to mark you as responding.");
     } finally {
@@ -113,7 +116,7 @@ export default function PanicAlertCenter() {
     try {
       await ignorePanicAlert(currentAlert.id);
       setDismissedAlertIds((prev) => (prev.includes(currentAlert.id) ? prev : [...prev, currentAlert.id]));
-      await loadActiveAlerts();
+      await loadActiveAlerts({ force: true });
     } catch (error) {
       showError(error?.message || "Unable to ignore this alert.");
     } finally {
@@ -127,7 +130,7 @@ export default function PanicAlertCenter() {
     try {
       await reportFalsePanicAlert(currentAlert.id);
       showSuccess("This panic alert was flagged for review.");
-      await loadActiveAlerts();
+      await loadActiveAlerts({ force: true });
     } catch (error) {
       showError(error?.message || "Unable to report this alert.");
     } finally {

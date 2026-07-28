@@ -1,8 +1,6 @@
-import AppShell from "../../../layouts/AppShell";
 import { useApiQuery, useSocketQueryInvalidation } from "../../../hooks/useApi";
 import { endpoints } from "../../../services/endpoints";
 import OfficePageHeader from "../../../components/office/OfficePageHeader";
-import OfficePanel from "../../../components/office/OfficePanel";
 import { OfficeEmptyState, OfficeErrorBanner, OfficeLoadingState } from "../../../components/office/OfficeStates";
 import { officeTabs } from "./officeNav";
 
@@ -18,16 +16,16 @@ export default function OfficeSettingsPage() {
 
   if (isLoading) {
     return (
-      <AppShell title="Office Settings" showMobileNav>
+      <div className="min-h-screen bg-slate-50/50 px-4 py-6 sm:px-6 lg:px-8">
         <OfficeLoadingState />
-      </AppShell>
+      </div>
     );
   }
 
   const office = data?.office;
 
   return (
-    <AppShell title="Office Settings" showMobileNav>
+    <div className="min-h-screen bg-slate-50/50 px-4 py-6 sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 pb-10">
         {isError ? <OfficeErrorBanner message={error?.message || "Unable to load office settings."} onRetry={() => refetch()} /> : null}
         <OfficePageHeader
@@ -36,22 +34,25 @@ export default function OfficeSettingsPage() {
           tabs={officeTabs}
         />
 
-        <OfficePanel title="Office Profile" subtitle="Read-only profile data from the backend">
+        <section className="rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+          <div className="mb-4">
+            <h3 className="text-lg font-black text-slate-950 dark:text-white">Office Profile</h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Read-only profile data from the backend</p>
+          </div>
           {office ? (
             <div className="grid gap-4 sm:grid-cols-2">
               <ProfileField label="Company" value={office.companyName} />
               <ProfileField label="Email" value={office.businessEmail} />
               <ProfileField label="Phone" value={office.phoneNumber || "Not set"} />
-              <ProfileField label="Timezone" value={office.timezone || "Not set"} />
               <ProfileField label="Location" value={[office.city, office.state, office.country].filter(Boolean).join(", ") || "Not set"} />
               <ProfileField label="Employees" value={String(office.employeeCount ?? 0)} />
             </div>
           ) : (
             <OfficeEmptyState title="Office profile missing" description="Complete office signup to create this profile." />
           )}
-        </OfficePanel>
+        </section>
       </div>
-    </AppShell>
+    </div>
   );
 }
 

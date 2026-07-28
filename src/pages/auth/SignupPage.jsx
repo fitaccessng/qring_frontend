@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { Building2, Home, User, Mail, Lock, Gift, ChevronRight, Eye, EyeOff, BriefcaseBusiness, MapPin, Globe, Users } from "lucide-react";
+import { Building2, Home, User, Mail, Lock, Gift, ChevronRight, Eye, EyeOff, BriefcaseBusiness, MapPin, Globe } from "lucide-react";
 import { useAuth } from "../../state/AuthContext";
 import quickdropLogo from "../../assets/qring_logo.jpeg";
 import { shouldUseGoogleAuth } from "../../utils/nativeRuntime";
@@ -27,11 +27,7 @@ export default function SignupPage() {
     country: "",
     state: "",
     city: "",
-    officeSize: "",
-    industry: "",
-    numberOfEmployees: "",
-    timezone: "",
-    administratorName: ""
+    numberOfEmployees: ""
   });
 
   const [error, setError] = useState("");
@@ -84,6 +80,14 @@ export default function SignupPage() {
           const payload = {
             ...form,
             email: normalizedEmail,
+            referralCode: form.referralCode.trim() || undefined,
+            companyName: form.companyName.trim() || undefined,
+            businessEmail: form.businessEmail.trim().toLowerCase() || undefined,
+            phoneNumber: form.phoneNumber.trim() || undefined,
+            officeAddress: form.officeAddress.trim() || undefined,
+            country: form.country.trim() || undefined,
+            state: form.state.trim() || undefined,
+            city: form.city.trim() || undefined,
             numberOfEmployees: form.numberOfEmployees ? Number(form.numberOfEmployees) : undefined,
           };
           const data = await signup(payload);
@@ -273,46 +277,18 @@ export default function SignupPage() {
                     onChange={(v) => setForm({ ...form, state: v })}
                   />
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <InputField
-                    icon={MapPin}
-                    placeholder="City"
-                    value={form.city}
-                    onChange={(v) => setForm({ ...form, city: v })}
-                  />
-                  <InputField
-                    icon={Users}
-                    placeholder="Office Size"
-                    value={form.officeSize}
-                    onChange={(v) => setForm({ ...form, officeSize: v })}
-                  />
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <InputField
-                    icon={BriefcaseBusiness}
-                    placeholder="Industry"
-                    value={form.industry}
-                    onChange={(v) => setForm({ ...form, industry: v })}
-                  />
-                  <InputField
-                    icon={Users}
-                    placeholder="Number of Employees"
-                    type="number"
-                    value={form.numberOfEmployees}
-                    onChange={(v) => setForm({ ...form, numberOfEmployees: v })}
-                  />
-                </div>
                 <InputField
-                  icon={Globe}
-                  placeholder="Timezone"
-                  value={form.timezone}
-                  onChange={(v) => setForm({ ...form, timezone: v })}
+                  icon={MapPin}
+                  placeholder="City"
+                  value={form.city}
+                  onChange={(v) => setForm({ ...form, city: v })}
                 />
                 <InputField
                   icon={User}
-                  placeholder="Administrator Name"
-                  value={form.administratorName}
-                  onChange={(v) => setForm({ ...form, administratorName: v })}
+                  placeholder="Number of Employees"
+                  type="number"
+                  value={form.numberOfEmployees}
+                  onChange={(v) => setForm({ ...form, numberOfEmployees: v })}
                 />
               </div>
             ) : null}

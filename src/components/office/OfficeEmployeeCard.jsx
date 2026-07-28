@@ -1,7 +1,8 @@
-import { PhoneCall, Video } from "lucide-react";
+import { MailPlus, MessageSquare } from "lucide-react";
 import OfficeStatusPill from "./OfficeStatusPill";
 
-export default function OfficeEmployeeCard({ member, onVoiceCall, onVideoCall, callDisabled = false }) {
+export default function OfficeEmployeeCard({ member, onSendDetails, onChat, detailsSent = false, actionDisabled = false }) {
+  const hasDetailsBeenSent = Boolean(detailsSent || member?.detailsSentAt);
   return (
     <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/50">
       <div className="flex items-start justify-between gap-3">
@@ -17,28 +18,28 @@ export default function OfficeEmployeeCard({ member, onVoiceCall, onVideoCall, c
         {member.extension ? <span className="rounded-full bg-white px-3 py-1 dark:bg-slate-900">{member.extension}</span> : null}
         {member.userId ? <span className="rounded-full bg-white px-3 py-1 dark:bg-slate-900">User linked</span> : null}
       </div>
-      {(onVoiceCall || onVideoCall) ? (
+      {(onSendDetails || onChat) ? (
         <div className="mt-4 flex flex-wrap gap-2">
-          {onVoiceCall ? (
+          {!hasDetailsBeenSent && onSendDetails ? (
             <button
               type="button"
-              onClick={onVoiceCall}
-              disabled={callDisabled}
+              onClick={onSendDetails}
+              disabled={actionDisabled}
               className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-slate-700 transition hover:border-brand-500/30 hover:text-brand-600 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
             >
-              <PhoneCall className="h-3.5 w-3.5" />
-              Voice
+              <MailPlus className="h-3.5 w-3.5" />
+              Email
             </button>
           ) : null}
-          {onVideoCall ? (
+          {hasDetailsBeenSent && onChat ? (
             <button
               type="button"
-              onClick={onVideoCall}
-              disabled={callDisabled}
+              onClick={onChat}
+              disabled={actionDisabled}
               className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-slate-700 transition hover:border-brand-500/30 hover:text-brand-600 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
             >
-              <Video className="h-3.5 w-3.5" />
-              Video
+              <MessageSquare className="h-3.5 w-3.5" />
+              Chat
             </button>
           ) : null}
         </div>

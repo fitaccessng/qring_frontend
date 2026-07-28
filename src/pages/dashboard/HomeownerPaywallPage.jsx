@@ -155,8 +155,8 @@ export default function ResidentSubscriptionCenter() {
   return (
     <div className="min-h-screen bg-[#f8f9fa] font-sans text-slate-900 antialiased flex flex-col">
       {/* HEADER WITH BACK BUTTON AND BILLING TITLE */}
-      <header className="fixed top-0 w-full z-[100] bg-white/80 backdrop-blur-md border-b border-slate-100 px-6 py-4 flex justify-between items-center">
-        <div className="max-w-5xl mx-auto w-full flex justify-between items-center">
+      <header className="sticky top-0 z-50 w-full border-b border-slate-200/60 bg-white/80 px-4 py-4 backdrop-blur-md sm:px-6">
+        <div className="mx-auto flex w-full max-w-5xl items-center justify-between">
           <div className="flex items-center gap-4">
             <button 
               onClick={() => navigate(-1)} 

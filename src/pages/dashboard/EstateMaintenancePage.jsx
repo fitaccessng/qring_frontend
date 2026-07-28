@@ -1,18 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { createPortal } from "react-dom";
 import { useNavigate } from 'react-router-dom';
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowLeft,
+  ChevronLeft,
   Bell,
   HardHat,
   Verified,
   TriangleAlert,
   Lightbulb,
   Plus,
-  LayoutDashboard,
-  Wallet,
-  Users,
-  Building2,
   Settings,
   CheckCircle2,
   Filter,
@@ -31,7 +28,7 @@ import { useSocketEvents } from "../../hooks/useSocketEvents";
 import { getDashboardSocket } from "../../services/socketClient";
 import useEstateOverviewState from "../../hooks/useEstateOverviewState";
 import useResponsiveSheet from "../../hooks/useResponsiveSheet";
-import { estateFieldClassName } from "../../components/mobile/EstateManagerPageShell";
+import { estateFieldClassName, estateTextareaClassName } from "../../components/mobile/EstateManagerPageShell";
 
 const EstateMaintenancePage = () => {
   const navigate = useNavigate();
@@ -125,120 +122,156 @@ const EstateMaintenancePage = () => {
   const resolvedCount = resolvedRequests.length;
   const totalCount = requests.length;
   const healthScore = totalCount > 0 ? Math.round((resolvedCount / totalCount) * 100) : 100;
-  const strokeDashoffset = 125.6 - (125.6 * healthScore) / 100;
 
   return (
-    <div className="bg-[#f8f9fa] text-[#2b3437] min-h-screen font-sans flex flex-col selection:bg-indigo-100 pb-32">
+    <div className="bg-slate-50/50 min-h-screen font-sans pb-32 dark:bg-slate-950 text-slate-900 dark:text-slate-100 antialiased flex flex-col selection:bg-indigo-100 dark:selection:bg-indigo-950/40">
 
-      {/* Header */}
-      <header className="fixed top-0 w-full z-50 bg-[#f8f9fa]/80 backdrop-blur-xl flex justify-between items-center px-4 h-16 border-b border-slate-100">
-        <button
-          onClick={() => navigate(-1)}
-          className="p-2 text-[#4955b3] active:bg-indigo-50 rounded-full transition-all"
-        >
-          <ArrowLeft size={24} strokeWidth={2.5} />
-        </button>
-        <h1 className="text-[#2b3437] font-black tracking-tight text-lg">Maintenance Hub</h1>
-        <button className="relative p-2 text-[#4955b3] active:bg-indigo-50 rounded-full transition-all">
-          <Bell size={22} strokeWidth={2.5} />
-          {pendingCount > 0 && <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-rose-500 rounded-full border-2 border-[#f8f9fa]" />}
-        </button>
+      {/* STATIC STICKY HEADER */}
+      <header className="sticky top-0 z-[100] w-full border-b border-slate-100/80 bg-white/90 px-4 py-3.5 backdrop-blur-md dark:bg-slate-950/90 dark:border-slate-900">
+        <div className="mx-auto flex max-w-4xl items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => navigate(-1)} 
+              className="p-2 bg-slate-50 text-slate-600 rounded-full hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 transition-all active:scale-95"
+            >
+              <ChevronLeft size={20} />
+            </button>
+            <div>
+              <h1 className="font-extrabold text-sm sm:text-lg text-slate-900 tracking-tight dark:text-white leading-none">Operations</h1>
+              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1">Maintenance Hub</p>
+            </div>
+          </div>
+          <button className="relative p-2 bg-slate-50 text-slate-600 dark:bg-slate-900 dark:text-slate-300 rounded-full">
+            <Bell size={18} />
+            {pendingCount > 0 && (
+              <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-rose-500 rounded-full border border-white dark:border-slate-950" />
+            )}
+          </button>
+        </div>
       </header>
 
-      <main className="flex-1 px-5 pt-24 max-w-7xl mx-auto w-full">
-        {/* Operations Header */}
-        <section className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
+      <main className="mt-4 px-4 max-w-4xl mx-auto w-full space-y-6 flex-1">
+        
+        {/* Dynamic Header Information */}
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 px-1">
           <div>
-            <span className="text-[#4955b3] font-bold tracking-[0.15em] uppercase text-[10px] mb-1 block">Central Command</span>
-            <h2 className="text-4xl font-black tracking-tight text-[#2b3437]">Operations</h2>
+            <span className="text-indigo-600 dark:text-indigo-400 font-bold tracking-widest text-[9px] uppercase block">Central Command</span>
+            <h2 className="text-xl font-black text-slate-900 dark:text-white mt-1">Operations Summary</h2>
+            <p className="text-slate-500 dark:text-slate-400 text-xs font-medium mt-1 max-w-md leading-relaxed">
+              Track infrastructure issues, organize audit schedules, and direct quick solutions across the estate.
+            </p>
           </div>
-
-          <div className="bg-white border border-slate-100 rounded-[2rem] p-5 flex items-center gap-4 shadow-sm">
+          
+          {/* Health Score Indicator */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-100/50 dark:border-slate-800/40 rounded-2xl p-4 flex items-center gap-3.5 shadow-sm self-start sm:self-auto shrink-0">
             <div className="relative flex items-center justify-center">
-              <svg className="w-12 h-12 transform -rotate-90">
-                <circle className="text-slate-100" cx="24" cy="24" fill="transparent" r="20" stroke="currentColor" strokeWidth="4"></circle>
-                <circle className="text-[#006b61] transition-all duration-1000" cx="24" cy="24" fill="transparent" r="20" stroke="currentColor" strokeDasharray="125.6" strokeDashoffset={strokeDashoffset} strokeWidth="4" strokeLinecap="round"></circle>
+              <svg className="w-10 h-10 transform -rotate-90">
+                <circle className="text-slate-100 dark:text-slate-800" cx="20" cy="20" fill="transparent" r="16" stroke="currentColor" strokeWidth="3.5"></circle>
+                <circle className="text-emerald-500 transition-all duration-1000" cx="20" cy="20" fill="transparent" r="16" stroke="currentColor" strokeDasharray="100.5" strokeDashoffset={100.5 - (100.5 * healthScore) / 100} strokeWidth="3.5" strokeLinecap="round"></circle>
               </svg>
-              <div className="absolute text-[#006b61]"><CheckCircle2 size={18} /></div>
+              <div className="absolute text-emerald-500"><CheckCircle2 size={14} /></div>
             </div>
             <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Health Score</p>
-                <p className="text-xl font-black text-[#006b61]">{healthScore}%</p>
+              <p className="text-[8px] font-bold uppercase tracking-widest text-slate-450 dark:text-slate-500">Health Score</p>
+              <p className="text-base font-black text-emerald-500">{healthScore}%</p>
             </div>
           </div>
-        </section>
+        </div>
 
-        {/* Bento Stats */}
-        <section className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
-          <div className="bg-[#dfe0ff] rounded-[2rem] p-6 flex flex-col justify-between h-40 border border-indigo-100">
-            <div className="p-2 bg-white/50 w-fit rounded-xl text-[#4955b3]"><Settings size={20} /></div>
+        {/* Bento Stats Block Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
+          {/* Open Tickets */}
+          <div className="bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100/40 dark:border-indigo-900/30 rounded-3xl p-5 flex flex-col justify-between min-h-[135px]">
+            <div className="p-2.5 bg-indigo-100/50 dark:bg-indigo-500/10 w-fit rounded-xl text-indigo-600 dark:text-indigo-400"><Settings size={18} /></div>
             <div>
-              <h3 className="text-3xl font-black text-[#3b48a6]">{pendingCount}</h3>
-              <p className="text-[10px] font-black uppercase tracking-widest text-[#4652b0]">Open</p>
+              <h3 className="text-2xl font-black text-indigo-950 dark:text-white leading-none">{pendingCount}</h3>
+              <p className="text-[9px] font-bold uppercase tracking-widest text-indigo-600 dark:text-indigo-400 mt-1.5">Open Tickets</p>
             </div>
-          </div>
-          <div className="bg-white rounded-[2rem] p-6 flex flex-col justify-between h-40 border border-slate-100 shadow-sm">
-            <div className="p-2 bg-slate-50 w-fit rounded-xl text-slate-400"><HardHat size={20} /></div>
-            <div>
-              <h3 className="text-3xl font-black text-[#2b3437]">{audits.length}</h3>
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Audits</p>
-            </div>
-          </div>
-          <div className="bg-[#85f6e5]/30 rounded-[2rem] p-6 flex flex-col justify-between h-40 border border-[#85f6e5]/50">
-            <div className="p-2 bg-white/50 w-fit rounded-xl text-[#006b61]"><Verified size={20} /></div>
-            <div>
-              <h3 className="text-3xl font-black text-[#005c53]">{resolvedCount}</h3>
-              <p className="text-[10px] font-black uppercase tracking-widest text-[#00675d]">Resolved</p>
-            </div>
-          </div>
-          <div className="bg-rose-50 rounded-[2rem] p-6 flex flex-col justify-between h-40 border border-rose-100">
-            <div className="p-2 bg-white/50 w-fit rounded-xl text-rose-500"><TriangleAlert size={20} /></div>
-            <div>
-              <h3 className="text-3xl font-black text-rose-600">{pendingRequests.filter(r => r.priority === 'high').length}</h3>
-              <p className="text-[10px] font-black uppercase tracking-widest text-rose-500">Critical</p>
-            </div>
-          </div>
-        </section>
-
-        {/* Feed */}
-        <section className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-2xl font-black">Request Feed</h3>
-            <button onClick={() => setControlsOpen(true)} className="p-2.5 rounded-full bg-white border border-slate-100 text-[#4955b3] shadow-sm"><Filter size={18} /></button>
           </div>
 
-          <div className="space-y-4">
+          {/* Audits */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-100/50 dark:border-slate-800/40 rounded-3xl p-5 flex flex-col justify-between min-h-[135px] shadow-sm">
+            <div className="p-2.5 bg-slate-50 dark:bg-slate-850 w-fit rounded-xl text-slate-400 dark:text-slate-500"><HardHat size={18} /></div>
+            <div>
+              <h3 className="text-2xl font-black text-slate-900 dark:text-white leading-none">{audits.length}</h3>
+              <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mt-1.5">Audits</p>
+            </div>
+          </div>
+
+          {/* Resolved */}
+          <div className="bg-emerald-50/30 dark:bg-emerald-950/10 border border-emerald-100/20 dark:border-emerald-900/10 rounded-3xl p-5 flex flex-col justify-between min-h-[135px]">
+            <div className="p-2.5 bg-emerald-100/30 dark:bg-emerald-500/10 w-fit rounded-xl text-emerald-600 dark:text-emerald-400"><Verified size={18} /></div>
+            <div>
+              <h3 className="text-2xl font-black text-emerald-850 dark:text-emerald-450 leading-none">{resolvedCount}</h3>
+              <p className="text-[9px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-450 mt-1.5">Resolved</p>
+            </div>
+          </div>
+
+          {/* Critical Items */}
+          <div className="bg-rose-50/50 dark:bg-rose-950/20 border border-rose-100/45 dark:border-rose-900/20 rounded-3xl p-5 flex flex-col justify-between min-h-[135px]">
+            <div className="p-2.5 bg-rose-100/40 dark:bg-rose-500/10 w-fit rounded-xl text-rose-600 dark:text-rose-450"><TriangleAlert size={18} /></div>
+            <div>
+              <h3 className="text-2xl font-black text-rose-700 dark:text-rose-450 leading-none">{pendingRequests.filter(r => r.priority === 'high').length}</h3>
+              <p className="text-[9px] font-bold uppercase tracking-widest text-rose-600 dark:text-rose-450 mt-1.5">Critical</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Requests Feed Ledger */}
+        <section className="space-y-3.5">
+          <div className="flex items-center justify-between px-1">
+            <h3 className="text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-wider">Active Requests</h3>
+            <button 
+              onClick={() => setControlsOpen(true)} 
+              className="flex items-center gap-1.5 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider hover:opacity-75 transition-all"
+            >
+              Estate Settings <Filter size={12} />
+            </button>
+          </div>
+
+          <div className="space-y-2.5">
             {loading ? (
-                <div className="p-10 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest">Syncing...</div>
+              <div className="text-center py-10 text-[10px] font-bold uppercase tracking-wider text-slate-400">Syncing Feed...</div>
             ) : requests.length === 0 ? (
-                <div className="p-10 text-center text-slate-300 font-black uppercase text-[10px] tracking-widest bg-white rounded-[2rem] border border-dashed">No Requests Found</div>
+              <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl p-8 text-center shadow-sm">
+                <p className="text-slate-400 dark:text-slate-500 font-semibold text-xs">No active maintenance requests found.</p>
+              </div>
             ) : requests.map((item) => (
-              <div key={item.id} className="group bg-white border border-slate-100 p-5 rounded-[2.5rem] shadow-sm">
-                <div className="flex items-start gap-5">
-                  <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-[#4955b3]"><Lightbulb size={20} /></div>
-                  <div className="flex-grow">
-                    <div className="flex justify-between items-start">
-                      <h5 className="font-black text-[#2b3437] line-clamp-1">{item.title}</h5>
-                      <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest whitespace-nowrap ml-2">
+              <div key={item.id} className="group bg-white dark:bg-slate-900 border border-slate-100/50 dark:border-slate-800/40 p-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3.5 shadow-sm">
+                <div className="flex items-start gap-3">
+                  <div className="w-11 h-11 rounded-xl bg-slate-50 dark:bg-slate-850 flex items-center justify-center text-indigo-600 dark:text-indigo-400 border border-slate-100/50 dark:border-slate-800 shrink-0">
+                    <Lightbulb size={18} />
+                  </div>
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <h5 className="font-extrabold text-xs text-slate-900 dark:text-white leading-tight">{item.title}</h5>
+                      <span className="text-[8px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest whitespace-nowrap">
                         {item.createdAt ? new Date(item.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'NOW'}
                       </span>
                     </div>
-                    <p className="text-slate-500 text-sm mt-1 line-clamp-2">{item.description}</p>
-                    <div className="flex items-center justify-between mt-5">
-                      <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${item.maintenanceStatus === 'solved' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
-                        {item.maintenanceStatus}
-                      </div>
-                      {item.maintenanceStatus !== 'solved' && (
-                        <button
-                            onClick={() => updateStatus(item, 'solved')}
-                            disabled={!!updatingId}
-                            className="bg-[#4955b3] text-white px-5 py-2 rounded-xl text-[10px] font-black uppercase active:scale-95 disabled:opacity-50 transition-all"
-                        >
-                            {updatingId === item.id ? '...' : 'Close Ticket'}
-                        </button>
-                      )}
-                    </div>
+                    <p className="text-slate-550 dark:text-slate-400 text-xs mt-1 leading-relaxed max-w-xl">{item.description}</p>
                   </div>
+                </div>
+
+                <div className="flex items-center justify-between sm:justify-end gap-3.5 w-full sm:w-auto border-t sm:border-t-0 border-slate-100/50 dark:border-slate-800/40 pt-2.5 sm:pt-0 mt-1 sm:mt-0 shrink-0">
+                  <div className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider flex items-center gap-1.5 ${
+                    item.maintenanceStatus === 'solved' 
+                      ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-450' 
+                      : 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-450'
+                  }`}>
+                    <span className={`w-1 h-1 rounded-full ${item.maintenanceStatus === 'solved' ? 'bg-emerald-500' : 'bg-amber-550'}`}></span>
+                    {item.maintenanceStatus || 'pending'}
+                  </div>
+
+                  {item.maintenanceStatus !== 'solved' && (
+                    <button
+                      onClick={() => updateStatus(item, 'solved')}
+                      disabled={!!updatingId}
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider active:scale-95 disabled:opacity-50 transition-all shadow-sm"
+                    >
+                      {updatingId === item.id ? '...' : 'Resolve'}
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -246,12 +279,12 @@ const EstateMaintenancePage = () => {
         </section>
       </main>
 
-      {/* TRIGGER BUTTON */}
+      {/* FIXED CREATE FAB */}
       <button
         onClick={() => setFormOpen(true)}
-        className="fixed right-6 bottom-2 w-16 h-16 bg-[#4955b3] text-white rounded-[1.5rem] shadow-xl shadow-indigo-100 flex items-center justify-center z-40 active:scale-90 transition-transform"
+        className="fixed right-5 bottom-5 w-14 h-14 bg-indigo-600 text-white rounded-2xl shadow-xl shadow-indigo-500/15 flex items-center justify-center z-[90] active:scale-90 transition-transform hover:bg-indigo-700"
       >
-        <Plus size={28} strokeWidth={3} />
+        <Plus size={24} strokeWidth={2.5} />
       </button>
 
       {/* CREATE FORM SHEET */}
@@ -259,52 +292,61 @@ const EstateMaintenancePage = () => {
         open={formOpen}
         onClose={() => setFormOpen(false)}
         eyebrow="Central Command"
-        title="New Maintenance Request"
-        panelClassName="md:max-w-xl"
+        title="New Request"
+        busy={isSubmitting}
+        footer={
+          <button
+            type="submit"
+            form="maintenance-request-form"
+            disabled={isSubmitting}
+            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3.5 rounded-xl font-bold text-xs tracking-wider shadow-md transition-all active:scale-95 disabled:opacity-50"
+          >
+            {isSubmitting ? 'Posting...' : 'Post Request'}
+          </button>
+        }
       >
-        <form onSubmit={handleCreateRequest} className="space-y-6 p-5 pt-1">
-          <div>
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Issue Title</label>
+        <form id="maintenance-request-form" onSubmit={handleCreateRequest} className="space-y-4 pt-1">
+          <div className="space-y-1.5">
+            <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 ml-0.5">Issue Title</label>
             <input
               type="text"
               placeholder="e.g., Street Light Repair"
               className={estateFieldClassName}
               value={formData.title}
               onChange={e => setFormData({...formData, title: e.target.value})}
+              required
             />
           </div>
-          <div>
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Priority Level</label>
+          <div className="space-y-1.5">
+            <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 ml-0.5">Priority Level</label>
             <div className="grid grid-cols-3 gap-2">
               {['low', 'medium', 'high'].map(p => (
                 <button
                   key={p}
                   type="button"
                   onClick={() => setFormData({...formData, priority: p})}
-                  className={`py-3 rounded-xl text-[10px] font-black uppercase border transition-all ${formData.priority === p ? 'bg-indigo-50 border-[#4955b3] text-[#4955b3]' : 'bg-white border-slate-100 text-slate-400'}`}
+                  className={`py-3 rounded-xl text-[10px] font-extrabold uppercase border transition-all ${
+                    formData.priority === p 
+                      ? 'bg-indigo-50 border-indigo-600 text-indigo-600 dark:bg-indigo-950/40 dark:border-indigo-400 dark:text-indigo-400' 
+                      : 'bg-white border-slate-100 text-slate-400 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-500'
+                  }`}
                 >
                   {p}
                 </button>
               ))}
             </div>
           </div>
-          <div>
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Description</label>
+          <div className="space-y-1.5">
+            <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 ml-0.5">Description</label>
             <textarea
-              rows="3"
+              rows={3}
               placeholder="Describe the issue in detail..."
-              className={`${estateFieldClassName} resize-none`}
+              className={estateTextareaClassName}
               value={formData.description}
               onChange={e => setFormData({...formData, description: e.target.value})}
+              required
             />
           </div>
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full bg-[#4955b3] text-white py-5 rounded-[1.5rem] font-black uppercase tracking-widest shadow-lg active:scale-95 disabled:opacity-50 transition-all"
-          >
-            {isSubmitting ? 'Posting...' : 'Post Request'}
-          </button>
         </form>
       </MaintenanceSheetFrame>
 
@@ -313,12 +355,19 @@ const EstateMaintenancePage = () => {
         open={controlsOpen}
         onClose={() => setControlsOpen(false)}
         eyebrow="Central Command"
-        title="Operations Management"
-        panelClassName="md:max-w-lg"
+        title="Estate Context"
+        footer={
+          <button 
+            onClick={() => setControlsOpen(false)} 
+            className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 dark:bg-slate-800 dark:hover:bg-slate-750 dark:text-slate-200 py-3.5 rounded-xl font-bold text-xs tracking-wider transition-all active:scale-95"
+          >
+            Close
+          </button>
+        }
       >
-        <div className="grid gap-6 p-5 pt-1">
-          <label className="block">
-            <span className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">Estate Context</span>
+        <div className="space-y-4 pt-1">
+          <div className="space-y-1.5">
+            <span className="block text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 ml-0.5">Selected Estate</span>
             <select
               value={estateId}
               onChange={(e) => { setEstateId(e.target.value); setControlsOpen(false); }}
@@ -326,12 +375,9 @@ const EstateMaintenancePage = () => {
             >
               {(overview?.estates ?? []).map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
             </select>
-          </label>
-          <button onClick={() => setControlsOpen(false)} className="w-full bg-slate-100 text-[#2b3437] py-4 rounded-2xl font-black uppercase tracking-widest">Close</button>
+          </div>
         </div>
       </MaintenanceSheetFrame>
-
-      {/* --- BOTTOM NAV BAR --- */}
 
     </div>
   );
@@ -344,81 +390,105 @@ function MaintenanceSheetFrame({
   onClose,
   eyebrow,
   title,
-  panelClassName = "",
+  busy,
+  footer,
   children,
 }) {
-  if (!open) return null;
+  const sheet = useResponsiveSheet({ open, onClose });
 
-  return (
-    <div className="fixed inset-0 z-[140]">
-      {/* Overlay */}
-      <div
-        className="absolute inset-0 bg-slate-900/50"
-        onClick={onClose}
-      />
+  if (typeof document === "undefined") return null;
 
-      {/* MODAL WRAPPER */}
-      <div
-        className="
-          absolute inset-x-0 bottom-0
-          bg-white
-
-          h-[100dvh]
-          max-h-[100dvh]
-
-          flex flex-col
-          overflow-hidden
-
-          rounded-t-[2rem]
-          shadow-[0_-18px_40px_rgba(15,23,42,0.16)]
-
-          md:top-1/2 md:left-1/2 md:bottom-auto md:right-auto
-          md:-translate-x-1/2 md:-translate-y-1/2
-          md:max-h-[90vh]
-          md:w-full md:max-w-xl
-          md:rounded-2xl
-        "
-      >
-        {/* HEADER (fixed) */}
-        <div className="shrink-0 px-5 py-4 border-b border-slate-100">
-          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#4955b3]">
-            {eyebrow}
-          </p>
-
-          <div className="flex items-center justify-between mt-2">
-            <h3 className="text-xl font-black text-[#2b3437]">
-              {title}
-            </h3>
-
-            <button
-              onClick={onClose}
-              className="rounded-2xl bg-slate-50 p-3 text-slate-500"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-
-        {/* 🔥 SCROLL AREA (ONLY THIS SCROLLS) */}
-        <div
-          className="
-            flex-1
-            min-h-0
-            overflow-y-auto
-            px-5
-            pb-10
-            overscroll-contain
-          "
-          style={{
-            WebkitOverflowScrolling: "touch",
-          }}
-        >
-          <div className="space-y-6 pt-4">
-            {children}
-          </div>
-        </div>
-      </div>
+  const resolvedFooter = footer && (
+    <div className="border-t border-slate-100/60 dark:border-slate-800 bg-white dark:bg-slate-900 px-5 py-4 shrink-0">
+      {footer}
     </div>
   );
-}
 
+  return createPortal(
+    <AnimatePresence>
+      {open && (
+        <div 
+          className="fixed left-0 right-0 top-0 z-[200] flex flex-col justify-end md:justify-center items-center" 
+          style={{ height: sheet.isMobile ? (sheet.viewportHeight || "100dvh") : "100vh" }}
+        >
+          {/* Backdrop Overlay */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
+            onClick={onClose}
+          />
+
+          {/* Sheet Panel */}
+          {sheet.isMobile ? (
+            /* Mobile Bottom Sheet Layout */
+            <motion.section
+              {...sheet.mobileSheetProps}
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 350 }}
+              className="relative flex w-full flex-col overflow-hidden rounded-t-[2rem] bg-white dark:bg-slate-900 shadow-2xl max-h-[85dvh] z-10"
+            >
+              {/* Drag Handle Bar */}
+              <div onPointerDown={sheet.startDrag} className="flex justify-center py-4 shrink-0 cursor-grab active:cursor-grabbing">
+                <div className="h-1 w-12 rounded-full bg-slate-200 dark:bg-slate-800" />
+              </div>
+              
+              {/* Modal Title Block */}
+              <div onPointerDown={sheet.startDrag} className="flex items-start justify-between px-5 pb-4 border-b border-slate-100/50 dark:border-slate-800/40 shrink-0">
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400">{eyebrow}</p>
+                  <h3 className="mt-1 text-lg font-black text-slate-900 dark:text-white">{title}</h3>
+                </div>
+                <button type="button" onClick={onClose} className="rounded-xl bg-slate-50 dark:bg-slate-800 p-2 text-slate-400">
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Scroll Container */}
+              <div
+                ref={sheet.contentRef}
+                onScroll={sheet.onContentScroll}
+                onPointerDown={sheet.onContentPointerDown}
+                className="flex-1 overflow-y-auto px-5 py-5 overscroll-contain"
+              >
+                {children}
+              </div>
+
+              {resolvedFooter}
+              {/* Device Bottom Safe Space Offset */}
+              <div className="h-[env(safe-area-inset-bottom)] bg-white dark:bg-slate-900 shrink-0" />
+            </motion.section>
+          ) : (
+            /* Desktop / Tablet Modal Dialog */
+            <motion.section
+              initial={{ opacity: 0, scale: 0.97, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.97, y: 12 }}
+              transition={{ type: "spring", duration: 0.4 }}
+              className="relative w-full overflow-hidden rounded-[2rem] border border-slate-100/50 dark:border-slate-800/40 bg-white dark:bg-slate-900 shadow-2xl max-w-lg z-10 m-4"
+            >
+              <div className="flex items-start justify-between border-b border-slate-100/50 dark:border-slate-800/40 px-5 py-4">
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400">{eyebrow}</p>
+                  <h3 className="mt-1 text-lg font-black text-slate-900 dark:text-white">{title}</h3>
+                </div>
+                <button type="button" onClick={onClose} className="rounded-xl bg-slate-50 dark:bg-slate-800 p-2 text-slate-400 transition-all hover:bg-slate-100 dark:hover:bg-slate-750">
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="max-h-[60dvh] overflow-y-auto px-5 py-5 overscroll-contain">{children}</div>
+              
+              {resolvedFooter}
+            </motion.section>
+          )}
+        </div>
+      )}
+    </AnimatePresence>,
+    document.body
+  );
+}

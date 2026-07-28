@@ -196,7 +196,7 @@ function getParticipantContext() {
       polite: false
     };
   }
-  if (role === "office") {
+  if (role === "office" || role === "office_staff") {
     return {
       user,
       participantType: "security",
@@ -1372,7 +1372,7 @@ export function useSessionRealtime(sessionId) {
     try {
       if (!restart || !callSessionRef.current) {
         const response =
-          currentUserRole === "office"
+          currentUserRole === "office" || currentUserRole === "office_staff"
             ? await requestOfficeCall({
                 visitorSessionId: sessionId,
                 type: nextMode,
@@ -1385,7 +1385,7 @@ export function useSessionRealtime(sessionId) {
                 hasVideo: video,
                 visitorToken: participantType === "visitor" ? getVisitorSessionToken(sessionId) || undefined : undefined
               });
-        const data = currentUserRole === "office" ? response : response?.data ?? null;
+        const data = currentUserRole === "office" || currentUserRole === "office_staff" ? response : response?.data ?? null;
         if (String(data?.status || "").toLowerCase() === "ok" || String(data?.state || "").toLowerCase() === "connecting") {
           setCallStateSafe("connecting");
         }

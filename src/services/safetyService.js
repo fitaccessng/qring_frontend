@@ -1,13 +1,56 @@
-import { apiRequest } from "./apiClient";
+import { ApiError, apiRequest } from "./apiClient";
+
+const ACTIVE_PANIC_CACHE_TTL_MS = 12000;
+const ACTIVE_PANIC_RATE_LIMIT_TTL_MS = 45000;
+
+let activePanicCache = { rows: [], at: 0 };
+let activePanicInFlight = null;
+let activePanicRateLimitedUntil = 0;
 
 export async function getSafetyDashboard() {
   const response = await apiRequest("/safety/dashboard", { noCache: true });
   return response?.data ?? { context: null, metrics: {}, alerts: [], reports: [], watchlist: [] };
 }
 
-export async function getActivePanicAlerts() {
-  const response = await apiRequest("/panic/active", { noCache: true });
-  return Array.isArray(response?.data) ? response.data : [];
+export async function getActivePanicAlerts(options = {}) {
+  const force = Boolean(options?.force);
+  const now = Date.now();
+
+  if (!force && activePanicCache.at && now - activePanicCache.at < ACTIVE_PANIC_CACHE_TTL_MS) {
+    return activePanicCache.rows;
+  }
+
+  if (!force && now < activePanicRateLimitedUntil) {
+    return activePanicCache.rows;
+  }
+
+  if (activePanicInFlight) {
+    return activePanicInFlight;
+  }
+
+  activePanicInFlight = apiRequest("/panic/active", {
+    noCache: force,
+    retryCount: 0,
+    silent: true
+  })
+    .then((response) => {
+      const rows = Array.isArray(response?.data) ? response.data : [];
+      activePanicCache = { rows, at: Date.now() };
+      activePanicRateLimitedUntil = 0;
+      return rows;
+    })
+    .catch((error) => {
+      if (error instanceof ApiError && error.status === 429) {
+        activePanicRateLimitedUntil = Date.now() + ACTIVE_PANIC_RATE_LIMIT_TTL_MS;
+        return activePanicCache.rows;
+      }
+      throw error;
+    })
+    .finally(() => {
+      activePanicInFlight = null;
+    });
+
+  return activePanicInFlight;
 }
 
 export async function triggerPanicAlert(payload) {

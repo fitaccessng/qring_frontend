@@ -9,6 +9,8 @@ export const queryClient = new QueryClient({
       retry: 1,
       refetchOnWindowFocus: !isNativeApp(),
       refetchOnReconnect: true,
+      refetchInterval: 15000,
+      refetchIntervalInBackground: false,
       networkMode: "always"
     },
     mutations: {

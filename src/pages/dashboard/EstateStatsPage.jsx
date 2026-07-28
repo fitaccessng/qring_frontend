@@ -1,9 +1,18 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
-  ArrowLeft, Bell, ShieldCheck, TrendingUp, ThumbsUp,
-  Download, CreditCard, Building2, Users, LayoutDashboard,
-  Settings, Lock
+  ChevronLeft,
+  Bell,
+  ShieldCheck,
+  TrendingUp,
+  ThumbsUp,
+  Download,
+  Building2,
+  Users,
+  CreditCard,
+  Lock,
+  ArrowUpRight,
+  TrendingDown
 } from 'lucide-react';
 import { getEstateStatsSummary, getEstateStatsSummarySnapshot } from "../../services/estateService";
 
@@ -45,186 +54,168 @@ export default function EstateStatsPage() {
   const restricted = !loading && !summary && Boolean(error);
 
   return (
-    <div className="bg-[#f8f9fa] text-[#2b3437] min-h-screen font-sans selection:bg-indigo-100 pb-32">
+    <div className="bg-slate-50/50 min-h-screen font-sans pb-32 dark:bg-slate-950 text-slate-900 dark:text-slate-100 antialiased flex flex-col selection:bg-indigo-100 dark:selection:bg-indigo-950/40">
 
-      {/* --- HEADER --- */}
-      <header className="fixed top-0 w-full z-50 bg-[#f8f9fa]/80 backdrop-blur-xl border-b border-slate-100">
-        <div className="flex justify-between items-center px-4 h-16 max-w-7xl mx-auto">
-          <button
-            onClick={() => navigate(-1)}
-            className="p-2 text-[#4955b3] active:bg-indigo-50 rounded-full transition-all"
-          >
-            <ArrowLeft size={24} strokeWidth={2.5} />
-          </button>
-          <h1 className="text-[#2b3437] font-black tracking-tight text-lg">Estate Stats</h1>
-          <button className="relative p-2 text-[#4955b3] active:bg-indigo-50 rounded-full transition-all">
-            <Bell size={22} strokeWidth={2.5} />
-            <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-rose-500 rounded-full border-2 border-[#f8f9fa]" />
+      {/* --- STICKY GLASS HEADER --- */}
+      <header className="sticky top-0 z-[100] w-full border-b border-slate-100/80 bg-white/90 px-4 py-3.5 backdrop-blur-md dark:bg-slate-950/90 dark:border-slate-900">
+        <div className="mx-auto flex max-w-7xl items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate(-1)}
+              className="p-2 bg-slate-50 text-slate-600 rounded-full hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 transition-all active:scale-95"
+            >
+              <ChevronLeft size={20} />
+            </button>
+            <div>
+              <h1 className="font-extrabold text-sm sm:text-lg text-slate-900 tracking-tight dark:text-white leading-none">Estate Stats</h1>
+              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1">Analytics & Metrics</p>
+            </div>
+          </div>
+          <button className="relative p-2 bg-slate-50 text-slate-600 dark:bg-slate-900 dark:text-slate-300 rounded-full">
+            <Bell size={18} />
+            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-rose-500 rounded-full border border-white dark:border-slate-950" />
           </button>
         </div>
       </header>
 
-      <main className="pt-24 px-5 max-w-7xl mx-auto w-full">
+      <main className="mt-6 px-4 max-w-7xl mx-auto w-full space-y-6 flex-1">
 
-        {/* --- PAGE TITLE & ACTIONS --- */}
-        <section className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
+        {/* --- TITLE & ACTION SEGMENTS --- */}
+        <section className="flex flex-col md:flex-row md:items-end justify-between gap-4 px-1">
           <div>
-            <span className="text-[#4955b3] font-bold tracking-[0.15em] uppercase text-[10px] mb-1 block">
-              {loading ? "Refreshing..." : "Analytics Dashboard"}
+            <span className="text-indigo-600 dark:text-indigo-400 font-bold tracking-widest text-[9px] uppercase block">
+              {loading ? "Refreshing Database..." : "Live Performance Monitor"}
             </span>
-            <h2 className="text-4xl font-black tracking-tight text-[#2b3437]">Performance</h2>
+            <h2 className="text-xl font-black text-slate-900 dark:text-white mt-1">Operational Analytics</h2>
+            <p className="text-slate-500 dark:text-slate-400 text-xs font-medium mt-1 max-w-md leading-relaxed">
+              Real-time audit records, traffic behavior, and community density summaries.
+            </p>
           </div>
 
           {!restricted && (
-            <div className="flex items-center gap-2">
-              <button className="bg-white border border-slate-100 px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider shadow-sm active:scale-95 transition-transform">
+            <div className="flex items-center gap-2 shrink-0">
+              <button className="bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider shadow-sm hover:bg-slate-50 dark:hover:bg-slate-850 transition-all active:scale-95">
                 Last 30 Days
               </button>
-              <button className="bg-[#4955b3] text-white p-2.5 rounded-2xl shadow-lg shadow-indigo-100 active:scale-95 transition-transform">
-                <Download size={18} strokeWidth={2.5} />
+              <button className="bg-indigo-600 hover:bg-indigo-700 text-white p-2.5 rounded-xl shadow-md shadow-indigo-500/10 active:scale-95 transition-all">
+                <Download size={16} strokeWidth={2.5} />
               </button>
             </div>
           )}
         </section>
 
         {restricted ? (
-          /* --- PAYWALL STATE --- */
-          <section className="bg-white p-8 rounded-[3rem] border border-amber-100 shadow-xl shadow-amber-900/5 text-center flex flex-col items-center">
-            <div className="w-16 h-16 bg-amber-50 rounded-3xl flex items-center justify-center text-amber-500 mb-6">
-              <Lock size={32} strokeWidth={2.5} />
+          /* --- RESTRICTED / PAYWALL LAYER --- */
+          <section className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-slate-100/50 dark:border-slate-800/45 shadow-sm text-center flex flex-col items-center max-w-lg mx-auto mt-8">
+            <div className="w-14 h-14 bg-indigo-50 dark:bg-indigo-500/10 rounded-2xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 mb-5">
+              <Lock size={24} />
             </div>
-            <h2 className="text-2xl font-black text-slate-900">Upgrade Required</h2>
-            <p className="mt-3 text-slate-500 max-w-md mx-auto leading-relaxed">
-              Analytics are not available on your current plan. Upgrade to unlock visitor flow, trend reporting, and performance insights.
+            <h2 className="text-lg font-black text-slate-900 dark:text-white">Premium Feature Locked</h2>
+            <p className="mt-2 text-slate-500 dark:text-slate-400 text-xs font-medium max-w-xs mx-auto leading-relaxed">
+              Historical trends, visitor flow mapping, and analytical snapshots require an active professional subscription plan.
             </p>
             <Link
               to="/billing/paywall"
-              className="mt-8 bg-[#2b3437] text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-slate-200 active:scale-95 transition-all"
+              className="mt-6 w-full max-w-xs bg-indigo-600 hover:bg-indigo-700 text-white py-3.5 rounded-xl font-bold text-xs tracking-wider shadow-md transition-all active:scale-95"
             >
-              Upgrade Now
+              Upgrade Plan
             </Link>
           </section>
         ) : (
           <>
             {/* --- BENTO METRICS GRID --- */}
-            <section className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-8">
-              <div className="col-span-2 bg-[#dfe0ff] p-6 rounded-[2.5rem] flex flex-col justify-between h-48 border border-indigo-100 relative overflow-hidden">
-                <div className="p-2 bg-white/50 w-fit rounded-xl text-[#4955b3] z-10"><ShieldCheck size={20} /></div>
-                <div className="z-10">
-                  <h3 className="text-3xl font-black text-[#3b48a6]">{stats.residents}</h3>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-[#4652b0] opacity-70">Total Residents</p>
-                </div>
-                <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-indigo-400/10 rounded-full blur-2xl" />
-              </div>
-
-              <div className="col-span-2 bg-white p-6 rounded-[2.5rem] flex flex-col justify-between h-48 border border-slate-100 shadow-sm">
+            <section className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+              {/* Card 1: Total Residents */}
+              <div className="bg-indigo-50 dark:bg-indigo-500/5 p-5 rounded-3xl border border-indigo-100/40 dark:border-indigo-500/10 flex flex-col justify-between min-h-[145px] relative overflow-hidden">
                 <div className="flex justify-between items-start">
-                  <div className="p-2 bg-slate-50 w-fit rounded-xl text-slate-400"><TrendingUp size={20} /></div>
-                  <span className="text-[10px] font-black text-emerald-500 bg-emerald-50 px-2 py-1 rounded-lg">LIVE</span>
+                  <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl text-indigo-600 dark:text-indigo-400 border border-indigo-100/20 dark:border-indigo-500/10 shadow-sm z-10">
+                    <ShieldCheck size={18} />
+                  </div>
+                  <span className="text-[8px] font-extrabold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider bg-indigo-100/50 dark:bg-indigo-500/10 px-2.5 py-0.5 rounded-full">
+                    Verified
+                  </span>
                 </div>
-                <div>
-                  <h3 className="text-3xl font-black text-[#2b3437]">{stats.totalVisits}</h3>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Visits</p>
+                <div className="z-10 mt-3">
+                  <p className="text-indigo-500/70 dark:text-indigo-400/50 text-[10px] font-bold uppercase tracking-wider">Total Residents</p>
+                  <p className="text-2xl font-black text-indigo-950 dark:text-white mt-0.5">{stats.residents}</p>
+                </div>
+                <div className="absolute -right-8 -bottom-8 w-24 h-24 bg-indigo-600/10 rounded-full blur-2xl pointer-events-none" />
+              </div>
+
+              {/* Card 2: Total Visits */}
+              <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-100/50 dark:border-slate-800/40 flex flex-col justify-between min-h-[145px] shadow-sm relative overflow-hidden">
+                <div className="flex justify-between items-start">
+                  <div className="p-2.5 bg-slate-50 dark:bg-slate-850 rounded-xl text-slate-450 dark:text-slate-400 border border-slate-100/50 dark:border-slate-800 shadow-sm">
+                    <TrendingUp size={18} />
+                  </div>
+                  <span className="text-[8px] font-extrabold text-emerald-650 dark:text-emerald-400 uppercase tracking-wider bg-emerald-50 dark:bg-emerald-500/5 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                    <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
+                    LIVE
+                  </span>
+                </div>
+                <div className="mt-3">
+                  <p className="text-slate-400 dark:text-slate-500 text-[10px] font-bold uppercase tracking-wider">Total Check-Ins</p>
+                  <p className="text-2xl font-black text-slate-900 dark:text-white mt-0.5">{stats.totalVisits}</p>
                 </div>
               </div>
 
-              <div className="col-span-2 bg-[#85f6e5]/30 p-6 rounded-[2.5rem] flex flex-col justify-between h-48 border border-[#85f6e5]/50">
-                <div className="p-2 bg-white/50 w-fit rounded-xl text-[#006b61]"><ThumbsUp size={20} /></div>
-                <div>
-                  <div className="flex items-baseline gap-2">
-                    <h3 className="text-3xl font-black text-[#005c53]">
-                      {stats.totalVisits > 0 ? Math.round((stats.approved / stats.totalVisits) * 100) : 0}%
-                    </h3>
+              {/* Card 3: Approval Ratio */}
+              <div className="bg-emerald-50/50 dark:bg-emerald-500/5 p-5 rounded-3xl border border-emerald-100/40 dark:border-emerald-500/10 flex flex-col justify-between min-h-[145px] relative overflow-hidden">
+                <div className="flex justify-between items-start">
+                  <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl text-emerald-600 dark:text-emerald-450 border border-emerald-100/20 dark:border-emerald-500/10 shadow-sm z-10">
+                    <ThumbsUp size={18} />
                   </div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-[#00675d]">Approval Rate</p>
                 </div>
+                <div className="z-10 mt-3">
+                  <p className="text-emerald-600/70 dark:text-emerald-400/50 text-[10px] font-bold uppercase tracking-wider">Approval Rate</p>
+                  <p className="text-2xl font-black text-emerald-700 dark:text-emerald-400 mt-0.5">
+                    {stats.totalVisits > 0 ? Math.round((stats.approved / stats.totalVisits) * 100) : 0}%
+                  </p>
+                </div>
+                <div className="absolute -right-8 -bottom-8 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
               </div>
             </section>
 
-            {/* --- ACTIVITY & CHART --- */}
-            <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
-              <div className="lg:col-span-8 bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm">
-                <div className="flex justify-between items-center mb-10">
-                  <h3 className="font-black text-xl">Operational Health</h3>
-                  <div className="flex gap-3">
-                    <div className="flex items-center gap-1.5 text-[9px] font-black text-slate-400"><div className="w-2 h-2 rounded-full bg-[#4955b3]" /> Approved</div>
-                    <div className="flex items-center gap-1.5 text-[9px] font-black text-slate-400"><div className="w-2 h-2 rounded-full bg-rose-400" /> Rejected</div>
-                  </div>
-                </div>
-                <div className="flex items-end justify-between h-48 gap-3">
-                  {[60, 85, 45, 90, 75, 40, 30].map((val, i) => (
-                    <div key={i} className="flex-1 flex flex-col items-center gap-3">
-                      <div className="w-full max-w-[32px] bg-slate-50 rounded-full h-full relative overflow-hidden">
-                        <div className="absolute bottom-0 w-full bg-[#4955b3] rounded-full transition-all duration-1000" style={{ height: `${val}%` }} />
-                      </div>
-                      <span className="text-[9px] font-black text-slate-300 uppercase">{['M','T','W','T','F','S','S'][i]}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="lg:col-span-4">
-                <div className="bg-[#2b3437] text-white p-8 rounded-[3rem] h-full shadow-xl">
-                  <h3 className="font-black text-xl mb-6">Recent Activity</h3>
-                  <div className="space-y-6">
-                    {loading && <p className="text-white/40 text-xs italic">Loading latest visits...</p>}
-                    {!loading && summary?.recentActivity?.slice(0, 3).map((row) => (
-                      <div key={row.id} className="flex gap-4 group">
-                        <span className="text-[9px] font-black text-white/30 pt-1 uppercase">
-                          {row.startedAt ? new Date(row.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "--:--"}
-                        </span>
-                        <div>
-                          <h4 className="text-sm font-bold leading-tight truncate w-32">{row.visitor}</h4>
-                          <p className="text-[10px] text-white/50 mt-0.5">{row.homeName}</p>
-                        </div>
-                      </div>
-                    ))}
-                    {!loading && (!summary?.recentActivity || summary.recentActivity.length === 0) && (
-                      <p className="text-white/30 text-xs uppercase font-black tracking-widest">No Recent Logs</p>
-                    )}
-                  </div>
-                  <button className="w-full mt-10 py-4 rounded-2xl bg-white/10 text-white text-[10px] font-black uppercase tracking-widest hover:bg-white/20 transition-all">
-                    View Full Logs
-                  </button>
-                </div>
-              </div>
-            </section>
-
-            {/* --- FOOTER INSIGHTS --- */}
-            <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <InsightCard label="Active Homes" val={stats.activeHomes} icon={<Building2 />} color="text-indigo-500" />
-              <InsightCard label="Access Points" val={stats.activeDoors} icon={<CreditCard />} color="text-emerald-500" />
-              <InsightCard label="Approved Today" val={stats.approved} icon={<Users />} color="text-slate-400" />
+            {/* --- OPERATIONAL HEALTH CHART & ACTIVITY SHEET --- */}
+         
+            {/* --- FOOTER CARD METRICS --- */}
+            <section className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+              <InsightCard label="Active Homes" val={stats.activeHomes} icon={<Building2 size={16} />} color="indigo" />
+              <InsightCard label="Access Points" val={stats.activeDoors} icon={<CreditCard size={16} />} color="emerald" />
+              <InsightCard label="Approved Today" val={stats.approved} icon={<Users size={16} />} color="slate" />
             </section>
           </>
         )}
       </main>
-
-      {/* --- BOTTOM NAV --- */}
-
     </div>
   );
 }
 
-/* --- REUSABLE SUB-COMPONENTS --- */
-
+/* --- ADAPTED INSIGHT CARD --- */
 function InsightCard({ label, val, icon, color }) {
+  const colorMap = {
+    indigo: {
+      bg: "bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-100/20",
+    },
+    emerald: {
+      bg: "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-450 border-emerald-100/20",
+    },
+    slate: {
+      bg: "bg-slate-50 dark:bg-slate-850 text-slate-500 dark:text-slate-400 border-slate-100/50",
+    }
+  };
+
+  const activeTheme = colorMap[color] || colorMap.slate;
+
   return (
-    <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex items-center gap-5">
-      <div className={`p-3 bg-slate-50 rounded-2xl ${color}`}>{icon}</div>
+    <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100/50 dark:border-slate-800/40 shadow-sm flex items-center gap-3.5">
+      <div className={`w-11 h-11 rounded-xl flex items-center justify-center border ${activeTheme.bg}`}>
+        {icon}
+      </div>
       <div>
-        <h4 className="text-2xl font-black">{val}</h4>
-        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</p>
+        <h4 className="text-lg font-black text-slate-900 dark:text-white leading-none">{val}</h4>
+        <p className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider mt-1">{label}</p>
       </div>
     </div>
-  );
-}
-
-function NavItem({ icon, label, active = false }) {
-  return (
-    <button className={`flex flex-col items-center gap-1.5 px-4 py-2 rounded-2xl transition-all ${active ? 'text-[#4955b3] bg-indigo-50/50' : 'text-slate-300'}`}>
-      {icon}
-      <span className="text-[9px] font-black uppercase tracking-tight">{label}</span>
-    </button>
   );
 }

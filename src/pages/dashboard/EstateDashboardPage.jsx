@@ -26,7 +26,8 @@ import {
   Network,
   ClipboardList,
   ArrowDown,
-  ArrowUp
+  ArrowUp,
+  HardHat
 } from "lucide-react";
 import { useNotifications } from "../../state/NotificationsContext";
 import { useEstateNotifications } from "../../hooks/useEstateNotifications";
@@ -47,6 +48,7 @@ const EXTRA_TOOLKIT_ITEMS = [
   { label: "Residents", icon: <UserPlus size={20} />, to: "/dashboard/estate/invites" },
   { label: "Security", icon: <Shield size={20} />, to: "/dashboard/estate/security" },
   { label: "Logs", icon: <ClipboardList size={20} />, to: "/dashboard/estate/logs" },
+  { label: "Artisans", icon: <HardHat size={20} />, to: "/dashboard/estate/artisans" },
   { label: "Settings", icon: <Settings size={20} />, to: "/dashboard/estate/settings" }
 ];
 

@@ -1,12 +1,12 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom"; // Added useNavigate
+import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Bell, Plus, User, Phone, CalendarOff, History,
   CalendarDays, MessageSquare, LayoutGrid,
   UserCircle, Trash2, ShieldCheck, X,
   MapPin, DoorOpen, Clock, AlignLeft, Navigation,
-  ArrowLeft // Added ArrowLeft
+  ArrowLeft
 } from "lucide-react";
 import { useApiQuery, useApiMutation } from "../../hooks/useApi";
 import { endpoints } from "../../services/endpoints";
@@ -15,8 +15,8 @@ import { useNotifications } from "../../state/NotificationsContext";
 import { createHomeownerAppointment } from "../../services/homeownerService";
 
 export default function ResidentAppointmentsPage() {
-  const navigate = useNavigate(); // For the back button logic
-  const { user } = useAuth(); // No change needed, but check for homeowner-specific logic below
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const { unreadCount } = useNotifications();
   const scrollContainerRef = useRef(null);
   const [selectedDate, setSelectedDate] = useState(() => toDateKey(new Date()));
@@ -24,23 +24,24 @@ export default function ResidentAppointmentsPage() {
   const [isLocating, setIsLocating] = useState(false);
   const [inviteResult, setInviteResult] = useState(null);
 
-  // Error Safeguard
   const listUrl = endpoints?.homeowner?.appointments || "/homeowner/appointments";
-  const createUrl = endpoints?.homeowner?.appointments || "/homeowner/appointments";
 
   const { data: appointments, isLoading, refetch } = useApiQuery({
     queryKey: ["appointments", selectedDate],
     url: `${listUrl}?date=${selectedDate}`,
     enabled: !!selectedDate,
   });
+  
   const { data: doorsResponse } = useApiQuery({
     queryKey: ["homeowner-doors-for-appointments"],
     url: endpoints?.homeowner?.doors || "/homeowner/doors"
   });
+
   const filteredAppointments = useMemo(() => {
     const rows = Array.isArray(appointments) ? appointments : [];
     return rows.filter((item) => toDateKey(item?.startsAt || item?.createdAt) === selectedDate);
   }, [appointments, selectedDate]);
+
   const availableDoors = useMemo(() => {
     if (Array.isArray(doorsResponse)) return doorsResponse;
     return Array.isArray(doorsResponse?.doors) ? doorsResponse.doors : [];
@@ -114,207 +115,258 @@ export default function ResidentAppointmentsPage() {
       window.prompt("Copy this invite:", raw);
     }
   }
+
   return (
-    <div className="bg-[#f8f9fa] min-h-screen font-sans pb-32 overflow-x-hidden">
-      {/* Updated Header with Back Arrow */}
-      <header className="fixed top-0 w-full z-[100] bg-white/90 backdrop-blur-md border-b border-slate-100 px-6 py-4">
-        <div className="max-w-5xl mx-auto w-full flex justify-between items-center">
-          <div className="flex items-center gap-4">
+    <div className="bg-slate-50/50 min-h-screen font-sans text-slate-900 antialiased selection:bg-indigo-500/10 selection:text-indigo-600">
+      
+      {/* STATIC HEADER */}
+      <header className="w-full bg-white border-b border-slate-200/60 sticky top-0 z-40 backdrop-blur-xl bg-white/80">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex justify-between items-center">
+          <div className="flex items-center gap-3">
             <button
               onClick={() => navigate(-1)}
-              className="p-2 -ml-2 hover:bg-slate-50 rounded-full transition-colors text-slate-600"
+              className="p-2 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 hover:text-slate-900 transition-all active:scale-95"
             >
-              <ArrowLeft size={22} />
+              <ArrowLeft size={20} />
             </button>
             <div>
-              <h1 className="font-bold text-lg text-slate-900 leading-none">Appointments</h1>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter mt-1">Security Access</p>
+              <h1 className="font-bold text-base sm:text-xl text-slate-900 tracking-tight">Appointments</h1>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse" />
+                <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Security Access Portal</p>
+              </div>
             </div>
           </div>
 
-          <Link to="/dashboard/notifications" className="relative p-2.5 bg-slate-50 text-slate-600 rounded-full hover:bg-indigo-50 transition-all">
+          <Link 
+            to="/dashboard/notifications" 
+            className="relative p-2.5 bg-slate-100 hover:bg-slate-200/80 text-slate-700 rounded-xl transition-all active:scale-95"
+          >
             <Bell size={18} />
             {unreadCount > 0 && (
-              <span className="absolute top-2 right-2.5 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white" />
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-white" />
             )}
           </Link>
         </div>
       </header>
 
-      <main className="pt-24 px-6 max-w-4xl mx-auto space-y-8">
-        <section>
-          <div className="flex justify-between items-end mb-4">
-            <h2 className="font-extrabold text-2xl text-slate-900 tracking-tight">Select Date</h2>
-            <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1">{formatDateHeader(selectedDate)}</span>
-          </div>
-          <div ref={scrollContainerRef} className="flex gap-3 overflow-x-auto pb-4 no-scrollbar snap-x">
-            {dateTiles.map((item) => {
-              const isActive = selectedDate === item.date;
-              return (
-                <button
-                  key={item.date}
-                  onClick={() => setSelectedDate(item.date)}
-                  className={`flex-shrink-0 w-16 h-24 flex flex-col items-center justify-center rounded-3xl transition-all snap-start ${
-                    isActive ? "bg-indigo-600 text-white shadow-xl shadow-indigo-200 scale-105" : "bg-white border border-slate-100 text-slate-400"
-                  }`}
-                >
-                  <span className="text-[9px] font-black uppercase mb-1">{item.weekday}</span>
-                  <span className="text-xl font-black">{item.day}</span>
-                </button>
-              );
-            })}
-          </div>
-        </section>
+      {/* MAIN LAYOUT CONTAINER */}
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        
+        {/* LEFT COLUMN: Date Selector & Overview */}
+        <div className="lg:col-span-7 space-y-6">
+          <section className="bg-white border border-slate-200/80 rounded-3xl p-5 sm:p-6 shadow-sm">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="font-bold text-slate-900 tracking-tight text-sm sm:text-base">Select Booking Date</h2>
+              <span className="text-[11px] font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">{formatDateHeader(selectedDate)}</span>
+            </div>
+            
+            <div ref={scrollContainerRef} className="flex gap-2.5 overflow-x-auto pb-2 no-scrollbar snap-x scroll-smooth">
+              {dateTiles.map((item) => {
+                const isActive = selectedDate === item.date;
+                return (
+                  <button
+                    key={item.date}
+                    onClick={() => setSelectedDate(item.date)}
+                    className={`flex-shrink-0 w-14 h-20 flex flex-col items-center justify-center rounded-2xl transition-all duration-200 snap-start border ${
+                      isActive 
+                        ? "bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-600/10 scale-102 font-bold" 
+                        : "bg-slate-50 border-slate-200/60 text-slate-400 hover:bg-slate-100/80 hover:text-slate-600"
+                    }`}
+                  >
+                    <span className={`text-[9px] font-bold uppercase tracking-tight mb-1 ${isActive ? "text-indigo-200" : "text-slate-400"}`}>{item.weekday}</span>
+                    <span className="text-lg font-extrabold tracking-tight">{item.day}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
 
-        <section className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h3 className="font-bold text-lg text-slate-800">Scheduled Visitors</h3>
-            <span className="text-[10px] font-bold text-slate-400 uppercase bg-slate-100 px-3 py-1 rounded-full">{filteredAppointments.length || 0} Expected</span>
-          </div>
-          {isLoading ? (
-            <div className="animate-pulse space-y-4">
-              {[1, 2].map(i => <div key={i} className="h-20 bg-white rounded-[2rem] border border-slate-100" />)}
+          {/* VISITOR SCHEDULE CONTAINER */}
+          <section className="space-y-4">
+            <div className="flex justify-between items-center px-1">
+              <h3 className="font-bold text-sm sm:text-base text-slate-800 tracking-tight">Expected Visitors</h3>
+              <span className="text-xs font-bold text-slate-400 bg-slate-100 px-3 py-1 rounded-full">{filteredAppointments.length || 0} Scheduled</span>
             </div>
-          ) : filteredAppointments.length > 0 ? (
-            <div className="space-y-3">
-              {filteredAppointments.map((appt, idx) => (
-                <div key={idx} className="bg-white p-5 rounded-[2rem] border border-slate-100 flex items-center justify-between group shadow-sm">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center"><User size={22} /></div>
-                    <div>
-                      <p className="font-bold text-sm text-slate-900">{appt.name || appt.visitorName}</p>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{appt.phone || appt.visitorPhone}</p>
+
+            {isLoading ? (
+              <div className="space-y-3">
+                {[1, 2].map(i => (
+                  <div key={i} className="h-20 bg-white rounded-2xl border border-slate-200/60 animate-pulse" />
+                ))}
+              </div>
+            ) : filteredAppointments.length > 0 ? (
+              <div className="space-y-3">
+                {filteredAppointments.map((appt, idx) => (
+                  <div key={idx} className="bg-white p-4 rounded-2xl border border-slate-200/70 flex items-center justify-between group shadow-sm transition-all hover:border-slate-300">
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <div className="w-11 h-11 rounded-xl bg-slate-50 border border-slate-100 text-slate-600 flex items-center justify-center shrink-0">
+                        <User size={18} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-bold text-sm text-slate-900 truncate tracking-tight">{appt.name || appt.visitorName}</p>
+                        <p className="text-[11px] font-semibold text-slate-400 mt-0.5 tracking-tight">{appt.phone || appt.visitorContact}</p>
+                      </div>
                     </div>
+                    <button className="p-2 text-slate-400 hover:text-rose-500 rounded-xl hover:bg-rose-50 transition-colors active:scale-95 shrink-0">
+                      <Trash2 size={16} />
+                    </button>
                   </div>
-                  <button className="p-2 text-slate-300 hover:text-rose-500 transition-colors"><Trash2 size={18} /></button>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 bg-white rounded-3xl border border-dashed border-slate-300 text-center px-6">
+                <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center mb-3 text-slate-300">
+                  <CalendarOff size={22} />
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-16 bg-white rounded-[3rem] border-2 border-dashed border-slate-100 text-center px-6">
-              <CalendarOff size={40} className="text-slate-200 mb-4" />
-              <p className="text-xs font-black text-slate-400 uppercase tracking-widest">No scheduled visits</p>
-            </div>
-          )}
-        </section>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">No Scheduled Visits for this day</p>
+              </div>
+            )}
+          </section>
+        </div>
+
+        {/* RIGHT COLUMN: Static Action & Prompt to trigger creation context */}
+        <div className="lg:col-span-5 lg:sticky lg:top-24">
+          <div className="bg-slate-900 text-white rounded-3xl p-6 border border-slate-800 shadow-xl shadow-slate-950/10 text-center lg:text-left">
+            <h3 className="text-lg font-bold tracking-tight">Need to bring in someone new?</h3>
+            <p className="text-slate-400 text-xs sm:text-sm mt-1.5 leading-relaxed">
+              Instantly create custom entries, assign points of access, and generate invite codes or deep-links directly for your guests.
+            </p>
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="mt-5 w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs uppercase tracking-wider py-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-md shadow-indigo-600/10 active:scale-[0.98]"
+            >
+              <Plus size={16} />
+              <span>Invite New Guest</span>
+            </button>
+          </div>
+        </div>
       </main>
 
-      <button
-        onClick={() => setIsModalOpen(true)}
-        className="fixed bottom-28 right-6 w-16 h-16 bg-indigo-600 text-white rounded-full shadow-2xl shadow-indigo-300 flex items-center justify-center hover:bg-indigo-700 active:scale-90 transition-all z-[90] border-4 border-white"
-      >
-        <Plus size={28} />
-      </button>
-
-      {/* MODAL SECTION */}
+      {/* FULL RESPONSIVE FORM INTERFACE MODAL */}
       <AnimatePresence>
         {isModalOpen && (
-          <div className="fixed inset-0 z-[1000] flex items-end sm:items-center justify-center">
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
             <motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => setIsModalOpen(false)}
-              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+              className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm"
             />
 
             <motion.div
               initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
-              className="relative bg-white w-full max-w-lg rounded-t-[2.5rem] sm:rounded-[2.5rem] flex flex-col h-[85vh] sm:h-auto sm:max-h-[90vh] shadow-2xl overflow-hidden"
+              className="relative bg-white w-full sm:max-w-xl rounded-t-[2rem] sm:rounded-3xl flex flex-col h-[90vh] sm:h-auto sm:max-h-[85vh] shadow-2xl overflow-hidden"
             >
               {/* Modal Header */}
-              <div className="p-8 pb-4 bg-white shrink-0">
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="font-black text-2xl text-slate-900 tracking-tight">Create Appointment</h3>
-                  <button onClick={() => setIsModalOpen(false)} className="p-2 bg-slate-50 rounded-full text-slate-400"><X size={20} /></button>
+              <div className="px-6 pt-6 pb-4 bg-white border-b border-slate-100 shrink-0">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h3 className="font-bold text-lg text-slate-900 tracking-tight">Create Pass Invitation</h3>
+                    <p className="text-slate-400 text-xs font-medium mt-0.5">Schedule security pre-clearance codes seamlessly.</p>
+                  </div>
+                  <button 
+                    onClick={() => setIsModalOpen(false)} 
+                    className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-xl transition-colors active:scale-95"
+                  >
+                    <X size={18} />
+                  </button>
                 </div>
-                <p className="text-slate-500 text-xs font-medium leading-relaxed">Schedule access and share link with visitor.</p>
               </div>
 
               {/* Scrollable Form Content */}
               <form onSubmit={handleCreateAppointment} className="flex-1 flex flex-col overflow-hidden">
-                <div className="flex-1 overflow-y-auto px-8 py-4 space-y-6 no-scrollbar">
-                  <InputField label="Visitor Name" name="visitorName" placeholder="Full Name" icon={<User size={18}/>} required />
-                  <InputField label="Visitor Contact" name="visitorContact" placeholder="+234..." icon={<Phone size={18}/>} required />
-                  <InputField label="Visitor Email" name="visitorEmail" placeholder="visitor@email.com" icon={<MessageSquare size={18}/>} />
+                <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5 no-scrollbar bg-slate-50/50">
+                  <InputField label="Visitor Full Name" name="visitorName" placeholder="John Doe" icon={<User size={16}/>} required />
+                  <InputField label="Visitor Mobile Number" name="visitorContact" placeholder="+234..." icon={<Phone size={16}/>} required />
+                  <InputField label="Visitor Email Address" name="visitorEmail" type="email" placeholder="visitor@email.com" icon={<MessageSquare size={16}/>} />
 
-                  <div className="h-px bg-slate-100 w-full" />
-
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Door / Point of Entry</label>
-                    <div className="relative group">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Point of Entry Gateway</label>
+                    <div className="relative">
                       <select
                         name="doorId"
                         required
-                        className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-bold text-slate-900 focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 transition-all outline-none"
+                        className="w-full appearance-none bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-900 focus:border-indigo-500 transition-all outline-none"
                         defaultValue=""
                       >
-                        <option value="" disabled>Select a door</option>
+                        <option value="" disabled>Choose point of entry...</option>
                         {availableDoors.map((door) => (
                           <option key={door.id} value={door.id}>
-                            {door.gateLabel || door.name || "Door"}
+                            {door.gateLabel || door.name || "Access Door"}
                           </option>
                         ))}
                       </select>
-                      <div className="absolute right-5 top-4 text-slate-300"><DoorOpen size={18}/></div>
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400"><DoorOpen size={16}/></div>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <InputField label="Start Time" name="startTime" type="datetime-local" icon={<Clock size={18}/>} required />
-                    <InputField label="End Time" name="endTime" type="datetime-local" icon={<Clock size={18}/>} required />
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <InputField label="Valid From" name="startTime" type="datetime-local" icon={<Clock size={16}/>} required />
+                    <InputField label="Valid Until" name="endTime" type="datetime-local" icon={<Clock size={16}/>} required />
                   </div>
 
-                  <div className="h-px bg-slate-100 w-full" />
-
-                  {/* Geofencing Section */}
-                  <div className="space-y-4 bg-slate-50 p-5 rounded-[2rem] border border-slate-100">
-                    <div className="flex justify-between items-center px-1">
-                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Location Security</label>
-                      <button type="button" onClick={handleGetLocation} className="flex items-center gap-1.5 text-[10px] font-bold text-indigo-600 uppercase">
+                  {/* Geofencing Controls Layout */}
+                  <div className="space-y-4 bg-white p-4 rounded-2xl border border-slate-200">
+                    <div className="flex justify-between items-center px-0.5">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Geofence Validation</label>
+                      <button 
+                        type="button" 
+                        onClick={handleGetLocation} 
+                        className="flex items-center gap-1.5 text-[10px] font-bold text-indigo-600 hover:text-indigo-700 uppercase transition-colors"
+                      >
                         <Navigation size={12} className={isLocating ? "animate-pulse" : ""} />
-                        {isLocating ? "Locating..." : "Turn On Location"}
+                        {isLocating ? "Acquiring..." : "Get Live Coordinates"}
                       </button>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
-                      <InputField label="Latitude" name="latitude" placeholder="Optional" icon={<MapPin size={16}/>} />
-                      <InputField label="Longitude" name="longitude" placeholder="Optional" icon={<MapPin size={16}/>} />
+                      <InputField label="Latitude" name="latitude" placeholder="Optional" icon={<MapPin size={14}/>} />
+                      <InputField label="Longitude" name="longitude" placeholder="Optional" icon={<MapPin size={14}/>} />
                     </div>
-                    <InputField label="Radius (meters)" name="geofenceRadiusMeters" type="number" min="30" max="2000" placeholder="120" icon={<Navigation size={16}/>} />
+                    <InputField label="Safe Radius (Meters)" name="geofenceRadiusMeters" type="number" min="30" max="2000" placeholder="e.g., 120" icon={<Navigation size={14}/>} />
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Purpose</label>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Notes / Purpose</label>
                     <div className="relative">
-                      <textarea name="purpose" placeholder="Reason for visit..." rows="3" className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-bold text-slate-900 focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 transition-all outline-none resize-none" />
-                      <div className="absolute right-5 top-4 text-slate-300"><AlignLeft size={18} /></div>
+                      <textarea name="purpose" placeholder="Reason for visitation request..." rows="2" className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-900 focus:border-indigo-500 transition-all outline-none resize-none" />
+                      <div className="absolute right-4 top-4 text-slate-400"><AlignLeft size={16} /></div>
                     </div>
                   </div>
-                  <div className="h-6" />
-                  {inviteResult ? (
-                    <div className="rounded-[2rem] border border-emerald-100 bg-emerald-50 p-5 space-y-3">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-emerald-700">
-                        {inviteResult?.inviteDelivery === "email" ? "Invitation sent" : "Invite ready to share"}
+
+                  {inviteResult && (
+                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 space-y-2.5">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">
+                        {inviteResult?.inviteDelivery === "email" ? "Invitation Dispatched" : "Access Key Ready"}
                       </p>
-                      {inviteResult?.shareUrl ? (
-                        <button type="button" onClick={() => handleCopyInvite(inviteResult.shareUrl)} className="w-full rounded-2xl bg-white px-4 py-3 text-left text-xs font-bold text-slate-700 border border-emerald-100">
-                          Copy link
+                      {inviteResult?.shareUrl && (
+                        <button type="button" onClick={() => handleCopyInvite(inviteResult.shareUrl)} className="w-full rounded-xl bg-white px-3 py-2.5 text-left text-xs font-bold text-slate-700 border border-slate-200 shadow-sm active:scale-[0.99] transition-transform">
+                          Copy Access URL Link
                         </button>
-                      ) : null}
-                      {inviteResult?.inviteCode ? (
-                        <button type="button" onClick={() => handleCopyInvite(inviteResult.inviteCode)} className="w-full rounded-2xl bg-white px-4 py-3 text-left text-xs font-bold text-slate-700 border border-emerald-100">
-                          Copy code: {inviteResult.inviteCode}
+                      )}
+                      {inviteResult?.inviteCode && (
+                        <button type="button" onClick={() => handleCopyInvite(inviteResult.inviteCode)} className="w-full rounded-xl bg-white px-3 py-2.5 text-left text-xs font-mono font-bold text-slate-700 border border-slate-200 shadow-sm active:scale-[0.99] transition-transform">
+                          Code: {inviteResult.inviteCode} (Tap to copy)
                         </button>
-                      ) : null}
+                      )}
                     </div>
-                  ) : null}
+                  )}
                 </div>
 
                 {/* Fixed Footer Action */}
-                <div className="p-8 pt-4 bg-white border-t border-slate-100 shrink-0">
+                <div className="p-4 bg-white border-t border-slate-100 shrink-0">
                   <button
                     type="submit"
                     disabled={createMutation.isPending}
-                    className="w-full bg-indigo-600 text-white font-black text-xs uppercase tracking-widest py-5 rounded-2xl shadow-xl shadow-indigo-100 flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-50"
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs uppercase tracking-wider py-4 rounded-xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:opacity-50 shadow-sm"
                   >
-                    {createMutation.isPending ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><ShieldCheck size={18} /> Invite Guest</>}
+                    {createMutation.isPending ? (
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        <ShieldCheck size={16} />
+                        <span>Generate & Dispatch Pass</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </form>
@@ -322,9 +374,6 @@ export default function ResidentAppointmentsPage() {
           </div>
         )}
       </AnimatePresence>
-
-      {/* Bottom Nav */}
-     
     </div>
   );
 }
@@ -335,17 +384,17 @@ function parseOptionalNumber(value) {
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : undefined;
 }
-// Sub-components
+
 function InputField({ label, icon, ...props }) {
   return (
-    <div className="space-y-2">
-      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">{label}</label>
+    <div className="space-y-1.5 w-full">
+      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">{label}</label>
       <div className="relative group">
         <input
           {...props}
-          className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-bold text-slate-900 focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 transition-all outline-none placeholder:text-slate-300"
+          className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-900 focus:border-indigo-500 transition-all outline-none placeholder:text-slate-300"
         />
-        <div className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-600 transition-colors pointer-events-none">
+        <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none group-focus-within:text-indigo-600 transition-colors">
           {icon}
         </div>
       </div>
@@ -353,7 +402,6 @@ function InputField({ label, icon, ...props }) {
   );
 }
 
-// Utils
 function toDateKey(val) {
   const d = new Date(val);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;

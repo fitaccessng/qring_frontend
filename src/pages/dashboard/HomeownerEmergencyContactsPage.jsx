@@ -4,15 +4,10 @@ import {
   Bell,
   ChevronLeft,
   HeartHandshake,
-  History,
   HomeIcon,
   Info,
-  KeyRound,
-  LayoutGrid,
-  Shield,
   ShieldAlert,
   Trash2,
-  User as UserIcon,
   UserPlus
 } from "lucide-react";
 import { useNotifications } from "../../state/NotificationsContext";
@@ -147,18 +142,14 @@ export default function HomeownerEmergencyContactsPage() {
 
   return (
     <div className="min-h-screen bg-[#f8f9fa] font-sans text-slate-900 antialiased flex flex-col">
-      <header className="fixed top-0 w-full z-[100] bg-white/80 backdrop-blur-md border-b border-slate-100 px-6 py-4">
-        <div className="max-w-4xl mx-auto flex justify-between items-center">
-          <div className="flex items-center gap-4">
+      {/* Static Header Layout */}
+      <header className="sticky top-0 z-50 w-full border-b border-slate-200/60 bg-white/80 px-4 py-4 backdrop-blur-md sm:px-6">
+        <div className="mx-auto flex max-w-5xl items-center justify-between">
+          <div className="flex items-center gap-3 sm:gap-4">
             <button onClick={() => navigate(-1)} className="p-2.5 bg-slate-50 text-slate-600 rounded-full hover:bg-slate-100 transition-colors">
               <ChevronLeft size={20} />
             </button>
-            <div>
-              <h1 className="font-bold text-lg text-slate-900 leading-none">Safety Center</h1>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
-                {isPanicActive ? "🔴 Emergency Active" : "🟢 System Armed"}
-              </p>
-            </div>
+            <h1 className="font-bold text-base sm:text-xl text-slate-900 tracking-tight">Emergency Contacts</h1>
           </div>
           <Link to="/dashboard/notifications" className="relative p-2.5 bg-slate-50 text-slate-600 rounded-full">
             <Bell size={18} />
@@ -167,29 +158,30 @@ export default function HomeownerEmergencyContactsPage() {
         </div>
       </header>
 
-      <main className="flex-grow pt-28 pb-32 px-6 max-w-2xl mx-auto w-full">
-        <section className="mb-10">
-          <h2 className="text-3xl font-black text-slate-900 tracking-tight mb-3">Emergency Contacts</h2>
-          <p className="text-slate-500 text-lg leading-relaxed">Add verified QRing users by email so panic alerts reach real accounts.</p>
+      {/* Main Structural Layout Content Framework */}
+      <main className="flex-grow py-8 sm:py-12 px-4 sm:px-6 max-w-2xl mx-auto w-full">
+        <section className="mb-8 sm:mb-10">
+          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight mb-3">Emergency Contacts</h2>
+          <p className="text-slate-500 text-base sm:text-lg leading-relaxed">Add verified QRing users by email so panic alerts reach real accounts.</p>
         </section>
 
-        <section className="bg-white rounded-[2rem] p-6 border border-slate-100 shadow-sm mb-10">
+        <section className="bg-white rounded-[1.5rem] sm:rounded-[2rem] p-4 sm:p-6 border border-slate-100 shadow-sm mb-8 sm:mb-10">
           <div className="flex items-center gap-3 mb-4">
             <UserPlus size={20} className="text-indigo-600" />
             <h3 className="font-bold text-slate-900">Add New Contact</h3>
           </div>
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid gap-3 grid-cols-1 md:grid-cols-3">
             <input
               value={form.email}
               onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))}
               placeholder="QRing user email"
-              className="rounded-2xl bg-slate-50 border border-slate-100 px-4 py-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500/20"
+              className="w-full rounded-2xl bg-slate-50 border border-slate-100 px-4 py-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500/20"
             />
             <input
               value={form.relationship}
               onChange={(event) => setForm((prev) => ({ ...prev, relationship: event.target.value }))}
               placeholder="Relationship"
-              className="rounded-2xl bg-slate-50 border border-slate-100 px-4 py-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500/20"
+              className="w-full rounded-2xl bg-slate-50 border border-slate-100 px-4 py-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500/20"
             />
             <div className="rounded-2xl bg-slate-50 border border-slate-100 px-4 py-3 text-xs font-semibold text-slate-500 flex items-center">
               The user must already have a verified QRing account.
@@ -208,34 +200,34 @@ export default function HomeownerEmergencyContactsPage() {
 
         <div className="space-y-4">
           {loading ? (
-            <div className="bg-white rounded-[2rem] p-8 border border-slate-100 shadow-sm text-center text-slate-500 font-bold">Loading contacts...</div>
+            <div className="bg-white rounded-[1.5rem] sm:rounded-[2rem] p-6 sm:p-8 border border-slate-100 shadow-sm text-center text-slate-500 font-bold">Loading contacts...</div>
           ) : contacts.length === 0 ? (
-            <div className="bg-white rounded-[2rem] p-8 border border-slate-100 shadow-sm text-center text-slate-500 font-bold">
+            <div className="bg-white rounded-[1.5rem] sm:rounded-[2rem] p-6 sm:p-8 border border-slate-100 shadow-sm text-center text-slate-500 font-bold">
               No emergency contacts saved yet.
             </div>
           ) : (
             contacts.map((contact) => (
-              <div key={contact.id} className="group bg-white rounded-[2rem] p-6 border border-slate-100 shadow-sm hover:shadow-md transition-all duration-300">
-                <div className="flex items-center gap-5">
-                  <div className={`w-16 h-16 rounded-2xl ${colorForRelationship(contact.relationship)} flex items-center justify-center`}>
+              <div key={contact.id} className="group bg-white rounded-[1.5rem] sm:rounded-[2rem] p-4 sm:p-6 border border-slate-100 shadow-sm hover:shadow-md transition-all duration-300">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-5">
+                  <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl shrink-0 ${colorForRelationship(contact.relationship)} flex items-center justify-center`}>
                     {iconForRelationship(contact.relationship)}
                   </div>
-                  <div className="flex-1">
+                  <div className="flex-1 w-full min-w-0">
                     <div className="flex items-center justify-between mb-1 gap-3">
-                      <span className="text-[10px] font-black uppercase tracking-[0.15em] text-indigo-500">
+                      <span className="text-[10px] font-black uppercase tracking-[0.15em] text-indigo-500 truncate">
                         {contact.relationship || "Emergency Contact"}
                       </span>
                       <button
                         type="button"
                         onClick={() => handleRemoveContact(contact.id)}
                         disabled={saving}
-                        className="text-slate-300 hover:text-rose-500 transition-colors disabled:opacity-60"
+                        className="text-slate-300 hover:text-rose-500 transition-colors disabled:opacity-60 shrink-0"
                       >
                         <Trash2 size={18} />
                       </button>
                     </div>
-                    <h3 className="text-xl font-bold text-slate-900">{contact.name}</h3>
-                    <p className="text-slate-500 font-medium">{contact.email || contact.phone || "No contact saved"}</p>
+                    <h3 className="text-lg sm:text-xl font-bold text-slate-900 truncate">{contact.name}</h3>
+                    <p className="text-slate-500 text-sm font-medium truncate">{contact.email || contact.phone || "No contact saved"}</p>
                   </div>
                 </div>
               </div>
@@ -243,7 +235,7 @@ export default function HomeownerEmergencyContactsPage() {
           )}
         </div>
 
-        <div className="mt-12 bg-white rounded-[2rem] p-8 border border-slate-100 flex flex-col md:flex-row gap-6 items-center">
+        <div className="mt-8 sm:mt-12 bg-white rounded-[1.5rem] sm:rounded-[2rem] p-6 sm:p-8 border border-slate-100 flex flex-col md:flex-row gap-4 sm:gap-6 items-center">
           <div className="flex-shrink-0 w-12 h-12 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center">
             <Info size={24} />
           </div>
@@ -253,8 +245,6 @@ export default function HomeownerEmergencyContactsPage() {
           </div>
         </div>
       </main>
-
-     
 
       <div className="fixed top-0 right-0 -z-10 w-1/2 h-full opacity-40 pointer-events-none overflow-hidden">
         <div className="absolute top-0 right-0 w-full h-1/2 bg-gradient-to-bl from-indigo-100/50 via-transparent to-transparent blur-3xl" />

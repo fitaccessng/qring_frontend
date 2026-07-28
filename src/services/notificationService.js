@@ -1,9 +1,46 @@
-import { apiRequest } from "./apiClient";
+import { ApiError, apiRequest } from "./apiClient";
 import { isNativeApp } from "../utils/nativeRuntime";
 
+const NOTIFICATION_CACHE_TTL_MS = 10000;
+const NOTIFICATION_RATE_LIMIT_TTL_MS = 45000;
+
+let notificationCache = { rows: [], at: 0 };
+let notificationInFlight = null;
+let notificationRateLimitedUntil = 0;
+
+function invalidateNotificationCache() {
+  notificationCache = { rows: [], at: 0 };
+}
+
 export async function getNotifications() {
-  const response = await apiRequest("/notifications/", { silent: true });
-  return Array.isArray(response?.data) ? response.data : [];
+  const now = Date.now();
+  if (notificationCache.at && now - notificationCache.at < NOTIFICATION_CACHE_TTL_MS) {
+    return notificationCache.rows;
+  }
+  if (now < notificationRateLimitedUntil) {
+    return notificationCache.rows;
+  }
+  if (notificationInFlight) return notificationInFlight;
+
+  notificationInFlight = apiRequest("/notifications/", { silent: true, retryCount: 0 })
+    .then((response) => {
+      const rows = Array.isArray(response?.data) ? response.data : [];
+      notificationCache = { rows, at: Date.now() };
+      notificationRateLimitedUntil = 0;
+      return rows;
+    })
+    .catch((error) => {
+      if (error instanceof ApiError && error.status === 429) {
+        notificationRateLimitedUntil = Date.now() + NOTIFICATION_RATE_LIMIT_TTL_MS;
+        return notificationCache.rows;
+      }
+      throw error;
+    })
+    .finally(() => {
+      notificationInFlight = null;
+    });
+
+  return notificationInFlight;
 }
 
 export async function registerPushSubscription(payload) {
@@ -20,6 +57,7 @@ export async function markNotificationRead(notificationId) {
       method: "POST",
       silent: true
     });
+    invalidateNotificationCache();
     return response?.data ?? null;
   } catch (error) {
     if (Number(error?.status) === 404) {
@@ -34,6 +72,7 @@ export async function markAllNotificationsRead() {
     method: "POST",
     silent: true
   });
+  invalidateNotificationCache();
   return response?.data ?? null;
 }
 
@@ -42,6 +81,7 @@ export async function clearNotifications() {
     method: "DELETE",
     silent: true
   });
+  invalidateNotificationCache();
   return response?.data ?? null;
 }
 

@@ -1,8 +1,7 @@
-import React, { useEffect, useMemo, useState, useRef } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, Link } from 'react-router-dom';
-import { motion } from "framer-motion";
 import {
-  ArrowLeft,
+  ChevronLeft,
   Bell,
   MapPin,
   ArrowRight,
@@ -10,13 +9,8 @@ import {
   Plus,
   Copy,
   ExternalLink,
-  ShieldCheck,
   QrCode,
   Layers,
-  LayoutGrid,
-  History,
-  CalendarDays,
-  User,
   Printer,
   Download,
   CheckCircle2,
@@ -32,7 +26,6 @@ import {
 } from "../../services/estateService";
 import useEstateOverviewState from "../../hooks/useEstateOverviewState";
 import { showError, showSuccess } from "../../utils/flash";
-import useResponsiveSheet from "../../hooks/useResponsiveSheet";
 
 export default function EstateCreatePage() {
   const navigate = useNavigate();
@@ -202,204 +195,213 @@ export default function EstateCreatePage() {
   };
 
   return (
-    <div className="bg-[#f8f9fa] min-h-screen font-sans pb-36">
-      {/* HEADER */}
-      <header className="fixed top-0 w-full z-[100] bg-white/80 backdrop-blur-md border-b border-slate-100 px-6 py-4">
-        <div className="max-w-4xl mx-auto flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <button onClick={() => navigate(-1)} className="p-2.5 bg-slate-50 text-indigo-600 rounded-full hover:bg-indigo-50 transition-all active:scale-90">
-              <ArrowLeft size={20} />
+    <div className="bg-slate-50/50 min-h-screen font-sans pb-32 dark:bg-slate-950 text-slate-900 dark:text-slate-100 antialiased">
+      {/* STATIC STICKY HEADER */}
+      <header className="sticky top-0 z-[100] w-full border-b border-slate-100/80 bg-white/90 px-4 py-3.5 backdrop-blur-md dark:bg-slate-950/90 dark:border-slate-900">
+        <div className="mx-auto flex max-w-2xl items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => navigate(-1)} 
+              className="p-2 bg-slate-50 text-slate-600 rounded-full hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 transition-all active:scale-95"
+            >
+              <ChevronLeft size={20} />
             </button>
             <div>
-              <h1 className="font-black text-lg text-slate-900 leading-none tracking-tight">Manage Estates</h1>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Portfolio Control</p>
+              <h1 className="font-extrabold text-sm sm:text-lg text-slate-900 tracking-tight dark:text-white leading-none">Manage Estates</h1>
+              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1">Portfolio Control</p>
             </div>
           </div>
-          <button className="relative p-2.5 bg-slate-50 text-slate-500 rounded-full">
-            <Bell size={20} />
-            <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-white" />
+          <button className="relative p-2 bg-slate-50 text-slate-600 dark:bg-slate-900 dark:text-slate-300 rounded-full">
+            <Bell size={18} />
+            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-rose-500 rounded-full border border-white dark:border-slate-950" />
           </button>
         </div>
       </header>
 
-      <main className="pt-24 px-6 max-w-2xl mx-auto">
-        {/* STATS BENTO */}
-        <div className="grid grid-cols-2 gap-4 mb-10">
-          <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm relative overflow-hidden group">
-            <div className="bg-indigo-50 w-12 h-12 rounded-2xl flex items-center justify-center text-indigo-600 mb-4">
-              <Layers size={22} />
+      <main className="mt-4 px-4 max-w-2xl mx-auto space-y-4">
+        
+        {/* COMPACT STATISTICS STRIP (Preserves layout on small viewports) */}
+        <section className="grid grid-cols-2 gap-3">
+          <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100/50 dark:border-slate-800/40 shadow-sm flex items-center gap-3">
+            <div className="bg-indigo-50 dark:bg-indigo-500/10 w-9 h-9 rounded-xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
+              <Layers size={16} />
             </div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Estates</p>
-            <h4 className="text-3xl font-black text-slate-900">{stats.totalEstates}</h4>
-            <Layers className="absolute -right-4 -bottom-4 opacity-[0.03] text-indigo-900" size={100} />
-          </div>
-
-          <div className="bg-slate-900 p-6 rounded-[2.5rem] shadow-xl shadow-slate-200 relative overflow-hidden group">
-            <div className="bg-white/10 w-12 h-12 rounded-2xl flex items-center justify-center text-indigo-400 mb-4">
-              <QrCode size={22} />
-            </div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Active QRs</p>
-            <h4 className="text-3xl font-black text-white">{stats.activeQrs}</h4>
-            <QrCode className="absolute -right-4 -bottom-4 opacity-10 text-white" size={100} />
-          </div>
-        </div>
-
-        <div className="mb-10 rounded-[2.2rem] border border-slate-100 bg-white p-5 shadow-sm">
-          <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Plan Guardrail</p>
-              <h3 className="mt-2 text-xl font-black text-slate-900">Estate portfolio capacity</h3>
-              <p className="mt-1 text-sm text-slate-500">
-                {maxEstates
-                  ? `You are using ${usedEstates} of ${maxEstates} estate slot${maxEstates === 1 ? "" : "s"} on your current plan.`
-                  : "Your current plan supports multiple estates without a hard estate-count limit."}
-              </p>
-            </div>
-            <div className="rounded-[1.4rem] bg-slate-50 px-4 py-3 text-right">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Homes</p>
-              <p className="mt-1 text-lg font-black text-slate-900">{stats.totalHomes}</p>
+              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Estates</p>
+              <h4 className="text-lg font-black leading-none mt-0.5 text-slate-900 dark:text-white">{stats.totalEstates}</h4>
             </div>
           </div>
-          {!canCreateEstate ? (
-            <div className="mt-4 rounded-[1.4rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
-              Your current plan has reached its estate limit. Upgrade before adding another estate profile.
-            </div>
-          ) : null}
-        </div>
 
-        {/* ESTATE LIST */}
-        <div className="space-y-4">
-          <div className="flex justify-between items-center px-2 mb-2">
-            <h4 className="font-black text-sm text-slate-400 uppercase tracking-widest tracking-[0.2em]">Your Property Network</h4>
+          <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100/50 dark:border-slate-800/40 shadow-sm flex items-center gap-3">
+            <div className="bg-emerald-50 dark:bg-emerald-500/10 w-9 h-9 rounded-xl flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+              <QrCode size={16} />
+            </div>
+            <div>
+              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Active QRs</p>
+              <h4 className="text-lg font-black leading-none mt-0.5 text-slate-900 dark:text-white">{stats.activeQrs}</h4>
+            </div>
+          </div>
+        </section>
+
+        {/* PLAN LIMITATION INFO BAR */}
+        <section className="rounded-2xl border border-slate-100/50 dark:border-slate-800/40 bg-white dark:bg-slate-900 p-4 shadow-sm space-y-2">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-wider text-slate-400 leading-none">Plan Capacity</p>
+              <h3 className="mt-1 text-sm font-bold text-slate-900 dark:text-white">Property Slots</h3>
+            </div>
+            <div className="rounded-xl bg-slate-50 dark:bg-slate-800/50 px-2.5 py-1 text-right">
+              <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mr-1.5">Homes:</span>
+              <span className="text-xs font-black text-slate-900 dark:text-white">{stats.totalHomes}</span>
+            </div>
+          </div>
+          <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+            {maxEstates
+              ? `Using ${usedEstates} of ${maxEstates} estate slots on your current plan.`
+              : "Standard multi-estate capabilities enabled without specific counts."}
+          </p>
+          {!canCreateEstate && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50/55 dark:bg-amber-950/20 dark:border-amber-900 px-3 py-2 text-[11px] font-semibold text-amber-900 dark:text-amber-400">
+              Plan limit reached. Upgrade to register additional estate profiles.
+            </div>
+          )}
+        </section>
+
+        {/* PROPERTY LIST */}
+        <section className="space-y-3.5">
+          <div className="px-1.5">
+            <h4 className="font-bold text-[10px] text-slate-400 uppercase tracking-widest">Your Property Network</h4>
           </div>
 
           {estatesWithQr.map((estate) => (
-            <article key={estate.id} className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm transition-all hover:shadow-md">
-              <div className="flex justify-between items-start gap-4">
+            <article key={estate.id} className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-100/50 dark:border-slate-800/40 shadow-sm flex flex-col gap-4">
+              <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[9px] font-black uppercase tracking-widest border border-emerald-100 flex items-center gap-1 w-fit">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-full text-[9px] font-black uppercase tracking-wider dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20">
                     <CheckCircle2 size={10} /> Active Profile
                   </span>
-                  <h3 className="mt-3 text-xl font-black text-slate-900 truncate tracking-tight">{estate.name}</h3>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">ID: {estate.id}</p>
+                  <h3 className="mt-2 text-base font-black text-slate-900 dark:text-white truncate tracking-tight">{estate.name}</h3>
+                  <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">ID: {estate.id}</p>
                 </div>
                 <button
                   onClick={() => handleGenerateSharedQr(estate)}
                   disabled={qrBusyEstateId === estate.id}
-                  className="bg-slate-900 text-white px-6 py-3 rounded-2xl text-xs font-black shadow-lg shadow-slate-200 active:scale-95 disabled:opacity-50 transition-all"
+                  className="bg-slate-950 hover:bg-slate-900 text-white dark:bg-white dark:text-slate-950 px-3.5 py-2 rounded-xl text-[11px] font-black tracking-wide shrink-0 disabled:opacity-50 transition-all active:scale-95"
                 >
-                  {qrBusyEstateId === estate.id ? "..." : estate.sharedQr ? "Regenerate" : "Generate QR"}
+                  {qrBusyEstateId === estate.id ? "..." : estate.sharedQr ? "Re-Gen" : "Generate"}
                 </button>
               </div>
 
               {estate.sharedQr ? (
-                <div className="mt-6 p-4 bg-slate-50 rounded-3xl border border-slate-100 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-indigo-600 shadow-sm">
-                      <QrCode size={18} />
+                <div className="p-3 bg-slate-50/80 dark:bg-slate-800/20 rounded-2xl border border-slate-100/40 dark:border-slate-850 flex items-center justify-between">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-lg bg-white dark:bg-slate-900 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shadow-sm shrink-0">
+                      <QrCode size={14} />
                     </div>
-                    <div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Access Key</p>
-                      <p className="text-xs font-bold text-slate-700 mt-1">{estate.sharedQr.qrId}</p>
+                    <div className="min-w-0">
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider leading-none">Access Key</p>
+                      <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 mt-1 truncate">{estate.sharedQr.qrId}</p>
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-1.5 shrink-0">
                     <button
                       onClick={() => {
                         setActiveQrData({ ...estate.sharedQr, estateName: estate.name });
                         setIsQrModalOpen(true);
                       }}
-                      className="p-3 bg-white text-indigo-600 rounded-xl shadow-sm hover:bg-indigo-50 transition-all active:scale-90"
+                      className="p-2 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 rounded-xl shadow-sm border border-slate-100/50 dark:border-slate-800 hover:bg-slate-50 transition-all"
                     >
-                      <ExternalLink size={16} />
+                      <ExternalLink size={14} />
                     </button>
                     <button
                       onClick={() => copyText(toPublicUrl(estate.sharedQr.scanUrl))}
-                      className="p-3 bg-white text-slate-400 rounded-xl shadow-sm hover:text-indigo-600 transition-all active:scale-90"
+                      className="p-2 bg-white dark:bg-slate-900 text-slate-400 dark:text-slate-500 rounded-xl shadow-sm border border-slate-100/50 dark:border-slate-800 hover:text-indigo-600 transition-all"
                     >
-                      <Copy size={16} />
+                      <Copy size={14} />
                     </button>
                   </div>
                 </div>
               ) : (
-                <div className="mt-6 flex items-center gap-3 py-3 px-4 border border-dashed border-slate-200 rounded-2xl">
-                  <MapPin size={14} className="text-slate-300" />
-                  <p className="text-[11px] font-bold text-slate-400 italic">Generate a QR to enable digital security access.</p>
+                <div className="flex items-center gap-2.5 py-2.5 px-3 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50/30 dark:bg-slate-900/10">
+                  <MapPin size={12} className="text-slate-300 shrink-0" />
+                  <p className="text-[10px] font-medium text-slate-400 dark:text-slate-500 italic">Generate QR to assign modern entry codes.</p>
                 </div>
               )}
             </article>
           ))}
 
           {estatesWithQr.length === 0 && (
-             <div className="py-20 text-center bg-white rounded-[3rem] border border-dashed border-slate-200">
-                <Building2 className="mx-auto h-12 w-12 text-slate-200 mb-2" />
-                <p className="text-xs font-black text-slate-300 uppercase tracking-widest">No Estates Registered</p>
+             <div className="py-16 text-center bg-white dark:bg-slate-900 rounded-[2rem] border border-dashed border-slate-200 dark:border-slate-800">
+                <Building2 className="mx-auto h-10 w-10 text-slate-200 dark:text-slate-800 mb-2" />
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">No Estates Registered</p>
              </div>
           )}
-        </div>
+        </section>
       </main>
 
-      {/* FLOATING ACTION BUTTON */}
+      {/* COMPACT FLOATING ACTION BUTTON */}
       <button
         onClick={() => setIsFormOpen(true)}
         disabled={!canCreateEstate}
-        className="fixed bottom-28 right-6 z-[100] w-16 h-16 flex items-center justify-center rounded-full bg-indigo-600 text-white shadow-2xl shadow-indigo-300 active:scale-90 hover:bg-indigo-700 transition-all"
+        className="fixed bottom-6 right-6 z-[100] w-14 h-14 flex items-center justify-center rounded-full bg-indigo-600 text-white shadow-lg shadow-indigo-500/25 active:scale-90 hover:bg-indigo-700 transition-all disabled:opacity-50"
       >
-        <Plus size={28} strokeWidth={3} />
+        <Plus size={24} strokeWidth={2.5} />
       </button>
 
-      {/* QR VIEW MODAL (PRINT & DOWNLOAD) */}
+      {/* MOBILE-ERgonomic QR VIEW BOTTOM SHEET */}
       {isQrModalOpen && activeQrData && (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/70 backdrop-blur-md animate-in fade-in" onClick={() => setIsQrModalOpen(false)} />
+        <div className="fixed inset-0 z-[1000] flex items-end sm:items-center sm:justify-center">
+          <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={() => setIsQrModalOpen(false)} />
 
-          <div className="relative bg-white w-full max-w-lg rounded-[3.5rem] shadow-2xl animate-in zoom-in-95 duration-300 overflow-hidden flex flex-col">
-
-            <div className="px-8 pt-8 pb-4 flex justify-between items-center">
+          <div className="relative bg-white dark:bg-slate-900 w-full sm:max-w-md rounded-t-[2rem] sm:rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col pb-safe max-h-[92dvh]">
+            {/* Grab handle indicator for mobile sheeting layout */}
+            <div className="mx-auto mt-3 h-1 w-12 rounded-full bg-slate-200 dark:bg-slate-800 sm:hidden" />
+            
+            <div className="px-6 pt-4 pb-2 flex justify-between items-center border-b border-slate-100/50 dark:border-slate-800/40">
                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <h3 className="font-black text-[10px] text-slate-400 uppercase tracking-[0.2em]">Master Key Live</h3>
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <h3 className="font-bold text-[9px] text-slate-400 uppercase tracking-widest">Master Key Live</h3>
                </div>
-               <button onClick={() => setIsQrModalOpen(false)} className="p-3 bg-slate-50 text-slate-400 rounded-full hover:bg-rose-50 hover:text-rose-500 transition-all">
-                 <X size={20} />
+               <button onClick={() => setIsQrModalOpen(false)} className="p-2 bg-slate-50 dark:bg-slate-800 text-slate-400 rounded-full hover:text-rose-500 transition-all">
+                 <X size={16} />
                </button>
             </div>
 
-            <div className="px-10 pb-10 text-center">
-               <div className="inline-block p-6 bg-white rounded-[3rem] mb-6 border-4 border-slate-50 shadow-[0_20px_50px_rgba(0,0,0,0.05)]">
+            <div className="px-6 py-6 text-center overflow-y-auto">
+               <div className="inline-block p-4 bg-white rounded-2xl mb-4 border border-slate-100 shadow-sm">
                  <img
                     id="active-qr-img"
                     src={buildQrImageUrl(toPublicUrl(activeQrData.scanUrl))}
                     alt="Estate QR"
-                    className="w-56 h-56"
+                    className="w-44 h-44 mx-auto"
                  />
                </div>
 
-               <h4 className="text-2xl font-black text-slate-900 mb-1 tracking-tight">{activeQrData.estateName}</h4>
-               <p className="text-indigo-600 text-[10px] font-black uppercase tracking-[0.2em] mb-8 bg-indigo-50 inline-block px-4 py-1.5 rounded-full">
+               <h4 className="text-xl font-black text-slate-900 dark:text-white mb-1 tracking-tight">{activeQrData.estateName}</h4>
+               <p className="text-indigo-600 dark:text-indigo-400 text-[10px] font-bold uppercase tracking-wider mb-6 bg-indigo-50/85 dark:bg-indigo-500/10 inline-block px-3 py-1 rounded-full">
                  {activeQrData.qrId}
                </p>
 
-               <div className="grid grid-cols-2 gap-3 mb-4">
+               <div className="grid grid-cols-2 gap-3 mb-3">
                   <button
                     onClick={handlePrintQR}
-                    className="flex items-center justify-center gap-2 py-4 bg-slate-50 text-slate-900 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-100 transition-all"
+                    className="flex items-center justify-center gap-1.5 py-3 bg-slate-50 dark:bg-slate-800 text-slate-950 dark:text-slate-100 rounded-xl font-bold text-[10px] uppercase tracking-wider hover:bg-slate-100 transition-all"
                   >
-                    <Printer size={16} /> Print Key
+                    <Printer size={14} /> Print Key
                   </button>
                   <button
                     onClick={() => handleDownloadQR(activeQrData.estateName)}
-                    className="flex items-center justify-center gap-2 py-4 bg-slate-50 text-slate-900 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-100 transition-all"
+                    className="flex items-center justify-center gap-1.5 py-3 bg-slate-50 dark:bg-slate-800 text-slate-950 dark:text-slate-100 rounded-xl font-bold text-[10px] uppercase tracking-wider hover:bg-slate-100 transition-all"
                   >
-                    <Download size={16} /> Save Image
+                    <Download size={14} /> Save Image
                   </button>
                </div>
 
                <button
                   onClick={() => copyText(toPublicUrl(activeQrData.scanUrl))}
-                  className="w-full py-5 bg-indigo-600 text-white rounded-[2rem] font-black text-[10px] uppercase tracking-[0.2em] shadow-xl shadow-indigo-200 flex items-center justify-center gap-2 active:scale-95 transition-all"
+                  className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-[10px] uppercase tracking-wider shadow-sm flex items-center justify-center gap-1.5 active:scale-95 transition-all"
                >
-                 <Copy size={18} /> Copy Access Link
+                 <Copy size={14} /> Copy Access Link
                </button>
             </div>
           </div>
@@ -409,55 +411,44 @@ export default function EstateCreatePage() {
       {/* Hidden iframe for printing */}
       <iframe id="ifmcontentstoprint" title="print-frame" style={{ height: '0px', width: '0px', position: 'absolute' }}></iframe>
 
-      {/* REGISTER ESTATE SHEET */}
+      {/* BOTTOM DRAWER ESTATED SHEET */}
       <EstateCreationSheet open={isFormOpen} onClose={() => setIsFormOpen(false)}>
-        <form className="space-y-8" onSubmit={onSubmit}>
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-3xl flex items-center justify-center">
-              <Building2 size={24} />
+        <form className="space-y-6" onSubmit={onSubmit}>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-xl flex items-center justify-center shrink-0">
+              <Building2 size={20} />
             </div>
             <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Step 1: Identity</p>
-              <h3 className="text-xl font-black text-slate-900 tracking-tight">Create Estate Profile</h3>
+              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400 leading-none">Step 1: Identity</p>
+              <h3 className="text-base font-black text-slate-900 dark:text-white tracking-tight mt-1">Create Estate Profile</h3>
             </div>
           </div>
           <div>
-            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1">Name of Estate</label>
+            <label className="block text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 ml-0.5">Name of Estate</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Sapphire Gardens"
-              className="w-full px-6 py-5 rounded-[2rem] bg-slate-50 border-none focus:ring-4 focus:ring-indigo-100 outline-none transition-all font-bold text-slate-900"
+              className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-850 border border-transparent focus:border-slate-200 focus:bg-white focus:outline-none transition-all text-xs font-semibold text-slate-900 dark:text-slate-150"
               required
             />
           </div>
-          <button type="submit" disabled={busy} className="w-full py-5 bg-indigo-600 text-white font-black text-lg rounded-[2.5rem] shadow-xl shadow-indigo-100 flex items-center justify-center gap-3 active:scale-95 transition-all">
-            {busy ? "Syncing..." : "Launch Portfolio"} <ArrowRight size={20} />
+          <button type="submit" disabled={busy} className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 active:scale-95 transition-all">
+            {busy ? "Syncing..." : "Launch Portfolio"} <ArrowRight size={14} />
           </button>
           {!canCreateEstate ? (
-            <p className="text-center text-sm font-semibold text-amber-700">
+            <p className="text-center text-xs font-semibold text-amber-700">
               Estate limit reached on this plan.
             </p>
           ) : remainingEstates !== null ? (
-            <p className="text-center text-sm text-slate-500">
+            <p className="text-center text-[10px] text-slate-400 font-medium">
               {remainingEstates} estate slot{remainingEstates === 1 ? "" : "s"} remaining.
             </p>
           ) : null}
         </form>
       </EstateCreationSheet>
-
-
     </div>
-  );
-}
-
-function NavItem({ to, icon, label, active = false }) {
-  return (
-    <Link to={to} className={`flex flex-col items-center justify-center min-w-[64px] transition-all ${active ? 'text-indigo-600' : 'text-slate-400 hover:text-indigo-400'}`}>
-      <div className={`${active ? 'bg-indigo-50 p-2 rounded-xl' : 'p-2'}`}>{icon}</div>
-      <span className="text-[9px] font-black uppercase mt-1 tracking-tighter">{label}</span>
-    </Link>
   );
 }
 
@@ -465,57 +456,55 @@ function EstateCreationSheet({ open, onClose, children }) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[140] flex items-end md:items-center md:justify-center">
+    <div className="fixed inset-0 z-[140] flex items-end sm:items-center sm:justify-center">
       {/* Overlay */}
       <button
         type="button"
-        className="absolute inset-0 bg-slate-900/45"
+        className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
         onClick={onClose}
         aria-label="Close estate registration"
       />
 
       {/* SHEET */}
       <div className="
-        relative flex w-full flex-col bg-white
-        rounded-t-[2rem] md:rounded-[2rem]
-        shadow-[0_-18px_40px_rgba(15,23,42,0.16)]
-        md:max-w-xl
-        h-[85dvh] md:h-auto md:max-h-[80dvh]
-        overflow-hidden
+        relative flex w-full flex-col bg-white dark:bg-slate-900
+        rounded-t-[2rem] sm:rounded-[2rem]
+        shadow-2xl
+        sm:max-w-md
+        max-h-[85dvh] sm:max-h-[80dvh]
+        overflow-hidden pb-safe
       ">
+        {/* Grab handle indicator for mobile sheet style */}
+        <div className="mx-auto mt-3 h-1 w-12 rounded-full bg-slate-200 dark:bg-slate-800 sm:hidden shrink-0" />
 
-        {/* HEADER (fixed, not draggable) */}
-        <div className="shrink-0 flex items-start justify-between border-b border-slate-100 px-6 py-5">
+        {/* HEADER */}
+        <div className="shrink-0 flex items-start justify-between border-b border-slate-100/50 dark:border-slate-800/40 px-5 py-4">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-indigo-600">
+            <p className="text-[9px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400">
               Portfolio Control
             </p>
-            <h3 className="mt-2 text-2xl font-black text-slate-900">
+            <h3 className="mt-1 text-lg font-black text-slate-900 dark:text-white">
               Register Estate
             </h3>
-            <p className="mt-2 text-sm text-slate-500">
-              Add a new managed estate profile and unlock its shared QR flow.
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              Add a new managed estate profile to trigger entry access codes.
             </p>
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="rounded-2xl bg-slate-50 p-3 text-slate-500"
+            className="rounded-xl bg-slate-50 dark:bg-slate-800 p-2 text-slate-400"
           >
-            <X size={18} />
+            <X size={16} />
           </button>
         </div>
 
-        {/* SCROLL AREA (ONLY SCROLL CONTAINER) */}
-        <div className="flex-1 min-h-0 overflow-y-auto px-6 py-6">
+        {/* SCROLLABLE INTERNALS */}
+        <div className="flex-1 min-h-0 overflow-y-auto px-5 py-5">
           {children}
         </div>
-
-        {/* safe area */}
-        <div className="h-[env(safe-area-inset-bottom)] bg-white" />
       </div>
     </div>
   );
 }
-

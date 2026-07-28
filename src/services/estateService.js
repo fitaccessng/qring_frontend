@@ -1,6 +1,7 @@
 import { apiRequest } from "./apiClient";
 
 const ESTATE_SERVICE_CACHE_TTL_MS = 2 * 60 * 1000;
+export const ESTATE_DATA_UPDATED_EVENT = "qring:estate-data-updated";
 
 const estateServiceCache = {
   overview: createCacheSlot(),
@@ -26,7 +27,7 @@ async function resolveCached(slot, loader, { force = false } = {}) {
   if (!force && isFresh(slot)) {
     return slot.value;
   }
-  if (!force && slot.promise) {
+  if (slot.promise) {
     return slot.promise;
   }
   slot.promise = (async () => {
@@ -66,6 +67,9 @@ export function invalidateEstateServiceCache() {
   estateServiceCache.settingsByEstateId.clear();
   estateServiceCache.sharedQrByEstateId.clear();
   estateServiceCache.alertPaymentsByEstateId.clear();
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(ESTATE_DATA_UPDATED_EVENT));
+  }
 }
 
 export function getEstateOverviewSnapshot() {
@@ -97,11 +101,13 @@ export function getEstateSettingsSnapshot(estateId) {
   return estateServiceCache.settingsByEstateId.get(String(estateId))?.value ?? null;
 }
 
-export async function getEstateOverview() {
+export async function getEstateOverview({ force = false } = {}) {
   return resolveCached(estateServiceCache.overview, async () => {
-    const response = await apiRequest("/estate/overview");
+    const response = await apiRequest(`/estate/overview${force ? "?refresh=true" : ""}`, {
+      noCache: force
+    });
     return response?.data ?? {};
-  });
+  }, { force });
 }
 
 export async function getEstateSettingsSummary() {
@@ -109,6 +115,19 @@ export async function getEstateSettingsSummary() {
     const response = await apiRequest("/estate/settings-summary");
     return response?.data ?? {};
   });
+}
+
+export async function listEstateArtisans(estateId) {
+  const response = await apiRequest(`/estate/${encodeURIComponent(estateId)}/artisans`, { noCache: true });
+  return Array.isArray(response?.data) ? response.data : [];
+}
+
+export async function saveEstateArtisans(estateId, contacts) {
+  const response = await apiRequest(`/estate/${encodeURIComponent(estateId)}/artisans`, {
+    method: "PUT",
+    body: JSON.stringify({ contacts })
+  });
+  return Array.isArray(response?.data) ? response.data : [];
 }
 
 export async function createEstate(payload) {

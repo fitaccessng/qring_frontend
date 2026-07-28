@@ -211,17 +211,15 @@ export default function ResidentSafetyPage() {
     <div className={`min-h-screen font-sans antialiased transition-colors duration-700 ${isPanicActive ? 'bg-rose-50' : 'bg-[#fcfcfd]'}`}>
 
       {/* Header */}
-      <header className="fixed top-0 w-full z-[100] bg-white/80 backdrop-blur-md border-b border-slate-100 px-6 py-4">
-        <div className="max-w-4xl mx-auto flex justify-between items-center">
+      <header className="sticky top-0 z-50 w-full border-b border-slate-200/60 bg-white/80 px-4 py-4 backdrop-blur-md sm:px-6">
+        <div className="mx-auto flex max-w-5xl items-center justify-between">
           <div className="flex items-center gap-4">
             <button onClick={() => navigate(-1)} className="p-2.5 bg-slate-50 text-slate-600 rounded-full">
               <ChevronLeft size={20} />
             </button>
             <div>
-              <h1 className="font-bold text-lg text-slate-900 leading-none">Safety Center</h1>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
-                {isPanicActive ? '🔴 Emergency Active' : '🟢 System Armed'}
-              </p>
+              <h1 className="font-bold text-lg text-slate-900 leading-none">Panic</h1>
+            
             </div>
           </div>
           <Link to="/dashboard/notifications" className="relative p-2.5 bg-slate-50 text-slate-600 rounded-full">

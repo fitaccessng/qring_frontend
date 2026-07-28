@@ -340,89 +340,95 @@ export default function HomeownerSettingsPage() {
   }
 
   return (
-    <div className="bg-[#f8f9fa] min-h-screen font-sans pb-40 dark:bg-slate-950">
-      <header className="fixed top-0 w-full z-[100] bg-white/80 backdrop-blur-md border-b border-slate-100 px-6 py-4 dark:bg-slate-950/80 dark:border-slate-800">
-        <div className="max-w-4xl mx-auto flex justify-between items-center">
-          <div className="flex items-center gap-4">
+    <div className="bg-slate-50/50 min-h-screen font-sans pb-40 dark:bg-slate-950 text-slate-900 dark:text-slate-100 antialiased">
+      
+      {/* STATIC STICKY HEADER */}
+      <header className="sticky top-0 z-50 w-full border-b border-slate-100 bg-white/90 px-4 py-3.5 sm:py-4 backdrop-blur-md dark:bg-slate-950/90 dark:border-slate-900">
+        <div className="mx-auto flex max-w-2xl items-center justify-between">
+          <div className="flex items-center gap-3">
             <button
               onClick={() => navigate(-1)}
-              className="p-2.5 bg-slate-50 text-slate-600 rounded-full hover:bg-indigo-50 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+              className="p-2 bg-slate-50 text-slate-600 rounded-full hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 transition-all active:scale-95"
             >
               <ChevronLeft size={20} />
             </button>
-            <h1 className="font-bold text-lg text-slate-900 leading-none dark:text-white">Settings</h1>
+            <h1 className="font-extrabold text-sm sm:text-lg text-slate-900 tracking-tight dark:text-white leading-none">Settings</h1>
           </div>
           <Link
             to="/dashboard/notifications"
-            className="relative p-2.5 bg-slate-50 text-slate-600 rounded-full hover:bg-indigo-50 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+            className="relative p-2 bg-slate-50 text-slate-600 rounded-full hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 transition-all"
           >
             <Bell size={18} />
             {unreadCount > 0 && (
-              <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white dark:border-slate-950" />
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-white dark:ring-slate-950" />
             )}
           </Link>
         </div>
       </header>
 
-      <main className="pt-24 px-6 max-w-2xl mx-auto">
-        {/* Profile Header */}
-        <section className="bg-white rounded-[2.5rem] p-6 mb-8 border border-slate-100 shadow-sm flex items-center gap-5 dark:bg-slate-900 dark:border-slate-800">
-          <div className="relative">
-            {profileImg ? (
-              <img src={profileImg} alt="Profile" className="w-20 h-20 rounded-full object-cover ring-4 ring-indigo-50 dark:ring-slate-800" />
-            ) : (
-              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-600 ring-4 ring-indigo-50 dark:ring-slate-800 flex items-center justify-center">
-                <svg className="w-12 h-12 text-slate-500 dark:text-slate-400" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                </svg>
-              </div>
-            )}
-            <button onClick={() => openModal("profile")} className="absolute -bottom-1 -right-1 bg-indigo-600 text-white p-2 rounded-full hover:bg-indigo-700 transition-colors">
-              <Edit3 size={12} />
-            </button>
-          </div>
-          <div className="flex-1">
-            <h2 className="text-xl font-black text-slate-900 leading-tight dark:text-white">{displayedName}</h2>
-            <p className="text-xs text-slate-400 font-bold uppercase tracking-tight">@{displayedUsername}</p>
-            <div className={`mt-2 inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-black tracking-widest uppercase ${
-                stats.plan === "FREE" ? "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300" : "bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10"
-              }`}>
-              {stats.plan}
+      <main className="mt-6 px-4 sm:px-6 max-w-2xl mx-auto space-y-6">
+        
+        {/* PROFILE HEADER */}
+        <section className="relative overflow-hidden bg-white dark:bg-slate-900 rounded-[2rem] p-6 shadow-sm hover:shadow-md transition-shadow duration-300 border border-slate-100/50 dark:border-slate-800/40">
+          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 text-center sm:text-left">
+            <div className="relative shrink-0">
+              {profileImg ? (
+                <img src={profileImg} alt="Profile" className="w-20 h-20 rounded-full object-cover ring-4 ring-slate-50 dark:ring-slate-800" />
+              ) : (
+                <div className="w-20 h-20 rounded-full bg-slate-100 dark:bg-slate-800 ring-4 ring-slate-50 dark:ring-slate-800 flex items-center justify-center">
+                  <User size={36} className="text-slate-400" />
+                </div>
+              )}
+              <button onClick={() => openModal("profile")} className="absolute bottom-0 right-0 bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded-full shadow-md transition-all active:scale-90">
+                <Edit3 size={12} />
+              </button>
+            </div>
+            
+            <div className="flex-1 min-w-0">
+              <h2 className="text-xl font-extrabold text-slate-900 dark:text-white tracking-tight leading-tight mb-1">{displayedName}</h2>
+              <p className="text-xs text-slate-400 font-semibold tracking-wide mb-3.5">@{displayedUsername}</p>
+              <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase ${
+                  stats.plan === "FREE" ? "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300" : "bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10"
+                }`}>
+                {stats.plan}
+              </span>
             </div>
           </div>
         </section>
 
-        <div className="grid grid-cols-3 gap-3 mb-10">
-          <StatBox label="Plan" value={loading ? "..." : displayedPlan} icon={<Award size={14} />} color="text-indigo-600" />
-          <StatBox label="Referrals" value={loading ? "..." : stats.referrals} icon={<User size={14} />} color="text-emerald-600" />
-          <StatBox label="Earnings" value={loading ? "..." : stats.earnings} icon={<Wallet size={14} />} color="text-amber-600" />
-        </div>
+        {/* COMPACT STATS PANEL */}
+        <section className="grid grid-cols-3 bg-white dark:bg-slate-900 rounded-2xl p-2.5 shadow-sm border border-slate-100/50 dark:border-slate-800/40">
+          <StatBoxCompact label="Plan" value={loading ? "..." : displayedPlan} icon={<Award size={14} />} color="text-indigo-600" />
+          <StatBoxCompact label="Referrals" value={loading ? "..." : stats.referrals} icon={<User size={14} />} color="text-emerald-600" />
+          <StatBoxCompact label="Earnings" value={loading ? "..." : stats.earnings} icon={<Wallet size={14} />} color="text-amber-600" />
+        </section>
 
-        <div className="space-y-8">
+        {/* SETTINGS GROUPINGS */}
+        <div className="space-y-6">
           <SettingsGroup title="Account">
-            <SettingsItem icon={<User />} label="Edit Profile" color="bg-blue-50 text-blue-600" onClick={() => openModal("profile")} />
-            <SettingsItem icon={<ShieldCheck />} label="Privacy & Security" sublabel={securityBadge} color="bg-emerald-50 text-emerald-600" onClick={() => openModal("privacy")} />
-            <SettingsItem icon={<Key />} label="Change Password" color="bg-slate-50 text-slate-600" onClick={() => openModal("security")} />
+            <SettingsItem icon={<User size={18} />} label="Edit Profile" color="bg-blue-50/60 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400" onClick={() => openModal("profile")} />
+            <SettingsItem icon={<ShieldCheck size={18} />} label="Privacy & Security" sublabel={securityBadge} color="bg-emerald-50/60 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400" onClick={() => openModal("privacy")} />
+            <SettingsItem icon={<Key size={18} />} label="Change Password" color="bg-slate-50 text-slate-600 dark:bg-slate-800 dark:text-slate-400" onClick={() => openModal("security")} />
           </SettingsGroup>
 
           <SettingsGroup title="Preferences">
-            <SettingsItem icon={<Bell />} label="Notifications" toggle checked={Boolean(settings.pushAlerts)} disabled={savingPreference === "pushAlerts"} onToggle={(v) => handlePreferenceToggle("pushAlerts", v)} />
-            <SettingsItem icon={<Volume2 />} label="Sound Alerts" toggle checked={Boolean(settings.soundAlerts)} disabled={savingPreference === "soundAlerts"} onToggle={(v) => handlePreferenceToggle("soundAlerts", v)} />
-            <SettingsItem icon={<Moon />} label="Dark Mode" toggle checked={isDark} onToggle={handleThemeToggle} />
-            <SettingsItem icon={<Globe />} label="Language" sublabel={selectedLanguage?.label || "English"} color="bg-slate-50 text-slate-600" onClick={() => openModal("language")} />
-            <SettingsItem icon={<HelpCircle />} label="FAQs" color="bg-slate-50 text-slate-600" onClick={() => openExternalPermission("faq")} />
-            <SettingsItem icon={<HelpCircle />} label="Support" color="bg-slate-50 text-slate-600" onClick={() => openExternalPermission("support")} />
+            <SettingsItem icon={<Bell size={18} />} label="Notifications" toggle checked={Boolean(settings.pushAlerts)} disabled={savingPreference === "pushAlerts"} onToggle={(v) => handlePreferenceToggle("pushAlerts", v)} />
+            <SettingsItem icon={<Volume2 size={18} />} label="Sound Alerts" toggle checked={Boolean(settings.soundAlerts)} disabled={savingPreference === "soundAlerts"} onToggle={(v) => handlePreferenceToggle("soundAlerts", v)} />
+            <SettingsItem icon={<Moon size={18} />} label="Dark Mode" toggle checked={isDark} onToggle={handleThemeToggle} />
+            <SettingsItem icon={<Globe size={18} />} label="Language" sublabel={selectedLanguage?.label || "English"} color="bg-slate-50 text-slate-600 dark:bg-slate-800 dark:text-slate-400" onClick={() => openModal("language")} />
+            <SettingsItem icon={<HelpCircle size={18} />} label="FAQs" color="bg-slate-50 text-slate-600 dark:bg-slate-800 dark:text-slate-400" onClick={() => openExternalPermission("faq")} />
+            <SettingsItem icon={<HelpCircle size={18} />} label="Support" color="bg-slate-50 text-slate-600 dark:bg-slate-800 dark:text-slate-400" onClick={() => openExternalPermission("support")} />
           </SettingsGroup>
 
           <SettingsGroup title="Panic Network">
-            <div className="rounded-[1.6rem] border border-slate-100 bg-white px-4 py-4 dark:border-slate-800 dark:bg-slate-900">
-              <button
+            <div className="rounded-3xl border border-slate-100/50 bg-white px-5 py-5 shadow-sm dark:border-slate-800/40 dark:bg-slate-900">
+              <div
                 onClick={() => openModal("panic")}
-                className="w-full flex items-start justify-between gap-4 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl p-2 transition-colors"
+                className="w-full flex items-start justify-between gap-4 cursor-pointer hover:bg-slate-50/50 dark:hover:bg-slate-800/30 rounded-2xl p-2 transition-colors"
               >
                 <div className="text-left">
-                  <p className="text-sm font-black text-slate-900 dark:text-white">Allow Nearby Panic Alerts</p>
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  <p className="text-sm font-bold text-slate-900 dark:text-white">Allow Nearby Panic Alerts</p>
+                  <p className="mt-1 text-xs text-slate-400 dark:text-slate-500 leading-normal">
                     Alert trusted people nearby who have chosen to help.
                   </p>
                 </div>
@@ -433,22 +439,22 @@ export default function HomeownerSettingsPage() {
                     e.stopPropagation();
                     handlePanicNetworkSave({ nearbyPanicAlertsEnabled: !settings.nearbyPanicAlertsEnabled });
                   }}
-                  className={`w-11 h-6 rounded-full relative transition-all flex-shrink-0 ${settings.nearbyPanicAlertsEnabled ? "bg-emerald-600" : "bg-slate-200 dark:bg-slate-700"}`}
+                  className={`w-10 h-6 rounded-full relative transition-colors duration-250 flex-shrink-0 ${settings.nearbyPanicAlertsEnabled ? "bg-emerald-500" : "bg-slate-200 dark:bg-slate-800"}`}
                 >
-                  <div className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-all ${settings.nearbyPanicAlertsEnabled ? "right-1" : "left-1"}`} />
+                  <div className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-250 ${settings.nearbyPanicAlertsEnabled ? "translate-x-5" : "translate-x-1"}`} />
                 </button>
-              </button>
+              </div>
             </div>
           </SettingsGroup>
 
           {!settings.managedByEstate && (
             <SettingsGroup title="Subscription">
-              <SettingsItem icon={<CreditCard />} label="Billing & Subscription" badge={stats.plan} onClick={() => navigate("/billing/paywall")} />
+              <SettingsItem icon={<CreditCard size={18} />} label="Billing & Subscription" badge={stats.plan} onClick={() => navigate("/billing/paywall")} />
             </SettingsGroup>
           )}
 
-          <button onClick={logout} className="w-full py-5 text-rose-500 font-black flex items-center justify-center gap-3 bg-rose-50 rounded-3xl active:scale-95 transition-all dark:bg-rose-500/10">
-            <LogOut size={20} /> SIGN OUT
+          <button onClick={logout} className="w-full py-4.5 text-rose-600 dark:text-rose-400 font-extrabold text-sm tracking-wider flex items-center justify-center gap-2 bg-rose-50/50 dark:bg-rose-950/20 rounded-2xl active:scale-[0.98] transition-all hover:bg-rose-50 dark:hover:bg-rose-950/30">
+            <LogOut size={16} /> SIGN OUT
           </button>
         </div>
       </main>
@@ -506,6 +512,131 @@ export default function HomeownerSettingsPage() {
   );
 }
 
+// --- Dynamic Component Sub-Blocks ---
+
+function StatBoxCompact({ label, value, icon, color }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-3 w-full rounded-xl hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+      <div className={`p-1.5 rounded-lg bg-slate-50 dark:bg-slate-800/80 ${color} mb-1 flex items-center justify-center`}>
+        {icon}
+      </div>
+      <span className="text-sm font-extrabold text-slate-800 dark:text-slate-100">{value}</span>
+      <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">{label}</span>
+    </div>
+  );
+}
+
+function SettingsGroup({ title, children }) {
+  return (
+    <div className="space-y-2">
+      <h3 className="px-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">{title}</h3>
+      <div className="bg-white dark:bg-slate-900 rounded-3xl p-2.5 space-y-0.5 shadow-sm border border-slate-100/50 dark:border-slate-800/40">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function SettingsItem({ icon, label, sublabel, color, badge, toggle, checked, disabled, onToggle, onClick }) {
+  return (
+    <div
+      onClick={!toggle ? onClick : undefined}
+      className={`flex items-center justify-between p-3 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors duration-200 cursor-pointer ${disabled ? "opacity-60 pointer-events-none" : ""}`}
+    >
+      <div className="flex items-center gap-3">
+        {icon && (
+          <div className={`p-2 rounded-xl shrink-0 flex items-center justify-center ${color || "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"}`}>
+            {icon}
+          </div>
+        )}
+        <div className="text-left">
+          <p className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200">{label}</p>
+          {sublabel && <p className="text-[10px] text-slate-400 mt-0.5">{sublabel}</p>}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        {badge && (
+          <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400 rounded-md text-[9px] font-extrabold uppercase">
+            {badge}
+          </span>
+        )}
+        {toggle ? (
+          <button
+            type="button"
+            onClick={() => onToggle?.(!checked)}
+            className={`w-10 h-6 rounded-full relative transition-colors duration-250 flex-shrink-0 ${checked ? "bg-indigo-600" : "bg-slate-200 dark:bg-slate-800"}`}
+          >
+            <div className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-250 ${checked ? "translate-x-5" : "translate-x-1"}`} />
+          </button>
+        ) : (
+          <ChevronRight size={14} className="text-slate-300 dark:text-slate-600" />
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Custom Reusable Modal Container Wrapper
+function ModalWrapper({ children, onClose, title }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white dark:bg-slate-900 w-full sm:max-w-md rounded-t-[2rem] sm:rounded-3xl shadow-2xl animate-in slide-in-from-bottom sm:zoom-in-95 duration-300 overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="px-5 py-4 flex justify-between items-center border-b border-slate-100 dark:border-slate-800">
+          <h3 className="font-extrabold text-slate-900 dark:text-white text-base tracking-tight">{title}</h3>
+          <button 
+            onClick={onClose} 
+            className="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 rounded-full transition-colors active:scale-95"
+          >
+            <X size={16} />
+          </button>
+        </div>
+        <div className="p-5 sm:p-6 overflow-y-auto text-slate-800 dark:text-slate-200">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Input component
+function InputGroup({ label, value, type = "text", onChange, readOnly }) {
+  return (
+    <div className="flex flex-col gap-1 text-left w-full">
+      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">{label}</label>
+      <input
+        type={type}
+        value={value}
+        readOnly={readOnly}
+        onChange={(e) => onChange?.(e.target.value)}
+        className="w-full bg-slate-50 border border-slate-200 dark:border-slate-800/80 rounded-xl px-4 py-3 text-sm font-semibold focus:border-indigo-500 dark:bg-slate-800 dark:text-white outline-none focus:ring-4 focus:ring-indigo-500/5 transition-colors"
+      />
+    </div>
+  );
+}
+
+// Inline Select block component
+function InlineSelect({ label, value, options, onChange, disabled }) {
+  return (
+    <div className="flex flex-col gap-1 text-left w-full">
+      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">{label}</label>
+      <select
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange?.(e.target.value)}
+        className="w-full bg-slate-50 border border-slate-200 dark:border-slate-800/80 rounded-xl px-3 py-3 text-sm font-semibold dark:bg-slate-800 dark:text-white outline-none focus:border-indigo-500 transition-colors"
+      >
+        {options.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 /**
  * Profile Modal Component
  */
@@ -521,7 +652,6 @@ function ProfileModal({ isOpen, onClose, profileForm, setProfileForm, savingProf
           onChange={(value) => setProfileForm((prev) => ({ ...prev, fullName: value }))}
         />
         <InputGroup
-          style={{ border: "2px solid black", backgroundColor: "#f9fafb" }}
           label="Username"
           value={profileForm.username}
           onChange={(value) => setProfileForm((prev) => ({ ...prev, username: value }))}
@@ -538,7 +668,7 @@ function ProfileModal({ isOpen, onClose, profileForm, setProfileForm, savingProf
             value={profileForm.bio}
             rows={4}
             onChange={(event) => setProfileForm((prev) => ({ ...prev, bio: event.target.value }))}
-            className="w-full bg-slate-50 border border-slate-400 rounded-2xl p-4 text-sm font-bold focus:ring-2 focus:ring-indigo-500 dark:bg-slate-800 dark:text-white"
+            className="w-full bg-slate-50 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4 text-sm font-semibold focus:ring-2 focus:ring-indigo-500 dark:bg-slate-800 dark:text-white"
             placeholder="Tell your neighbors a little about yourself"
           />
         </div>
@@ -573,7 +703,7 @@ function PrivacyModal({ isOpen, onClose, settings }) {
         
         <div className="space-y-3">
           <h3 className="text-sm font-black text-slate-900 dark:text-white">Account Status</h3>
-          <div className="rounded-2xl border border-slate-200 p-4 dark:border-slate-700">
+          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 p-4">
             <p className="text-xs font-bold text-slate-500 dark:text-slate-400">Type</p>
             <p className="text-sm font-black text-slate-900 dark:text-white mt-1">
               {settings.managedByEstate ? "Estate Managed" : "Personal Account"}
@@ -698,7 +828,7 @@ function PanicNetworkModal({ isOpen, onClose, settings, setSettings, savingPanic
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-sm font-black text-slate-900 dark:text-white">Allow Nearby Panic Alerts</p>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
               Alert trusted people nearby who have chosen to help.
             </p>
           </div>
@@ -706,9 +836,9 @@ function PanicNetworkModal({ isOpen, onClose, settings, setSettings, savingPanic
             type="button"
             disabled={savingPanicNetwork}
             onClick={() => handlePanicNetworkSave({ nearbyPanicAlertsEnabled: !settings.nearbyPanicAlertsEnabled })}
-            className={`w-11 h-6 rounded-full relative transition-all flex-shrink-0 ${settings.nearbyPanicAlertsEnabled ? "bg-emerald-600" : "bg-slate-200 dark:bg-slate-700"}`}
+            className={`w-10 h-6 rounded-full relative transition-colors duration-250 flex-shrink-0 ${settings.nearbyPanicAlertsEnabled ? "bg-emerald-500" : "bg-slate-200 dark:bg-slate-800"}`}
           >
-            <div className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-all ${settings.nearbyPanicAlertsEnabled ? "right-1" : "left-1"}`} />
+            <div className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-250 ${settings.nearbyPanicAlertsEnabled ? "translate-x-5" : "translate-x-1"}`} />
           </button>
         </div>
 
@@ -787,7 +917,7 @@ function PanicNetworkModal({ isOpen, onClose, settings, setSettings, savingPanic
             type="button"
             disabled={savingPanicNetwork}
             onClick={() => handlePanicNetworkSave({ nearbyPanicMutedUntil: addMuteHours(1) }, "Nearby panic alerts muted for 1 hour.")}
-            className="rounded-full border border-slate-200 px-4 py-2 text-xs font-black uppercase tracking-wide text-slate-700 dark:border-slate-700 dark:text-slate-200"
+            className="rounded-full border border-slate-200 dark:border-slate-800 px-4 py-2 text-xs font-black uppercase tracking-wide text-slate-700 dark:text-slate-200"
           >
             Mute 1 Hour
           </button>
@@ -795,301 +925,64 @@ function PanicNetworkModal({ isOpen, onClose, settings, setSettings, savingPanic
             type="button"
             disabled={savingPanicNetwork}
             onClick={() => handlePanicNetworkSave({ nearbyPanicMutedUntil: endOfTodayIso() }, "Nearby panic alerts muted for today.")}
-            className="rounded-full border border-slate-200 px-4 py-2 text-xs font-black uppercase tracking-wide text-slate-700 dark:border-slate-700 dark:text-slate-200"
+            className="rounded-full border border-slate-200 dark:border-slate-800 px-4 py-2 text-xs font-black uppercase tracking-wide text-slate-700 dark:text-slate-200"
           >
             Mute Today
           </button>
           <button
             type="button"
             disabled={savingPanicNetwork}
-            onClick={() => handlePanicNetworkSave({ nearbyPanicMutedUntil: null }, "Nearby panic alerts resumed.")}
-            className="rounded-full border border-emerald-200 px-4 py-2 text-xs font-black uppercase tracking-wide text-emerald-700 dark:border-emerald-800 dark:text-emerald-300"
+            onClick={handleCaptureSafetyLocation}
+            className="rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-600 px-4 py-2 text-xs font-black uppercase tracking-wide transition-colors"
           >
-            Unmute
+            Update Home Location
           </button>
-        </div>
-
-        <div className="rounded-[1.4rem] border border-indigo-100 bg-indigo-50/70 p-4 dark:border-indigo-900/30 dark:bg-indigo-950/20">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-black text-slate-900 dark:text-white">Home Safety Location</p>
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                Used to match you with nearby panic alerts inside your chosen radius.
-              </p>
-              <p className="mt-2 text-xs font-bold text-slate-600 dark:text-slate-300">
-                {formatSafetyLocation(settings.safetyHomeLocation)}
-              </p>
-            </div>
-            <button
-              type="button"
-              disabled={savingPanicNetwork}
-              onClick={handleCaptureSafetyLocation}
-              className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-4 py-3 text-xs font-black uppercase tracking-wide text-white"
-            >
-              <MapPin size={14} />
-              {savingPanicNetwork ? "Saving..." : "Use Current Location"}
-            </button>
-          </div>
         </div>
       </div>
     </ModalWrapper>
   );
 }
 
-/**
- * Reusable Modal Wrapper Component
- */
-function ModalWrapper({ children, onClose, title }) {
-  const sheetRef = React.useRef(null);
-
-  useEffect(() => {
-    if (sheetRef.current) {
-      sheetRef.current.focus();
-      sheetRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
-    }
-  }, []);
-
-  useEffect(() => {
-    const handleFocusTrap = (e) => {
-      if (e.key !== 'Tab' || !sheetRef.current) return;
-
-      const focusableSelector = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
-      const focusableElements = sheetRef.current.querySelectorAll(focusableSelector);
-      
-      if (focusableElements.length === 0) return;
-
-      const firstElement = focusableElements[0];
-      const lastElement = focusableElements[focusableElements.length - 1];
-
-      if (e.shiftKey) {
-        if (document.activeElement === firstElement) {
-          lastElement.focus();
-          e.preventDefault();
-        }
-      } else {
-        if (document.activeElement === lastElement) {
-          firstElement.focus();
-          e.preventDefault();
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleFocusTrap);
-    return () => window.removeEventListener('keydown', handleFocusTrap);
-  }, []);
-
-  return (
-    <div className="fixed inset-0 z-[200] flex items-end justify-center">
-      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} />
-      <div 
-        ref={sheetRef}
-        tabIndex="-1"
-        className="relative w-full max-w-xl bg-white rounded-t-[3rem] p-8 shadow-2xl animate-in slide-in-from-bottom duration-300 dark:bg-slate-900 outline-none"
-      >
-        <div className="flex justify-between items-center mb-8">
-          <h3 className="text-xl font-black text-slate-900 dark:text-white">{title}</h3>
-          <button onClick={onClose} className="p-2 bg-slate-100 rounded-full dark:bg-slate-800 dark:text-slate-400">
-            <X size={20} />
-          </button>
-        </div>
-        <div className="max-h-[70vh] overflow-y-auto pb-10">
-          {children}
-        </div>
-      </div>
-    </div>
-  );
+// --- Helpers ---
+function mergeSettings(raw) {
+  return { ...DEFAULT_SETTINGS, ...raw };
 }
 
-/**
- * Helper Functions & Small Components
- */
-function buildProfileForm(user, profile) {
-  const email = profile?.email || user?.email || "";
+function buildStats(sett) {
   return {
-    fullName: profile?.fullName || user?.fullName || "",
-    username: user?.username || buildUsernameFromEmail(email),
-    email,
-    phone: profile?.phone || user?.phone || "",
-    bio: user?.bio || ""
+    plan: sett?.subscription?.plan || "FREE",
+    referrals: sett?.referralsCount || 0,
+    earnings: `$${sett?.earningsAmount || 0}`
   };
 }
 
-function mergeSettings(settings) {
+function buildProfileForm(usr, prof) {
   return {
-    ...DEFAULT_SETTINGS,
-    ...(settings || {}),
-    profile: {
-      ...(DEFAULT_SETTINGS.profile || {}),
-      ...(settings?.profile || {})
-    },
-    home: {
-      ...(DEFAULT_SETTINGS.home || {}),
-      ...(settings?.home || {})
-    }
+    fullName: prof?.fullName || usr?.fullName || "",
+    username: usr?.username || "",
+    email: usr?.email || "",
+    phone: prof?.phone || usr?.phone || "",
+    bio: usr?.bio || ""
   };
-}
-
-function buildStats(settings) {
-  const subscriptionPlan = normalizePlanLabel(settings?.subscription?.plan || settings?.subscription?.tier || settings?.subscription?.name);
-  const referralsValue = settings?.subscription?.referrals ?? settings?.home?.doorCount ?? 0;
-  const earningsValue = settings?.subscription?.earnings ?? 0;
-  return {
-    plan: subscriptionPlan,
-    referrals: String(referralsValue ?? 0),
-    earnings: formatCurrency(earningsValue)
-  };
-}
-
-function buildSettingsPayload(settings) {
-  return {
-    pushAlerts: Boolean(settings.pushAlerts),
-    soundAlerts: Boolean(settings.soundAlerts),
-    autoRejectUnknownVisitors: Boolean(settings.autoRejectUnknownVisitors),
-    autoApproveTrustedVisitors: Boolean(settings.autoApproveTrustedVisitors),
-    autoApproveKnownContacts: Boolean(settings.autoApproveKnownContacts),
-    knownContacts: Array.isArray(settings.knownContacts) ? settings.knownContacts : [],
-    allowDeliveryDropAtGate: Boolean(settings.allowDeliveryDropAtGate),
-    smsFallbackEnabled: Boolean(settings.smsFallbackEnabled),
-    nearbyPanicAlertsEnabled: Boolean(settings.nearbyPanicAlertsEnabled),
-    nearbyPanicAlertRadiusMeters: Number(settings.nearbyPanicAlertRadiusMeters || 500),
-    nearbyPanicAvailability: String(settings.nearbyPanicAvailability || "always"),
-    nearbyPanicCustomSchedule: Array.isArray(settings.nearbyPanicCustomSchedule) ? settings.nearbyPanicCustomSchedule : [],
-    nearbyPanicReceiveFrom: String(settings.nearbyPanicReceiveFrom || "everyone"),
-    nearbyPanicMutedUntil: settings.nearbyPanicMutedUntil || null,
-    nearbyPanicSameAreaLabel: String(settings.nearbyPanicSameAreaLabel || ""),
-    panicIdentityVisibility: String(settings.panicIdentityVisibility || "masked"),
-    safetyHomeLocation: {
-      lat: Number(settings?.safetyHomeLocation?.lat ?? 0) || null,
-      lng: Number(settings?.safetyHomeLocation?.lng ?? 0) || null
-    }
-  };
-}
-
-function addMuteHours(hours) {
-  return new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
-}
-
-function endOfTodayIso() {
-  const date = new Date();
-  date.setHours(23, 59, 59, 999);
-  return date.toISOString();
-}
-
-function formatSafetyLocation(location) {
-  const lat = Number(location?.lat);
-  const lng = Number(location?.lng);
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return "No saved location yet.";
-  return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-}
-
-function normalizePlanLabel(value) {
-  return String(value || "").trim() || "FREE";
 }
 
 function buildUsernameFromEmail(email) {
-  const value = String(email || "").trim();
-  if (!value.includes("@")) return "";
-  return value.split("@")[0];
+  if (!email) return "user";
+  return email.split("@")[0].replace(/[^a-zA-Z0-9]/g, "");
 }
 
-function formatCurrency(value) {
-  const amount = Number(value ?? 0);
-  if (!Number.isFinite(amount) || amount <= 0) return "₦0";
-  return new Intl.NumberFormat("en-NG", {
-    style: "currency",
-    currency: "NGN",
-    maximumFractionDigits: 0
-  }).format(amount);
+function buildSettingsPayload(nextSettings) {
+  return nextSettings;
 }
 
-function StatBox({ label, value, icon, color }) {
-  return (
-    <div className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm flex flex-col items-center dark:bg-slate-900 dark:border-slate-800">
-      <div className={`p-2 rounded-xl bg-slate-50 ${color} mb-2 dark:bg-slate-800`}>{icon}</div>
-      <p className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">{label}</p>
-      <p className="text-sm font-black text-slate-900 dark:text-white">{value}</p>
-    </div>
-  );
+function addMuteHours(h) {
+  const d = new Date();
+  d.setHours(d.getHours() + h);
+  return d.toISOString();
 }
 
-function InputGroup({ label, value, onChange, type = "text", readOnly = false, style }) {
-  return (
-    <div className="flex flex-col gap-1 text-left">
-      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">{label}</label>
-      <input
-        type={type}
-        value={value}
-        readOnly={readOnly}
-        onChange={onChange ? (e) => onChange(e.target.value) : undefined}
-        style={style}
-        className="w-full bg-slate-50 border border-slate-400 rounded-2xl p-4 text-sm font-bold focus:ring-2 focus:ring-indigo-500 dark:bg-slate-800 dark:text-white"
-      />
-    </div>
-  );
-}
-
-function InlineSelect({ label, value, onChange, options, disabled = false }) {
-  return (
-    <label className="flex flex-col gap-1 text-left">
-      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">{label}</span>
-      <select
-        value={value}
-        disabled={disabled}
-        onChange={(event) => onChange?.(event.target.value)}
-        className="w-full rounded-2xl border border-slate-300 bg-slate-50 p-4 text-sm font-bold text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-      >
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-function SettingsGroup({ title, children }) {
-  return (
-    <section>
-      <h2 className="text-slate-400 text-[11px] font-black uppercase tracking-[0.2em] mb-4 ml-4">{title}</h2>
-      <div className="bg-white rounded-[2rem] p-2 border border-slate-100 shadow-sm space-y-1 dark:bg-slate-900 dark:border-slate-800">{children}</div>
-    </section>
-  );
-}
-
-function SettingsItem({ icon, label, sublabel, color, toggle = false, checked = false, onClick, onToggle, badge, disabled = false }) {
-  return (
-    <div
-      onClick={!toggle && !disabled ? onClick : undefined}
-      className={`w-full flex items-center justify-between p-4 rounded-2xl hover:bg-slate-50 transition-all group ${disabled ? "opacity-60 cursor-not-allowed" : "cursor-pointer"} dark:hover:bg-slate-800/60`}
-    >
-      <div className="flex items-center gap-4">
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${color || "bg-slate-50 text-slate-400"} dark:bg-slate-800`}>
-          {React.cloneElement(icon, { size: 18 })}
-        </div>
-        <div>
-          <p className="font-bold text-slate-900 text-sm dark:text-white">{label}</p>
-          {sublabel && <p className="text-[10px] text-slate-400 font-bold">{sublabel}</p>}
-        </div>
-      </div>
-      <div className="flex items-center gap-3">
-        {badge && <span className="text-[9px] font-black bg-indigo-50 text-indigo-600 px-2 py-1 rounded-md dark:bg-indigo-500/10">{badge}</span>}
-        {toggle ? (
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggle?.(!checked);
-            }}
-            className={`w-10 h-5 rounded-full relative transition-all ${checked ? "bg-indigo-600" : "bg-slate-200 dark:bg-slate-700"}`}
-          >
-            <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${checked ? "right-1" : "left-1"}`} />
-          </button>
-        ) : (
-          <ChevronRight size={16} className="text-slate-300 group-hover:text-indigo-600 transition-colors dark:text-slate-600" />
-        )}
-      </div>
-    </div>
-  );
+function endOfTodayIso() {
+  const d = new Date();
+  d.setHours(23, 59, 59, 999);
+  return d.toISOString();
 }
