@@ -15,18 +15,20 @@ export function buildStartSessionCallPlan({
   const normalizedVisitorToken = String(visitorToken || "").trim() || undefined;
   const canUseCanonicalRoute = Boolean(explicitVisitorSessionId || explicitVisitorRequestId);
 
+  const resolvedHasVideo = hasVideo !== undefined ? Boolean(hasVideo) : normalizedType === "video";
+
   const canonicalBody = {
     visitorSessionId: explicitVisitorSessionId,
     visitorRequestId: explicitVisitorRequestId,
     visitorName: normalizedVisitorName,
     type: normalizedType,
-    hasVideo: Boolean(hasVideo)
+    hasVideo: resolvedHasVideo
   };
 
   const legacyBody = {
     sessionId: safeSessionId,
     type: normalizedType,
-    hasVideo: Boolean(hasVideo),
+    hasVideo: resolvedHasVideo,
     visitorToken: normalizedVisitorToken
   };
 
