@@ -1,19 +1,40 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
-import { Mail, ShieldCheck, ChevronRight, CheckCircle2, AlertCircle } from "lucide-react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Mail, ShieldCheck, ChevronRight, CheckCircle2, AlertCircle, Building2, Phone, MapPin, Users } from "lucide-react";
 import { apiRequest } from "../../services/apiClient";
+import { useAuth } from "../../state/AuthContext";
 import quickdropLogo from "../../assets/qring_logo.jpeg";
 
 const OTP_LENGTH = 6;
 
 export default function VerifyEmailPage() {
   const [params] = useSearchParams();
+  const navigate = useNavigate();
+  const { login } = useAuth();
   const [state, setState] = useState({ loading: false, ok: false, error: "" });
   const [form, setForm] = useState({ email: "", code: "" });
+  const [officeDetails, setOfficeDetails] = useState({
+    companyName: "",
+    phoneNumber: "",
+    officeAddress: "",
+    numberOfEmployees: ""
+  });
+  const [officeSubmitting, setOfficeSubmitting] = useState(false);
+  const [officeError, setOfficeError] = useState("");
   const otpRefs = useRef([]);
 
   const linkEmail = useMemo(() => params.get("email") || "", [params]);
   const linkToken = useMemo(() => params.get("token") || "", [params]);
+  const pendingOfficeSignup = useMemo(() => Boolean(params.get("pendingOfficeSignup") || sessionStorage.getItem("pendingOfficeSignup")), [params]);
+  const pendingOfficeSignupData = useMemo(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const stored = sessionStorage.getItem("pendingOfficeSignup");
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  }, [params]);
   
   const otpDigits = useMemo(() => {
     const clean = String(form.code || "").replace(/\D/g, "").slice(0, OTP_LENGTH);
@@ -76,6 +97,37 @@ export default function VerifyEmailPage() {
     }
   };
 
+  const handleOfficeSubmit = async (event) => {
+    event.preventDefault();
+    setOfficeSubmitting(true);
+    setOfficeError("");
+    try {
+      const payload = {
+        companyName: officeDetails.companyName.trim(),
+        phoneNumber: officeDetails.phoneNumber.trim(),
+        officeAddress: officeDetails.officeAddress.trim(),
+        numberOfEmployees: officeDetails.numberOfEmployees ? Number(officeDetails.numberOfEmployees) : undefined,
+      };
+      if (!pendingOfficeSignupData?.email || !pendingOfficeSignupData?.password) {
+        throw new Error("The signup session expired. Please sign up again.");
+      }
+      await login({
+        email: pendingOfficeSignupData.email,
+        password: pendingOfficeSignupData.password,
+      });
+      await apiRequest("/office/profile", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      sessionStorage.removeItem("pendingOfficeSignup");
+      navigate("/dashboard/office/overview", { replace: true });
+    } catch (err) {
+      setOfficeError(err?.message || "Unable to save office details yet.");
+    } finally {
+      setOfficeSubmitting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col font-body antialiased">
       {/* --- Branding Header --- */}
@@ -95,20 +147,74 @@ export default function VerifyEmailPage() {
           <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-10 -mt-4" />
 
           {state.ok ? (
-            <div className="text-center py-8 animate-in zoom-in-95">
-              <div className="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm">
-                <CheckCircle2 size={40} />
+            pendingOfficeSignup ? (
+              <form onSubmit={handleOfficeSubmit} className="flex flex-col gap-4 animate-in zoom-in-95">
+                <div className="text-center mb-2">
+                  <div className="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm">
+                    <CheckCircle2 size={40} />
+                  </div>
+                  <h2 className="text-2xl font-black text-slate-900 mb-2">Almost there</h2>
+                  <p className="text-slate-500 text-sm font-medium">Complete your office profile to finish setup.</p>
+                </div>
+
+                {officeError && (
+                  <div className="p-4 rounded-2xl text-xs font-bold bg-red-50 text-red-600 border border-red-100 flex items-center gap-3">
+                    <AlertCircle size={16} />
+                    <span>{officeError}</span>
+                  </div>
+                )}
+
+                <InputField
+                  icon={Building2}
+                  placeholder="Company Name"
+                  value={officeDetails.companyName}
+                  onChange={(v) => setOfficeDetails((prev) => ({ ...prev, companyName: v }))}
+                />
+                <InputField
+                  icon={Phone}
+                  placeholder="Phone Number"
+                  value={officeDetails.phoneNumber}
+                  onChange={(v) => setOfficeDetails((prev) => ({ ...prev, phoneNumber: v }))}
+                />
+                <InputField
+                  icon={MapPin}
+                  placeholder="Office Address"
+                  value={officeDetails.officeAddress}
+                  onChange={(v) => setOfficeDetails((prev) => ({ ...prev, officeAddress: v }))}
+                />
+                <InputField
+                  icon={Users}
+                  type="number"
+                  placeholder="Number of Employees"
+                  value={officeDetails.numberOfEmployees}
+                  onChange={(v) => setOfficeDetails((prev) => ({ ...prev, numberOfEmployees: v }))}
+                />
+
+                <button
+                  disabled={officeSubmitting}
+                  className="w-full bg-brand-500 text-white font-black py-5 rounded-[2.5rem] shadow-xl shadow-brand-500/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
+                  type="submit"
+                >
+                  {officeSubmitting ? "Saving..." : "Continue"}
+                  {!officeSubmitting && <ChevronRight className="w-5 h-5 font-bold" />}
+                </button>
+              </form>
+            ) : (
+              <div className="text-center py-8 animate-in zoom-in-95">
+                <div className="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm">
+                  <CheckCircle2 size={40} />
+                </div>
+                <h2 className="text-2xl font-black text-slate-900 mb-2">Verified!</h2>
+                <p className="text-slate-500 text-sm mb-10 font-medium">Your email is confirmed. You can now access your workspace.</p>
+                <Link
+                  to="/login"
+                  className="w-full bg-brand-500 text-white font-black py-5 rounded-[2.5rem] shadow-xl shadow-brand-500/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                >
+                  Go to Dashboard
+                  <ChevronRight size={20} />
+                </Link>
               </div>
-              <h2 className="text-2xl font-black text-slate-900 mb-2">Verified!</h2>
-              <p className="text-slate-500 text-sm mb-10 font-medium">Your email is confirmed. You can now access your workspace.</p>
-              <Link
-                to="/login"
-                className="w-full bg-brand-500 text-white font-black py-5 rounded-[2.5rem] shadow-xl shadow-brand-500/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-              >
-                Go to Dashboard
-                <ChevronRight size={20} />
-              </Link>
-            </div>
+            )
           ) : (
             <form
               onSubmit={async (e) => {

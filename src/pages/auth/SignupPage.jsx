@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { Building2, Home, User, Mail, Lock, Gift, ChevronRight, Eye, EyeOff, BriefcaseBusiness, MapPin, Globe } from "lucide-react";
+import { Building2, Home, User, Mail, Lock, Gift, ChevronRight, Eye, EyeOff, BriefcaseBusiness } from "lucide-react";
 import { useAuth } from "../../state/AuthContext";
 import quickdropLogo from "../../assets/qring_logo.jpeg";
 import { shouldUseGoogleAuth } from "../../utils/nativeRuntime";
@@ -19,15 +19,7 @@ export default function SignupPage() {
     email: "",
     password: "",
     role: "homeowner",
-    referralCode: "",
-    companyName: "",
-    businessEmail: "",
-    phoneNumber: "",
-    officeAddress: "",
-    country: "",
-    state: "",
-    city: "",
-    numberOfEmployees: ""
+    referralCode: ""
   });
 
   const [error, setError] = useState("");
@@ -81,19 +73,18 @@ export default function SignupPage() {
             ...form,
             email: normalizedEmail,
             referralCode: form.referralCode.trim() || undefined,
-            companyName: form.companyName.trim() || undefined,
-            businessEmail: form.businessEmail.trim().toLowerCase() || undefined,
-            phoneNumber: form.phoneNumber.trim() || undefined,
-            officeAddress: form.officeAddress.trim() || undefined,
-            country: form.country.trim() || undefined,
-            state: form.state.trim() || undefined,
-            city: form.city.trim() || undefined,
-            numberOfEmployees: form.numberOfEmployees ? Number(form.numberOfEmployees) : undefined,
           };
           const data = await signup(payload);
           const role = String(data?.user?.role || form.role || "").toLowerCase();
-          if (role === "office" || data?.accessToken) {
-            navigate("/dashboard/office/overview", { replace: true });
+          if (role === "office") {
+            sessionStorage.setItem(
+              "pendingOfficeSignup",
+              JSON.stringify({ email: normalizedEmail, password: form.password, role: "office" })
+            );
+            navigate(`/verify-email?email=${encodeURIComponent(normalizedEmail)}&pendingOfficeSignup=true`, {
+              replace: true,
+              state: { pendingOfficeSignup: true },
+            });
             return;
           }
           navigate(`/verify-email?email=${encodeURIComponent(normalizedEmail)}`, {
@@ -236,62 +227,6 @@ export default function SignupPage() {
               onChange={(v) => setForm({ ...form, referralCode: v })} 
             />
 
-            {form.role === "office" ? (
-              <div className="grid gap-4 pt-2">
-                <InputField
-                  icon={Building2}
-                  placeholder="Company Name"
-                  value={form.companyName}
-                  onChange={(v) => setForm({ ...form, companyName: v })}
-                />
-                <InputField
-                  icon={Mail}
-                  type="email"
-                  placeholder="Business Email"
-                  value={form.businessEmail}
-                  onChange={(v) => setForm({ ...form, businessEmail: v })}
-                />
-                <InputField
-                  icon={User}
-                  placeholder="Phone Number"
-                  value={form.phoneNumber}
-                  onChange={(v) => setForm({ ...form, phoneNumber: v })}
-                />
-                <InputField
-                  icon={MapPin}
-                  placeholder="Office Address"
-                  value={form.officeAddress}
-                  onChange={(v) => setForm({ ...form, officeAddress: v })}
-                />
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <InputField
-                    icon={Globe}
-                    placeholder="Country"
-                    value={form.country}
-                    onChange={(v) => setForm({ ...form, country: v })}
-                  />
-                  <InputField
-                    icon={Globe}
-                    placeholder="State"
-                    value={form.state}
-                    onChange={(v) => setForm({ ...form, state: v })}
-                  />
-                </div>
-                <InputField
-                  icon={MapPin}
-                  placeholder="City"
-                  value={form.city}
-                  onChange={(v) => setForm({ ...form, city: v })}
-                />
-                <InputField
-                  icon={User}
-                  placeholder="Number of Employees"
-                  type="number"
-                  value={form.numberOfEmployees}
-                  onChange={(v) => setForm({ ...form, numberOfEmployees: v })}
-                />
-              </div>
-            ) : null}
 
             <div className="flex items-center gap-3 px-1 pt-2">
               <input

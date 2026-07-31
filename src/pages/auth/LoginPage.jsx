@@ -8,6 +8,14 @@ import { resolvePostLoginPath } from "../../utils/authRouting";
 import { shouldUseGoogleAuth } from "../../utils/nativeRuntime";
 import { useAsyncAction } from "../../hooks/useAsyncAction";
 
+function getVerificationDeliveryError(result) {
+  const data = result?.data ?? result ?? {};
+  const emailStatus = String(data.emailStatus || "").toLowerCase();
+  if (!emailStatus || emailStatus === "ok" || emailStatus === "sent") return "";
+  const reason = data.emailReason ? `: ${data.emailReason}` : "";
+  return `Verification email was not sent (${emailStatus}${reason}).`;
+}
+
 function resolveTargetPath(data, fromPath) {
   return resolvePostLoginPath(data?.user, fromPath);
 }
@@ -186,7 +194,11 @@ export default function LoginPage() {
                   onClick={async () => {
                     setVerificationState((p) => ({ ...p, sending: true, status: "" }));
                     try {
-                      await requestEmailVerification({ email: form.email.trim().toLowerCase() });
+                      const result = await requestEmailVerification({ email: form.email.trim().toLowerCase() });
+                      const deliveryError = getVerificationDeliveryError(result);
+                      if (deliveryError) {
+                        throw new Error(deliveryError);
+                      }
                       setVerificationState((p) => ({ ...p, sending: false, status: "Sent!" }));
                     } catch (requestError) {
                       setVerificationState((p) => ({ ...p, sending: false }));
