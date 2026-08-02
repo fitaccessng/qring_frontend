@@ -35,6 +35,7 @@ import { useAuth } from "../../state/AuthContext";
 import { useLanguage } from "../../state/LanguageContext";
 import { useNotifications } from "../../state/NotificationsContext";
 import { useTheme } from "../../state/ThemeContext";
+import useSubscription from "../../hooks/useSubscription";
 import { showError, showSuccess } from "../../utils/flash";
 
 const DEFAULT_PROFILE_IMAGE = null;
@@ -88,6 +89,7 @@ export default function HomeownerSettingsPage() {
   const { unreadCount } = useNotifications();
   const { isDark, toggleTheme } = useTheme();
   const { language, selectedLanguage, languageOptions, setLanguage } = useLanguage();
+  const { subscription, inSignupTrial } = useSubscription();
   const [settings, setSettings] = useState(() => mergeSettings(cachedSettings));
   const [stats, setStats] = useState(() => buildStats(mergeSettings(cachedSettings)));
   const [profileForm, setProfileForm] = useState(() => buildProfileForm(user, mergeSettings(cachedSettings).profile));
@@ -402,6 +404,27 @@ export default function HomeownerSettingsPage() {
           <StatBoxCompact label="Referrals" value={loading ? "..." : stats.referrals} icon={<User size={14} />} color="text-emerald-600" />
           <StatBoxCompact label="Earnings" value={loading ? "..." : stats.earnings} icon={<Wallet size={14} />} color="text-amber-600" />
         </section>
+
+        {inSignupTrial ? (
+          <section className="rounded-[2rem] border border-emerald-200/80 bg-emerald-50 p-5 shadow-sm dark:border-emerald-900/50 dark:bg-emerald-950/20">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-700 dark:text-emerald-400">Free Trial</p>
+                <h3 className="mt-1 text-lg font-extrabold text-emerald-900 dark:text-emerald-200">Your account is still in the free trial period</h3>
+                <p className="mt-2 text-sm leading-6 text-emerald-700 dark:text-emerald-300">
+                  {subscription?.trialDaysRemaining ?? 0} day{(subscription?.trialDaysRemaining ?? 0) === 1 ? "" : "s"} remaining. No payment method is required until the trial ends.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate("/billing/paywall")}
+                className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700"
+              >
+                View billing
+              </button>
+            </div>
+          </section>
+        ) : null}
 
         {/* SETTINGS GROUPINGS */}
         <div className="space-y-6">

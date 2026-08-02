@@ -192,6 +192,16 @@ export default function ResidentSubscriptionCenter() {
         </div>
 
         {/* Status Bento Grid */}
+        {subscription?.inSignupTrial ? (
+          <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 shadow-sm">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <span className="font-semibold">Free trial is active for your account.</span>
+              <span>{subscription?.trialDaysRemaining ?? 0} day{(subscription?.trialDaysRemaining ?? 0) === 1 ? "" : "s"} remaining</span>
+            </div>
+            <p className="mt-1 text-emerald-700">You can keep using the app during the trial. A payment method is not required until the trial ends.</p>
+          </div>
+        ) : null}
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
           <div className="md:col-span-2 bg-indigo-600 rounded-[2rem] p-8 relative overflow-hidden text-white shadow-xl shadow-indigo-200">
             <div className="relative z-10 flex flex-col h-full justify-between">

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Mic, Pause, Play, Waveform } from "lucide-react";
+import { Mic, Pause, Play, Radio } from "lucide-react";
 import { downloadPanicAudioSegment, listPanicAudioSegments, uploadPanicAudioSegment } from "../../services/safetyService";
 import { showError, showSuccess } from "../../utils/flash";
 
@@ -267,7 +267,7 @@ export default function PanicAudioPanel({ alert, compact = false }) {
           <p className="mt-1 text-sm text-white/90">{description}</p>
         </div>
         <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/30 bg-amber-400/10 px-3 py-2 text-xs font-semibold text-amber-100">
-          <Waveform className="h-4 w-4" />
+          <Radio className="h-4 w-4" />
           {segmentCount > 0 ? `${segmentCount} saved segment${segmentCount === 1 ? "" : "s"}` : "No recorded segments"}
         </div>
       </div>

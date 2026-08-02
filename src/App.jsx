@@ -25,6 +25,7 @@ import AppPreloader from "./components/mobile/AppPreloader";
 import PanicAlertCenter from "./components/panic/PanicAlertCenter";
 import PersistentAppMobileNav from "./components/system/PersistentAppMobileNav";
 import ToastCenter from "./components/ToastCenter";
+import AppUpdateNotifier from "./components/system/AppUpdateNotifier";
 import { env } from "./config/env";
 import { NotificationsProvider } from "./state/NotificationsContext";
 import { queryClient } from "./lib/queryClient";
@@ -155,6 +156,7 @@ export default function App() {
             <NotificationsProvider>
               <Router>
                 <AppRoutes />
+                <AppUpdateNotifier />
               </Router>
             </NotificationsProvider>
           </QueryClientProvider>
