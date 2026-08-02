@@ -63,6 +63,14 @@ function buildActionUrl({ action, panicId = "", route = "" }) {
   return `qring://notification-action?${params.toString()}`;
 }
 
+function normalizeRoute(route) {
+  const safeRoute = String(route || "").trim();
+  if (!safeRoute) return "/dashboard/notifications";
+  if (safeRoute.startsWith("/")) return safeRoute;
+  if (safeRoute.startsWith("http://") || safeRoute.startsWith("https://")) return "/dashboard/notifications";
+  return `/${safeRoute}`;
+}
+
 function parseNotificationActionPayload(input) {
   try {
     const safe = input && typeof input === "object" ? input : {};
@@ -103,8 +111,8 @@ async function executeNotificationAction({ actionId, panicId, route }) {
     await reportFalsePanicAlert(panicId);
   }
 
-  if (typeof window !== "undefined" && route.startsWith("/")) {
-    navigateToAppPath(route);
+  if (typeof window !== "undefined") {
+    navigateToAppPath(normalizeRoute(route));
   }
 
   return true;
@@ -135,7 +143,7 @@ async function handleLaunchUrl(url) {
 function buildLocalNotification(notification) {
   const data = notification?.data && typeof notification.data === "object" ? notification.data : {};
   const notificationId = Number(notification?.id || Date.now() % 2147483000);
-  const route = String(data.route || "/dashboard/notifications").trim();
+  const route = normalizeRoute(data.route || "/dashboard/notifications");
   const panicId = String(data.panicId || "").trim();
   const wantsPanicActions = String(data.actionSet || "") === PANIC_ACTION_TYPE_ID;
 
@@ -182,17 +190,21 @@ async function ensureNativePushInitialized() {
     await PushNotifications.addListener("registration", async (token) => {
       const value = String(token?.value || "").trim();
       if (!value) return;
-      await registerPushSubscription({
-        provider: "fcm",
-        endpoint: `native-fcm:${value}`,
-        token: value,
-        keys: {
+      try {
+        await registerPushSubscription({
+          provider: "fcm",
+          endpoint: `native-fcm:${value}`,
           token: value,
-          platform: getNativePlatform() || "native",
-          runtime: "capacitor",
-          native: true
-        }
-      });
+          keys: {
+            token: value,
+            platform: getNativePlatform() || "native",
+            runtime: "capacitor",
+            native: true
+          }
+        });
+      } catch (error) {
+        console.error("Native push registration sync failed", error);
+      }
     });
 
     await PushNotifications.addListener("registrationError", (error) => {

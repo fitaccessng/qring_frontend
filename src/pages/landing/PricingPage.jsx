@@ -1,387 +1,480 @@
-import React, { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  BellRing,
+  ArrowRight,
+  BadgeCheck,
+  BriefcaseBusiness,
   Building2,
-  CalendarClock,
-  ChevronRight,
+  Check,
+  Crown,
   DoorClosed,
-  History,
-  LayoutDashboard,
-  MessageSquareMore,
-  PhoneCall,
-  QrCode,
+  Landmark,
+  Layers3,
   ShieldCheck,
-  UserCog,
+  Sparkles,
   Users
 } from "lucide-react";
 import LandingPageNavbar from "../../components/landing/marketing/sections/LandingPageNavbar";
 
-const estatePlans = [
+const pricingSections = [
   {
-    name: "Starter Estate",
-    subtitle: "Up to 3 houses (trial only, 30 days)",
-    monthly: "₦0",
-    yearly: "₦0",
-    cadence: "/month",
-    cta: "Start Free Trial",
-    to: "/signup",
-    accent: "light",
-    icon: Building2,
-    features: [
-      "Up to 3 houses",
-      "Full system access (limited scale)",
-      "Trial only - 30 days"
-    ]
-  },
-  {
-    name: "Estate Basic",
-    subtitle: "Up to 10 houses",
-    monthly: "₦6,000",
-    yearly: "₦57,600",
-    cadence: billing => billing === "monthly" ? "/month" : "/year",
-    cta: "Start Basic",
-    to: "/signup",
-    accent: "light",
-    icon: BellRing,
-    features: [
-      "Up to 10 houses",
-      "Realtime alerts",
-      "Visitor logs",
-      "Resident management",
-      "Mobile dashboard"
-    ]
-  },
-  {
-    name: "Estate Plus",
-    subtitle: "Up to 15 houses",
-    monthly: "₦9,000",
-    yearly: "₦86,400",
-    cadence: billing => billing === "monthly" ? "/month" : "/year",
-    cta: "Choose Plus",
-    to: "/signup",
-    accent: "light",
-    icon: CalendarClock,
-    features: [
-      "Everything in Basic",
-      "Visitor scheduling",
-      "Access time windows",
-      "Chat + call verification"
-    ]
-  },
-  {
-    name: "Estate Growth",
-    subtitle: "Up to 30 houses",
-    monthly: "₦18,000",
-    yearly: "₦172,800",
-    cadence: billing => billing === "monthly" ? "/month" : "/year",
-    cta: "Choose Growth",
-    to: "/signup",
-    accent: "featured",
-    badge: "Popular",
-    icon: LayoutDashboard,
-    features: [
-      "Everything in Plus",
-      "Multi-admin roles",
-      "Analytics dashboard",
-      "Activity tracking"
-    ]
-  },
-  {
-    name: "Estate Pro",
-    subtitle: "Up to 50 houses",
-    monthly: "₦30,000",
-    yearly: "₦288,000",
-    cadence: billing => billing === "monthly" ? "/month" : "/year",
-    cta: "Start Pro",
-    to: "/signup",
-    accent: "light",
-    icon: UserCog,
-    features: [
-      "Everything in Growth",
-      "Advanced analytics",
-      "Security audit logs",
-      "Role permissions",
-      "Priority support"
-    ]
-  },
-  {
-    name: "Enterprise Estate",
-    subtitle: "Custom plan for large estates",
-    monthly: "Custom Pricing",
-    yearly: "Custom Pricing",
-    cadence: "",
-    cta: "Contact Sales",
-    to: "/contact",
-    accent: "dark",
-    icon: ShieldCheck,
-    features: [
-      "Unlimited houses",
-      "SLA + API access",
-      "Multi-location control",
-      "Dedicated support"
-    ]
-  }
-];
-
-const homeownerPlans = [
-  {
-    name: "Free",
-    subtitle: "1 door",
-    monthly: "Free",
-    yearly: "Free",
-    cadence: "",
-    cta: "Get Started Free",
-    to: "/signup",
-    accent: "light",
+    id: "homeowner",
+    label: "Homeowner",
+    title: "Homeowner",
+    eyebrow: "Personal access control",
+    description: "Simple plans for homes that want secure visitor approval, flexible scheduling, and stronger privacy controls.",
     icon: DoorClosed,
-    features: [
-      "1 door",
-      "Basic notifications",
-      "Limited logs"
+    plans: [
+      {
+        name: "Free",
+        price: "₦0",
+        cadence: "/month",
+        capacity: "1 Home",
+        cta: "Get Started Free",
+        to: "/signup",
+        icon: DoorClosed,
+        features: [
+          "QR visitor invitations",
+          "Visitor approval",
+          "Visitor history",
+          "Basic notifications",
+          "Entry & exit records",
+          "Mobile access"
+        ]
+      },
+      {
+        name: "Home Pro",
+        price: "₦2,500",
+        cadence: "/month",
+        capacity: "1 Home",
+        cta: "Choose Home Pro",
+        to: "/signup",
+        icon: Sparkles,
+        features: [
+          "Everything in Free",
+          "Visitor scheduling",
+          "Call & chat verification",
+          "Advanced notifications",
+          "Temporary visitor passes",
+          "Frequent visitor management",
+          "Longer visitor history"
+        ]
+      },
+      {
+        name: "Home Premium",
+        price: "₦4,500",
+        cadence: "/month",
+        capacity: "Multiple Homes or Entrances",
+        cta: "Choose Home Premium",
+        to: "/signup",
+        icon: Crown,
+        popular: true,
+        features: [
+          "Everything in Home Pro",
+          "Multiple homes/gates",
+          "Access time windows",
+          "Family member management",
+          "Priority support",
+          "Enhanced privacy controls",
+          "Activity insights"
+        ]
+      }
     ]
   },
   {
-    name: "Home Pro",
-    subtitle: "Smart homeowner controls",
-    monthly: "₦2,500",
-    yearly: "₦24,000",
-    cadence: billing => billing === "monthly" ? "/month" : "/year",
-    cta: "Choose Home Pro",
-    to: "/signup",
-    accent: "featured",
-    icon: MessageSquareMore,
-    features: [
-      "Chat + call verification",
-      "Visitor history",
-      "Visitor scheduling",
-      "Advanced notifications"
+    id: "estate",
+    label: "Estate",
+    title: "Estate",
+    eyebrow: "Managed communities",
+    description: "Flexible estate plans with resident management, visitor controls, analytics, and growth-friendly administration.",
+    icon: Building2,
+    plans: [
+      {
+        name: "Starter Estate",
+        price: "₦0",
+        cadence: "/month",
+        capacity: "Up to 3 Houses",
+        cta: "Start Free Trial",
+        to: "/signup",
+        icon: Building2,
+        features: [
+          "Full platform access",
+          "Resident management",
+          "Visitor approvals",
+          "QR visitor passes",
+          "Security dashboard",
+          "30-day free trial"
+        ]
+      },
+      {
+        name: "Estate Basic",
+        price: "₦6,000",
+        cadence: "/month",
+        capacity: "Up to 10 Houses",
+        cta: "Start Basic",
+        to: "/signup",
+        icon: ShieldCheck,
+        features: [
+          "Everything in Starter",
+          "Realtime alerts",
+          "Visitor logs",
+          "Resident directory",
+          "Mobile dashboard",
+          "Gate access records",
+          "Visitor search"
+        ]
+      },
+      {
+        name: "Estate Plus",
+        price: "₦9,000",
+        cadence: "/month",
+        capacity: "Up to 15 Houses",
+        cta: "Choose Plus",
+        to: "/signup",
+        icon: BadgeCheck,
+        popular: true,
+        features: [
+          "Everything in Basic",
+          "Visitor scheduling",
+          "Access time windows",
+          "Call & chat verification",
+          "Security announcements",
+          "Delivery management",
+          "Guest pre-registration"
+        ]
+      },
+      {
+        name: "Estate Growth",
+        price: "₦18,000",
+        cadence: "/month",
+        capacity: "Up to 30 Houses",
+        cta: "Choose Growth",
+        to: "/signup",
+        icon: Layers3,
+        features: [
+          "Everything in Plus",
+          "Multiple administrators",
+          "Analytics dashboard",
+          "Activity tracking",
+          "Estate reports",
+          "Staff management",
+          "Security insights"
+        ]
+      },
+      {
+        name: "Estate Pro",
+        price: "₦30,000",
+        cadence: "/month",
+        capacity: "Up to 50 Houses",
+        cta: "Start Pro",
+        to: "/signup",
+        icon: Landmark,
+        features: [
+          "Everything in Growth",
+          "Advanced analytics",
+          "Security audit logs",
+          "Custom administrator roles",
+          "Priority support",
+          "Data export",
+          "Enhanced reporting"
+        ]
+      },
+      {
+        name: "Enterprise Estate",
+        price: "Custom Pricing",
+        cadence: "",
+        capacity: "Unlimited Houses",
+        cta: "Contact Sales",
+        to: "/contact",
+        icon: Crown,
+        enterprise: true,
+        features: [
+          "Everything in Pro",
+          "Multi-location",
+          "API",
+          "SLA",
+          "Dedicated support",
+          "Custom integrations",
+          "Staff training"
+        ]
+      }
     ]
   },
   {
-    name: "Home Premium",
-    subtitle: "Advanced access and privacy",
-    monthly: "₦4,500",
-    yearly: "₦43,200",
-    cadence: billing => billing === "monthly" ? "/month" : "/year",
-    cta: "Choose Home Premium",
-    to: "/signup",
-    accent: "light",
-    icon: QrCode,
-    features: [
-      "Multiple doors",
-      "Access time windows",
-      "Priority support",
-      "Advanced privacy controls"
+    id: "office",
+    label: "Office",
+    title: "Office",
+    eyebrow: "Workplace reception",
+    description: "Reception-ready plans for offices that need visitor check-in, attendance, security alerts, and multi-branch visibility.",
+    icon: BriefcaseBusiness,
+    plans: [
+      {
+        name: "Office Starter",
+        price: "₦8,000",
+        cadence: "/month",
+        capacity: "Up to 10 Employees",
+        cta: "Start Office",
+        to: "/signup",
+        icon: BriefcaseBusiness,
+        features: [
+          "Visitor management",
+          "Reception dashboard",
+          "QR visitor check-in",
+          "Employee directory",
+          "Visitor history",
+          "Email notifications"
+        ]
+      },
+      {
+        name: "Office Business",
+        price: "₦15,000",
+        cadence: "/month",
+        capacity: "Up to 25 Employees",
+        cta: "Choose Business",
+        to: "/signup",
+        icon: Users,
+        features: [
+          "Everything in Starter",
+          "Visitor scheduling",
+          "Host approval",
+          "Delivery management",
+          "Employee attendance",
+          "Visitor badges",
+          "Activity reports"
+        ]
+      },
+      {
+        name: "Office Professional",
+        price: "₦25,000",
+        cadence: "/month",
+        capacity: "Up to 50 Employees",
+        cta: "Choose Professional",
+        to: "/signup",
+        icon: BadgeCheck,
+        popular: true,
+        features: [
+          "Everything in Business",
+          "Multiple receptionists",
+          "Department management",
+          "Role permissions",
+          "Security alerts",
+          "Meeting visitor management",
+          "Advanced reporting"
+        ]
+      },
+      {
+        name: "Office Growth",
+        price: "₦40,000",
+        cadence: "/month",
+        capacity: "Up to 100 Employees",
+        cta: "Choose Growth",
+        to: "/signup",
+        icon: Layers3,
+        features: [
+          "Everything in Professional",
+          "Multiple branches",
+          "Multi-admin",
+          "Advanced analytics",
+          "Audit logs",
+          "Priority support",
+          "Export reports"
+        ]
+      },
+      {
+        name: "Office Enterprise",
+        price: "Custom Pricing",
+        cadence: "",
+        capacity: "Unlimited Employees",
+        cta: "Contact Sales",
+        to: "/contact",
+        icon: Crown,
+        enterprise: true,
+        features: [
+          "Everything in Growth",
+          "Unlimited branches",
+          "API Access",
+          "SSO",
+          "Dedicated account manager",
+          "Custom branding",
+          "Custom integrations",
+          "SLA support"
+        ]
+      }
     ]
   }
 ];
 
-const footerLinks = [
-  "Privacy Policy",
-  "Terms of Service",
-  "Cookie Policy",
-  "Contact Support"
-];
-
-function formatCadence(cadence, billing) {
-  return typeof cadence === "function" ? cadence(billing) : cadence;
-}
-
-function PricingCard({ plan, billing }) {
+function PricingCard({ plan }) {
   const Icon = plan.icon;
-  const price = billing === "monthly" ? plan.monthly : plan.yearly;
-  const cadence = formatCadence(plan.cadence, billing);
-  const isFeatured = plan.accent === "featured";
-  const isDark = plan.accent === "dark";
+  const isHighlighted = Boolean(plan.popular || plan.enterprise);
 
   return (
     <article
-      className={
-        isDark
-          ? "flex h-full flex-col rounded-[2rem] bg-[linear-gradient(135deg,#00346f_0%,#004a99_100%)] p-6 text-white shadow-[0_30px_80px_rgba(0,52,111,0.18)] sm:p-8"
-          : isFeatured
-            ? "flex h-full flex-col rounded-[2rem] bg-[#00346f] p-6 text-white shadow-[0_30px_80px_rgba(0,52,111,0.18)] sm:p-8"
-            : "flex h-full flex-col rounded-[2rem] border border-slate-200/70 bg-white p-6 shadow-sm sm:p-8"
-      }
+      className={[
+        "group flex h-full min-h-[560px] flex-col justify-between rounded-2xl border p-5 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl sm:p-6",
+        isHighlighted
+          ? "border-[#00346f] bg-[#00346f] text-white shadow-[0_24px_70px_rgba(0,52,111,0.22)]"
+          : "border-slate-200 bg-white text-slate-900 hover:border-[#004a99]/35"
+      ].join(" ")}
     >
-      <div className="mb-8 flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          {plan.badge ? (
-            <span className="mb-3 inline-flex rounded-full bg-white/12 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-white">
-              {plan.badge}
-            </span>
-          ) : null}
-          <div className="flex items-center gap-3">
-            <div
-              className={`flex h-11 w-11 items-center justify-center rounded-2xl ${
-                isDark || isFeatured ? "bg-white/10 text-blue-100" : "bg-slate-100 text-[#00346f]"
-              }`}
-            >
-              <Icon className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <h3
-                className={`font-heading text-2xl font-extrabold tracking-tight ${
-                  isDark || isFeatured ? "text-white" : "text-[#00346f]"
-                }`}
-              >
-                {plan.name}
-              </h3>
-              <p className={`${isDark || isFeatured ? "text-blue-200/85" : "text-slate-500"} text-sm leading-6`}>
-                {plan.subtitle}
-              </p>
-            </div>
-          </div>
+      <div className="mb-5 flex h-10 items-center justify-between gap-3">
+        <span
+          className={[
+            "inline-flex min-h-7 items-center rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em]",
+            plan.popular
+              ? "bg-emerald-300 text-[#00346f]"
+              : plan.enterprise
+                ? "bg-white/14 text-white"
+                : "bg-slate-100 text-slate-600"
+          ].join(" ")}
+        >
+          {plan.popular ? "Popular" : plan.enterprise ? "Enterprise" : "Core plan"}
+        </span>
+        <div
+          className={[
+            "flex h-10 w-10 items-center justify-center rounded-lg transition group-hover:scale-105",
+            isHighlighted ? "bg-white/12 text-white" : "bg-[#00346f]/8 text-[#00346f]"
+          ].join(" ")}
+        >
+          <Icon className="h-5 w-5" />
         </div>
+      </div>
 
-        <div className="rounded-[1.25rem] bg-black/[0.04] px-4 py-3 text-left sm:min-w-[132px] sm:bg-transparent sm:px-0 sm:py-0 sm:text-right">
-          <div className={`font-heading text-3xl font-extrabold sm:text-4xl ${isDark || isFeatured ? "text-white" : "text-[#00346f]"}`}>
-            {price}
-          </div>
-          {cadence ? (
-            <div className={`${isDark || isFeatured ? "text-blue-200/80" : "text-slate-400"} text-xs font-medium`}>
-              {cadence}
-            </div>
+      <div className="min-h-[128px]">
+        <h3 className={["font-heading text-2xl font-black tracking-tight", isHighlighted ? "text-white" : "text-[#00346f]"].join(" ")}>
+          {plan.name}
+        </h3>
+        <p className={["mt-3 text-sm font-bold", isHighlighted ? "text-blue-100" : "text-slate-500"].join(" ")}>
+          {plan.capacity}
+        </p>
+        <div className="mt-5 flex flex-wrap items-end gap-x-1.5 gap-y-1">
+          <span className="font-heading text-4xl font-black tracking-tight sm:text-[2.65rem]">{plan.price}</span>
+          {plan.cadence ? (
+            <span className={["pb-1.5 text-sm font-bold", isHighlighted ? "text-blue-100/85" : "text-slate-400"].join(" ")}>
+              {plan.cadence}
+            </span>
           ) : null}
         </div>
       </div>
 
-      <div className="flex-grow space-y-4">
+      <ul className="mt-6 flex flex-1 flex-col gap-3.5">
         {plan.features.map((feature) => (
-          <div key={feature} className="flex items-start gap-3">
-            <ChevronRight
-              className={`mt-0.5 h-4 w-4 shrink-0 ${
-                isDark || isFeatured ? "text-emerald-300" : "text-emerald-600"
-              }`}
-            />
-            <span className={`${isDark || isFeatured ? "text-white/90" : "text-slate-700"} text-sm leading-6`}>
+          <li key={feature} className="flex items-start gap-3">
+            <span
+              className={[
+                "mt-0.5 flex h-5 w-5 flex-none items-center justify-center rounded-full",
+                isHighlighted ? "bg-white/12 text-emerald-300" : "bg-emerald-50 text-emerald-700"
+              ].join(" ")}
+            >
+              <Check className="h-3.5 w-3.5" />
+            </span>
+            <span className={["text-sm leading-6", isHighlighted ? "text-white/90" : "text-slate-650"].join(" ")}>
               {feature}
             </span>
-          </div>
+          </li>
         ))}
-      </div>
+      </ul>
 
       <Link
         to={plan.to}
-        className={
-          isDark || isFeatured
-            ? "mt-8 inline-flex w-full items-center justify-center rounded-xl bg-white px-4 py-4 text-center text-sm font-extrabold uppercase tracking-[0.16em] text-[#00346f] transition hover:bg-blue-50"
-            : "mt-8 inline-flex w-full items-center justify-center rounded-xl border border-[#00346f] px-4 py-4 text-center text-sm font-bold uppercase tracking-[0.16em] text-[#00346f] transition hover:bg-[#00346f]/5"
-        }
+        className={[
+          "mt-8 inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3.5 text-center text-sm font-black uppercase tracking-[0.12em] transition",
+          isHighlighted
+            ? "bg-white text-[#00346f] hover:bg-blue-50"
+            : "border border-[#00346f] bg-white text-[#00346f] hover:bg-[#00346f] hover:text-white"
+        ].join(" ")}
       >
         {plan.cta}
+        <ArrowRight className="h-4 w-4" />
       </Link>
     </article>
   );
 }
 
-export default function PricingPage() {
-  const [audience, setAudience] = useState("estate");
-  const [billing, setBilling] = useState("monthly");
+function PricingSection({ section }) {
+  const Icon = section.icon;
 
-  const visiblePlans = useMemo(
-    () => (audience === "estate" ? estatePlans : homeownerPlans),
-    [audience]
+  return (
+    <section id={section.id} className="scroll-mt-28">
+      <div className="mb-8 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+        <div className="max-w-2xl">
+          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#00346f]/15 bg-white px-3 py-1 text-[11px] font-black uppercase tracking-[0.2em] text-[#00346f] shadow-sm">
+            <Icon className="h-3.5 w-3.5" />
+            {section.eyebrow}
+          </div>
+          <h2 className="font-heading text-3xl font-black tracking-tight text-[#00346f] sm:text-4xl">
+            {section.title}
+          </h2>
+          <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">
+            {section.description}
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+        {section.plans.map((plan) => (
+          <PricingCard key={plan.name} plan={plan} />
+        ))}
+      </div>
+    </section>
   );
+}
 
+export default function PricingPage() {
   return (
     <div className="flex min-h-[105dvh] flex-col overflow-x-hidden bg-[#f8f9fa] font-saas text-slate-900 selection:bg-[#004a99] selection:text-white">
       <LandingPageNavbar />
 
-      <main className="mx-auto flex-1 max-w-7xl px-6 pb-24 pt-32">
-        <section className="mb-20 text-center">
-          <h1 className="font-heading text-5xl font-extrabold tracking-[-0.06em] text-[#00346f] md:text-7xl">
-            Plans for Every Home and Estate
-          </h1>
-          <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-slate-600 md:text-xl">
-            Choose the architectural security layer that fits your lifestyle.
-            From single gates to sprawling multi-unit developments.
-          </p>
-
-          <div className="mt-10 flex justify-center">
-            <div className="inline-flex flex-wrap justify-center rounded-full border border-slate-200 bg-white p-1 shadow-sm">
-              {[
-                ["estate", "Estate Plans"],
-                ["homeowner", "Homeowner Plans"]
-              ].map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setAudience(value)}
-                  className={`rounded-full px-5 py-2.5 text-sm font-bold transition ${
-                    audience === value
-                      ? "bg-[#00346f] text-white shadow-sm"
-                      : "text-slate-600 hover:text-[#00346f]"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
+      <main className="mx-auto w-full max-w-7xl flex-1 px-4 pb-20 pt-28 sm:px-6 lg:pt-32">
+        <section className="mb-12 grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-end">
+          <div>
+            <div className="mb-5 inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-black uppercase tracking-[0.22em] text-[#00346f] shadow-sm">
+              Qring pricing
             </div>
-          </div>
-
-          <div className="mt-8 flex justify-center">
-            <div
-              className="inline-flex flex-col items-center gap-3 rounded-[1.5rem] border border-slate-200 bg-white p-2 shadow-sm sm:flex-row"
-              role="tablist"
-              aria-label="Billing period"
-            >
-              <div className="grid grid-cols-2 rounded-full bg-slate-100 p-1">
-                {[
-                  ["monthly", "Monthly"],
-                  ["yearly", "Yearly"]
-                ].map(([value, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    role="tab"
-                    aria-selected={billing === value}
-                    onClick={() => setBilling(value)}
-                    className={`min-w-[120px] rounded-full px-4 py-2.5 text-sm font-bold transition ${
-                      billing === value
-                        ? "bg-[#00346f] text-white shadow-sm"
-                        : "text-slate-500 hover:text-[#00346f]"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-
-              <span className="rounded-full bg-emerald-100 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-800">
-                Save 20% Yearly
-              </span>
-            </div>
-          </div>
-        </section>
-
-        <section className="mb-32 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-          {visiblePlans.map((plan) => (
-            <PricingCard key={plan.name} plan={plan} billing={billing} />
-          ))}
-        </section>
-
-        <section className="relative mt-20 overflow-hidden rounded-[2rem]">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(0,74,153,0.14),transparent_55%)]" />
-          <div className="relative z-10 bg-slate-200/70 p-16 text-center backdrop-blur-sm md:p-24">
-            <h2 className="mb-6 font-heading text-4xl font-extrabold text-[#00346f]">
-              Still not sure which plan is right?
-            </h2>
-            <p className="mx-auto mb-10 max-w-xl text-slate-600">
-              Our security consultants are ready to help you architect the
-              perfect access solution for your property.
+            <h1 className="font-heading text-4xl font-black tracking-tight text-[#00346f] sm:text-5xl lg:text-6xl">
+              Plans for homes, estates, and offices.
+            </h1>
+            <p className="mt-5 max-w-3xl text-base leading-8 text-slate-600 sm:text-lg">
+              Pick the access-control plan that matches your front gate, reception desk, or managed community without changing how your existing QRing workflows operate.
             </p>
-            <div className="flex flex-col justify-center gap-4 sm:flex-row">
+          </div>
+
+          <nav className="grid grid-cols-1 gap-2 rounded-lg border border-slate-200 bg-white p-2 shadow-sm sm:grid-cols-3" aria-label="Pricing sections">
+            {pricingSections.map((section) => (
+              <a
+                key={section.id}
+                href={`#${section.id}`}
+                className="rounded-md px-3 py-2.5 text-center text-xs font-black uppercase tracking-[0.12em] text-slate-600 transition hover:bg-[#00346f] hover:text-white"
+              >
+                {section.label}
+              </a>
+            ))}
+          </nav>
+        </section>
+
+        <div className="flex flex-col gap-16">
+          {pricingSections.map((section) => (
+            <PricingSection key={section.id} section={section} />
+          ))}
+        </div>
+
+        <section className="mt-16 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+          <div className="grid gap-6 p-6 md:grid-cols-[1fr_auto] md:items-center md:p-10">
+            <div>
+              <h2 className="font-heading text-3xl font-black tracking-tight text-[#00346f]">Need a custom rollout?</h2>
+              <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
+                Large communities and workplaces can speak with QRing about onboarding, integrations, training, and SLA-backed support.
+              </p>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row md:flex-col lg:flex-row">
               <Link
                 to="/request-demo"
-                className="rounded-xl bg-[linear-gradient(135deg,#00346f_0%,#004a99_100%)] px-10 py-4 text-sm font-bold uppercase tracking-[0.16em] text-white transition hover:shadow-lg"
+                className="inline-flex w-full items-center justify-center rounded-lg bg-[#00346f] px-6 py-3.5 text-sm font-black uppercase tracking-[0.12em] text-white transition hover:bg-[#004a99] sm:w-auto"
               >
                 Schedule a Demo
               </Link>
               <Link
                 to="/contact"
-                className="rounded-xl border border-slate-200 bg-white px-10 py-4 text-sm font-bold uppercase tracking-[0.16em] text-[#00346f] transition hover:bg-slate-50"
+                className="inline-flex w-full items-center justify-center rounded-lg border border-slate-300 bg-white px-6 py-3.5 text-sm font-black uppercase tracking-[0.12em] text-[#00346f] transition hover:border-[#00346f] sm:w-auto"
               >
                 Contact Sales
               </Link>
@@ -390,32 +483,26 @@ export default function PricingPage() {
         </section>
       </main>
 
-
-          <footer className="mt-20 rounded-t-[3rem] bg-slate-50">
-            <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-6 px-8 py-12 md:flex-row">
-              <div className="flex flex-col gap-2">
-                <span className="font-heading text-lg font-bold text-slate-950">QRing</span>
-                <p className="text-sm text-slate-500">© 2024 QRing. Architectural Security Systems.</p>
-              </div>
-
-              <div className="flex flex-wrap justify-center gap-8">
-                <Link className="text-sm text-slate-500 transition hover:text-blue-700 hover:underline" to="/contact">
-                  Privacy Policy
-                </Link>
-                <Link className="text-sm text-slate-500 transition hover:text-blue-700 hover:underline" to="/contact">
-                  Terms of Service
-                </Link>
-                <Link className="text-sm text-slate-500 transition hover:text-blue-700 hover:underline" to="/contact">
-                  Security Whitepaper
-                </Link>
-                <Link className="text-sm text-slate-500 transition hover:text-blue-700 hover:underline" to="/contact">
-                  Contact Support
-                </Link>
-              </div>
-            </div>
-          </footer>
-
-
+      <footer className="mt-10 border-t border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-5 px-6 py-10 md:flex-row">
+          <div>
+            <span className="font-heading text-lg font-black text-[#00346f]">QRing</span>
+            <p className="mt-1 text-sm text-slate-500">© 2024 QRing. Architectural Security Systems.</p>
+          </div>
+          <div className="flex flex-wrap justify-center gap-6">
+            {[
+              ["Privacy Policy", "/privacy"],
+              ["Terms of Service", "/terms"],
+              ["Security", "/security"],
+              ["Contact Support", "/contact"]
+            ].map(([label, to]) => (
+              <Link key={label} className="text-sm font-semibold text-slate-500 transition hover:text-[#00346f] hover:underline" to={to}>
+                {label}
+              </Link>
+            ))}
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

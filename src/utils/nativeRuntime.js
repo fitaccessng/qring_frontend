@@ -28,5 +28,9 @@ export function isMobileAppRuntime() {
 }
 
 export function shouldUseGoogleAuth() {
-  return !isMobileAppRuntime();
+  const explicitlyDisabled = String(importMetaEnv.VITE_DISABLE_GOOGLE_AUTH ?? "")
+    .trim()
+    .toLowerCase() === "true";
+
+  return !explicitlyDisabled;
 }

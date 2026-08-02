@@ -1,4 +1,4 @@
-import { ApiError, apiRequest } from "./apiClient";
+import { ApiError, apiRequest, apiRequestBinary, apiUpload } from "./apiClient";
 
 const ACTIVE_PANIC_CACHE_TTL_MS = 12000;
 const ACTIVE_PANIC_RATE_LIMIT_TTL_MS = 45000;
@@ -77,6 +77,27 @@ export async function resolvePanicAlert(panicId) {
   return response?.data ?? null;
 }
 
+export async function uploadPanicAudioSegment({ panicId, segmentIndex, file, filenameHint }) {
+  const formData = new FormData();
+  formData.append("panicId", panicId);
+  formData.append("segmentIndex", String(segmentIndex || 0));
+  if (filenameHint) {
+    formData.append("filenameHint", filenameHint);
+  }
+  formData.append("media", file);
+  const response = await apiUpload("/panic/audio/segment", formData);
+  return response?.data ?? null;
+}
+
+export async function listPanicAudioSegments(panicId) {
+  const response = await apiRequest(`/panic/${panicId}/audio/segments`, { method: "GET" });
+  return response?.data ?? [];
+}
+
+export async function getPanicAudioSegmentFile(segmentId) {
+  return `${import.meta.env.VITE_API_BASE_URL || ""}/panic/audio/segment/${segmentId}/file`;
+}
+
 export async function joinPanicAudio(panicId) {
   const response = await apiRequest("/panic/audio/join", {
     method: "POST",
@@ -128,6 +149,17 @@ export async function updatePanicAlertNotes(panicId, notes) {
 export async function getSafetyAlerts(limit = 40) {
   const response = await apiRequest(`/safety/alerts?limit=${encodeURIComponent(limit)}`, { noCache: true });
   return Array.isArray(response?.data) ? response.data : [];
+}
+
+export async function downloadPanicAudioSegment(segmentId) {
+  const response = await apiRequestBinary(`/panic/audio/segment/${segmentId}/file`, {
+    method: "GET"
+  });
+  if (!response.ok) {
+    const raw = await response.text().catch(() => "");
+    throw new ApiError(raw || "Unable to download panic audio.", response.status, null);
+  }
+  return await response.blob();
 }
 
 export async function triggerSafetyAlert(payload) {

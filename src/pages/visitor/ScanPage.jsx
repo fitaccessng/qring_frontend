@@ -420,7 +420,6 @@ export default function ScanPage() {
 
     if (!consentAccepted) return setError("Please accept the privacy notice.");
     if (!doorId) return setError("Please select an entry gate.");
-    if (!visitorForm.snapshotDataUrl) return setError("Please snap a live photo validation.");
     if (!visitorForm.name.trim()) return setError("Please enter your full name.");
     if (!visitorForm.phone.trim()) return setError("Please fill in your phone contact line.");
     if (!visitorForm.purpose.trim()) return setError("Please specify your reason for arriving.");
@@ -556,8 +555,11 @@ export default function ScanPage() {
   }
 
   const isFormValid = Boolean(
-    (isOfficeQr ? true : visitorForm.snapshotDataUrl) &&
-    (officeEntryMode === "staff" ? Boolean(visitorForm.name.trim()) : Boolean(visitorForm.name.trim() && visitorForm.phone.trim() && visitorForm.purpose.trim() && visitorForm.staffName.trim())) &&
+    (isOfficeQr
+      ? officeEntryMode === "staff"
+        ? Boolean(visitorForm.name.trim())
+        : Boolean(visitorForm.name.trim() && visitorForm.phone.trim() && visitorForm.purpose.trim() && visitorForm.staffName.trim())
+      : Boolean(doorId && visitorForm.name.trim() && visitorForm.phone.trim() && visitorForm.purpose.trim())) &&
     !requestState.sending
   );
 
@@ -1089,7 +1091,7 @@ export default function ScanPage() {
                       </button>
                       {!isFormValid && (
                         <p className="mt-2 text-center text-[11px] text-slate-400 font-medium">
-                          Fill out all fields and take a verification photo to unlock submission
+                          Fill out all required fields to unlock submission
                         </p>
                       )}
                     </div>

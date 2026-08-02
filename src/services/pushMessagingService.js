@@ -42,12 +42,17 @@ export async function registerFcmPushSubscription() {
   });
   if (!token) return { status: "no_token" };
 
-  await registerPushSubscription({
-    provider: "fcm",
-    endpoint: `fcm:${token}`,
-    token,
-    keys: { token, ua: navigator.userAgent },
-  });
+  try {
+    await registerPushSubscription({
+      provider: "fcm",
+      endpoint: `fcm:${token}`,
+      token,
+      keys: { token, ua: navigator.userAgent },
+    });
+  } catch (error) {
+    console.error("Web push registration failed", error);
+    return { status: "registration_failed", token };
+  }
   return { status: "registered", token };
 }
 

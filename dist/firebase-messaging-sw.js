@@ -41,6 +41,7 @@ importScripts("/firebase-messaging-compat.js");
         const title = payload?.notification?.title || payload?.data?.title || "Qring Alert";
         const body = payload?.notification?.body || payload?.data?.body || "You have a new notification.";
         const data = payload?.data || {};
+        const route = typeof data.route === "string" && data.route.startsWith("/") ? data.route : "/dashboard/notifications";
         const actionSet = data?.actionSet || "";
         const actions = actionSet === "panic_response"
           ? [
@@ -51,7 +52,7 @@ importScripts("/firebase-messaging-compat.js");
           : [];
         self.registration.showNotification(title, {
           body,
-          data,
+          data: { ...data, route },
           actions,
           icon: "/qring_logo.png",
           badge: "/qring_logo.png",
@@ -67,7 +68,7 @@ importScripts("/firebase-messaging-compat.js");
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const data = event?.notification?.data || {};
-  const route = typeof data.route === "string" ? data.route : "";
+  const route = typeof data.route === "string" && data.route.startsWith("/") ? data.route : "/dashboard/notifications";
   const panicId = typeof data.panicId === "string" ? data.panicId : "";
   const action = typeof event.action === "string" ? event.action : "";
   const url =
