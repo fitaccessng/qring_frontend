@@ -142,7 +142,11 @@ function prepareNativeHashRoute() {
   const search = String(window.location.search || "");
   if (pathname !== "/") {
     const normalizedPath = pathname.startsWith("/") ? pathname : `/${pathname}`;
-    window.history.replaceState(window.history.state, "", `/#${normalizedPath}${search}`);
+    const target = `/#${normalizedPath}${search}`;
+    const currentHref = `${window.location.origin}${window.location.pathname}${window.location.search}${window.location.hash}`;
+    if (currentHref !== `${window.location.origin}${target}`) {
+      window.history.replaceState(window.history.state, "", target);
+    }
   }
 
   return true;

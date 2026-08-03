@@ -40,14 +40,37 @@ export function getRouteFromAppUrl(url) {
   try {
     const parsed = new URL(safeUrl);
     const routeFromQuery = sanitizeRoute(parsed.searchParams.get("route"));
-    if (routeFromQuery) return routeFromQuery;
+    if (routeFromQuery) {
+      if (typeof window !== "undefined") {
+        const currentRoute = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+        if (currentRoute === routeFromQuery || currentRoute === `/#${routeFromQuery}`) {
+          return "";
+        }
+      }
+      return routeFromQuery;
+    }
 
     if (parsed.protocol === "qring:") {
       const pathFromCustomScheme = sanitizeRoute(parsed.pathname);
-      if (pathFromCustomScheme) return pathFromCustomScheme;
+      if (pathFromCustomScheme) {
+        if (typeof window !== "undefined") {
+          const currentRoute = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+          if (currentRoute === pathFromCustomScheme || currentRoute === `/#${pathFromCustomScheme}`) {
+            return "";
+          }
+        }
+        return pathFromCustomScheme;
+      }
     }
 
     const pathFromWebUrl = sanitizeRoute(`${parsed.pathname}${parsed.search}${parsed.hash || ""}`.replace(/#\/?/, "/"));
+    if (!pathFromWebUrl) return "";
+    if (typeof window !== "undefined") {
+      const currentRoute = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      if (currentRoute === pathFromWebUrl || currentRoute === `/#${pathFromWebUrl}`) {
+        return "";
+      }
+    }
     return pathFromWebUrl;
   } catch {
     return "";

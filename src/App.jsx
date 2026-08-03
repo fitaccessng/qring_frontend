@@ -1,4 +1,4 @@
-import { BrowserRouter, HashRouter, Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
+import { BrowserRouter, HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { Suspense, lazy, useEffect, useState } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import LoginPage from "./pages/auth/LoginPage";
@@ -189,7 +189,11 @@ function prepareNativeHashRoute() {
   const search = String(window.location.search || "");
   if (pathname !== "/") {
     const normalizedPath = pathname.startsWith("/") ? pathname : `/${pathname}`;
-    window.history.replaceState(window.history.state, "", `/#${normalizedPath}${search}`);
+    const target = `/#${normalizedPath}${search}`;
+    const currentHref = `${window.location.origin}${window.location.pathname}${window.location.search}${window.location.hash}`;
+    if (currentHref !== `${window.location.origin}${target}`) {
+      window.history.replaceState(window.history.state, "", target);
+    }
   }
 
   return true;
@@ -252,8 +256,9 @@ function AppRoutes() {
     void addNativeNetworkListener(({ connected }) => {
       if (!connected || !active) return;
       queryClient.invalidateQueries().catch(() => {});
+      const currentRoute = `${location.pathname}${location.search}`;
       if (location.pathname.startsWith("/login") || location.pathname.startsWith("/signup")) {
-        navigateToAppPath(location.pathname, { replace: true });
+        navigateToAppPath(currentRoute, { replace: true });
       }
     }).then((cleanup) => {
       cleanupNetwork = cleanup;
@@ -264,7 +269,7 @@ function AppRoutes() {
       cleanupUrl();
       cleanupNetwork();
     };
-  }, [location.pathname, nativeApp, navigate]);
+  }, [location.pathname, location.search, nativeApp, navigate]);
 
   return (
     <>
@@ -461,14 +466,6 @@ function LazyRoute({ children }) {
       {children}
     </Suspense>
   );
-}
-
-function LegacySessionCallRedirect() {
-  const { sessionId } = useParams();
-  const location = useLocation();
-  const path = String(location.pathname || "").toLowerCase();
-  const mode = path.endsWith("/video") ? "video" : "audio";
-  return <Navigate to={`/session/${encodeURIComponent(sessionId || "")}/message?mode=${mode}`} replace />;
 }
 
 function RouteFallback() {

@@ -38,6 +38,8 @@ export function navigateToAppPath(path, { replace = false } = {}) {
 
   if (isNativeApp()) {
     const target = `#${safePath}`;
+    if (window.location.hash === target) return;
+
     if (replace) {
       window.history.replaceState(window.history.state, "", target);
     } else {
@@ -46,6 +48,9 @@ export function navigateToAppPath(path, { replace = false } = {}) {
     window.dispatchEvent(new Event("popstate"));
     return;
   }
+
+  const currentPath = `${window.location.pathname}${window.location.search}`;
+  if (currentPath === safePath) return;
 
   if (replace) {
     window.history.replaceState(window.history.state, "", safePath);
