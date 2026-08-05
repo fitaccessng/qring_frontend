@@ -51,6 +51,7 @@ export default defineConfig(({ mode }) => {
             if (id.includes('socket.io-client')) {
               return 'socket';
             }
+            return undefined;
           }
         }
       }
