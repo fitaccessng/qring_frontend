@@ -10,6 +10,7 @@ export default function HomeownerSubscriptionRoute({ requiredAction = "", requir
   const allowed = useMemo(() => {
     if (!subscription) return false;
     if (subscription.status === "suspended") return false;
+    if (subscription.inSignupTrial) return true;
     if (!can("view_dashboard")) return false;
     if (requiredAction && !can(requiredAction)) return false;
     if (requiredFeature && !hasFeature(requiredFeature)) return false;

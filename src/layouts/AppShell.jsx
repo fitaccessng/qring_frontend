@@ -139,7 +139,7 @@ function onboardingSeenForUser(user) {
 export default function AppShell({ title, children, showTopBar = true, showMobileNav = false }) {
   const { user, logout } = useAuth();
   const { unreadCount } = useNotifications();
-  const { hasFeature } = useSubscription();
+  const { hasFeature, inSignupTrial } = useSubscription();
   const navigate = useNavigate();
   const location = useLocation();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -185,6 +185,11 @@ export default function AppShell({ title, children, showTopBar = true, showMobil
   const navItems = useMemo(() => {
     const base = navByRole[routeRole] ?? [];
     if (routeRole !== "homeowner") return base;
+
+    // Hide billing/paywall navigation while user is in signup trial
+    if (inSignupTrial) {
+      return base.filter((item) => item.to !== "/billing/paywall");
+    }
 
     if (homeownerContextLoading) {
       return base.filter((item) => item.to !== "/billing/paywall");
@@ -248,10 +253,16 @@ export default function AppShell({ title, children, showTopBar = true, showMobil
     }
     return navItems.filter((item) => !item.to.endsWith("/settings")).slice(0, 4);
   }, [isEstateManagedHomeowner, navItems, routeRole]);
+  // Remove billing link from mobile nav if in signup trial
+  const effectiveMobileNavItems = useMemo(() => {
+    if (!inSignupTrial) return mobileNavItems;
+    return mobileNavItems.filter((item) => item.to !== "/billing/paywall");
+  }, [mobileNavItems, inSignupTrial]);
   const filteredNavItems = useMemo(() => {
     if (routeRole === "homeowner") return [];
     return navItems.filter((item) => {
       if (isEstateManagedHomeowner && item.to === "/billing/paywall") return false;
+      if (inSignupTrial && item.to === "/billing/paywall") return false;
       const requiredFeature = featureRequirementByRoute[item.to];
       if (!requiredFeature) return true;
       return hasFeature(requiredFeature);
@@ -259,8 +270,9 @@ export default function AppShell({ title, children, showTopBar = true, showMobil
   }, [hasFeature, isEstateManagedHomeowner, navItems, routeRole]);
   const filteredMobileNavItems = useMemo(() => {
     if (routeRole === "homeowner") return [];
-    return mobileNavItems.filter((item) => {
+    return effectiveMobileNavItems.filter((item) => {
       if (isEstateManagedHomeowner && item.to === "/billing/paywall") return false;
+      if (inSignupTrial && item.to === "/billing/paywall") return false;
       const requiredFeature = featureRequirementByRoute[item.to];
       if (!requiredFeature) return true;
       return hasFeature(requiredFeature);

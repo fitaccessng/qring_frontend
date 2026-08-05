@@ -470,7 +470,7 @@ export default function HomeownerSettingsPage() {
             </div>
           </SettingsGroup>
 
-          {!settings.managedByEstate && (
+          {!settings.managedByEstate && !inSignupTrial && (
             <SettingsGroup title="Subscription">
               <SettingsItem icon={<CreditCard size={18} />} label="Billing & Subscription" badge={stats.plan} onClick={() => navigate("/billing/paywall")} />
             </SettingsGroup>

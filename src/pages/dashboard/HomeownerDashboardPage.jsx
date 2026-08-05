@@ -54,7 +54,7 @@ const itemVariants = {
 export default function HomeownerDashboardPage() {
   const { user } = useAuth();
   const { unreadCount } = useNotifications();
-  const { hasFeature } = useSubscription();
+  const { hasFeature, inSignupTrial } = useSubscription();
   const [homeownerContext, setHomeownerContext] = useState({ managedByEstate: false, estateName: "" });
   
   const { data, isLoading, isError, refetch, isFetching } = useApiQuery({
@@ -122,6 +122,8 @@ export default function HomeownerDashboardPage() {
     ];
 
     return actions.filter(item => {
+      // Hide billing quick action while in signup trial
+      if (inSignupTrial && item.to === "/billing/paywall") return false;
       const requiredFeature = quickActionFeatureByRoute[item.to];
       return requiredFeature ? hasFeature(requiredFeature) : true;
     });
