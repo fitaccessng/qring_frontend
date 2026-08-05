@@ -107,10 +107,11 @@ export default function EstateCreatePage() {
   }
 
   async function handleGenerateSharedQr(estate) {
+    if (qrBusyEstateId) return;
     setQrBusyEstateId(estate.id);
     try {
       await createEstateSharedQr(estate.id);
-      const rows = await listEstateSharedQrs(estate.id);
+      const rows = await listEstateSharedQrs(estate.id, { force: true });
       setEstateQrByEstateId((prev) => ({ ...prev, [estate.id]: rows }));
 
       const newQr = rows.find(r => r.active !== false);

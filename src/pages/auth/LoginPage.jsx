@@ -4,7 +4,7 @@ import { Mail, Lock, ChevronRight, Eye, EyeOff, AlertCircle } from "lucide-react
 import { useAuth } from "../../state/AuthContext";
 import { requestEmailVerification } from "../../services/authService";
 import quickdropLogo from "../../assets/qring_logo.jpeg";
-import { resolvePostLoginPath } from "../../utils/authRouting";
+import { resolvePostLoginPath, getRedirectPathFromUrl } from "../../utils/authRouting";
 import { shouldUseGoogleAuth } from "../../utils/nativeRuntime";
 import { useAsyncAction } from "../../hooks/useAsyncAction";
 
@@ -46,6 +46,8 @@ export default function LoginPage() {
     timeoutMessage: "Google sign-in is taking too long. Please try again.",
   });
 
+  const redirectPath = location.state?.from?.pathname || getRedirectPathFromUrl(searchParams.get("redirect") || "") || "";
+
   useEffect(() => {
     if (!googleAuthEnabled) return () => {};
     let active = true;
@@ -57,7 +59,7 @@ export default function LoginPage() {
           navigate("/google-role", { replace: true, state: { intent: "signup" } });
           return;
         }
-        const target = resolveTargetPath(resumed.data, location.state?.from?.pathname);
+        const target = resolveTargetPath(resumed.data, redirectPath);
         navigate(target || "/google-role", { replace: true });
       } catch (err) {
         if (active) setError(err.message ?? "Google sign-in failed");
@@ -65,7 +67,7 @@ export default function LoginPage() {
     };
     resumeNativeGoogleAuth();
     return () => { active = false; };
-  }, [googleAuthEnabled, location.state?.from?.pathname, navigate, resumeGoogleRedirect]);
+  }, [googleAuthEnabled, redirectPath, navigate, resumeGoogleRedirect]);
 
   const onSubmit = async (event) => {
     event.preventDefault();
@@ -76,7 +78,7 @@ export default function LoginPage() {
         setSubmitting(true);
         try {
           const data = await login(form);
-          const target = resolveTargetPath(data, location.state?.from?.pathname);
+          const target = resolveTargetPath(data, redirectPath);
           if (!target) throw new Error("No user role returned. Contact support.");
           navigate(target, { replace: true });
         } catch (err) {
@@ -110,7 +112,7 @@ export default function LoginPage() {
         setGoogleSubmitting(true);
         try {
           const data = await googleSignIn();
-          const target = resolveTargetPath(data, location.state?.from?.pathname);
+          const target = resolveTargetPath(data, redirectPath);
           if (!target) throw new Error("No user role returned. Contact support.");
           navigate(target, { replace: true });
         } catch (err) {

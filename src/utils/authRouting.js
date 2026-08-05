@@ -22,6 +22,20 @@ export function resolvePostLoginPath(user, redirectPath = "") {
   return getRoleHomePath(user?.role);
 }
 
+export function getRedirectPathFromUrl(url) {
+  if (!url) return "";
+  try {
+    const searchParams = new URLSearchParams(url.startsWith("?") ? url : new URL(url, window.location.origin).search);
+    const candidate = String(searchParams.get("redirect") || "").trim();
+    if (candidate.startsWith("/") && !candidate.startsWith("//")) {
+      return candidate;
+    }
+  } catch {
+    // ignore invalid URL values
+  }
+  return "";
+}
+
 export function getCurrentAppPath() {
   if (typeof window === "undefined") return "/";
   const hash = String(window.location.hash || "");

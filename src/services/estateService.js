@@ -238,12 +238,16 @@ export async function createEstateSharedQr(estateId) {
   return response?.data ?? null;
 }
 
-export async function listEstateSharedQrs(estateId) {
+export async function listEstateSharedQrs(estateId, { force = false } = {}) {
   const slot = getOrCreateMapSlot(estateServiceCache.sharedQrByEstateId, String(estateId));
-  return resolveCached(slot, async () => {
-    const response = await apiRequest(`/estate/shared-qr?estateId=${encodeURIComponent(estateId)}`);
-    return Array.isArray(response?.data) ? response.data : [];
-  });
+  return resolveCached(
+    slot,
+    async () => {
+      const response = await apiRequest(`/estate/shared-qr?estateId=${encodeURIComponent(estateId)}`);
+      return Array.isArray(response?.data) ? response.data : [];
+    },
+    { force }
+  );
 }
 
 export async function createEstateAlert(payload) {

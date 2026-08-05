@@ -287,7 +287,7 @@ export async function createMaintenanceRequest(payload) {
 }
 
 export async function createHomeownerMaintenanceRequest(payload) {
-  const response = await apiRequest("/homeowner/maintenance", {
+  const response = await apiRequest("/homeowner/maintenance-requests", {
     method: "POST",
     body: JSON.stringify(payload)
   });

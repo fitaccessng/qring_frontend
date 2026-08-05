@@ -1,7 +1,27 @@
 import { useEffect, useState } from "react";
 
+const UPDATE_NOTICE_DISMISSED_STORAGE_KEY = "qring:update-notifier-dismissed";
+
+function readUpdateNoticeDismissed() {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.sessionStorage.getItem(UPDATE_NOTICE_DISMISSED_STORAGE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function writeUpdateNoticeDismissed(value) {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(UPDATE_NOTICE_DISMISSED_STORAGE_KEY, value ? "true" : "false");
+  } catch {
+    // Ignore storage write failures.
+  }
+}
+
 export default function AppUpdateNotifier() {
-  const [updateReady, setUpdateReady] = useState(false);
+  const [updateReady, setUpdateReady] = useState(() => !readUpdateNoticeDismissed());
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
@@ -17,7 +37,9 @@ export default function AppUpdateNotifier() {
       worker.addEventListener("statechange", () => {
         if (!active) return;
         if (worker.state === "installed" && navigator.serviceWorker.controller) {
-          setUpdateReady(true);
+          if (!readUpdateNoticeDismissed()) {
+            setUpdateReady(true);
+          }
         }
       });
     };
@@ -30,7 +52,7 @@ export default function AppUpdateNotifier() {
 
       try {
         const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
-        if (registration.waiting) {
+        if (registration.waiting && !readUpdateNoticeDismissed()) {
           setUpdateReady(true);
         }
 
@@ -59,6 +81,11 @@ export default function AppUpdateNotifier() {
 
   if (!updateReady) return null;
 
+  const handleDismiss = () => {
+    writeUpdateNoticeDismissed(true);
+    setUpdateReady(false);
+  };
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
@@ -80,14 +107,23 @@ export default function AppUpdateNotifier() {
           <p className="text-sm font-semibold text-slate-900">Update ready</p>
           <p className="mt-1 text-sm text-slate-600">A new version of Qring is available. Refresh to use the latest experience.</p>
         </div>
-        <button
-          type="button"
-          onClick={handleRefresh}
-          disabled={isRefreshing}
-          className="rounded-full bg-[#2456f5] px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-[#1b46c6] disabled:cursor-wait disabled:opacity-70"
-        >
-          {isRefreshing ? "Updating..." : "Refresh"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleDismiss}
+            className="rounded-full border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
+          >
+            Dismiss
+          </button>
+          <button
+            type="button"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="rounded-full bg-[#2456f5] px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-[#1b46c6] disabled:cursor-wait disabled:opacity-70"
+          >
+            {isRefreshing ? "Updating..." : "Refresh"}
+          </button>
+        </div>
       </div>
     </div>
   );
