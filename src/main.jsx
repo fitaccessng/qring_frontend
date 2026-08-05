@@ -9,8 +9,7 @@ async function enableAppUpdates() {
   if (window?.Capacitor?.isNativePlatform?.()) return;
 
   try {
-    const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
-    await registration.update();
+    await navigator.serviceWorker.register("/sw.js", { scope: "/" });
   } catch (error) {
     console.warn("App update registration failed", error);
   }
