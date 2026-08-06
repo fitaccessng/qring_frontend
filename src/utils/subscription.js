@@ -3,6 +3,44 @@ const DEFAULT_ALLOWED_ACTIONS = {
   renew_subscription: true
 };
 
+export function isSubscriptionTrialLike(subscription) {
+  if (!subscription) return false;
+  const status = String(subscription.status ?? "").trim().toLowerCase();
+  const trialStatus = String(subscription.trialStatus ?? "").trim().toLowerCase();
+  return Boolean(
+    subscription.inSignupTrial ||
+    subscription.isTrial ||
+    trialStatus === "active" ||
+    status === "trial"
+  );
+}
+
+export function isSubscriptionFeatureEnabled(subscription, featureKey) {
+  if (!featureKey) return true;
+  if (isSubscriptionTrialLike(subscription)) return true;
+  return Boolean(
+    subscription?.featureFlags?.[featureKey] ||
+    subscription?.features?.includes?.(featureKey) ||
+    subscription?.allowedActions?.[featureKey] === true
+  );
+}
+
+export function isSubscriptionEntitled(subscription, { requiredFeature = "", requiredAction = "" } = {}) {
+  if (!subscription) return false;
+  if (subscription.status === "suspended") return false;
+  if (isSubscriptionTrialLike(subscription)) return true;
+
+  if (requiredAction) {
+    const actionAllowed = typeof subscription?.can === "function"
+      ? subscription.can(requiredAction)
+      : subscription?.allowedActions?.[requiredAction] !== false;
+    if (!actionAllowed) return false;
+  }
+
+  if (requiredFeature && !isSubscriptionFeatureEnabled(subscription, requiredFeature)) return false;
+  return true;
+}
+
 function toIsoString(value) {
   if (!value) return null;
   if (typeof value === "string") return value;
@@ -49,7 +87,7 @@ export function normalizeSubscriptionSummary(raw) {
           : "soft"
       : null);
 
-  return {
+  const normalized = {
     ...raw,
     status,
     expiresAt,
@@ -59,11 +97,17 @@ export function normalizeSubscriptionSummary(raw) {
     isBillPayer,
     allowedActions,
     warningPhase,
-    can: (actionKey) => {
-      if (!actionKey) return true;
-      return allowedActions[actionKey] !== false;
-    }
   };
+
+  normalized.isTrialActive = isSubscriptionTrialLike(normalized);
+  normalized.hasFeature = (featureKey) => isSubscriptionFeatureEnabled(normalized, featureKey);
+  normalized.can = (actionKey) => {
+    if (!actionKey) return true;
+    if (normalized.isTrialActive) return true;
+    return normalized.allowedActions[actionKey] !== false;
+  };
+
+  return normalized;
 }
 
 export function getSubscriptionBannerContent(subscription) {

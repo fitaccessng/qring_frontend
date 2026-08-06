@@ -2,20 +2,16 @@ import { useEffect, useMemo } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import useSubscription from "../hooks/useSubscription";
 import { openPlanLockedModal } from "../utils/blocking";
+import { isSubscriptionEntitled } from "../utils/subscription";
 
 export default function HomeownerSubscriptionRoute({ requiredAction = "", requiredFeature = "" }) {
-  const { subscription, loading, can, hasFeature } = useSubscription();
+  const { subscription, loading } = useSubscription();
   const location = useLocation();
 
   const allowed = useMemo(() => {
     if (!subscription) return false;
-    if (subscription.status === "suspended") return false;
-    if (subscription.inSignupTrial) return true;
-    if (!can("view_dashboard")) return false;
-    if (requiredAction && !can(requiredAction)) return false;
-    if (requiredFeature && !hasFeature(requiredFeature)) return false;
-    return true;
-  }, [subscription, can, hasFeature, requiredAction, requiredFeature]);
+    return isSubscriptionEntitled(subscription, { requiredAction, requiredFeature });
+  }, [subscription, requiredAction, requiredFeature]);
 
   if (loading) {
     return (

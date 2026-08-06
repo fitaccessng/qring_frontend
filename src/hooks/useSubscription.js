@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { getSubscriptionSummary } from "../services/paymentService";
-import { normalizeSubscriptionSummary } from "../utils/subscription";
+import { isSubscriptionFeatureEnabled, normalizeSubscriptionSummary } from "../utils/subscription";
 
 export function hasSubscriptionFeature(subscription, featureKey) {
-  return Boolean(subscription?.featureFlags?.[featureKey]);
+  return isSubscriptionFeatureEnabled(subscription, featureKey);
 }
 
 export default function useSubscription() {
