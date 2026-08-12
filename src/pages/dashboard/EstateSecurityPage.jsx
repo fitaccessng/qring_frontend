@@ -5,7 +5,7 @@ import { useEstateSecurityState } from "./estateSecurity/useEstateSecurityState"
 import { showError } from "../../utils/flash";
 
 export default function EstateSecurityPage() {
-  const { currentEstate, error, loading, stats, securityRules, suspiciousHouseThreshold, suspiciousRejectionThreshold } = useEstateSecurityState();
+  const { currentEstate, error, estateId, estates, setEstateId, loading, stats, securityRules, suspiciousHouseThreshold, suspiciousRejectionThreshold } = useEstateSecurityState();
 
   useEffect(() => {
     if (error) showError(error);
@@ -15,6 +15,9 @@ export default function EstateSecurityPage() {
     <EstateSecurityShell
       title="Security Center"
       subtitle={`Manage guard accounts, resident approval rules, and suspicious activity settings${currentEstate?.name ? ` for ${currentEstate.name}` : ""}.`}
+      estates={estates}
+      estateId={estateId}
+      onEstateChange={setEstateId}
     >
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <SecurityStatCard icon={Users} label="Active Guards" value={loading ? "--" : stats.active} helper={`${stats.suspended} suspended`} />

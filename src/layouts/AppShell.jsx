@@ -93,7 +93,7 @@ const estateManagedHomeownerNav = [
 
 const featureRequirementByRoute = {
   "/dashboard/homeowner/appointments": "visitor_scheduling",
-  "/dashboard/homeowner/access-passes": "visitor_scheduling",
+  "/dashboard/homeowner/access-passes": "visitor_pass_basic",
   "/dashboard/homeowner/messages": "chat_call_verification",
   "/dashboard/homeowner/estate-video-calls": "chat_call_verification",
   "/dashboard/homeowner/estate-audio-calls": "chat_call_verification",

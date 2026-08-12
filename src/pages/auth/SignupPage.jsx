@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { Building2, Home, User, Mail, Lock, Gift, ChevronRight, Eye, EyeOff, BriefcaseBusiness } from "lucide-react";
+import { Building2, User, Mail, Lock, Gift, ChevronRight, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "../../state/AuthContext";
 import quickdropLogo from "../../assets/qring_logo.jpeg";
 import { shouldUseGoogleAuth } from "../../utils/nativeRuntime";
@@ -18,7 +18,7 @@ export default function SignupPage() {
     fullName: "",
     email: "",
     password: "",
-    role: "homeowner",
+    role: "estate",
     referralCode: ""
   });
 
@@ -71,22 +71,11 @@ export default function SignupPage() {
           const normalizedEmail = form.email.trim().toLowerCase();
           const payload = {
             ...form,
+            role: "estate",
             email: normalizedEmail,
             referralCode: form.referralCode.trim() || undefined,
           };
           const data = await signup(payload);
-          const role = String(data?.user?.role || form.role || "").toLowerCase();
-          if (role === "office") {
-            sessionStorage.setItem(
-              "pendingOfficeSignup",
-              JSON.stringify({ email: normalizedEmail, password: form.password, role: "office" })
-            );
-            navigate(`/verify-email?email=${encodeURIComponent(normalizedEmail)}&pendingOfficeSignup=true`, {
-              replace: true,
-              state: { pendingOfficeSignup: true },
-            });
-            return;
-          }
           navigate(`/verify-email?email=${encodeURIComponent(normalizedEmail)}`, {
             replace: true,
           });
@@ -155,24 +144,12 @@ export default function SignupPage() {
           <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-10 -mt-4" />
 
           {/* Role Selection Cluster */}
-          <div className="grid grid-cols-3 gap-3 mb-8">
+          <div className="grid grid-cols-1 gap-3 mb-8">
             <RoleTab 
-              active={form.role === "homeowner"} 
-              onClick={() => setForm({ ...form, role: "homeowner" })}
-              icon={Home}
-              label="Resident"
-            />
-            <RoleTab 
-              active={form.role === "estate"} 
+              active
               onClick={() => setForm({ ...form, role: "estate" })}
               icon={Building2}
               label="Estate"
-            />
-            <RoleTab 
-              active={form.role === "office"} 
-              onClick={() => setForm({ ...form, role: "office" })}
-              icon={BriefcaseBusiness}
-              label="Office"
             />
           </div>
 
@@ -260,7 +237,7 @@ export default function SignupPage() {
             </button>
           </form>
 
-          {googleAuthEnabled && form.role !== "office" ? (
+          {googleAuthEnabled ? (
             <>
               <div className="relative flex py-8 items-center">
                 <div className="flex-grow border-t border-slate-100"></div>

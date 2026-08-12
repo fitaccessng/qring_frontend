@@ -17,7 +17,7 @@ const timeline = [
   {
     day: "Day 2",
     title: "Go live at the gate",
-    description: "Guards scan, homeowners approve, logs start recording automatically.",
+    description: "Guards scan, residents approve, logs start recording automatically.",
     icon: Smartphone,
   },
 ];
@@ -94,4 +94,3 @@ export default function SwitchingPlanSection() {
     </section>
   );
 }
-

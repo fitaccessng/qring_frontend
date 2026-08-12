@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, expect } from "vitest";
 import {
   isProductionRuntimeBaseSafe,
   resolveApiBaseUrl,
@@ -12,16 +11,15 @@ test("production runtime URLs never fall back to localhost", () => {
   const socketUrl = resolveSocketUrl("", "https://qring-backend-production.up.railway.app");
   const publicAppUrl = resolvePublicAppUrl("", "https://www.useqring.online");
 
-  assert.equal(apiBaseUrl.includes("localhost"), false);
-  assert.equal(socketUrl.includes("localhost"), false);
-  assert.equal(publicAppUrl.includes("localhost"), false);
-  assert.equal(
+  expect(apiBaseUrl.includes("localhost")).toBe(false);
+  expect(socketUrl.includes("localhost")).toBe(false);
+  expect(publicAppUrl.includes("localhost")).toBe(false);
+  expect(
     isProductionRuntimeBaseSafe({
       apiBaseUrl,
       socketUrl,
       productionBackendOrigin: "https://qring-backend-production.up.railway.app",
       productionFrontendOrigin: "https://www.useqring.online"
-    }),
-    true
-  );
+    })
+  ).toBe(true);
 });

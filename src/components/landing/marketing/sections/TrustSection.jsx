@@ -4,7 +4,7 @@ const bullets = [
   { icon: ShieldCheck, title: "Improves estate security", description: "Snapshot verification and approval logs reduce impersonation and disputes." },
   { icon: Zap, title: "Eliminates gate congestion", description: "Fast approvals reduce phone calls and waiting time at busy gates." },
   { icon: CheckCircle2, title: "Creates digital visitor records", description: "Every visit is stored with timestamps for accountability and reporting." },
-  { icon: LockKeyhole, title: "Increases transparency", description: "Homeowners and managers share a consistent view of who entered and when." },
+  { icon: LockKeyhole, title: "Increases transparency", description: "Residents and managers share a consistent view of who entered and when." },
 ];
 
 const stats = [
@@ -52,4 +52,3 @@ export default function TrustSection() {
     </section>
   );
 }
-

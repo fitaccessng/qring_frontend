@@ -4,7 +4,7 @@ const nodes = [
   { icon: MapPin, label: "Visitor arrives" },
   { icon: QrCode, label: "Scans QR" },
   { icon: Camera, label: "Snapshot captured" },
-  { icon: BellRing, label: "Homeowner notified" },
+  { icon: BellRing, label: "Resident notified" },
   { icon: ArrowRight, label: "Approve or reject" },
 ];
 
@@ -15,7 +15,7 @@ export default function HowItWorksFlowSection() {
         <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500 dark:text-slate-400">How it Works</p>
         <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl dark:text-white">A flow your security team can run</h2>
         <p className="mt-4 text-base leading-relaxed text-slate-600 dark:text-slate-300">
-          Visitor arrives → scans QR → request sent → homeowner approves → guard sees the decision immediately.
+          Visitor arrives → scans QR → request sent → resident approves → guard sees the decision immediately.
         </p>
       </div>
 

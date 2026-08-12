@@ -16,6 +16,8 @@ function getMessagingServiceWorkerUrl() {
   return `/firebase-messaging-sw.js?${params.toString()}`;
 }
 
+const LAST_FCM_TOKEN_KEY = "qring.lastFcmToken";
+
 async function ensureMessagingReady() {
   if (!isFirebaseConfigured || !app) return null;
   if (!import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID) return null;
@@ -36,6 +38,10 @@ export async function registerFcmPushSubscription() {
     return { status: "missing_vapid_key" };
   }
 
+  if (typeof window !== "undefined" && window.Notification?.permission && window.Notification.permission !== "granted") {
+    return { status: window.Notification.permission === "denied" ? "permission_denied" : "permission_required" };
+  }
+
   const token = await getToken(ready.messaging, {
     vapidKey,
     serviceWorkerRegistration: ready.registration,
@@ -53,7 +59,20 @@ export async function registerFcmPushSubscription() {
     console.error("Web push registration failed", error);
     return { status: "registration_failed", token };
   }
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem(LAST_FCM_TOKEN_KEY, token);
+  }
   return { status: "registered", token };
+}
+
+export function getLastFcmPushToken() {
+  if (typeof window === "undefined") return "";
+  return window.localStorage.getItem(LAST_FCM_TOKEN_KEY) || "";
+}
+
+export function clearLastFcmPushToken() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(LAST_FCM_TOKEN_KEY);
 }
 
 export async function setupForegroundMessageListener(onPayload) {

@@ -72,7 +72,7 @@ export default function RequestDemoPage() {
                 Know who is at the door — without opening it.
               </h1>
               <p className="mx-auto mt-5 max-w-2xl text-lg font-medium leading-relaxed text-slate-600">
-                Visitor scans a door QR, takes a selfie, adds a quick reason. Homeowner gets notified and can open,
+                Visitor scans a door QR, takes a selfie, adds a quick reason. Resident gets notified and can open,
                 call, or ignore.
               </p>
 
@@ -141,7 +141,7 @@ function Navbar({ doorName }) {
           to="/request-demo?mode=homeowner"
           className="hidden rounded-full border border-slate-300 bg-white px-5 py-2 text-[10px] font-black uppercase tracking-widest text-slate-900 transition-colors hover:bg-slate-100 md:inline-flex"
         >
-          Homeowner
+          Resident
         </Link>
         <Link
           to="/request-demo?mode=visitor"
@@ -191,7 +191,7 @@ function HomeownerPanel({ active, doorName, setDoorName, doorId, visitorUrl, hom
     <div className="rounded-[3rem] border border-slate-200 bg-white/85 p-7 shadow-[0_40px_120px_rgba(2,6,23,0.10)] backdrop-blur sm:p-8">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.28em] text-slate-500">Homeowner view</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.28em] text-slate-500">Resident view</p>
           <h2 className="mt-3 text-2xl font-black italic uppercase tracking-tighter text-slate-900">Door inbox</h2>
           <p className="mt-3 text-sm font-medium leading-relaxed text-slate-600">
             Generate a door QR. When a visitor submits, you get their selfie + reason here.
@@ -239,7 +239,7 @@ function HomeownerPanel({ active, doorName, setDoorName, doorId, visitorUrl, hom
 
             <div className="space-y-3">
               <CopyRow label="Visitor link" value={visitorUrl} />
-              <CopyRow label="Homeowner link" value={homeownerUrl} />
+              <CopyRow label="Resident link" value={homeownerUrl} />
               <div className="flex flex-wrap gap-2 pt-1">
                 <button
                   type="button"
@@ -276,7 +276,7 @@ function HomeownerPanel({ active, doorName, setDoorName, doorId, visitorUrl, hom
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">Incoming</p>
               <p className="mt-2 text-sm font-medium leading-relaxed text-slate-600">
-                {active ? "Live updates work best with two tabs open (visitor + homeowner)." : "Open in homeowner mode to see updates."}
+                {active ? "Live updates work best with two tabs open (visitor + resident)." : "Open in resident mode to see updates."}
               </p>
             </div>
             <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-slate-700">
@@ -437,7 +437,7 @@ function VisitorPanel({ active, doorName, doorId }) {
               {doorName}
             </h2>
             <p className="mt-3 max-w-xl text-sm font-medium leading-relaxed text-slate-600">
-              Take a quick selfie so the homeowner can confirm who is at the door.
+              Take a quick selfie so the resident can confirm who is at the door.
             </p>
           </div>
 
@@ -451,7 +451,7 @@ function VisitorPanel({ active, doorName, doorId }) {
           <div className="mt-10 rounded-[2.5rem] border border-emerald-200 bg-emerald-50 p-7">
             <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-700">Sent</p>
             <p className="mt-3 text-sm font-medium leading-relaxed text-emerald-800">
-              Homeowner notified. Please wait — they can open, call, or ignore.
+              Resident notified. Please wait — they can open, call, or ignore.
             </p>
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
               <button
@@ -514,7 +514,7 @@ function VisitorPanel({ active, doorName, doorId }) {
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-600">Selfie</p>
                   <p className="mt-2 text-sm font-medium leading-relaxed text-slate-700">
-                    The homeowner will only see this photo + your message.
+                    The resident will only see this photo + your message.
                   </p>
                 </div>
                 <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-slate-700">
@@ -600,13 +600,13 @@ function VisitorPanel({ active, doorName, doorId }) {
                 disabled={!canSubmit}
                 className="inline-flex items-center justify-center rounded-full bg-slate-900 px-8 py-4 text-xs font-black uppercase tracking-widest text-white transition enabled:hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Notify homeowner
+                Notify resident
               </button>
               <Link
                 to="/request-demo?mode=homeowner"
                 className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-8 py-4 text-xs font-black uppercase tracking-widest text-slate-900 transition-colors hover:bg-slate-100"
               >
-                Switch to homeowner
+                Switch to resident
               </Link>
             </div>
           </div>

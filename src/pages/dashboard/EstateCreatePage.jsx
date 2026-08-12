@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link } from "react-router-dom";
 import {
   ChevronLeft,
   Bell,
@@ -15,7 +15,7 @@ import {
   Download,
   CheckCircle2,
   X
-} from 'lucide-react';
+} from "lucide-react";
 
 // Core State & Services
 import { env } from "../../config/env";
@@ -26,6 +26,7 @@ import {
 } from "../../services/estateService";
 import useEstateOverviewState from "../../hooks/useEstateOverviewState";
 import { showError, showSuccess } from "../../utils/flash";
+import useSubscription from "../../hooks/useSubscription";
 
 export default function EstateCreatePage() {
   const navigate = useNavigate();
@@ -46,7 +47,9 @@ export default function EstateCreatePage() {
   const planRestrictions = overview?.planRestrictions ?? {};
   const maxEstates = Number(planRestrictions.maxEstates ?? 0);
   const usedEstates = Number(planRestrictions.usedEstates ?? estates.length ?? 0);
-  const canCreateEstate = !maxEstates || usedEstates < maxEstates;
+  const { resolveLimit } = useSubscription();
+  const limitState = resolveLimit({ maxCount: maxEstates, usedCount: usedEstates });
+  const canCreateEstate = limitState.canAdd;
   const remainingEstates = maxEstates > 0 ? Math.max(maxEstates - usedEstates, 0) : null;
 
   // -- Computed Stats --
@@ -141,7 +144,7 @@ export default function EstateCreatePage() {
     img.onload = () => {
       canvas.width = img.width;
       canvas.height = img.height;
-      ctx.drawImage(img, 0, 0);
+      if (ctx) ctx.drawImage(img, 0, 0);
       const link = document.createElement("a");
       link.download = `${estateName.replace(/\s+/g, "-")}-Access-QR.png`;
       link.href = canvas.toDataURL("image/png");
@@ -151,17 +154,19 @@ export default function EstateCreatePage() {
   };
 
   const handlePrintQR = () => {
-    const pri = document.getElementById("ifmcontentstoprint").contentWindow;
+    const frame = document.getElementById("ifmcontentstoprint");
+    const pri = frame?.contentWindow;
+    if (!pri || !activeQrData) return;
     pri.document.open();
     pri.document.write(`
       <html>
         <head>
           <style>
             body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 90vh; text-align: center; }
-            .card { border: 3px solid #00346f; padding: 50px; border-radius: 40px; max-width: 400px; }
-            img { width: 300px; height: 300px; margin-bottom: 20px; }
-            h1 { color: #00346f; margin: 10px 0; font-size: 28px; font-weight: 900; }
-            p { color: #64748b; font-size: 14px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
+            .card { border: 3px solid #00346f; padding: 40px; border-radius: 30px; max-width: 380px; }
+            img { width: 280px; height: 280px; margin-bottom: 20px; }
+            h1 { color: #00346f; margin: 10px 0; font-size: 26px; font-weight: 900; }
+            p { color: #64748b; font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
           </style>
         </head>
         <body>
@@ -191,218 +196,225 @@ export default function EstateCreatePage() {
   const copyText = async (value) => {
     try {
       await navigator.clipboard.writeText(value);
-      showSuccess("Link copied to clipboard");
+      showSuccess("Link copied");
     } catch { showError("Copy failed"); }
   };
 
   return (
-    <div className="bg-slate-50/50 min-h-screen font-sans pb-32 dark:bg-slate-950 text-slate-900 dark:text-slate-100 antialiased">
-      {/* STATIC STICKY HEADER */}
-      <header className="sticky top-0 z-[100] w-full border-b border-slate-100/80 bg-white/90 px-4 py-3.5 backdrop-blur-md dark:bg-slate-950/90 dark:border-slate-900">
-        <div className="mx-auto flex max-w-2xl items-center justify-between">
-          <div className="flex items-center gap-3">
+    <div className="bg-slate-50/80 min-h-screen font-sans pb-32 dark:bg-slate-950 text-slate-900 dark:text-slate-100 antialiased selection:bg-indigo-600 selection:text-white">
+      {/* MOBILE-FIRST HEADER BAR */}
+      <header className="sticky top-0 z-[100] w-full border-b border-slate-200/80 bg-white/90 px-4 py-3 backdrop-blur-md dark:bg-slate-950/90 dark:border-slate-800 safe-top">
+        <div className="mx-auto flex max-w-7xl items-center justify-between">
+          <div className="flex items-center gap-2.5">
             <button 
               onClick={() => navigate(-1)} 
-              className="p-2 bg-slate-50 text-slate-600 rounded-full hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 transition-all active:scale-95"
+              className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100/80 text-slate-700 hover:bg-slate-200 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 transition-all active:scale-95"
+              aria-label="Go Back"
             >
               <ChevronLeft size={20} />
             </button>
             <div>
-              <h1 className="font-extrabold text-sm sm:text-lg text-slate-900 tracking-tight dark:text-white leading-none">Manage Estates</h1>
-              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1">Portfolio Control</p>
+              <h1 className="font-extrabold text-sm sm:text-base text-slate-900 tracking-tight dark:text-white leading-tight">Manage Estates</h1>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Property Portfolio</p>
             </div>
           </div>
-          <button className="relative p-2 bg-slate-50 text-slate-600 dark:bg-slate-900 dark:text-slate-300 rounded-full">
+
+          <Link
+            to="/dashboard/notifications"
+            className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100/80 text-slate-700 dark:bg-slate-900 dark:text-slate-300 hover:bg-slate-200 transition-all active:scale-95"
+            aria-label="Notifications"
+          >
             <Bell size={18} />
-            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-rose-500 rounded-full border border-white dark:border-slate-950" />
-          </button>
+            <span className="absolute top-2.5 right-2.5 h-2 w-2 rounded-full bg-rose-500 ring-2 ring-white dark:ring-slate-950" />
+          </Link>
         </div>
       </header>
 
-      <main className="mt-4 px-4 max-w-2xl mx-auto space-y-4">
+      {/* MAIN CONTAINER */}
+      <main className="mt-4 px-4 sm:px-6 max-w-7xl mx-auto space-y-4">
         
-        {/* COMPACT STATISTICS STRIP (Preserves layout on small viewports) */}
-        <section className="grid grid-cols-2 gap-3">
-          <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100/50 dark:border-slate-800/40 shadow-sm flex items-center gap-3">
-            <div className="bg-indigo-50 dark:bg-indigo-500/10 w-9 h-9 rounded-xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
-              <Layers size={16} />
+        {/* STATS & PLAN CAPACITY GRID */}
+        <section className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-xs flex items-center gap-3">
+            <div className="bg-indigo-50 dark:bg-indigo-500/10 h-10 w-10 rounded-xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
+              <Layers size={18} />
             </div>
             <div>
-              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Estates</p>
-              <h4 className="text-lg font-black leading-none mt-0.5 text-slate-900 dark:text-white">{stats.totalEstates}</h4>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Estates</p>
+              <h4 className="text-base font-black text-slate-900 dark:text-white mt-0.5">{stats.totalEstates}</h4>
             </div>
           </div>
 
-          <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100/50 dark:border-slate-800/40 shadow-sm flex items-center gap-3">
-            <div className="bg-emerald-50 dark:bg-emerald-500/10 w-9 h-9 rounded-xl flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
-              <QrCode size={16} />
+          <div className="bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-xs flex items-center gap-3">
+            <div className="bg-emerald-50 dark:bg-emerald-500/10 h-10 w-10 rounded-xl flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+              <QrCode size={18} />
             </div>
             <div>
-              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Active QRs</p>
-              <h4 className="text-lg font-black leading-none mt-0.5 text-slate-900 dark:text-white">{stats.activeQrs}</h4>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Active QRs</p>
+              <h4 className="text-base font-black text-slate-900 dark:text-white mt-0.5">{stats.activeQrs}</h4>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-xs flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Plan Status</p>
+              <p className="text-xs font-bold text-slate-900 dark:text-white mt-0.5">
+                {maxEstates ? `${usedEstates} / ${maxEstates} Slots Used` : "Unlimited Plan"}
+              </p>
+            </div>
+            <div className="rounded-xl bg-slate-100 dark:bg-slate-800 px-2.5 py-1 text-xs font-black text-slate-700 dark:text-slate-300">
+              {stats.totalHomes} Homes
             </div>
           </div>
         </section>
 
-        {/* PLAN LIMITATION INFO BAR */}
-        <section className="rounded-2xl border border-slate-100/50 dark:border-slate-800/40 bg-white dark:bg-slate-900 p-4 shadow-sm space-y-2">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-[9px] font-black uppercase tracking-wider text-slate-400 leading-none">Plan Capacity</p>
-              <h3 className="mt-1 text-sm font-bold text-slate-900 dark:text-white">Property Slots</h3>
-            </div>
-            <div className="rounded-xl bg-slate-50 dark:bg-slate-800/50 px-2.5 py-1 text-right">
-              <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mr-1.5">Homes:</span>
-              <span className="text-xs font-black text-slate-900 dark:text-white">{stats.totalHomes}</span>
-            </div>
+        {!canCreateEstate && !limitState.isTrialBypass && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-900 px-4 py-2.5 text-xs font-bold text-amber-900 dark:text-amber-400 shadow-xs">
+            Plan limit reached. Upgrade your subscription to add more estates.
           </div>
-          <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-            {maxEstates
-              ? `Using ${usedEstates} of ${maxEstates} estate slots on your current plan.`
-              : "Standard multi-estate capabilities enabled without specific counts."}
-          </p>
-          {!canCreateEstate && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50/55 dark:bg-amber-950/20 dark:border-amber-900 px-3 py-2 text-[11px] font-semibold text-amber-900 dark:text-amber-400">
-              Plan limit reached. Upgrade to register additional estate profiles.
-            </div>
-          )}
-        </section>
+        )}
 
-        {/* PROPERTY LIST */}
-        <section className="space-y-3.5">
-          <div className="px-1.5">
-            <h4 className="font-bold text-[10px] text-slate-400 uppercase tracking-widest">Your Property Network</h4>
+        {/* PROPERTY GRID */}
+        <section className="space-y-3">
+          <div className="flex items-center justify-between px-1">
+            <h2 className="font-bold text-xs text-slate-400 uppercase tracking-widest">Estate Directory</h2>
+            <span className="text-xs font-bold text-slate-500">{estatesWithQr.length} Registered</span>
           </div>
 
-          {estatesWithQr.map((estate) => (
-            <article key={estate.id} className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-100/50 dark:border-slate-800/40 shadow-sm flex flex-col gap-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-full text-[9px] font-black uppercase tracking-wider dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20">
-                    <CheckCircle2 size={10} /> Active Profile
-                  </span>
-                  <h3 className="mt-2 text-base font-black text-slate-900 dark:text-white truncate tracking-tight">{estate.name}</h3>
-                  <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">ID: {estate.id}</p>
-                </div>
-                <button
-                  onClick={() => handleGenerateSharedQr(estate)}
-                  disabled={qrBusyEstateId === estate.id}
-                  className="bg-slate-950 hover:bg-slate-900 text-white dark:bg-white dark:text-slate-950 px-3.5 py-2 rounded-xl text-[11px] font-black tracking-wide shrink-0 disabled:opacity-50 transition-all active:scale-95"
-                >
-                  {qrBusyEstateId === estate.id ? "..." : estate.sharedQr ? "Re-Gen" : "Generate"}
-                </button>
-              </div>
-
-              {estate.sharedQr ? (
-                <div className="p-3 bg-slate-50/80 dark:bg-slate-800/20 rounded-2xl border border-slate-100/40 dark:border-slate-850 flex items-center justify-between">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-8 h-8 rounded-lg bg-white dark:bg-slate-900 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shadow-sm shrink-0">
-                      <QrCode size={14} />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider leading-none">Access Key</p>
-                      <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 mt-1 truncate">{estate.sharedQr.qrId}</p>
+          {estatesWithQr.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+              {estatesWithQr.map((estate) => (
+                <article key={estate.id} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-xs flex flex-col justify-between gap-4 transition-all hover:border-slate-300">
+                  <div className="space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-[10px] font-extrabold uppercase tracking-wider dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20">
+                          <CheckCircle2 size={10} /> Active
+                        </span>
+                        <h3 className="mt-1.5 text-base font-bold text-slate-900 dark:text-white truncate">{estate.name}</h3>
+                      </div>
+                      <button
+                        onClick={() => handleGenerateSharedQr(estate)}
+                        disabled={qrBusyEstateId === estate.id}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 disabled:opacity-50 transition-all active:scale-95 shadow-xs"
+                      >
+                        {qrBusyEstateId === estate.id ? "..." : estate.sharedQr ? "Re-Gen" : "Generate"}
+                      </button>
                     </div>
                   </div>
-                  <div className="flex gap-1.5 shrink-0">
-                    <button
-                      onClick={() => {
-                        setActiveQrData({ ...estate.sharedQr, estateName: estate.name });
-                        setIsQrModalOpen(true);
-                      }}
-                      className="p-2 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 rounded-xl shadow-sm border border-slate-100/50 dark:border-slate-800 hover:bg-slate-50 transition-all"
-                    >
-                      <ExternalLink size={14} />
-                    </button>
-                    <button
-                      onClick={() => copyText(toPublicUrl(estate.sharedQr.scanUrl))}
-                      className="p-2 bg-white dark:bg-slate-900 text-slate-400 dark:text-slate-500 rounded-xl shadow-sm border border-slate-100/50 dark:border-slate-800 hover:text-indigo-600 transition-all"
-                    >
-                      <Copy size={14} />
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2.5 py-2.5 px-3 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50/30 dark:bg-slate-900/10">
-                  <MapPin size={12} className="text-slate-300 shrink-0" />
-                  <p className="text-[10px] font-medium text-slate-400 dark:text-slate-500 italic">Generate QR to assign modern entry codes.</p>
-                </div>
-              )}
-            </article>
-          ))}
 
-          {estatesWithQr.length === 0 && (
-             <div className="py-16 text-center bg-white dark:bg-slate-900 rounded-[2rem] border border-dashed border-slate-200 dark:border-slate-800">
-                <Building2 className="mx-auto h-10 w-10 text-slate-200 dark:text-slate-800 mb-2" />
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">No Estates Registered</p>
+                  {estate.sharedQr ? (
+                    <div className="p-2.5 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="h-8 w-8 rounded-lg bg-white dark:bg-slate-900 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shadow-xs shrink-0">
+                          <QrCode size={16} />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Access Code</p>
+                          <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{estate.sharedQr.qrId}</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-1 shrink-0">
+                        <button
+                          onClick={() => {
+                            setActiveQrData({ ...estate.sharedQr, estateName: estate.name });
+                            setIsQrModalOpen(true);
+                          }}
+                          className="p-1.5 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 rounded-lg border border-slate-200/80 dark:border-slate-800 hover:bg-slate-100 active:scale-95 transition-all"
+                          aria-label="View QR"
+                        >
+                          <ExternalLink size={14} />
+                        </button>
+                        <button
+                          onClick={() => copyText(toPublicUrl(estate.sharedQr.scanUrl))}
+                          className="p-1.5 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 rounded-lg border border-slate-200/80 dark:border-slate-800 hover:text-indigo-600 active:scale-95 transition-all"
+                          aria-label="Copy Access Link"
+                        >
+                          <Copy size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 py-2 px-3 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-900/20">
+                      <MapPin size={14} className="text-slate-400 shrink-0" />
+                      <p className="text-xs font-semibold text-slate-400 dark:text-slate-500">Tap generate to assign master QR.</p>
+                    </div>
+                  )}
+                </article>
+              ))}
+            </div>
+          ) : (
+             <div className="py-12 text-center bg-white dark:bg-slate-900 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
+                <Building2 className="mx-auto h-8 w-8 text-slate-300 dark:text-slate-700 mb-2" />
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">No Estates Found</p>
              </div>
           )}
         </section>
       </main>
 
-      {/* COMPACT FLOATING ACTION BUTTON */}
+      {/* FLOATING ACTION BUTTON */}
       <button
         onClick={() => setIsFormOpen(true)}
         disabled={!canCreateEstate}
-        className="fixed bottom-6 right-6 z-[100] w-14 h-14 flex items-center justify-center rounded-full bg-indigo-600 text-white shadow-lg shadow-indigo-500/25 active:scale-90 hover:bg-indigo-700 transition-all disabled:opacity-50"
+        className="fixed bottom-6 right-6 z-[90] flex h-14 w-14 items-center justify-center rounded-full bg-[#4955b3] text-white shadow-lg shadow-indigo-500/30 active:scale-90 hover:bg-indigo-700 transition-all disabled:opacity-50"
+        aria-label="Add Estate"
       >
         <Plus size={24} strokeWidth={2.5} />
       </button>
 
-      {/* MOBILE-ERgonomic QR VIEW BOTTOM SHEET */}
+      {/* QR CODE BOTTOM SHEET / MODAL */}
       {isQrModalOpen && activeQrData && (
         <div className="fixed inset-0 z-[1000] flex items-end sm:items-center sm:justify-center">
           <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={() => setIsQrModalOpen(false)} />
 
-          <div className="relative bg-white dark:bg-slate-900 w-full sm:max-w-md rounded-t-[2rem] sm:rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col pb-safe max-h-[92dvh]">
-            {/* Grab handle indicator for mobile sheeting layout */}
-            <div className="mx-auto mt-3 h-1 w-12 rounded-full bg-slate-200 dark:bg-slate-800 sm:hidden" />
+          <div className="relative bg-white dark:bg-slate-900 w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col pb-safe max-h-[90dvh]">
+            <div className="mx-auto mt-3 h-1 w-12 rounded-full bg-slate-200 dark:bg-slate-800 sm:hidden shrink-0" />
             
-            <div className="px-6 pt-4 pb-2 flex justify-between items-center border-b border-slate-100/50 dark:border-slate-800/40">
+            <div className="px-5 pt-3 pb-2 flex justify-between items-center border-b border-slate-100 dark:border-slate-800">
                <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <h3 className="font-bold text-[9px] text-slate-400 uppercase tracking-widest">Master Key Live</h3>
+                  <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <h3 className="font-bold text-xs text-slate-400 uppercase tracking-wider">Master Access Code</h3>
                </div>
-               <button onClick={() => setIsQrModalOpen(false)} className="p-2 bg-slate-50 dark:bg-slate-800 text-slate-400 rounded-full hover:text-rose-500 transition-all">
+               <button onClick={() => setIsQrModalOpen(false)} className="p-1.5 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-full hover:text-rose-500 transition-all">
                  <X size={16} />
                </button>
             </div>
 
-            <div className="px-6 py-6 text-center overflow-y-auto">
-               <div className="inline-block p-4 bg-white rounded-2xl mb-4 border border-slate-100 shadow-sm">
+            <div className="p-6 text-center overflow-y-auto">
+               <div className="inline-block p-3 bg-white rounded-2xl mb-4 border border-slate-200 shadow-xs">
                  <img
                     id="active-qr-img"
                     src={buildQrImageUrl(toPublicUrl(activeQrData.scanUrl))}
                     alt="Estate QR"
-                    className="w-44 h-44 mx-auto"
+                    className="w-48 h-48 mx-auto"
                  />
                </div>
 
-               <h4 className="text-xl font-black text-slate-900 dark:text-white mb-1 tracking-tight">{activeQrData.estateName}</h4>
-               <p className="text-indigo-600 dark:text-indigo-400 text-[10px] font-bold uppercase tracking-wider mb-6 bg-indigo-50/85 dark:bg-indigo-500/10 inline-block px-3 py-1 rounded-full">
+               <h4 className="text-lg font-black text-slate-900 dark:text-white mb-1">{activeQrData.estateName}</h4>
+               <span className="text-indigo-600 dark:text-indigo-400 text-xs font-bold uppercase tracking-wider mb-6 bg-indigo-50 dark:bg-indigo-500/10 inline-block px-3 py-1 rounded-full border border-indigo-100 dark:border-indigo-500/20">
                  {activeQrData.qrId}
-               </p>
+               </span>
 
-               <div className="grid grid-cols-2 gap-3 mb-3">
+               <div className="grid grid-cols-2 gap-2.5 mb-3 mt-4">
                   <button
                     onClick={handlePrintQR}
-                    className="flex items-center justify-center gap-1.5 py-3 bg-slate-50 dark:bg-slate-800 text-slate-950 dark:text-slate-100 rounded-xl font-bold text-[10px] uppercase tracking-wider hover:bg-slate-100 transition-all"
+                    className="flex items-center justify-center gap-1.5 py-3 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-xl font-bold text-xs hover:bg-slate-200 transition-all active:scale-95"
                   >
-                    <Printer size={14} /> Print Key
+                    <Printer size={15} /> Print Code
                   </button>
                   <button
                     onClick={() => handleDownloadQR(activeQrData.estateName)}
-                    className="flex items-center justify-center gap-1.5 py-3 bg-slate-50 dark:bg-slate-800 text-slate-950 dark:text-slate-100 rounded-xl font-bold text-[10px] uppercase tracking-wider hover:bg-slate-100 transition-all"
+                    className="flex items-center justify-center gap-1.5 py-3 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-xl font-bold text-xs hover:bg-slate-200 transition-all active:scale-95"
                   >
-                    <Download size={14} /> Save Image
+                    <Download size={15} /> Save Image
                   </button>
                </div>
 
                <button
                   onClick={() => copyText(toPublicUrl(activeQrData.scanUrl))}
-                  className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-[10px] uppercase tracking-wider shadow-sm flex items-center justify-center gap-1.5 active:scale-95 transition-all"
+                  className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs shadow-xs flex items-center justify-center gap-2 active:scale-95 transition-all"
                >
-                 <Copy size={14} /> Copy Access Link
+                 <Copy size={15} /> Copy Public Link
                </button>
             </div>
           </div>
@@ -412,38 +424,41 @@ export default function EstateCreatePage() {
       {/* Hidden iframe for printing */}
       <iframe id="ifmcontentstoprint" title="print-frame" style={{ height: '0px', width: '0px', position: 'absolute' }}></iframe>
 
-      {/* BOTTOM DRAWER ESTATED SHEET */}
+      {/* BOTTOM DRAWER ESTATE CREATION SHEET */}
       <EstateCreationSheet open={isFormOpen} onClose={() => setIsFormOpen(false)}>
-        <form className="space-y-6" onSubmit={onSubmit}>
+        <form className="space-y-4" onSubmit={onSubmit}>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-xl flex items-center justify-center shrink-0">
+            <div className="h-10 w-10 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-xl flex items-center justify-center shrink-0">
               <Building2 size={20} />
             </div>
             <div>
-              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400 leading-none">Step 1: Identity</p>
-              <h3 className="text-base font-black text-slate-900 dark:text-white tracking-tight mt-1">Create Estate Profile</h3>
+              <h3 className="text-base font-bold text-slate-900 dark:text-white leading-tight">Create Estate Profile</h3>
+              <p className="text-xs text-slate-400 font-medium">Add a new property to your management network</p>
             </div>
           </div>
+
           <div>
-            <label className="block text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 ml-0.5">Name of Estate</label>
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Estate Name</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Sapphire Gardens"
-              className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-850 border border-transparent focus:border-slate-200 focus:bg-white focus:outline-none transition-all text-xs font-semibold text-slate-900 dark:text-slate-150"
+              placeholder="e.g. Royal Palm Estate"
+              className="w-full px-4 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 border border-transparent focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 focus:outline-none transition-all text-sm font-semibold text-slate-900 dark:text-slate-100"
               required
             />
           </div>
-          <button type="submit" disabled={busy} className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 active:scale-95 transition-all">
-            {busy ? "Syncing..." : "Launch Portfolio"} <ArrowRight size={14} />
+
+          <button type="submit" disabled={busy} className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs flex items-center justify-center gap-2 active:scale-95 transition-all">
+            {busy ? "Creating..." : "Save & Launch Estate"} <ArrowRight size={15} />
           </button>
+
           {!canCreateEstate ? (
-            <p className="text-center text-xs font-semibold text-amber-700">
-              Estate limit reached on this plan.
+            <p className="text-center text-xs font-bold text-amber-600">
+              Limit reached for current plan.
             </p>
           ) : remainingEstates !== null ? (
-            <p className="text-center text-[10px] text-slate-400 font-medium">
+            <p className="text-center text-xs text-slate-400 font-medium">
               {remainingEstates} estate slot{remainingEstates === 1 ? "" : "s"} remaining.
             </p>
           ) : null}
@@ -458,51 +473,43 @@ function EstateCreationSheet({ open, onClose, children }) {
 
   return (
     <div className="fixed inset-0 z-[140] flex items-end sm:items-center sm:justify-center">
-      {/* Overlay */}
       <button
         type="button"
         className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
         onClick={onClose}
-        aria-label="Close estate registration"
+        aria-label="Close form"
       />
 
-      {/* SHEET */}
       <div className="
         relative flex w-full flex-col bg-white dark:bg-slate-900
-        rounded-t-[2rem] sm:rounded-[2rem]
+        rounded-t-3xl sm:rounded-3xl
         shadow-2xl
         sm:max-w-md
         max-h-[85dvh] sm:max-h-[80dvh]
         overflow-hidden pb-safe
       ">
-        {/* Grab handle indicator for mobile sheet style */}
         <div className="mx-auto mt-3 h-1 w-12 rounded-full bg-slate-200 dark:bg-slate-800 sm:hidden shrink-0" />
 
-        {/* HEADER */}
-        <div className="shrink-0 flex items-start justify-between border-b border-slate-100/50 dark:border-slate-800/40 px-5 py-4">
+        <div className="shrink-0 flex items-center justify-between border-b border-slate-100 dark:border-slate-800 px-5 py-3.5">
           <div>
-            <p className="text-[9px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400">
-              Portfolio Control
-            </p>
-            <h3 className="mt-1 text-lg font-black text-slate-900 dark:text-white">
-              Register Estate
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">
+              New Estate
             </h3>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              Add a new managed estate profile to trigger entry access codes.
+            <p className="text-xs text-slate-400 font-medium">
+              Register property to generate entry codes
             </p>
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl bg-slate-50 dark:bg-slate-800 p-2 text-slate-400"
+            className="rounded-xl bg-slate-100 dark:bg-slate-800 p-2 text-slate-400 hover:text-slate-600 transition-all"
           >
             <X size={16} />
           </button>
         </div>
 
-        {/* SCROLLABLE INTERNALS */}
-        <div className="flex-1 min-h-0 overflow-y-auto px-5 py-5">
+        <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4">
           {children}
         </div>
       </div>

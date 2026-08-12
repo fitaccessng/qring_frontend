@@ -5,127 +5,74 @@ import { ArrowRight, Check } from "lucide-react";
 const estatePlans = [
   {
     id: "starter-estate",
-    name: "Starter Estate",
-    monthlyPrice: 0,
-    yearlyPrice: 0,
+    name: "Starter",
+    monthlyPrice: 15000,
+    yearlyPrice: 180000,
     monthlyBilling: "/month",
     yearlyBilling: "/month",
-    intro: "Up to 3 houses (trial only, 30 days)",
-    subsidy: "Trial only - 30 days",
-    note: "Full system access at limited scale.",
-    cta: "Start Free Trial",
+    intro: "Up to 8 Houses/Units",
+    subsidy: "30-day free trial",
+    note: "Everything a small estate needs to move away from manual gate records.",
+    cta: "Start 30-Day Free Trial",
     to: "/signup",
-    features: ["Up to 3 houses", "Full system access (limited scale)", "Trial only - 30 days"],
+    features: ["Up to 8 Houses/Units", "Register residents", "House QR code for each registered house", "Digital gate records"],
   },
   {
     id: "estate-basic",
-    name: "Estate Basic",
-    monthlyPrice: 6000,
-    yearlyPrice: 72000,
+    name: "Basic",
+    monthlyPrice: 25000,
+    yearlyPrice: 300000,
     monthlyBilling: "/month",
     yearlyBilling: "/year",
-    intro: "Up to 10 houses",
+    intro: "Up to 30 Houses/Units",
     subsidy: "Standard plan",
-    note: "Realtime alerts, visitor logs, resident management, and mobile dashboard.",
-    cta: "Start Basic",
+    note: "Everything needed to manage everyday estate access and security.",
+    cta: "Choose Basic",
     to: "/signup",
-    features: ["Up to 10 houses", "Realtime alerts", "Visitor logs", "Resident management", "Mobile dashboard"],
+    features: ["Up to 30 Houses/Units", "Instant resident alerts", "Emergency alerts", "Daily gate activity"],
   },
   {
     id: "estate-plus",
-    name: "Estate Plus",
-    monthlyPrice: 9000,
-    yearlyPrice: 108000,
+    name: "Plus",
+    monthlyPrice: 45000,
+    yearlyPrice: 540000,
     monthlyBilling: "/month",
     yearlyBilling: "/year",
-    intro: "Up to 15 houses",
+    intro: "Up to 50 Houses/Units",
     subsidy: "Growing estates",
-    note: "Everything in Basic plus scheduling, access windows, and chat + call verification.",
+    note: "For estates that want stronger security and more control.",
     cta: "Choose Plus",
     to: "/signup",
-    features: ["Everything in Basic", "Visitor scheduling", "Access time windows", "Chat & call verification"],
+    features: ["Everything in Basic", "Schedule future visitors", "Access time windows", "Video and audio verification"],
   },
   {
     id: "estate-growth",
-    name: "Estate Growth",
-    monthlyPrice: 18000,
-    yearlyPrice: 216000,
+    name: "Growth",
+    monthlyPrice: 85000,
+    yearlyPrice: 1020000,
     monthlyBilling: "/month",
     yearlyBilling: "/year",
-    intro: "Up to 30 houses",
+    intro: "Up to 100 Houses/Units",
     subsidy: "Popular",
-    note: "Everything in Plus with multi-admin roles, analytics dashboard, and activity tracking.",
+    note: "For larger and professionally managed estates.",
     cta: "Choose Growth",
     to: "/signup",
     popular: true,
-    features: ["Everything in Plus", "Multi-admin roles", "Activity tracking", "Analytics dashboard"],
+    features: ["Everything in Plus", "Multiple administrators", "Download records", "Management activity history"],
   },
   {
     id: "estate-pro",
-    name: "Estate Pro",
-    monthlyPrice: 30000,
-    yearlyPrice: 360000,
-    monthlyBilling: "/month",
-    yearlyBilling: "/year",
-    intro: "Up to 50 houses",
-    subsidy: "Advanced control",
-    note: "Everything in Growth with advanced analytics, audit logs, role permissions, and priority support.",
-    cta: "Start Pro",
-    to: "/signup",
-    features: ["Everything in Growth", "Advanced analytics", "Security audit logs", "Role permissions", "Priority support"],
-  },
-  {
-    id: "enterprise-estate",
-    name: "Enterprise Estate",
+    name: "Pro",
     monthlyPrice: 0,
     yearlyPrice: 0,
     monthlyBilling: "",
     yearlyBilling: "",
-    intro: "Custom plan for large estates",
+    intro: "Custom house capacity",
     subsidy: "Custom pricing",
-    note: "Unlimited houses, SLA + API access, multi-location control, and dedicated support.",
+    note: "For large estates, gated communities, estate groups, and multi-estate operators.",
     cta: "Contact Sales",
     to: "/contact",
-    features: ["Unlimited houses", "SLA + API access", "Multi-location control", "Dedicated support"],
-  },
-];
-
-const homeownerPlans = [
-  {
-    id: "free",
-    name: "Free",
-    monthlyPrice: 0,
-    yearlyPrice: 0,
-    monthlyBilling: "",
-    yearlyBilling: "",
-    note: "1 door with basic notifications and limited logs.",
-    cta: "Get Started Free",
-    to: "/signup",
-    features: ["1 door", "Basic notifications", "Limited logs"],
-  },
-  {
-    id: "home-pro",
-    name: "Home Pro",
-    monthlyPrice: 2500,
-    yearlyPrice: 30000,
-    monthlyBilling: "/month",
-    yearlyBilling: "/year",
-    note: "Smart homeowner controls.",
-    cta: "Choose Home Pro",
-    to: "/signup",
-    features: ["Chat + call verification", "Visitor history", "Visitor scheduling", "Advanced notifications"],
-  },
-  {
-    id: "home-premium",
-    name: "Home Premium",
-    monthlyPrice: 4500,
-    yearlyPrice: 54000,
-    monthlyBilling: "/month",
-    yearlyBilling: "/year",
-    note: "Advanced access and privacy.",
-    cta: "Choose Home Premium",
-    to: "/signup",
-    features: ["Multiple doors", "Access time windows", "Priority support", "Advanced privacy controls"],
+    features: ["Everything in Growth", "Multiple estates", "Custom reports", "Dedicated onboarding"],
   },
 ];
 
@@ -217,39 +164,6 @@ function EstatePlanRow({ plan, billingCycle }) {
   );
 }
 
-function HomeownerPlanBlock({ plan, billingCycle }) {
-  const price = billingCycle === "yearly" ? plan.yearlyPrice : plan.monthlyPrice;
-  const billing = billingCycle === "yearly" ? plan.yearlyBilling : plan.monthlyBilling;
-
-  return (
-    <article className="grid gap-5 border-t border-slate-200/80 py-6 first:border-t-0 md:grid-cols-[minmax(0,1fr)_auto] md:items-start md:gap-8 dark:border-slate-800">
-      <div>
-        <div className="flex flex-wrap items-end gap-3">
-          <h3 className="text-xl font-black tracking-tight text-slate-950 dark:text-white">{plan.name}</h3>
-          <div className="flex items-end gap-1 text-slate-950 dark:text-white">
-            <span className="text-3xl font-black tracking-tight">{formatPrice(price)}</span>
-            <span className="pb-1 text-sm font-semibold text-slate-500 dark:text-slate-400">{billing}</span>
-          </div>
-        </div>
-        <p className="mt-3 text-sm font-medium text-slate-500 dark:text-slate-400">{plan.note}</p>
-        <div className="mt-5">
-          <PlanFeatureList items={plan.features} subtle />
-        </div>
-      </div>
-
-      <div className="md:min-w-[190px]">
-        <Link
-          to={plan.to}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-blue-200 bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition hover:border-blue-300 hover:text-blue-700 dark:border-blue-900/60 dark:bg-slate-950 dark:text-white"
-        >
-          {plan.cta}
-          <ArrowRight className="h-4 w-4" aria-hidden="true" />
-        </Link>
-      </div>
-    </article>
-  );
-}
-
 export function PricingShowcase({ compact = false }) {
   const [billingCycle, setBillingCycle] = useState("monthly");
 
@@ -259,10 +173,10 @@ export function PricingShowcase({ compact = false }) {
         <div className="max-w-3xl">
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">Pricing</p>
           <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl lg:text-5xl dark:text-white">
-            Clear pricing for estates and homeowners
+            Clear pricing for estate security
           </h2>
           <p className="mt-4 text-base leading-7 text-slate-600 dark:text-slate-300">
-            Fixed plan pricing for estates and homeowners with clear limits, features, and upgrade paths.
+            Fixed plan pricing for estates with clear house limits, visitor controls, and upgrade paths.
           </p>
         </div>
 
@@ -311,21 +225,6 @@ export function PricingShowcase({ compact = false }) {
           </div>
         </div>
 
-        <div className="mt-14 rounded-2xl border border-slate-200/90 bg-slate-50/70 px-5 py-6 sm:px-7 sm:py-8 dark:border-slate-800 dark:bg-slate-900/40">
-          <div className="max-w-2xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500 dark:text-slate-400">Section 2</p>
-            <h3 className="mt-2 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl dark:text-white">Homeowner Plans</h3>
-            <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
-              Homeowner plans with simple monthly or yearly billing and clear access/privacy upgrades.
-            </p>
-          </div>
-
-          <div className="mt-6 rounded-2xl border border-white bg-white px-5 sm:px-7 dark:border-slate-800 dark:bg-slate-950">
-            {homeownerPlans.map((plan) => (
-              <HomeownerPlanBlock key={plan.id} plan={plan} billingCycle={billingCycle} />
-            ))}
-          </div>
-        </div>
       </div>
     </section>
   );

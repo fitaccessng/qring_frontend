@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { createPortal } from "react-dom";
 import { useNavigate } from 'react-router-dom';
 import {
   ChevronLeft,
@@ -9,20 +10,23 @@ import {
   Users,
   RefreshCw,
   Plus,
-  ArrowRight
+  ArrowRight,
+  X
 } from 'lucide-react';
 
-import { createEstateHomeowner, inviteHomeowner } from "../../services/estateService";
+import { createEstateHomeowner, getEstateResidentDetail, inviteHomeowner } from "../../services/estateService";
 import { showError, showSuccess } from "../../utils/flash";
 import useEstateOverviewState from "../../hooks/useEstateOverviewState";
 
 const EstateInvitesPage = () => {
   const navigate = useNavigate();
-  const { overview, setOverview, loading, refresh } = useEstateOverviewState();
+  const { overview, loading, refresh, estateId, setEstateId } = useEstateOverviewState();
 
   const [form, setForm] = useState({ fullName: "", email: "", phone: "", unitNumber: "", password: "" });
   const [busy, setBusy] = useState(false);
   const [resendingId, setResendingId] = useState(null);
+  const [selectedResident, setSelectedResident] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   
   // Mobile Tab State (Allows switching between the Invite Form and Resident List views)
   const [activeTab, setActiveTab] = useState("invite"); // "invite" | "residents"
@@ -31,7 +35,15 @@ const EstateInvitesPage = () => {
     if (overview?.error) showError(overview.error);
   }, [overview?.error]);
 
-  const homeowners = useMemo(() => overview?.homeowners ?? [], [overview]);
+  const estates = useMemo(() => overview?.estates ?? [], [overview]);
+  const currentEstate = useMemo(
+    () => estates.find((estate) => String(estate.id) === String(estateId)) ?? estates[0] ?? null,
+    [estateId, estates]
+  );
+  const homeowners = useMemo(
+    () => (overview?.homeowners ?? []).filter((person) => !currentEstate?.id || String(person.estateId) === String(currentEstate.id)),
+    [overview, currentEstate?.id]
+  );
 
   const buildTemporaryPassword = (formData) => {
     const safeName = (formData?.fullName || "resident").replace(/\s+/g, "").slice(0, 6) || "resident";
@@ -64,19 +76,32 @@ const EstateInvitesPage = () => {
     }
   }
 
+  async function openResidentDetail(person) {
+    if (!currentEstate?.id) return;
+    setSelectedResident(person);
+    setDetailLoading(true);
+    try {
+      const detail = await getEstateResidentDetail(currentEstate.id, person.id);
+      setSelectedResident(detail || person);
+    } catch (err) {
+      showError(err.message || "Failed to load resident profile");
+    } finally {
+      setDetailLoading(false);
+    }
+  }
+
   async function onSubmit(event) {
     event.preventDefault();
     setBusy(true);
     try {
-      const estateId = overview?.estates?.[0]?.id;
-      if (!estateId) throw new Error("Create an estate first before inviting residents");
+      if (!currentEstate?.id) throw new Error("Create or select an estate first before inviting residents");
 
       const temporaryPassword = String(form.password || buildTemporaryPassword(form)).trim();
       const cleanEmail = form.email.trim().toLowerCase();
       let created = null;
       try {
         created = await createEstateHomeowner({
-          estateId,
+          estateId: currentEstate.id,
           fullName: form.fullName.trim(),
           email: cleanEmail,
           password: temporaryPassword,
@@ -111,7 +136,7 @@ const EstateInvitesPage = () => {
         );
       }
 
-      showSuccess(`Invite sent to ${form.fullName}. Temporary Password: ${temporaryPassword}`);
+      showSuccess(`Invite sent to ${form.fullName} for ${currentEstate.name}. Temporary Password: ${temporaryPassword}`);
       setForm({ fullName: "", email: "", phone: "", unitNumber: "", password: "" });
       refresh().catch(() => {});
       setActiveTab("residents"); // Auto-switch tab to resident view on success
@@ -171,6 +196,21 @@ const EstateInvitesPage = () => {
             Resident List ({homeowners.length})
           </button>
         </section>
+
+        {estates.length > 1 && (
+          <section className="bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-100/50 dark:border-slate-800/40 shadow-sm">
+            <label className="block text-[9px] font-bold uppercase tracking-wider text-slate-400 ml-0.5 mb-2">Current Estate</label>
+            <select
+              value={currentEstate?.id || ""}
+              onChange={(event) => setEstateId(event.target.value)}
+              className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-850 border border-transparent focus:border-slate-200 focus:bg-white focus:outline-none transition-all text-xs font-semibold text-slate-900 dark:text-slate-150"
+            >
+              {estates.map((estate) => (
+                <option key={estate.id} value={estate.id}>{estate.name}</option>
+              ))}
+            </select>
+          </section>
+        )}
 
         {/* INVITE FORM VIEW */}
         {activeTab === "invite" && (
@@ -269,7 +309,7 @@ const EstateInvitesPage = () => {
                 </div>
               ) : homeowners.map((person) => (
                 <div key={person.id} className="flex items-center justify-between p-3 bg-slate-50/50 dark:bg-slate-850/30 rounded-2xl border border-slate-100/30 dark:border-slate-800/50">
-                  <div className="flex items-center gap-3 min-w-0">
+                  <button type="button" onClick={() => openResidentDetail(person)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
                     <div className="w-9 h-9 rounded-xl bg-white dark:bg-slate-900 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shadow-sm shrink-0 border border-slate-100/80 dark:border-slate-800/55">
                       <Users size={16} />
                     </div>
@@ -279,7 +319,7 @@ const EstateInvitesPage = () => {
                         {person.roleLabel || "Resident"}{person.unitNumber ? ` · Unit ${person.unitNumber}` : ""}
                       </p>
                     </div>
-                  </div>
+                  </button>
                   <button
                     onClick={() => handleResend(person)}
                     disabled={resendingId === person.id}
@@ -315,8 +355,84 @@ const EstateInvitesPage = () => {
           <Plus size={24} strokeWidth={2.5} />
         </button>
       )}
+      <ResidentDetailModal resident={selectedResident} loading={detailLoading} onClose={() => setSelectedResident(null)} />
     </div>
   );
 };
+
+function ResidentDetailModal({ resident, loading, onClose }) {
+  if (!resident || typeof document === "undefined") return null;
+  const personal = resident.personal || resident;
+  const metrics = [
+    ["Visitors", resident.visitors?.total || 0],
+    ["Open Maint.", resident.maintenance?.open || 0],
+    ["Dues Due", resident.dues?.outstanding || 0],
+    ["Packages", resident.packages?.waiting || 0],
+  ];
+  return createPortal(
+    <div className="fixed inset-0 z-[150] flex items-center justify-center px-4">
+      <button type="button" className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm" onClick={onClose} aria-label="Close resident profile" />
+      <section className="relative z-10 max-h-[86dvh] w-full max-w-2xl overflow-hidden rounded-[2rem] bg-white shadow-2xl dark:bg-slate-900">
+        <div className="flex items-start justify-between border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+          <div>
+            <p className="text-[9px] font-black uppercase tracking-widest text-indigo-600">{personal.estateName || "Resident Profile"}</p>
+            <h3 className="mt-1 text-lg font-black text-slate-900 dark:text-white">{personal.fullName || resident.fullName || "Resident"}</h3>
+            <p className="mt-1 text-xs font-semibold text-slate-500">{personal.email || resident.email || "No email"} · {personal.phone || "No phone"}</p>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-xl bg-slate-50 p-2 text-slate-400 dark:bg-slate-800">
+            <X size={16} />
+          </button>
+        </div>
+        <div className="max-h-[70dvh] overflow-y-auto px-5 py-5">
+          {loading ? (
+            <p className="py-10 text-center text-sm font-bold text-slate-400">Loading resident profile...</p>
+          ) : (
+            <div className="space-y-5">
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                {metrics.map(([label, value]) => (
+                  <div key={label} className="rounded-2xl bg-slate-50 p-3 dark:bg-slate-850">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</p>
+                    <p className="mt-1 text-xl font-black text-slate-900 dark:text-white">{value}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-850">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Household</p>
+                {(resident.household?.homes || []).map((home) => (
+                  <p key={home.id} className="mt-2 text-sm font-bold text-slate-700 dark:text-slate-200">{home.name}</p>
+                ))}
+                {!(resident.household?.homes || []).length && <p className="mt-2 text-sm font-bold text-slate-400">No assigned unit</p>}
+              </div>
+              <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-850">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Vehicles</p>
+                {(resident.vehicles?.registered || []).map((vehicle) => (
+                  <p key={vehicle.id} className="mt-2 text-sm font-bold text-slate-700 dark:text-slate-200">{vehicle.plateNumber} · {vehicle.makeModel || vehicle.vehicleType}</p>
+                ))}
+                {!(resident.vehicles?.registered || []).length && <p className="mt-2 text-sm font-bold text-slate-400">No registered vehicles</p>}
+              </div>
+              <div>
+                <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Audit Timeline</p>
+                {(resident.auditTimeline || []).length ? (
+                  <div className="space-y-2">
+                    {resident.auditTimeline.map((item, index) => (
+                      <div key={`${item.kind}-${item.at}-${index}`} className="rounded-2xl border border-slate-100 p-3 dark:border-slate-800">
+                        <p className="text-sm font-black text-slate-900 dark:text-white">{item.label}</p>
+                        <p className="mt-1 text-xs font-semibold text-slate-500">{item.details?.title || item.details?.plateNumber || item.details?.description || item.details?.gateId || "Resident activity"}</p>
+                        <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">{item.at ? new Date(item.at).toLocaleString() : "No time"}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="rounded-2xl bg-slate-50 py-8 text-center text-sm font-bold text-slate-400 dark:bg-slate-850">No resident activity yet.</p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+    </div>,
+    document.body
+  );
+}
 
 export default EstateInvitesPage;

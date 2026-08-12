@@ -402,10 +402,10 @@ export default function LandingPage() {
             <div className="grid items-start gap-12 lg:grid-cols-3">
               <div>
                 <h2 className="font-heading text-4xl font-extrabold tracking-tight text-slate-950">
-                  Trusted by modern homeowners.
+                  Trusted by modern estates.
                 </h2>
                 <p className="mt-4 max-w-md leading-7 text-slate-600">
-                  Join over 10,000 users who have upgraded their home security to the
+                  Join estates and residents who have upgraded their gate security to the
                   QRing standard.
                 </p>
                 <div className="mt-6 flex items-center gap-2">

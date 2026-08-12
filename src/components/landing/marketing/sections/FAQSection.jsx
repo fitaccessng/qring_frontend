@@ -2,8 +2,8 @@ import { useMemo, useState } from "react";
 
 const defaultFaqs = [
   {
-    q: "Do homeowners and residents need to download an app?",
-    a: "Homeowners can approve from their phone, and estates can operate from the dashboard. Visitors just scan a QR code at the gate.",
+    q: "Do residents need to download an app?",
+    a: "Residents can approve from their phone, and estate managers can operate from the dashboard. Visitors just scan a QR code at the gate.",
   },
   {
     q: "What hardware is required at the gate?",
@@ -11,7 +11,7 @@ const defaultFaqs = [
   },
   {
     q: "How fast is approval?",
-    a: "Approvals happen in realtime. The homeowner gets notified immediately and the guard sees the decision right away.",
+    a: "Approvals happen in realtime. The resident gets notified immediately and the guard sees the decision right away.",
   },
   {
     q: "Can we export visitor logs?",
@@ -72,4 +72,3 @@ export default function FAQSection({ faqs = defaultFaqs }) {
     </section>
   );
 }
-

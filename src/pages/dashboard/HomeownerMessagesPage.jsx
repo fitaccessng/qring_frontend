@@ -20,6 +20,13 @@ import {
 } from "../../services/homeownerService";
 import { resolveSnapshotUrl } from "../../services/mediaUrl";
 
+const REJECTION_REPLY_OPTIONS = [
+  "Please deny entry. I am not expecting this visitor.",
+  "Please ask the visitor to call me before any access is granted.",
+  "Please deny entry and ask the visitor to come back later.",
+  "Please deny entry. I do not recognize this visitor."
+];
+
 export default function HomeownerMessagePage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -38,6 +45,8 @@ export default function HomeownerMessagePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [typedMessage, setTypedMessage] = useState("");
+  const [rejectReplyOpen, setRejectReplyOpen] = useState(false);
+  const [rejectReplyText, setRejectReplyText] = useState(REJECTION_REPLY_OPTIONS[0]);
   const [homeownerContext, setHomeownerContext] = useState({ managedByEstate: false, estateName: "" });
   const [threads, setThreads] = useState([]);
 
@@ -172,11 +181,24 @@ export default function HomeownerMessagePage() {
     }
   };
 
-  const handleDecision = async (action) => {
+  const handleDecision = async (action, options = {}) => {
     if (!activeThreadId || decisionBusy) return;
+    const replyText = String(options.replyText || "").trim();
     setDecisionBusy(action);
     setError("");
     try {
+      let savedReply = null;
+      if (action === "reject" && replyText) {
+        savedReply = await sendHomeownerSessionMessage(activeThreadId, replyText);
+        const message = savedReply || {
+          id: `local-reject-${Date.now()}`,
+          sessionId: activeThreadId,
+          text: replyText,
+          senderType: "homeowner",
+          at: new Date().toISOString(),
+        };
+        setMessagesByThread((prev) => ({ ...prev, [activeThreadId]: [...(prev[activeThreadId] || []), message] }));
+      }
       const result = await decideVisit(activeThreadId, action, {
         communicationChannel: "chat",
         communicationTarget: "gateman",
@@ -185,12 +207,28 @@ export default function HomeownerMessagePage() {
       setThreads((prev) => prev.map((thread) => (
         thread.id === activeThreadId ? { ...thread, sessionStatus: nextStatus } : thread
       )));
+      if (action === "reject") setRejectReplyOpen(false);
       loadThreads({ keepSelection: true });
     } catch (requestError) {
       setError(requestError?.message || `Unable to ${action === "approve" ? "approve" : "reject"} this pass.`);
     } finally {
       setDecisionBusy("");
     }
+  };
+
+  const openRejectReply = () => {
+    setRejectReplyText((value) => value.trim() || REJECTION_REPLY_OPTIONS[0]);
+    setRejectReplyOpen(true);
+  };
+
+  const submitRejectReply = (event) => {
+    event.preventDefault();
+    const text = rejectReplyText.trim();
+    if (!text) {
+      setError("Choose or type a reply for the gateman before rejecting.");
+      return;
+    }
+    handleDecision("reject", { replyText: text });
   };
 
   const handleCreateThread = (e) => {
@@ -361,7 +399,7 @@ export default function HomeownerMessagePage() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleDecision("reject")}
+                      onClick={openRejectReply}
                       disabled={Boolean(decisionBusy)}
                       className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-white px-3 py-2 text-[11px] font-black text-rose-700 transition hover:bg-rose-50 disabled:opacity-50"
                     >
@@ -369,6 +407,62 @@ export default function HomeownerMessagePage() {
                       Reject Pass
                     </button>
                   </div>
+                  {rejectReplyOpen ? (
+                    <form onSubmit={submitRejectReply} className="basis-full rounded-2xl border border-rose-100 bg-white p-3 shadow-sm">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-[10px] font-black uppercase tracking-wider text-rose-600">Reply to Gateman</p>
+                        <button
+                          type="button"
+                          onClick={() => setRejectReplyOpen(false)}
+                          className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                          aria-label="Close rejection reply"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {REJECTION_REPLY_OPTIONS.map((option) => (
+                          <button
+                            key={option}
+                            type="button"
+                            onClick={() => setRejectReplyText(option)}
+                            className={`rounded-xl border px-3 py-2 text-left text-[11px] font-bold transition ${
+                              rejectReplyText === option
+                                ? "border-rose-300 bg-rose-50 text-rose-700"
+                                : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                            }`}
+                          >
+                            {option}
+                          </button>
+                        ))}
+                      </div>
+                      <textarea
+                        value={rejectReplyText}
+                        onChange={(event) => setRejectReplyText(event.target.value)}
+                        rows={3}
+                        className="mt-3 w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 outline-none transition focus:border-rose-300 focus:bg-white"
+                        placeholder="Type a custom message for the gateman..."
+                      />
+                      <div className="mt-3 flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setRejectReplyOpen(false)}
+                          disabled={Boolean(decisionBusy)}
+                          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-black text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={Boolean(decisionBusy) || !rejectReplyText.trim()}
+                          className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-3 py-2 text-[11px] font-black text-white transition hover:bg-rose-500 disabled:opacity-50"
+                        >
+                          <XCircle size={14} />
+                          Send Reply & Reject
+                        </button>
+                      </div>
+                    </form>
+                  ) : null}
                 </div>
               ) : null}
 

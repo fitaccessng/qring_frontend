@@ -170,7 +170,7 @@ export default function AboutPage() {
                   The Gatekeeping Gap
                 </h3>
                 <p className="mb-8 leading-relaxed text-slate-600">
-                  For decades, security in Nigerian estates and offices has relied
+                  For decades, security in Nigerian estates and gated communities has relied
                   on paper logs: inefficient, prone to data breaches, and creating
                   massive bottlenecks at entrances. These manual gaps are where
                   security fails and privacy dies.
@@ -235,7 +235,7 @@ export default function AboutPage() {
                 Ready to evolve your access?
               </h2>
               <p className="mx-auto mb-10 max-w-2xl text-sm leading-7 text-blue-100 sm:text-base md:mb-12 md:text-lg">
-                Join the hundreds of estates and corporate offices already securing
+                Join the estates and gated communities already securing
                 their future with QRing.
               </p>
               <div className="flex flex-col justify-center gap-3 sm:flex-row sm:gap-4">

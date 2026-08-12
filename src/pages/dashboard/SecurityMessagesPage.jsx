@@ -6,6 +6,7 @@ import { getAccessToken } from "../../services/authStorage";
 import { RealtimeEvent } from "../../services/realtimeEvents";
 import { createRealtimeSocket, releaseRealtimeSocket } from "../../services/socketClient";
 import { playMessageNotificationSound } from "../../utils/notificationSound";
+import SecureSnapshotImage from "../../components/SecureSnapshotImage";
 import {
   deleteSecuritySessionMessage,
   getSecurityMessages,
@@ -336,7 +337,12 @@ export default function SecurityMessagesPage() {
     setCallBusy(key);
     try {
       const nextMode = type === "video" ? "video" : "audio";
-      const response = await startSessionCall({ sessionId: selectedId, type: nextMode, hasVideo: nextMode === "video" });
+      const response = await startSessionCall({
+        sessionId: selectedId,
+        visitorName: selectedThread?.name || "Visitor",
+        type: nextMode,
+        hasVideo: nextMode === "video"
+      });
       const data = response?.data ?? response ?? {};
       window.sessionStorage.setItem(
         "qring_call_start_intent",
@@ -393,6 +399,7 @@ export default function SecurityMessagesPage() {
         @keyframes bubbleIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
         .bubble-mine { background: #2563eb; color: #fff; border-bottom-right-radius: 4px; align-self: flex-end; box-shadow: 0 12px 24px rgba(37,99,235,0.16); }
         .bubble-theirs { background: #fff; color: #0f172a; border-bottom-left-radius: 4px; align-self: flex-start; border: 1px solid #e2e8f0; }
+        .bubble-homeowner { background: #fff7ed; border-color: #fed7aa; color: #7c2d12; }
 
         /* Compose */
         .compose-bar { background: #fff; border-top: 1px solid #e2e8f0; padding: 10px 14px; flex-shrink: 0; padding-bottom: max(10px, env(safe-area-inset-bottom)); }
@@ -542,7 +549,7 @@ export default function SecurityMessagesPage() {
                     {query ? "No matches" : "No conversations yet"}
                   </p>
                   <p style={{ fontSize: 13, color: "#a8a29e", margin: 0 }}>
-                    {query ? "Try a different search." : "Visitor chats will appear here."}
+                    {query ? "Try a different search." : "Homeowner visitor threads will appear here."}
                   </p>
                 </div>
               ) : (
@@ -604,7 +611,7 @@ export default function SecurityMessagesPage() {
                       </div>
                     ) : selectedMessages.length === 0 ? (
                       <div style={{ textAlign: "center", padding: "32px 0" }}>
-                        <p style={{ fontSize: 13, color: "#a8a29e" }}>No messages yet — start the conversation.</p>
+                        <p style={{ fontSize: 13, color: "#a8a29e" }}>No homeowner replies yet. Send a message or start a call.</p>
                         {typingByThread[selectedId]?.isTyping ? (
                           <p style={{ fontSize: 12, color: "#d97706", marginTop: 10 }}>
                             {typingByThread[selectedId]?.displayName || "Participant"} is typing...
@@ -613,17 +620,46 @@ export default function SecurityMessagesPage() {
                       </div>
                     ) : (
                       selectedMessages.map((msg, i) => {
-                        const mine = msg.senderType === "security";
+                        const senderType = String(msg.senderType || "").toLowerCase();
+                        const mine = senderType === "security" || senderType === "office" || senderType === "office_staff";
+                        const fromHomeowner = senderType === "homeowner";
+                        const snapshotUrl = String(msg.snapshotUrl || msg.photoUrl || "").trim();
+                        const isSnapshot = msg.messageType === "visitor_snapshot" || Boolean(snapshotUrl);
                         const showName = i === 0 || selectedMessages[i - 1]?.senderType !== msg.senderType;
                         return (
                           <div key={msg.id} style={{ display: "flex", flexDirection: "column", alignItems: mine ? "flex-end" : "flex-start" }}>
                             {showName && (
                               <span style={{ fontSize: 10, fontWeight: 600, color: "#a8a29e", marginBottom: 3, paddingInline: 4, letterSpacing: "0.06em", textTransform: "uppercase" }}>
-                                {mine ? "You" : msg.displayName}
+                                {mine ? "You" : fromHomeowner ? "Homeowner" : msg.displayName}
                               </span>
                             )}
-                            <div className={`bubble ${mine ? "bubble-mine" : "bubble-theirs"}`}>
-                              <p style={{ fontSize: 14, margin: 0, lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{msg.text}</p>
+                            <div className={`bubble ${mine ? "bubble-mine" : `bubble-theirs${fromHomeowner ? " bubble-homeowner" : ""}`}`}>
+                              {isSnapshot ? (
+                                <div style={{ width: "min(64vw, 280px)" }}>
+                                  {snapshotUrl ? (
+                                    <SecureSnapshotImage
+                                      src={snapshotUrl}
+                                      alt="Visitor snapshot"
+                                      visitorSessionId={selectedId}
+                                      className="aspect-video w-full rounded-xl bg-slate-100 object-cover"
+                                      fallback={
+                                        <div className="grid aspect-video w-full place-items-center rounded-xl bg-slate-100 text-xs font-bold text-slate-400">
+                                          Snapshot unavailable
+                                        </div>
+                                      }
+                                    />
+                                  ) : (
+                                    <div className="grid aspect-video w-full place-items-center rounded-xl bg-slate-100 text-xs font-bold text-slate-400">
+                                      Snapshot unavailable
+                                    </div>
+                                  )}
+                                  <p style={{ fontSize: 12, margin: "8px 0 0", lineHeight: 1.4, whiteSpace: "pre-wrap", wordBreak: "break-word", opacity: 0.8 }}>
+                                    {msg.text || "Visitor snapshot submitted."}
+                                  </p>
+                                </div>
+                              ) : (
+                                <p style={{ fontSize: 14, margin: 0, lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{msg.text}</p>
+                              )}
                               <div style={{ display: "flex", alignItems: "center", justifyContent: mine ? "flex-end" : "flex-start", gap: 6, marginTop: 5 }}>
                                 <span className="dm-mono" style={{ fontSize: 10, opacity: 0.5 }}>
                                   {formatClockTime(msg.at)}
@@ -668,7 +704,7 @@ export default function SecurityMessagesPage() {
                           e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
                         }}
                         onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(e); } }}
-                        placeholder="Message homeowner or visitor…"
+                        placeholder="Reply to homeowner…"
                       />
                       <button type="submit" className="send-btn" disabled={sending || !draft.trim()}>
                         <SendHorizontal size={15} color="#fff" />

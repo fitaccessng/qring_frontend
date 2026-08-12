@@ -1,6 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { getSubscriptionSummary } from "../services/paymentService";
-import { isSubscriptionFeatureEnabled, normalizeSubscriptionSummary } from "../utils/subscription";
+import {
+  canPerformSubscriptionAction,
+  getSubscriptionEntitlementState,
+  hasSubscriptionCategoryAccess,
+  isSubscriptionFeatureEnabled,
+  isSubscriptionPaidPlan,
+  isSubscriptionTrialLike,
+  normalizeSubscriptionSummary,
+  requiresSubscriptionUpgrade,
+  resolveSubscriptionLimit,
+  resolveSubscriptionNamedLimit,
+  resolveSubscriptionRetention,
+} from "../utils/subscription";
 
 export function hasSubscriptionFeature(subscription, featureKey) {
   return isSubscriptionFeatureEnabled(subscription, featureKey);
@@ -46,8 +58,30 @@ export default function useSubscription() {
       isBillPayer: Boolean(subscription?.isBillPayer),
       warningPhase: subscription?.warningPhase ?? null,
       inSignupTrial: Boolean(subscription?.inSignupTrial),
+      isTrialActive: isSubscriptionTrialLike(subscription),
+      isPaidPlan: isSubscriptionPaidPlan(subscription),
       hasFeature: (featureKey) => hasSubscriptionFeature(subscription, featureKey),
-      can: (actionKey) => subscription?.can?.(actionKey) ?? true,
+      canAccessFeature: (featureKey) => hasSubscriptionFeature(subscription, featureKey),
+      canPerformAction: (actionKey) => canPerformSubscriptionAction(subscription, actionKey),
+      can: (actionKey) => canPerformSubscriptionAction(subscription, actionKey),
+      hasAnalyticsAccess: () => hasSubscriptionCategoryAccess(subscription, "analytics"),
+      hasExportAccess: () => hasSubscriptionCategoryAccess(subscription, "exports"),
+      hasRealtimeAccess: () => hasSubscriptionCategoryAccess(subscription, "realtime"),
+      hasNotificationAccess: () => hasSubscriptionCategoryAccess(subscription, "notifications"),
+      hasMultiAdminAccess: () => hasSubscriptionCategoryAccess(subscription, "multiAdmin"),
+      hasMultiBranchAccess: () => hasSubscriptionCategoryAccess(subscription, "multiBranch"),
+      requiresUpgrade: (capabilityKey) => requiresSubscriptionUpgrade(subscription, capabilityKey),
+      getEntitlementState: ({ requiredFeature = "", requiredAction = "" } = {}) =>
+        getSubscriptionEntitlementState(subscription, { requiredFeature, requiredAction }),
+      resolveLimit: (limitOrOptions = {}, options = {}) => {
+        if (typeof limitOrOptions === "string") {
+          return resolveSubscriptionNamedLimit(subscription, limitOrOptions, options);
+        }
+        const { maxCount = 0, usedCount = 0, featureKey = "", actionKey = "" } = limitOrOptions ?? {};
+        return resolveSubscriptionLimit(subscription, { maxCount, usedCount, featureKey, actionKey });
+      },
+      resolveNamedLimit: (limitKey, options = {}) => resolveSubscriptionNamedLimit(subscription, limitKey, options),
+      resolveRetention: (retentionKey = "visitor_history") => resolveSubscriptionRetention(subscription, retentionKey),
     }),
     [subscription, loading, error]
   );

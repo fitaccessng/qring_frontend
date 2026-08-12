@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, expect } from "vitest";
 import { buildStartSessionCallPlan } from "../src/services/callRoutePlanner.js";
 
 test("buildStartSessionCallPlan prefers canonical call request inputs when visitor request data is present", () => {
@@ -12,15 +11,15 @@ test("buildStartSessionCallPlan prefers canonical call request inputs when visit
     hasVideo: true
   });
 
-  assert.equal(plan.canUseCanonicalRoute, true);
-  assert.deepEqual(plan.canonicalBody, {
+  expect(plan.canUseCanonicalRoute).toBe(true);
+  expect(plan.canonicalBody).toEqual({
     visitorSessionId: "visitor-session-123",
     visitorRequestId: "request-123",
     visitorName: "Visitor Example",
     type: "video",
     hasVideo: true
   });
-  assert.deepEqual(plan.legacyBody, {
+  expect(plan.legacyBody).toEqual({
     sessionId: "visitor-session-123",
     type: "video",
     hasVideo: true,
@@ -36,8 +35,8 @@ test("buildStartSessionCallPlan keeps security and realtime callers on the legac
     visitorToken: "visitor-token-1"
   });
 
-  assert.equal(plan.canUseCanonicalRoute, false);
-  assert.deepEqual(plan.legacyBody, {
+  expect(plan.canUseCanonicalRoute).toBe(false);
+  expect(plan.legacyBody).toEqual({
     sessionId: "legacy-session",
     type: "audio",
     hasVideo: false,

@@ -46,8 +46,6 @@ export default function EstatePlanPage() {
 
   const estatePercent = plan?.maxEstates ? Math.min(Math.round((plan.usedEstates / plan.maxEstates) * 100), 100) : 0;
   const homePercent = plan?.maxHomes ? Math.min(Math.round((plan.usedHomes / plan.maxHomes) * 100), 100) : 0;
-  const doorPercent = plan?.maxDoors ? Math.min(Math.round((plan.usedDoors / plan.maxDoors) * 100), 100) : 0;
-  const qrPercent = plan?.maxQrCodes ? Math.min(Math.round((plan.usedQrCodes / plan.maxQrCodes) * 100), 100) : 0;
   const featureCount = useMemo(() => (plan?.features || []).length, [plan]);
 
   return (
@@ -58,18 +56,18 @@ export default function EstatePlanPage() {
         description="Monitor plan capacity and stay ahead of usage limits."
         stats={[
           { label: "Estates", value: plan ? `${plan.usedEstates}/${plan.maxEstates || "∞"}` : "-", helper: "Portfolio usage" },
-          { label: "Homes", value: plan ? `${plan.usedHomes}/${plan.maxHomes || "∞"}` : "-", helper: "Unit usage" },
-          { label: "Doors", value: plan ? `${plan.usedDoors}/${plan.maxDoors}` : "-", helper: "Current usage" },
-          { label: "QR Codes", value: plan ? `${plan.usedQrCodes}/${plan.maxQrCodes}` : "-", helper: "Current usage" }
+          { label: "Houses/Units", value: plan ? `${plan.usedHomes}/${plan.maxHomes || "∞"}` : "-", helper: "Billable usage" },
+          { label: "Doors", value: plan ? `${plan.usedDoors}` : "-", helper: "Operational count" },
+          { label: "House QR", value: plan ? `${plan.usedQrCodes}` : "-", helper: "Registered houses" }
         ]}
       >
         <EstateMetricStrip
           items={[
             { label: "Plan", value: plan?.planName || plan?.plan || "-", helper: "Current estate tier" },
             { label: "Estates", value: plan ? `${plan.usedEstates}/${plan.maxEstates || "∞"}` : "-", helper: `${estatePercent}% used` },
-            { label: "Homes", value: plan ? `${plan.usedHomes}/${plan.maxHomes || "∞"}` : "-", helper: `${homePercent}% used` },
-            { label: "Doors", value: plan ? `${plan.usedDoors}/${plan.maxDoors}` : "-", helper: `${doorPercent}% used` },
-            { label: "QR", value: plan ? `${plan.usedQrCodes}/${plan.maxQrCodes}` : "-", helper: `${qrPercent}% used` }
+            { label: "Houses/Units", value: plan ? `${plan.usedHomes}/${plan.maxHomes || "∞"}` : "-", helper: `${homePercent}% used` },
+            { label: "Doors", value: plan ? `${plan.usedDoors}` : "-", helper: "Operational count" },
+            { label: "House QR", value: plan ? `${plan.usedQrCodes}` : "-", helper: "One per registered house" }
           ]}
         />
 
@@ -94,23 +92,21 @@ export default function EstatePlanPage() {
                   <div className="text-right text-xs text-blue-100">
                     <p>Admins: {plan.maxAdmins || 1}</p>
                     <p>Estates left: {plan.remainingEstates}</p>
-                    <p>Homes left: {plan.remainingHomes}</p>
-                    <p>Doors left: {plan.remainingDoors}</p>
-                    <p>QR left: {plan.remainingQrCodes}</p>
+                    <p>Houses/Units left: {plan.remainingHomes}</p>
+                    <p>Doors configured: {plan.usedDoors}</p>
+                    <p>House QR active: {plan.usedQrCodes}</p>
                   </div>
                 </div>
               </div>
 
               <UsageBar label={`Estates ${plan.usedEstates}/${plan.maxEstates || "∞"}`} percent={estatePercent} />
-              <UsageBar label={`Homes ${plan.usedHomes}/${plan.maxHomes || "∞"}`} percent={homePercent} />
-              <UsageBar label={`Doors ${plan.usedDoors}/${plan.maxDoors}`} percent={doorPercent} />
-              <UsageBar label={`QR Codes ${plan.usedQrCodes}/${plan.maxQrCodes}`} percent={qrPercent} />
+              <UsageBar label={`Houses/Units ${plan.usedHomes}/${plan.maxHomes || "∞"}`} percent={homePercent} />
 
               <div className="grid gap-3 sm:grid-cols-4">
                 <EstateInfoTile icon={<Building2 className="h-5 w-5" />} label="Estate Usage" value={`${plan.usedEstates}`} detail={`Remaining ${plan.remainingEstates}`} />
-                <EstateInfoTile icon={<Home className="h-5 w-5" />} label="Home Usage" value={`${plan.usedHomes}`} detail={`Remaining ${plan.remainingHomes}`} />
-                <EstateInfoTile icon={<DoorClosed className="h-5 w-5" />} label="Door Usage" value={`${plan.usedDoors}`} detail={`Remaining ${plan.remainingDoors}`} />
-                <EstateInfoTile icon={<QrCode className="h-5 w-5" />} label="QR Capacity" value={`${plan.usedQrCodes}`} detail={`Remaining ${plan.remainingQrCodes}`} />
+                <EstateInfoTile icon={<Home className="h-5 w-5" />} label="House/Unit Usage" value={`${plan.usedHomes}`} detail={`Remaining ${plan.remainingHomes}`} />
+                <EstateInfoTile icon={<DoorClosed className="h-5 w-5" />} label="Doors" value={`${plan.usedDoors}`} detail="Operational count" />
+                <EstateInfoTile icon={<QrCode className="h-5 w-5" />} label="House QR" value={`${plan.usedQrCodes}`} detail="One per registered house" />
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
@@ -118,7 +114,7 @@ export default function EstatePlanPage() {
                 <div className="rounded-[1.6rem] border border-amber-200 bg-amber-50 p-4 shadow-[0_12px_28px_rgba(15,23,42,0.08)]">
                   <p className="text-xs font-bold uppercase tracking-wide text-amber-700">Policy Snapshot</p>
                   <p className="mt-3 text-sm leading-relaxed text-amber-900">
-                    Estate Starter now enforces one estate with up to three homes and three doors. Creation pages now follow the same backend rule.
+                    Estate capacity is based on registered Houses/Units. House QR codes, gates, guards, residents, and visitor passes do not add billable units.
                   </p>
                 </div>
               </div>

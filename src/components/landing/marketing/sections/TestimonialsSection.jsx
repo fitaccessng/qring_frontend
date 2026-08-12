@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 const defaultTestimonials = [
   {
     name: "Chukwudi Okafor",
-    role: "Homeowner, Abuja",
+    role: "Resident, Abuja",
     quote: "Approvals are instant now. I see who is at the gate and respond in seconds — even when I'm in a meeting.",
   },
   {
@@ -37,7 +37,7 @@ export default function TestimonialsSection({ testimonials = defaultTestimonials
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-white/60">Trust</p>
             <h2 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl">Teams switch because it’s clearer</h2>
             <p className="mt-4 max-w-xl text-base leading-relaxed text-white/70">
-              The best visitor management system is the one people actually use. QRing keeps the flow simple for guards and homeowners, and gives managers
+              The best visitor management system is the one people actually use. QRing keeps the flow simple for guards and residents, and gives managers
               the records they need.
             </p>
           </div>
@@ -82,4 +82,3 @@ export default function TestimonialsSection({ testimonials = defaultTestimonials
     </section>
   );
 }
-

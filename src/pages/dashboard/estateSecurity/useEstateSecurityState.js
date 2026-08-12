@@ -60,7 +60,7 @@ export function buildSecuritySettingsPayload({
 }
 
 export function useEstateSecurityState() {
-  const { overview, estateId, loading: overviewLoading, error, setError } = useEstateOverviewState();
+  const { overview, estateId, setEstateId: setOverviewEstateId, loading: overviewLoading, error, setError } = useEstateOverviewState();
   const [selectedEstateId, setSelectedEstateId] = useState(estateId || "");
   const [securityUsers, setSecurityUsers] = useState([]);
   const [securityRules, setSecurityRules] = useState(defaultSecurityRules);
@@ -75,8 +75,24 @@ export function useEstateSecurityState() {
     if (estateId && !selectedEstateId) setSelectedEstateId(estateId);
   }, [estateId, selectedEstateId]);
 
-  const loadSecurity = useCallback(async () => {
+  const selectEstateId = useCallback((nextEstateId) => {
+    const normalized = String(nextEstateId || "").trim();
+    setSelectedEstateId(normalized);
+    setOverviewEstateId(normalized);
+  }, [setOverviewEstateId]);
+
+  useEffect(() => {
     if (!selectedEstateId) return;
+    const overviewUsers = Array.isArray(overview?.securityUsers) ? overview.securityUsers : [];
+    const scopedUsers = overviewUsers.filter((user) => String(user.estateId || "") === String(selectedEstateId));
+    if (scopedUsers.length) setSecurityUsers(scopedUsers);
+  }, [overview?.securityUsers, selectedEstateId]);
+
+  const loadSecurity = useCallback(async () => {
+    if (!selectedEstateId) {
+      setLoading(Boolean(overviewLoading));
+      return;
+    }
     setLoading(true);
     try {
       const [users, settings] = await Promise.all([
@@ -140,13 +156,16 @@ export function useEstateSecurityState() {
 
   return {
     overview,
+    estates: overview?.estates ?? [],
     currentEstate,
     estateId: selectedEstateId,
+    setEstateId: selectEstateId,
     overviewLoading,
     loading,
     error,
     securityUsers: normalizedUsers,
     setSecurityUsers,
+    refreshSecurity: loadSecurity,
     stats,
     securityRules,
     setSecurityRules,

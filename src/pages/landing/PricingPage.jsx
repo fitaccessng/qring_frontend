@@ -17,286 +17,103 @@ import LandingPageNavbar from "../../components/landing/marketing/sections/Landi
 
 const pricingSections = [
   {
-    id: "homeowner",
-    label: "Homeowner",
-    title: "Homeowner",
-    eyebrow: "Personal access control",
-    description: "Simple plans for homes that want secure visitor approval, flexible scheduling, and stronger privacy controls.",
-    icon: DoorClosed,
-    plans: [
-      {
-        name: "Free",
-        price: "₦0",
-        cadence: "/month",
-        capacity: "1 Home",
-        cta: "Get Started Free",
-        to: "/signup",
-        icon: DoorClosed,
-        features: [
-          "QR visitor invitations",
-          "Visitor approval",
-          "Visitor history",
-          "Basic notifications",
-          "Entry & exit records",
-          "Mobile access"
-        ]
-      },
-      {
-        name: "Home Pro",
-        price: "₦2,500",
-        cadence: "/month",
-        capacity: "1 Home",
-        cta: "Choose Home Pro",
-        to: "/signup",
-        icon: Sparkles,
-        features: [
-          "Everything in Free",
-          "Visitor scheduling",
-          "Call & chat verification",
-          "Advanced notifications",
-          "Temporary visitor passes",
-          "Frequent visitor management",
-          "Longer visitor history"
-        ]
-      },
-      {
-        name: "Home Premium",
-        price: "₦4,500",
-        cadence: "/month",
-        capacity: "Multiple Homes or Entrances",
-        cta: "Choose Home Premium",
-        to: "/signup",
-        icon: Crown,
-        popular: true,
-        features: [
-          "Everything in Home Pro",
-          "Multiple homes/gates",
-          "Access time windows",
-          "Family member management",
-          "Priority support",
-          "Enhanced privacy controls",
-          "Activity insights"
-        ]
-      }
-    ]
-  },
-  {
     id: "estate",
     label: "Estate",
-    title: "Estate",
+    title: "Estate Security Plans",
     eyebrow: "Managed communities",
-    description: "Flexible estate plans with resident management, visitor controls, analytics, and growth-friendly administration.",
+    description: "Plans for estates that need resident management, gate records, visitor approvals, security operations, and clear activity history.",
     icon: Building2,
     plans: [
       {
-        name: "Starter Estate",
-        price: "₦0",
+        name: "Starter",
+        price: "₦15,000",
         cadence: "/month",
-        capacity: "Up to 3 Houses",
-        cta: "Start Free Trial",
+        capacity: "Up to 8 Houses/Units",
+        cta: "Start 30-Day Free Trial",
         to: "/signup",
         icon: Building2,
         features: [
-          "Full platform access",
-          "Resident management",
-          "Visitor approvals",
-          "QR visitor passes",
-          "Security dashboard",
-          "30-day free trial"
+          "30-day free trial",
+          "Register residents and security guards",
+          "Approve visitors from phone",
+          "Each registered house gets its own QR code",
+          "Record visitor entry and exit",
+          "See visitor history by house",
+          "Digital gate records"
         ]
       },
       {
-        name: "Estate Basic",
-        price: "₦6,000",
+        name: "Basic",
+        price: "₦25,000",
         cadence: "/month",
-        capacity: "Up to 10 Houses",
-        cta: "Start Basic",
+        capacity: "Up to 30 Houses/Units",
+        cta: "Choose Basic",
         to: "/signup",
         icon: ShieldCheck,
         features: [
           "Everything in Starter",
-          "Realtime alerts",
-          "Visitor logs",
-          "Resident directory",
-          "Mobile dashboard",
-          "Gate access records",
-          "Visitor search"
+          "Resident vehicle registration",
+          "Delivery and dispatch rider approvals",
+          "Instant resident alerts",
+          "Emergency alerts to security",
+          "See visitors currently inside",
+          "Daily visitor and gate activity"
         ]
       },
       {
-        name: "Estate Plus",
-        price: "₦9,000",
+        name: "Plus",
+        price: "₦45,000",
         cadence: "/month",
-        capacity: "Up to 15 Houses",
+        capacity: "Up to 50 Houses/Units",
         cta: "Choose Plus",
         to: "/signup",
         icon: BadgeCheck,
         popular: true,
         features: [
           "Everything in Basic",
-          "Visitor scheduling",
-          "Access time windows",
-          "Call & chat verification",
-          "Security announcements",
-          "Delivery management",
-          "Guest pre-registration"
+          "Schedule future visitors",
+          "Expiring and frequent visitor passes",
+          "Visitor access days and time windows",
+          "Video and audio verification",
+          "Package tracking",
+          "Security incident reporting"
         ]
       },
       {
-        name: "Estate Growth",
-        price: "₦18,000",
+        name: "Growth",
+        price: "₦85,000",
         cadence: "/month",
-        capacity: "Up to 30 Houses",
+        capacity: "Up to 100 Houses/Units",
         cta: "Choose Growth",
         to: "/signup",
         icon: Layers3,
         features: [
           "Everything in Plus",
-          "Multiple administrators",
-          "Analytics dashboard",
-          "Activity tracking",
-          "Estate reports",
-          "Staff management",
-          "Security insights"
+          "Multiple estate administrators",
+          "Decide what each manager can access",
+          "Daily, weekly, and monthly visitor stats",
+          "Download visitor and resident records",
+          "Download security and gate reports",
+          "Keep a history of management activities"
         ]
       },
       {
-        name: "Estate Pro",
-        price: "₦30,000",
-        cadence: "/month",
-        capacity: "Up to 50 Houses",
-        cta: "Start Pro",
-        to: "/signup",
-        icon: Landmark,
-        features: [
-          "Everything in Growth",
-          "Advanced analytics",
-          "Security audit logs",
-          "Custom administrator roles",
-          "Priority support",
-          "Data export",
-          "Enhanced reporting"
-        ]
-      },
-      {
-        name: "Enterprise Estate",
+        name: "Pro",
         price: "Custom Pricing",
         cadence: "",
-        capacity: "Unlimited Houses",
-        cta: "Contact Sales",
-        to: "/contact",
-        icon: Crown,
-        enterprise: true,
-        features: [
-          "Everything in Pro",
-          "Multi-location",
-          "API",
-          "SLA",
-          "Dedicated support",
-          "Custom integrations",
-          "Staff training"
-        ]
-      }
-    ]
-  },
-  {
-    id: "office",
-    label: "Office",
-    title: "Office",
-    eyebrow: "Workplace reception",
-    description: "Reception-ready plans for offices that need visitor check-in, attendance, security alerts, and multi-branch visibility.",
-    icon: BriefcaseBusiness,
-    plans: [
-      {
-        name: "Office Starter",
-        price: "₦8,000",
-        cadence: "/month",
-        capacity: "Up to 10 Employees",
-        cta: "Start Office",
-        to: "/signup",
-        icon: BriefcaseBusiness,
-        features: [
-          "Visitor management",
-          "Reception dashboard",
-          "QR visitor check-in",
-          "Employee directory",
-          "Visitor history",
-          "Email notifications"
-        ]
-      },
-      {
-        name: "Office Business",
-        price: "₦15,000",
-        cadence: "/month",
-        capacity: "Up to 25 Employees",
-        cta: "Choose Business",
-        to: "/signup",
-        icon: Users,
-        features: [
-          "Everything in Starter",
-          "Visitor scheduling",
-          "Host approval",
-          "Delivery management",
-          "Employee attendance",
-          "Visitor badges",
-          "Activity reports"
-        ]
-      },
-      {
-        name: "Office Professional",
-        price: "₦25,000",
-        cadence: "/month",
-        capacity: "Up to 50 Employees",
-        cta: "Choose Professional",
-        to: "/signup",
-        icon: BadgeCheck,
-        popular: true,
-        features: [
-          "Everything in Business",
-          "Multiple receptionists",
-          "Department management",
-          "Role permissions",
-          "Security alerts",
-          "Meeting visitor management",
-          "Advanced reporting"
-        ]
-      },
-      {
-        name: "Office Growth",
-        price: "₦40,000",
-        cadence: "/month",
-        capacity: "Up to 100 Employees",
-        cta: "Choose Growth",
-        to: "/signup",
-        icon: Layers3,
-        features: [
-          "Everything in Professional",
-          "Multiple branches",
-          "Multi-admin",
-          "Advanced analytics",
-          "Audit logs",
-          "Priority support",
-          "Export reports"
-        ]
-      },
-      {
-        name: "Office Enterprise",
-        price: "Custom Pricing",
-        cadence: "",
-        capacity: "Unlimited Employees",
+        capacity: "Custom house capacity",
         cta: "Contact Sales",
         to: "/contact",
         icon: Crown,
         enterprise: true,
         features: [
           "Everything in Growth",
-          "Unlimited branches",
-          "API Access",
-          "SSO",
-          "Dedicated account manager",
-          "Custom branding",
-          "Custom integrations",
-          "SLA support"
+          "Multiple estates under one account",
+          "Central dashboard for estate groups",
+          "Unlimited administrators and security guards",
+          "Custom reports and estate branding",
+          "Dedicated onboarding and training",
+          "Dedicated account support"
         ]
       }
     ]
@@ -431,14 +248,14 @@ export default function PricingPage() {
               Qring pricing
             </div>
             <h1 className="font-heading text-4xl font-black tracking-tight text-[#00346f] sm:text-5xl lg:text-6xl">
-              Plans for homes, estates, and offices.
+              Plans for estate security and visitor access.
             </h1>
             <p className="mt-5 max-w-3xl text-base leading-8 text-slate-600 sm:text-lg">
-              Pick the access-control plan that matches your front gate, reception desk, or managed community without changing how your existing QRing workflows operate.
+              Pick the estate plan that matches your house count, gate operations, and resident visitor workflow without changing how QRing works.
             </p>
           </div>
 
-          <nav className="grid grid-cols-1 gap-2 rounded-lg border border-slate-200 bg-white p-2 shadow-sm sm:grid-cols-3" aria-label="Pricing sections">
+          <nav className="grid grid-cols-1 gap-2 rounded-lg border border-slate-200 bg-white p-2 shadow-sm" aria-label="Pricing sections">
             {pricingSections.map((section) => (
               <a
                 key={section.id}
@@ -462,7 +279,7 @@ export default function PricingPage() {
             <div>
               <h2 className="font-heading text-3xl font-black tracking-tight text-[#00346f]">Need a custom rollout?</h2>
               <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
-                Large communities and workplaces can speak with QRing about onboarding, integrations, training, and SLA-backed support.
+                Large estates and gated communities can speak with QRing about onboarding, integrations, training, and dedicated support.
               </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row md:flex-col lg:flex-row">

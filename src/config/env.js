@@ -50,7 +50,7 @@ const defaultSocketUrl =
   typeof window !== "undefined" && isDev
     ? ``
     : productionBackendOrigin;
-const windowOrigin = typeof window !== "undefined" && window.location ? window.location.origin : "";
+const windowOrigin = (typeof window !== "undefined" && window?.location && typeof window.location.origin === "string") ? window.location.origin : "";
 const defaultPublicAppUrl =
   windowOrigin && !isNativeRuntime && !isMobileAppBuild
     ? windowOrigin
@@ -167,7 +167,7 @@ const resolvedApiBaseUrl = resolveApiBaseUrl(runtimeApiBaseSource);
 const resolvedSocketUrl = (() => {
   if (isDev && typeof window !== "undefined" && !(importMetaEnv.VITE_SOCKET_URL ?? "").trim()) {
     // Keep Socket.IO same-origin in local dev so Vite proxy handles upstream CORS safely.
-    return trimTrailingSlash(window.location.origin);
+    return trimTrailingSlash(window?.location?.origin || "");
   }
   const explicit = resolveSocketUrl(importMetaEnv.VITE_SOCKET_URL);
   if ((importMetaEnv.VITE_SOCKET_URL ?? "").trim()) return explicit;

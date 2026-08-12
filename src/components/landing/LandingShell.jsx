@@ -160,7 +160,7 @@ export default function LandingShell({ children, hideHeader = false, hideFooter 
                   </div>
                 </div>
                 <p className="mt-4 max-w-sm text-sm text-slate-600 dark:text-slate-400">
-                  Qring gives estates and homeowners a secure, auditable, and human-friendly way to manage access.
+                  Qring gives estates, residents, and security teams a secure, auditable, and human-friendly way to manage access.
                 </p>
               </div>
               <div className="grid gap-6 sm:grid-cols-3">

@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, expect } from "vitest";
 
 globalThis.window = globalThis.window || {
   clearTimeout,
@@ -57,10 +56,11 @@ test("reusing the same namespace socket does not create duplicate listeners", ()
     withCredentials: true
   });
 
-  assert.equal(first, second);
-  assert.equal(socketFactoryCalls.length, 1);
-  assert.equal(
-    socketClient.buildNamespaceSocketKey("/realtime/signaling", { autoConnect: true, reconnection: true, withCredentials: true }),
+  expect(first).toBe(second);
+  expect(socketFactoryCalls.length).toBe(1);
+  expect(
+    socketClient.buildNamespaceSocketKey("/realtime/signaling", { autoConnect: true, reconnection: true, withCredentials: true })
+  ).toBe(
     socketClient.buildNamespaceSocketKey("/realtime/signaling", { autoConnect: true, reconnection: true, withCredentials: true })
   );
 });

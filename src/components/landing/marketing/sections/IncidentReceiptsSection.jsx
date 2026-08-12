@@ -71,15 +71,15 @@ export default function IncidentReceiptsSection() {
               <ReceiptRow label="Timestamp" value="2026-03-13 18:42" />
               <ReceiptRow label="Gate" value="Gate 1" />
               <ReceiptRow label="Visitor" value="Chinedu Okeke" />
-              <ReceiptRow label="Resident" value="Unit 14B (Homeowner)" />
-              <ReceiptRow label="Decision" value="Approved by homeowner" tone="text-emerald-700 dark:text-emerald-200" />
+              <ReceiptRow label="Resident" value="Unit 14B" />
+              <ReceiptRow label="Decision" value="Approved by resident" tone="text-emerald-700 dark:text-emerald-200" />
               <ReceiptRow label="Audit" value="Recorded + exportable" />
             </div>
 
             <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-5 text-sm dark:border-slate-800 dark:bg-slate-900/40">
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">What gets logged</p>
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                {["Request created", "Snapshot captured", "Homeowner decision", "Guard visibility", "Entry outcome", "Search + export"].map((x) => (
+                {["Request created", "Snapshot captured", "Resident decision", "Guard visibility", "Entry outcome", "Search + export"].map((x) => (
                   <div key={x} className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-950">
                     <span className="h-2 w-2 rounded-full bg-emerald-500" />
                     <span className="text-sm font-semibold text-slate-950 dark:text-white">{x}</span>
@@ -93,4 +93,3 @@ export default function IncidentReceiptsSection() {
     </section>
   );
 }
-

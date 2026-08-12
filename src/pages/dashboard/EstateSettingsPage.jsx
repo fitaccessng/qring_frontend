@@ -17,10 +17,28 @@ import {
 } from "lucide-react";
 import { useAuth } from "../../state/AuthContext";
 import { getEstateSettingsSummary, getEstateSettingsSummarySnapshot } from "../../services/estateService";
+import { updateCurrentUserProfile } from "../../services/authService";
+import { disablePushSubscription, getPushSubscriptionStatus } from "../../services/notificationService";
+import { clearLastFcmPushToken, getLastFcmPushToken, registerFcmPushSubscription } from "../../services/pushMessagingService";
+import { isNativeApp } from "../../utils/nativeRuntime";
+import { showError, showSuccess } from "../../utils/flash";
 import { useTheme } from "../../state/ThemeContext";
 import { useLanguage } from "../../state/LanguageContext";
 import { estateFieldClassName } from "../../components/mobile/EstateManagerPageShell";
 import BottomSheet from "../../components/system/BottomSheet";
+
+const ACTIVE_ESTATE_STORAGE_KEY = "qring.activeEstateId";
+
+function readActiveEstateId() {
+  if (typeof window === "undefined") return "";
+  return window.localStorage.getItem(ACTIVE_ESTATE_STORAGE_KEY) || "";
+}
+
+function writeActiveEstateId(estateId) {
+  if (typeof window === "undefined") return;
+  if (estateId) window.localStorage.setItem(ACTIVE_ESTATE_STORAGE_KEY, estateId);
+  else window.localStorage.removeItem(ACTIVE_ESTATE_STORAGE_KEY);
+}
 
 const PAGE_TRANSLATIONS = {
   en: {
@@ -85,16 +103,19 @@ const PAGE_TRANSLATIONS = {
 export default function EstateSettingsPage() {
   const cachedSummary = getEstateSettingsSummarySnapshot();
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
   const { isDark, toggleTheme } = useTheme();
   const { language, languageOptions, selectedLanguage, setLanguage } = useLanguage();
   const copy = PAGE_TRANSLATIONS[language] || PAGE_TRANSLATIONS.en;
   
   const [summary, setSummary] = useState(() => cachedSummary || { estates: [], doors: [], subscription: {} });
-  const [selectedEstateId, setSelectedEstateId] = useState(() => cachedSummary?.estates?.[0]?.id || "");
+  const [selectedEstateId, setSelectedEstateIdState] = useState(() => readActiveEstateId() || cachedSummary?.estates?.[0]?.id || "");
   const [loading, setLoading] = useState(() => !cachedSummary);
   const [loadError, setLoadError] = useState("");
   const [editValues, setEditValues] = useState({});
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [pushState, setPushState] = useState({ status: "checking", enabled: false, message: "Checking notification state..." });
+  const [savingPush, setSavingPush] = useState(false);
   const [activeModal, setActiveModal] = useState(null);
   const [notificationPrefs, setNotificationPrefs] = useState(() => {
     try {
@@ -108,9 +129,126 @@ export default function EstateSettingsPage() {
     }
   });
 
+  function setSelectedEstateId(estateId) {
+    setSelectedEstateIdState(estateId || "");
+    writeActiveEstateId(estateId || "");
+  }
+
   useEffect(() => {
     localStorage.setItem("qring_estate_notification_preferences", JSON.stringify(notificationPrefs));
   }, [notificationPrefs]);
+
+  useEffect(() => {
+    let active = true;
+    async function loadPushState() {
+      try {
+        if (isNativeApp()) {
+          if (active) setPushState({ status: "unsupported", enabled: false, message: "Mobile push registration is handled by the native shell." });
+          return;
+        }
+        if (typeof window === "undefined" || typeof window.Notification === "undefined" || !("serviceWorker" in navigator)) {
+          if (active) setPushState({ status: "unsupported", enabled: false, message: "This browser does not support Qring web push." });
+          return;
+        }
+        if (window.Notification.permission === "denied") {
+          if (active) setPushState({ status: "permission_denied", enabled: false, message: "Browser permission is blocked. Enable notifications in browser settings." });
+          return;
+        }
+        const status = await getPushSubscriptionStatus();
+        if (!active) return;
+        setPushState({
+          status: status.enabled ? "enabled" : "disabled",
+          enabled: Boolean(status.enabled),
+          message: status.enabled ? `${status.activeCount || 1} device token registered.` : "Notifications are disabled for this browser.",
+        });
+        setNotificationPrefs((current) => ({ ...current, pushNotifications: Boolean(status.enabled) }));
+      } catch (error) {
+        if (active) setPushState({ status: "registration_failed", enabled: false, message: error?.message || "Unable to check notification state." });
+      }
+    }
+    loadPushState();
+    return () => { active = false; };
+  }, []);
+
+  async function handleProfileSave() {
+    if (savingProfile) return;
+    const fullName = String(editValues.fullName ?? user?.fullName ?? "").trim();
+    const phone = String(editValues.phone ?? user?.phone ?? "").trim();
+    if (!fullName) {
+      showError("Full name is required.");
+      return;
+    }
+    setSavingProfile(true);
+    try {
+      const updated = await updateCurrentUserProfile({ fullName, phone: phone || null });
+      updateUser((current) => ({ ...(current || {}), ...(updated || {}) }));
+      setEditValues({});
+      setActiveModal(null);
+      showSuccess("Profile updated.");
+    } catch (error) {
+      showError(error?.message || "Failed to update profile.");
+    } finally {
+      setSavingProfile(false);
+    }
+  }
+
+  async function handlePushToggle(nextEnabled) {
+    if (savingPush) return;
+    setSavingPush(true);
+    try {
+      if (!nextEnabled) {
+        const token = getLastFcmPushToken();
+        await disablePushSubscription(token ? { provider: "fcm", token } : { provider: "fcm" });
+        clearLastFcmPushToken();
+        setNotificationPrefs((current) => ({ ...current, pushNotifications: false }));
+        setPushState({ status: "disabled", enabled: false, message: "Notifications are disabled for this browser." });
+        showSuccess("Notifications disabled.");
+        return;
+      }
+
+      if (isNativeApp()) {
+        setPushState({ status: "unsupported", enabled: false, message: "Mobile push registration is handled by the native shell." });
+        return;
+      }
+      if (typeof window === "undefined" || typeof window.Notification === "undefined" || !("serviceWorker" in navigator)) {
+        setPushState({ status: "unsupported", enabled: false, message: "This browser does not support Qring web push." });
+        return;
+      }
+      const permission = window.Notification.permission === "granted" ? "granted" : await window.Notification.requestPermission();
+      if (permission === "denied") {
+        setPushState({ status: "permission_denied", enabled: false, message: "Browser permission is blocked. Enable notifications in browser settings." });
+        setNotificationPrefs((current) => ({ ...current, pushNotifications: false }));
+        return;
+      }
+      if (permission !== "granted") {
+        setPushState({ status: "disabled", enabled: false, message: "Notification permission was not granted." });
+        setNotificationPrefs((current) => ({ ...current, pushNotifications: false }));
+        return;
+      }
+      const result = await registerFcmPushSubscription();
+      if (result.status !== "registered") {
+        const message = {
+          unsupported: "This browser does not support Qring web push.",
+          missing_vapid_key: "Push is not configured for this environment.",
+          no_token: "No push token was returned by the browser.",
+          registration_failed: "Push token registration failed.",
+          permission_denied: "Browser permission is blocked.",
+          permission_required: "Notification permission is required.",
+        }[result.status] || "Unable to enable notifications.";
+        setPushState({ status: result.status, enabled: false, message });
+        setNotificationPrefs((current) => ({ ...current, pushNotifications: false }));
+        return;
+      }
+      setNotificationPrefs((current) => ({ ...current, pushNotifications: true }));
+      setPushState({ status: "enabled", enabled: true, message: "Notifications are enabled for this browser." });
+      showSuccess("Notifications enabled.");
+    } catch (error) {
+      setPushState({ status: "registration_failed", enabled: false, message: error?.message || "Push registration failed." });
+      setNotificationPrefs((current) => ({ ...current, pushNotifications: false }));
+    } finally {
+      setSavingPush(false);
+    }
+  }
 
   useEffect(() => {
     let active = true;
@@ -326,8 +464,8 @@ export default function EstateSettingsPage() {
           open={activeModal === "personalDetails"}
           title={copy.personal}
           onClose={() => setActiveModal(null)}
-          onAction={() => setActiveModal(null)}
-          actionLabel={copy.saveChanges}
+          onAction={handleProfileSave}
+          actionLabel={savingProfile ? "Saving..." : copy.saveChanges}
         >
           <div className="space-y-4">
             <div className="space-y-1.5">
@@ -340,13 +478,23 @@ export default function EstateSettingsPage() {
               />
             </div>
             <div className="space-y-1.5">
+              <span className="block text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 ml-0.5">Phone</span>
+              <input 
+                type="tel" 
+                className={estateFieldClassName}
+                defaultValue={user?.phone || ""} 
+                onChange={(e) => setEditValues({ ...editValues, phone: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1.5">
               <span className="block text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 ml-0.5">{copy.email}</span>
               <input 
                 type="email" 
                 className={estateFieldClassName}
                 defaultValue={user?.email || ""} 
-                onChange={(e) => setEditValues({ ...editValues, email: e.target.value })}
+                readOnly
               />
+              <p className="text-[10px] font-semibold text-slate-400">Email is your sign-in identity and is managed through account security.</p>
             </div>
           </div>
         </SettingsSheet>
@@ -466,11 +614,17 @@ export default function EstateSettingsPage() {
             <PreferenceSwitch
               label={copy.push}
               description={copy.pushHint}
-              checked={notificationPrefs.pushNotifications}
+              checked={pushState.enabled}
+              disabled={savingPush}
               onLabel={copy.on}
               offLabel={copy.off}
-              onChange={(checked) => setNotificationPrefs((current) => ({ ...current, pushNotifications: checked }))}
+              onChange={handlePushToggle}
             />
+            <p className={`rounded-2xl px-3 py-2 text-[10px] font-bold uppercase tracking-wider ${
+              pushState.enabled ? "bg-emerald-50 text-emerald-700" : "bg-slate-50 text-slate-500 dark:bg-slate-950/40 dark:text-slate-400"
+            }`}>
+              {pushState.message}
+            </p>
             
             <PreferenceSwitch
               label={copy.emailNotifications}
@@ -521,7 +675,7 @@ export default function EstateSettingsPage() {
   );
 }
 
-function PreferenceSwitch({ label, description, checked, onChange, onLabel = "On", offLabel = "Off" }) {
+function PreferenceSwitch({ label, description, checked, onChange, disabled = false, onLabel = "On", offLabel = "Off" }) {
   return (
     <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-100/40 bg-slate-50/50 p-3.5 dark:border-slate-900/40 dark:bg-slate-950/40">
       <div className="min-w-0">
@@ -534,6 +688,7 @@ function PreferenceSwitch({ label, description, checked, onChange, onLabel = "On
         aria-checked={checked}
         aria-label={`${checked ? "Turn off" : "Turn on"} ${label}`}
         onClick={() => onChange(!checked)}
+        disabled={disabled}
         className="flex min-h-11 shrink-0 items-center gap-2 rounded-xl px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
       >
         <span className="min-w-7 text-right text-[10px] font-black uppercase text-slate-500 dark:text-slate-300">{checked ? onLabel : offLabel}</span>

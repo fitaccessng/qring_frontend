@@ -107,7 +107,7 @@ export default function HeroSection() {
               Smart Visitor Management for Modern Estates.
             </h1>
             <p className="mt-5 max-w-xl text-base leading-relaxed text-slate-600 sm:text-lg dark:text-slate-300">
-              Replace gate logbooks with QR-based visitor approvals. Visitors scan. Homeowners approve. Security stays in control.
+              Replace gate logbooks with QR-based visitor approvals. Visitors scan. Residents approve. Security stays in control.
             </p>
 
             <div className="mt-7 flex flex-wrap gap-3">
@@ -144,4 +144,3 @@ export default function HeroSection() {
     </section>
   );
 }
-

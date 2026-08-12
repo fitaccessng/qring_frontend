@@ -1,8 +1,5 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, expect } from "vitest";
 import { Capacitor } from "@capacitor/core";
-
-const nativeRuntimeModuleUrl = new URL("../src/utils/nativeRuntime.js", import.meta.url);
 
 function resetCapacitorMocks() {
   Capacitor.getPlatform = undefined;
@@ -14,8 +11,9 @@ test("shouldUseGoogleAuth enables Google auth for native app runtimes", async ()
   Capacitor.isNativePlatform = () => true;
   Capacitor.getPlatform = () => "android";
 
-  const { shouldUseGoogleAuth } = await import(`${nativeRuntimeModuleUrl.href}?t=${Date.now()}`);
-  assert.equal(shouldUseGoogleAuth(), true);
+  // Use a relative import specifier so the test runner resolves the module
+  const { shouldUseGoogleAuth } = await import("../src/utils/nativeRuntime.js?t=" + Date.now());
+  expect(shouldUseGoogleAuth()).toBe(true);
 });
 
 test("shouldUseGoogleAuth stays enabled for web runtimes", async () => {
@@ -23,6 +21,6 @@ test("shouldUseGoogleAuth stays enabled for web runtimes", async () => {
   Capacitor.isNativePlatform = () => false;
   Capacitor.getPlatform = () => "web";
 
-  const { shouldUseGoogleAuth } = await import(`${nativeRuntimeModuleUrl.href}?t=${Date.now()}`);
-  assert.equal(shouldUseGoogleAuth(), true);
+  const { shouldUseGoogleAuth } = await import("../src/utils/nativeRuntime.js?t=" + Date.now());
+  expect(shouldUseGoogleAuth()).toBe(true);
 });

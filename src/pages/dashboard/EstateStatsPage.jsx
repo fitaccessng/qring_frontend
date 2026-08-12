@@ -15,9 +15,12 @@ import {
   TrendingDown
 } from 'lucide-react';
 import { getEstateStatsSummary, getEstateStatsSummarySnapshot } from "../../services/estateService";
+import useSubscription from "../../hooks/useSubscription";
+import { isSubscriptionEntitled } from "../../utils/subscription";
 
 export default function EstateStatsPage() {
   const navigate = useNavigate();
+  const { subscription, loading: subscriptionLoading } = useSubscription();
   const [summary, setSummary] = useState(() => getEstateStatsSummarySnapshot());
   const [loading, setLoading] = useState(() => !getEstateStatsSummarySnapshot());
   const [error, setError] = useState("");
@@ -51,7 +54,8 @@ export default function EstateStatsPage() {
     };
   }, [summary]);
 
-  const restricted = !loading && !summary && Boolean(error);
+  const entitled = isSubscriptionEntitled(subscription, { requiredFeature: "analytics" });
+  const restricted = !subscriptionLoading && !entitled && !loading && !summary && Boolean(error);
 
   return (
     <div className="bg-slate-50/50 min-h-screen font-sans pb-32 dark:bg-slate-950 text-slate-900 dark:text-slate-100 antialiased flex flex-col selection:bg-indigo-100 dark:selection:bg-indigo-950/40">
@@ -110,15 +114,15 @@ export default function EstateStatsPage() {
             <div className="w-14 h-14 bg-indigo-50 dark:bg-indigo-500/10 rounded-2xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 mb-5">
               <Lock size={24} />
             </div>
-            <h2 className="text-lg font-black text-slate-900 dark:text-white">Premium Feature Locked</h2>
+            <h2 className="text-lg font-black text-slate-900 dark:text-white">Analytics unavailable</h2>
             <p className="mt-2 text-slate-500 dark:text-slate-400 text-xs font-medium max-w-xs mx-auto leading-relaxed">
-              Historical trends, visitor flow mapping, and analytical snapshots require an active professional subscription plan.
+              Your current access does not include estate analytics yet. If you are in a free trial, this access should be available automatically.
             </p>
             <Link
               to="/billing/paywall"
               className="mt-6 w-full max-w-xs bg-indigo-600 hover:bg-indigo-700 text-white py-3.5 rounded-xl font-bold text-xs tracking-wider shadow-md transition-all active:scale-95"
             >
-              Upgrade Plan
+              Review plan
             </Link>
           </section>
         ) : (

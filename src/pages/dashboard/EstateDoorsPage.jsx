@@ -31,7 +31,6 @@ const EstateDoorsPage = () => {
     homeownerId: "",
     name: ""
   });
-  const planRestrictions = overview?.planRestrictions ?? {};
 
   // Prevent body scroll when sheet is open
   useEffect(() => {
@@ -72,9 +71,7 @@ const EstateDoorsPage = () => {
   }, [homesByEstate]);
 
   const doors = useMemo(() => overview?.doors ?? [], [overview]);
-  const maxDoors = Number(planRestrictions.maxDoors ?? 0);
-  const usedDoors = Number(planRestrictions.usedDoors ?? doors.length ?? 0);
-  const canAddDoor = !maxDoors || usedDoors < maxDoors;
+  const usedDoors = doors.length;
 
   const selectedResident = useMemo(() =>
     homeownerOptions.find(opt => opt.homeownerId === form.homeownerId),
@@ -83,10 +80,6 @@ const EstateDoorsPage = () => {
 
   async function onSubmit(event) {
     event.preventDefault();
-    if (!canAddDoor) {
-      showError("Door limit reached for your current estate plan.");
-      return;
-    }
     if (!form.homeownerId || !form.name) {
         showError("Please select a resident and name the door.");
         return;
@@ -161,7 +154,7 @@ const EstateDoorsPage = () => {
         <div className="grid grid-cols-2 gap-3 mb-6">
           <div className="bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm">
             <DoorOpen className="text-[#4955b3] mb-2" size={24} />
-            <h3 className="text-2xl font-black text-[#2b3437]">{usedDoors}{maxDoors ? ` / ${maxDoors}` : ""}</h3>
+            <h3 className="text-2xl font-black text-[#2b3437]">{usedDoors}</h3>
             <p className="text-slate-400 font-black text-[9px] uppercase tracking-widest">Active Doors</p>
           </div>
           <div className="bg-[#4955b3] p-5 rounded-[2rem] text-white shadow-lg shadow-indigo-100">
@@ -202,16 +195,11 @@ const EstateDoorsPage = () => {
                 </div>
 
                 <button
-                    disabled={busy || !canAddDoor}
+                    disabled={busy}
                     className="w-full bg-[#4955b3] hover:bg-[#3c49a7] text-white py-5 rounded-2xl flex items-center justify-center gap-3 font-black text-base transition-all active:scale-[0.98] shadow-lg shadow-indigo-50 mt-2"
                 >
                     {busy ? "Creating..." : <><Plus size={20} strokeWidth={3} /> Add Door</>}
                 </button>
-                {!canAddDoor ? (
-                  <p className="text-center text-sm font-semibold text-amber-700">
-                    Upgrade your plan to add more doors.
-                  </p>
-                ) : null}
             </form>
         </section>
 

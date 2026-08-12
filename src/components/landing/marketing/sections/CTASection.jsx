@@ -32,7 +32,7 @@ export default function CTASection() {
           <div className="grid gap-3 rounded-3xl border border-white/10 bg-white/5 p-6">
             {[
               { label: "Visitor scan to request entry", value: "Instant" },
-              { label: "Homeowner approval decision", value: "One tap" },
+              { label: "Resident approval decision", value: "One tap" },
               { label: "Guard visibility at the gate", value: "Realtime" },
               { label: "Visitor history and audit trail", value: "Always on" },
             ].map((row) => (
@@ -49,4 +49,3 @@ export default function CTASection() {
     </section>
   );
 }
-

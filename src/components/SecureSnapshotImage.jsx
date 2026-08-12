@@ -33,6 +33,9 @@ export default function SecureSnapshotImage({
     const assetUrl = resolveSnapshotUrl(raw);
     const accessToken = getAccessToken();
     const effectiveVisitorToken = visitorToken || getVisitorSessionToken(visitorSessionId);
+    const sessionSnapshotUrl = visitorSessionId
+      ? `/advanced/visitor/sessions/${encodeURIComponent(visitorSessionId)}/snapshot/file`
+      : "";
     const needsAuthenticatedFetch =
       assetUrl.includes("/advanced/visitor/snapshots/") ||
       assetUrl.includes("/uploads/");
@@ -47,14 +50,23 @@ export default function SecureSnapshotImage({
     // eslint-disable-next-line no-console
     console.info("qring.snapshot.fetch.start", { assetUrl, visitorSessionId: visitorSessionId || undefined });
 
-    apiRequestBinary(assetUrl, {
+    const fetchSnapshot = (url) => apiRequestBinary(url, {
       headers: {
         ...(effectiveVisitorToken ? { "X-Visitor-Token": effectiveVisitorToken } : {})
       },
       token: accessToken || undefined,
       timeoutMs: 15000,
       retryCount: 1
-    })
+    });
+
+    fetchSnapshot(assetUrl)
+      .then(async (response) => {
+        if (!response.ok && assetUrl.includes("/uploads/") && sessionSnapshotUrl) {
+          // Stale local upload URLs can survive on older sessions; retry via the snapshot audit route.
+          return fetchSnapshot(sessionSnapshotUrl);
+        }
+        return response;
+      })
       .then(async (response) => {
         if (!response.ok) {
           throw new Error(`snapshot_fetch_failed_${response.status}`);

@@ -8,8 +8,18 @@ const tabs = [
   { to: "/dashboard/estate/security/monitoring", label: "Monitoring", icon: Sliders }
 ];
 
-export function EstateSecurityShell({ title, eyebrow = "Security Control", subtitle, children, action }) {
+export function EstateSecurityShell({
+  title,
+  eyebrow = "Security Control",
+  subtitle,
+  children,
+  action,
+  estates = [],
+  estateId = "",
+  onEstateChange
+}) {
   const navigate = useNavigate();
+  const showEstateSelector = Array.isArray(estates) && estates.length > 1 && typeof onEstateChange === "function";
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#f8f9fa] pb-32 font-sans text-[#2b3437]">
       <header className="fixed top-0 z-50 flex h-16 w-full items-center justify-between border-b border-slate-100 bg-white/90 px-4 backdrop-blur-xl md:px-6">
@@ -34,7 +44,23 @@ export function EstateSecurityShell({ title, eyebrow = "Security Control", subti
             <h2 className="truncate text-3xl font-black leading-tight text-[#2b3437] md:text-4xl">{title}</h2>
             {subtitle ? <p className="mt-1 max-w-xl text-sm font-medium leading-6 text-slate-500">{subtitle}</p> : null}
           </div>
-          {action}
+          <div className="flex w-full flex-col gap-3 md:w-auto md:min-w-[18rem]">
+            {showEstateSelector ? (
+              <label className="block">
+                <span className="mb-1 block text-[9px] font-black uppercase tracking-widest text-slate-400">Active Estate</span>
+                <select
+                  value={estateId || ""}
+                  onChange={(event) => onEstateChange(event.target.value)}
+                  className="min-h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-[#2b3437] outline-none focus:border-[#4955b3]"
+                >
+                  {estates.map((estate) => (
+                    <option key={estate.id} value={estate.id}>{estate.name || "Estate"}</option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+            {action}
+          </div>
         </section>
 
         <nav className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">

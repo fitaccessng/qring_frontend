@@ -51,6 +51,19 @@ export async function registerPushSubscription(payload) {
   return response?.data ?? null;
 }
 
+export async function getPushSubscriptionStatus() {
+  const response = await apiRequest("/notifications/push-subscriptions/status", { noCache: true });
+  return response?.data ?? { enabled: false, activeCount: 0, providers: [] };
+}
+
+export async function disablePushSubscription(payload = {}) {
+  const response = await apiRequest("/notifications/push-subscriptions/disable", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+  return response?.data ?? null;
+}
+
 export async function markNotificationRead(notificationId) {
   try {
     const response = await apiRequest(`/notifications/${notificationId}/read`, {

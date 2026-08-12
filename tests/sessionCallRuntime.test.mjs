@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, expect } from "vitest";
 import {
   applyRemoteTrackEvent,
   bindStreamToMediaElement,
@@ -19,10 +18,10 @@ test("remote media and timer gating require an attached stream", () => {
     }
   };
 
-  assert.equal(remoteMediaIsAttached(stream), true);
-  assert.equal(shouldStartCallTimer({ callState: "connecting", remoteMediaAttached: true }), false);
-  assert.equal(shouldStartCallTimer({ callState: "connected", remoteMediaAttached: false }), false);
-  assert.equal(shouldStartCallTimer({ callState: "connected", remoteMediaAttached: true }), true);
+  expect(remoteMediaIsAttached(stream)).toBe(true);
+  expect(shouldStartCallTimer({ callState: "connecting", remoteMediaAttached: true })).toBe(false);
+  expect(shouldStartCallTimer({ callState: "connected", remoteMediaAttached: false })).toBe(false);
+  expect(shouldStartCallTimer({ callState: "connected", remoteMediaAttached: true })).toBe(true);
 });
 
 test("stopStreamTracks stops every local track and terminal events clear the incoming call", () => {
@@ -37,11 +36,11 @@ test("stopStreamTracks stops every local track and terminal events clear the inc
   };
 
   stopStreamTracks(stream);
-  assert.deepEqual(stopped.sort(), ["audio", "video"]);
-  assert.equal(shouldClearIncomingCallOnTerminalEvent("ended"), true);
-  assert.equal(shouldClearIncomingCallOnTerminalEvent("rejected"), true);
-  assert.equal(shouldClearIncomingCallOnTerminalEvent("failed"), true);
-  assert.equal(shouldClearIncomingCallOnTerminalEvent("incoming"), false);
+  expect(stopped.sort()).toEqual(["audio", "video"]);
+  expect(shouldClearIncomingCallOnTerminalEvent("ended")).toBe(true);
+  expect(shouldClearIncomingCallOnTerminalEvent("rejected")).toBe(true);
+  expect(shouldClearIncomingCallOnTerminalEvent("failed")).toBe(true);
+  expect(shouldClearIncomingCallOnTerminalEvent("incoming")).toBe(false);
 });
 
 test("local and remote media bindings attach streams and track remote events", () => {
@@ -59,13 +58,13 @@ test("local and remote media bindings attach streams and track remote events", (
   };
 
   bindStreamToMediaElement(localElement, stream, { muted: true });
-  assert.equal(localElement.srcObject, stream);
-  assert.equal(localElement.muted, true);
+  expect(localElement.srcObject).toBe(stream);
+  expect(localElement.muted).toBe(true);
 
   const track = { kind: "video" };
   const result = applyRemoteTrackEvent(stream, { track, streams: [] });
-  assert.equal(result.remoteStream, stream);
-  assert.equal(stream._addedTrack, track);
-  assert.equal(result.remoteMediaAttached, true);
-  assert.equal(result.hasVideo, true);
+  expect(result.remoteStream).toBe(stream);
+  expect(stream._addedTrack).toBe(track);
+  expect(result.remoteMediaAttached).toBe(true);
+  expect(result.hasVideo).toBe(true);
 });

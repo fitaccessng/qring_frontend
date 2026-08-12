@@ -369,6 +369,8 @@ function AppRoutes() {
                   <Route path="/dashboard/homeowner/overview" element={<LazyRoute><HomeownerDashboardPage /></LazyRoute>} />
                   <Route element={<HomeownerSubscriptionRoute requiredFeature="visitor_scheduling" />}>
                     <Route path="/dashboard/homeowner/appointments" element={<LazyRoute><HomeownerAppointmentsPage /></LazyRoute>} />
+                  </Route>
+                  <Route element={<HomeownerSubscriptionRoute requiredFeature="visitor_pass_basic" />}>
                     <Route path="/dashboard/homeowner/access-passes" element={<LazyRoute><HomeownerAccessPassesPage /></LazyRoute>} />
                   </Route>
                   <Route path="/dashboard/homeowner/visits" element={<LazyRoute><HomeownerVisitsPage /></LazyRoute>} />

@@ -6,7 +6,7 @@ const policies = [
     title: "Snapshot verification",
     points: [
       "Capture a visitor snapshot at the gate with the entry request.",
-      "Homeowners approve with visual context, not just a name.",
+      "Residents approve with visual context, not just a name.",
       "Guards see the same snapshot alongside the decision.",
     ],
   },
@@ -46,7 +46,7 @@ export default function SecurityPlaybookSection() {
               A security system your estate can actually enforce
             </h2>
             <p className="mt-4 max-w-xl text-base leading-relaxed text-slate-600 dark:text-slate-300">
-              QRing turns “Who is that?” into a repeatable policy: snapshot, decision, and a permanent record. Clear for guards. Fast for homeowners.
+              QRing turns “Who is that?” into a repeatable policy: snapshot, decision, and a permanent record. Clear for guards. Fast for residents.
             </p>
 
             <div className="mt-8 grid gap-3">
@@ -95,4 +95,3 @@ export default function SecurityPlaybookSection() {
     </section>
   );
 }
-

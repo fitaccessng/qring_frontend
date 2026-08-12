@@ -38,7 +38,7 @@ export default function ResidentSubscriptionCenter() {
   const firstName = user?.fullName?.split(" ")[0] || user?.email || "User";
   const isFetching = loading;
   const role = String(user?.role || "homeowner").toLowerCase();
-  const audience = role === "estate" ? "estate" : "homeowner";
+  const audience = "estate";
   const isEstateAudience = audience === "estate";
 
   useEffect(() => {
@@ -75,6 +75,10 @@ export default function ResidentSubscriptionCenter() {
     let active = true;
 
     async function loadBillingData() {
+      if (role !== "estate") {
+        navigate("/dashboard/homeowner/overview", { replace: true });
+        return;
+      }
       setLoading(true);
       try {
         const [subscriptionData, planRows, referralData] = await Promise.all([
@@ -84,7 +88,7 @@ export default function ResidentSubscriptionCenter() {
         ]);
         if (!active) return;
         setSubscription(subscriptionData || null);
-        setPlans((Array.isArray(planRows) ? planRows : []).filter((plan) => String(plan.audience || "").toLowerCase() === audience));
+        setPlans((Array.isArray(planRows) ? planRows : []).filter((plan) => String(plan.audience || "").toLowerCase() === "estate"));
         setReferral(referralData || null);
       } catch (error) {
         if (!active) return;
@@ -98,7 +102,7 @@ export default function ResidentSubscriptionCenter() {
     return () => {
       active = false;
     };
-  }, [audience]);
+  }, [navigate, role]);
 
   const currentPlanId = String(subscription?.plan || "free");
   const currentPlan = useMemo(
@@ -111,8 +115,8 @@ export default function ResidentSubscriptionCenter() {
     return rows.map((plan, index) => ({
       ...plan,
       current: String(plan.id) === currentPlanId,
-      recommended: String(plan.id) === (isEstateAudience ? "estate_growth" : "home_pro"),
-      primary: String(plan.id) === (isEstateAudience ? "estate_growth" : "home_pro"),
+      recommended: String(plan.id) === "estate_plus",
+      primary: String(plan.id) === "estate_plus",
       ctaLabel: getPlanCtaLabel(plan.id)
     }));
   }, [currentPlanId, isEstateAudience, plans, subscription]);
@@ -121,6 +125,10 @@ export default function ResidentSubscriptionCenter() {
     if (!plan?.id || busyPlanId) return;
     if (String(plan.id) === currentPlanId) {
       showSuccess("You are already on this plan.");
+      return;
+    }
+    if (plan.requiresManualActivation || plan.manualActivationRequired || plan.selfServe === false) {
+      navigate("/contact");
       return;
     }
 
@@ -215,14 +223,14 @@ export default function ResidentSubscriptionCenter() {
                   {loading
                     ? "Loading your plan details..."
                     : isEstateAudience
-                      ? `This plan supports up to ${subscription?.limits?.maxDoors ?? subscription?.maxDoors ?? 0} houses / doors and ${subscription?.limits?.maxQrCodes ?? subscription?.maxQrCodes ?? 0} QR code(s).`
+                      ? `This plan includes up to ${subscription?.includedHouses ?? subscription?.limits?.maxHomes ?? 0} Houses/Units. Extra active houses are billed monthly.`
                       : `This plan supports up to ${subscription?.limits?.maxDoors ?? subscription?.maxDoors ?? 0} door(s) and ${subscription?.limits?.maxQrCodes ?? subscription?.maxQrCodes ?? 0} QR code(s).`}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => {
-                  const firstPaidPlan = availablePlans.find((plan) => !plan.current && Number(plan.amount || 0) > 0);
+                  const firstPaidPlan = availablePlans.find((plan) => !plan.current && Number(plan.amount || 0) > 0 && plan.selfServe !== false);
                   if (firstPaidPlan) handleSelectPlan(firstPaidPlan);
                 }}
                 className="mt-8 bg-white text-indigo-600 w-fit px-8 py-3.5 rounded-2xl font-bold text-sm active:scale-95 transition-all shadow-lg"
@@ -320,7 +328,7 @@ export default function ResidentSubscriptionCenter() {
           <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white flex flex-col justify-center">
             <h4 className="text-3xl font-black tracking-tighter mb-4">Why upgrade?</h4>
             <p className="text-slate-400 font-medium leading-relaxed mb-8">
-              Your available features now come directly from the live plan catalog and subscription policy in the backend.
+              Your estate features and house billing now come directly from the live plan catalog and subscription policy in the backend.
             </p>
             <div className="grid grid-cols-2 gap-4">
               <div className="p-5 bg-white/5 border border-white/10 rounded-2xl">
@@ -349,61 +357,48 @@ export default function ResidentSubscriptionCenter() {
   );
 }
 
-function buildPlanFeatures(plan, audience = "homeowner") {
+function buildPlanFeatures(plan) {
   const planId = String(plan?.id || "");
   const estateFeatures = {
     estate_starter: [
-      "Up to 3 houses",
-      "Full system access (limited scale)",
-      "Trial only - 30 days"
+      "Up to 8 Houses/Units included",
+      "30-day free trial for new estates",
+      "Register residents and security guards",
+      "House QR code for each registered house",
+      "Digital gate records"
     ],
     estate_basic: [
-      "Up to 10 houses",
-      "Realtime alerts",
-      "Visitor logs",
-      "Resident management",
-      "Mobile dashboard"
+      "Up to 30 Houses/Units included",
+      "Everything in Starter",
+      "Vehicle and regular visitor registration",
+      "Delivery approvals",
+      "Emergency alerts to security"
     ],
     estate_plus: [
+      "Up to 50 Houses/Units included",
       "Everything in Basic",
-      "Visitor scheduling",
+      "Schedule future visitors",
       "Access time windows",
-      "Chat + call verification"
+      "Video and audio verification",
+      "Incident reporting"
     ],
     estate_growth: [
+      "Up to 100 Houses/Units included",
       "Everything in Plus",
-      "Multi-admin roles",
-      "Analytics dashboard",
-      "Activity tracking"
+      "Multiple estate administrators",
+      "Manager access permissions",
+      "Download records and reports",
+      "Management activity history"
     ],
     estate_pro: [
       "Everything in Growth",
-      "Advanced analytics",
-      "Security audit logs",
-      "Role permissions",
-      "Priority support"
+      "Multiple estates under one account",
+      "Custom house capacity",
+      "Unlimited administrators and security guards",
+      "Dedicated onboarding and support"
     ]
   };
-  const homeownerFeatures = {
-    free: [
-      "1 door",
-      "Basic notifications",
-      "Limited logs"
-    ],
-    home_pro: [
-      "Chat + call verification",
-      "Visitor history",
-      "Visitor scheduling",
-      "Advanced notifications"
-    ],
-    home_premium: [
-      "Multiple doors",
-      "Access time windows",
-      "Priority support",
-      "Advanced privacy controls"
-    ]
-  };
-  const mapped = audience === "estate" ? estateFeatures[planId] : homeownerFeatures[planId];
+  const mapped = estateFeatures[planId];
   if (mapped?.length) {
     return mapped.map((text) => ({ text, included: true }));
   }
@@ -442,8 +437,8 @@ function formatCurrency(value) {
   }).format(Number(value || 0));
 }
 
-function fallbackFreePlan(subscription, audience = "homeowner") {
-  const fallbackId = audience === "estate" ? "estate_starter" : "free";
+function fallbackFreePlan(subscription) {
+  const fallbackId = "estate_starter";
   return [
     {
       id: String(subscription?.plan || fallbackId),
@@ -466,13 +461,10 @@ function fallbackFreePlan(subscription, audience = "homeowner") {
 function getPlanCtaLabel(planId) {
   const labels = {
     estate_starter: "Start Free Trial",
-    estate_basic: "Start Basic",
+    estate_basic: "Choose Basic",
     estate_plus: "Choose Plus",
     estate_growth: "Choose Growth",
-    estate_pro: "Start Pro",
-    free: "Get Started Free",
-    home_pro: "Choose Home Pro",
-    home_premium: "Choose Home Premium",
+    estate_pro: "Contact Sales",
   };
   return labels[String(planId || "")] || "Choose Plan";
 }

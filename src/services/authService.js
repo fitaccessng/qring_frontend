@@ -102,3 +102,20 @@ export async function changePassword(payload) {
     ...AUTH_REQUEST_OPTIONS,
   });
 }
+
+export async function getCurrentUser() {
+  const response = await apiRequest("/auth/me", {
+    method: "GET",
+    ...AUTH_REQUEST_OPTIONS,
+  });
+  return response?.data ?? null;
+}
+
+export async function updateCurrentUserProfile(payload) {
+  const response = await apiRequest("/auth/me", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+    ...AUTH_REQUEST_OPTIONS,
+  });
+  return response?.data ?? null;
+}

@@ -7,12 +7,32 @@ import {
 import { getDashboardSocket } from "../services/socketClient";
 
 const ESTATE_OVERVIEW_REFRESH_INTERVAL_MS = 15_000;
+const ACTIVE_ESTATE_STORAGE_KEY = "qring.activeEstateId";
+
+function readStoredEstateId() {
+  if (typeof window === "undefined") return "";
+  return window.localStorage.getItem(ACTIVE_ESTATE_STORAGE_KEY) || "";
+}
+
+function writeStoredEstateId(estateId) {
+  if (typeof window === "undefined") return;
+  if (estateId) window.localStorage.setItem(ACTIVE_ESTATE_STORAGE_KEY, estateId);
+  else window.localStorage.removeItem(ACTIVE_ESTATE_STORAGE_KEY);
+}
 
 export default function useEstateOverviewState() {
   const [overview, setOverview] = useState(() => getEstateOverviewSnapshot());
-  const [estateId, setEstateId] = useState(() => getEstateOverviewSnapshot()?.estates?.[0]?.id || "");
+  const [estateId, setEstateIdState] = useState(() => readStoredEstateId() || getEstateOverviewSnapshot()?.estates?.[0]?.id || "");
   const [loading, setLoading] = useState(() => !getEstateOverviewSnapshot());
   const [error, setError] = useState("");
+
+  const setEstateId = useCallback((value) => {
+    setEstateIdState((prev) => {
+      const next = typeof value === "function" ? value(prev) : value;
+      writeStoredEstateId(next || "");
+      return next || "";
+    });
+  }, []);
 
   const refresh = useCallback(async () => {
     const hasSnapshot = Boolean(getEstateOverviewSnapshot());
@@ -20,7 +40,11 @@ export default function useEstateOverviewState() {
     try {
       const data = await getEstateOverview({ force: true });
       setOverview(data);
-      setEstateId((prev) => prev || data?.estates?.[0]?.id || "");
+      setEstateId((prev) => {
+        const estates = data?.estates ?? [];
+        if (prev && estates.some((estate) => String(estate.id) === String(prev))) return prev;
+        return estates?.[0]?.id || "";
+      });
       setError("");
       return data;
     } catch (err) {
@@ -64,10 +88,15 @@ export default function useEstateOverviewState() {
   }, [refresh]);
 
   useEffect(() => {
-    if (!estateId && overview?.estates?.length) {
-      setEstateId(overview.estates[0].id);
+    const estates = overview?.estates ?? [];
+    if (!estates.length) {
+      if (estateId) setEstateId("");
+      return;
     }
-  }, [estateId, overview]);
+    if (!estateId || !estates.some((estate) => String(estate.id) === String(estateId))) {
+      setEstateId(estates[0].id);
+    }
+  }, [estateId, overview, setEstateId]);
 
   return {
     overview,

@@ -11,6 +11,7 @@ import {
 import { addEstateHome } from "../../services/estateService";
 import { showError, showSuccess } from "../../utils/flash";
 import useEstateOverviewState from "../../hooks/useEstateOverviewState";
+import useSubscription from "../../hooks/useSubscription";
 import PageSkeleton from "../../components/PageSkeleton";
 
 const EstateHomesPage = () => {
@@ -21,6 +22,7 @@ const EstateHomesPage = () => {
   const [busy, setBusy] = useState(false);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const planRestrictions = overview?.planRestrictions ?? {};
+  const { resolveLimit } = useSubscription();
 
   useEffect(() => {
     if (error) showError(error);
@@ -42,7 +44,8 @@ const EstateHomesPage = () => {
   const homes = overview?.homes ?? [];
   const maxHomes = Number(planRestrictions.maxHomes ?? 0);
   const usedHomes = Number(planRestrictions.usedHomes ?? homes.length ?? 0);
-  const canAddHome = !maxHomes || usedHomes < maxHomes;
+  const limitState = resolveLimit({ maxCount: maxHomes, usedCount: usedHomes });
+  const canAddHome = limitState.canAdd;
   const homeStats = {
     total: homes.length,
     occupancy: homes.length > 0 ? Math.round((homes.filter((home) => home.homeownerId).length / homes.length) * 100) : 0
@@ -147,7 +150,7 @@ const EstateHomesPage = () => {
               <p className="mt-2 text-2xl font-black text-slate-900">{maxHomes ? Math.max(maxHomes - usedHomes, 0) : "∞"}</p>
             </div>
           </div>
-          {!canAddHome ? (
+          {!canAddHome && !limitState.isTrialBypass ? (
             <div className="mt-4 rounded-[1.4rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
               Your current estate plan has reached its home limit. Upgrade before adding another unit.
             </div>

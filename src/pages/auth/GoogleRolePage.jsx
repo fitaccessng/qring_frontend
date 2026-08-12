@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Building2, CheckCircle2, Home } from "lucide-react";
+import { Building2, CheckCircle2 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import AuthCard from "../../components/AuthCard";
 import { useAuth } from "../../state/AuthContext";
@@ -7,7 +7,6 @@ import { getStoredUser } from "../../services/authStorage";
 import { resolvePostLoginPath } from "../../utils/authRouting";
 
 const rolePath = {
-  homeowner: "/dashboard/homeowner/overview",
   admin: "/dashboard/admin",
   estate: "/dashboard/estate"
 };
@@ -15,7 +14,7 @@ const MOBILE_ONBOARDING_INTENT_KEY = "qring_mobile_onboarding_intent";
 
 export default function GoogleRolePage() {
   const { googleSignUp, loading } = useAuth();
-  const [role, setRole] = useState("homeowner");
+  const [role, setRole] = useState("estate");
   const [error, setError] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
   const navigate = useNavigate();
@@ -66,12 +65,6 @@ export default function GoogleRolePage() {
             value={role}
             onChange={setRole}
             options={[
-              {
-                value: "homeowner",
-                label: "Resident / Homeowner",
-                description: "Control your home access, visitors, doors, and notifications.",
-                icon: Home
-              },
               {
                 value: "estate",
                 label: "Estate Manager",

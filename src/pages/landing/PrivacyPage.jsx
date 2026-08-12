@@ -195,14 +195,14 @@ export default function PrivacyPage() {
                 Questions about your data?
               </h3>
               <p className="mb-8 max-w-lg text-blue-100">
-                Our dedicated Privacy Office is available to discuss our structural
+                Our dedicated privacy team is available to discuss our structural
                 security measures and your data rights.
               </p>
               <Link
                 to="/contact"
                 className="inline-flex rounded-xl bg-white px-8 py-4 font-heading text-xs font-bold uppercase tracking-[0.18em] text-[#00346f] transition hover:bg-slate-100"
               >
-                Contact Privacy Office
+                Contact Privacy Team
               </Link>
             </div>
           </article>

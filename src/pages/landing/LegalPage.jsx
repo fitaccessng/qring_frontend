@@ -1,7 +1,7 @@
 import LandingShell from "../../components/landing/LandingShell";
 
 const items = [
-  { title: "Company details", body: "Qring Technologies operates software and services for estates and homeowners." },
+  { title: "Company details", body: "Qring Technologies operates software and services for estates, residents, security teams, and visitors." },
   { title: "Intellectual property", body: "All platform assets, trademarks, and software are protected by applicable laws." },
   { title: "Service availability", body: "We maintain 99.9% uptime targets and communicate maintenance windows in advance." }
 ];

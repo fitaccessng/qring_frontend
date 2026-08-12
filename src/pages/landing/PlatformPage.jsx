@@ -37,7 +37,7 @@ const steps = [
   {
     number: "02",
     title: "Invite residents",
-    description: "Homeowners approve or deny visits from any device."
+    description: "Residents approve or deny visits from any device."
   },
   {
     number: "03",

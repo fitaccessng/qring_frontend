@@ -99,11 +99,9 @@ export default function EstateManagerDashboard() {
   const planRestrictions = overview?.planRestrictions ?? {};
   const subscription = overview?.subscription ?? {};
   const activeDoors = Number(planRestrictions.usedDoors ?? estateDoors.length ?? 0);
-  const maxDoors = Math.max(Number(planRestrictions.maxDoors ?? 0), activeDoors, 1);
   const usedQrCodes = Number(planRestrictions.usedQrCodes ?? 0);
-  const maxQrCodes = Math.max(Number(planRestrictions.maxQrCodes ?? 0), usedQrCodes, 1);
-  const progressPercentage = Math.min(100, (activeDoors / maxDoors) * 100);
-  const qrProgressPercentage = Math.min(100, (usedQrCodes / maxQrCodes) * 100);
+  const maxHomes = Math.max(Number(planRestrictions.maxHomes ?? 0), estateHomes.length, 1);
+  const homeProgressPercentage = Math.min(100, (estateHomes.length / maxHomes) * 100);
 
   const analytics = overview?.analytics ?? {};
   const peakHour = analytics?.peakEntryTimes?.[0] ?? null;
@@ -127,17 +125,17 @@ export default function EstateManagerDashboard() {
 
   const detailProgressItems = [
     {
-      label: "Doors Configured",
-      value: `${activeDoors} / ${maxDoors}`,
-      helper: `${Math.max(maxDoors - activeDoors, 0)} slot${maxDoors - activeDoors === 1 ? "" : "s"} left`,
-      percent: progressPercentage,
+      label: "Houses/Units",
+      value: `${estateHomes.length} / ${maxHomes}`,
+      helper: `${Math.max(maxHomes - estateHomes.length, 0)} included unit${maxHomes - estateHomes.length === 1 ? "" : "s"} left`,
+      percent: homeProgressPercentage,
       tone: "indigo"
     },
     {
-      label: "QR Codes Ready",
-      value: `${usedQrCodes} / ${maxQrCodes}`,
-      helper: `${Math.max(maxQrCodes - usedQrCodes, 0)} QR slot${maxQrCodes - usedQrCodes === 1 ? "" : "s"} left`,
-      percent: qrProgressPercentage,
+      label: "House QR Ready",
+      value: `${usedQrCodes}`,
+      helper: "One QR code for each registered house",
+      percent: usedQrCodes ? 100 : 0,
       tone: "sky"
     },
     {
@@ -160,7 +158,7 @@ export default function EstateManagerDashboard() {
     {
       icon: <DoorOpen size={18} />,
       title: "Door Coverage",
-      subtitle: `${activeDoors}/${maxDoors} configured`,
+      subtitle: `${activeDoors} configured`,
       to: "/dashboard/estate/doors"
     },
     {
@@ -172,7 +170,7 @@ export default function EstateManagerDashboard() {
     {
       icon: <QrCode size={18} />,
       title: "QR Provisioning",
-      subtitle: `${usedQrCodes}/${maxQrCodes} live access codes`,
+      subtitle: `${usedQrCodes} house QR codes active`,
       to: "/dashboard/estate/doors"
     },
     {
@@ -242,11 +240,11 @@ export default function EstateManagerDashboard() {
             </div>
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <span className="text-slate-400 font-black uppercase tracking-tighter text-[10px]">Active Doors</span>
-                <span className="font-black text-slate-900 text-sm">{activeDoors} / {maxDoors}</span>
+                <span className="text-slate-400 font-black uppercase tracking-tighter text-[10px]">Houses/Units</span>
+                <span className="font-black text-slate-900 text-sm">{estateHomes.length} / {maxHomes}</span>
               </div>
               <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                <div className="bg-indigo-600 h-full transition-all duration-1000 ease-out rounded-full" style={{ width: `${progressPercentage}%` }} />
+                <div className="bg-indigo-600 h-full transition-all duration-1000 ease-out rounded-full" style={{ width: `${homeProgressPercentage}%` }} />
               </div>
               <div className="grid grid-cols-2 gap-2.5">
                 <MiniDetail label="Homes" value={stats.portfolio.homes} />

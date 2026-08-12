@@ -18,15 +18,15 @@ import { useAuth } from "../../state/AuthContext";
 const ONBOARDING_STEPS = [
   {
     eyebrow: "Sentinel Active",
-    title: "Your Home,\nYour Rules",
-    body: "Take control of your gate from anywhere. No more missed calls or security guesswork.",
+    title: "Your Estate,\nIn Control",
+    body: "Manage gate access, residents, security staff, and visitor decisions from one estate dashboard.",
     image:
       "https://lh3.googleusercontent.com/aida-public/AB6AXuAYlQyfk2hf4ZM7KZEfhaIMvQ9bso2v7eYerPGZDnGmi_VZOPKllFr-MDPUek6cAado-mzm6VQLQi9yS5DIkfcj869WrhYJ3igY8HLwRxh45IBgF6M7eRphmghzNwMZ5zMq4M_ICWpzvw2cwJNVw1Awqh0Lkd-Kz7LQQT0G6fOi4gCBFrx-v-Y7TUsN2fXLaIg20TeuBOxIXoNBgosPgjr0Ht0xr034sglGAhEDIw0FyKyiNbLawLN6G_6SAeDDR10yf_PisTjBe6Ad",
   },
   {
     eyebrow: "Verification Active",
     title: "See & Verify\nInstantly",
-    body: "Receive real-time alerts and video feeds when someone arrives. Verify identity before you even open the second gate.",
+    body: "Residents get real-time alerts, while security can verify each visitor before entry is recorded.",
     image:
       "https://lh3.googleusercontent.com/aida-public/AB6AXuBzmB0rWzn8yPOJmzUGOCBgoaVuNHzMPdyuyjQsaOiFc-b921EUMftnghUFAkoFVx5TVUQ3XFSgCRxa2aJtXDKqRsbW6AzHUOdLVd8Pr8ZhiC7mH3DWLlHSYAalSA_r_vbI-Bwnh_n9Dpp2LduKGYfnUHx-3jJGc0Ygd74xp_c3Kg_8VyyD4kv0VmOrY1sULDSCTl2ff7SMijJjMfNl7PjOzmNdqvliQmizcZ10pytkLIfPGStHoXb98wCdQbPJ1iB2a6eO5Ba1CLdw",
   },

@@ -24,7 +24,7 @@ const ruleCopy = {
 };
 
 export default function EstateSecurityRulesPage() {
-  const { currentEstate, error, securityRules, setSecurityRules, saveSettings } = useEstateSecurityState();
+  const { currentEstate, error, estateId, estates, setEstateId, securityRules, setSecurityRules, saveSettings } = useEstateSecurityState();
   const [busyKey, setBusyKey] = useState("");
 
   useEffect(() => {
@@ -53,6 +53,9 @@ export default function EstateSecurityRulesPage() {
     <EstateSecurityShell
       title="Approval Rules"
       subtitle={`Define how gate approvals should work${currentEstate?.name ? ` for ${currentEstate.name}` : ""}.`}
+      estates={estates}
+      estateId={estateId}
+      onEstateChange={setEstateId}
     >
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <SecurityStatCard icon={ShieldCheck} label="Enabled Rules" value={enabledCount} helper="Active approval controls" tone="emerald" />

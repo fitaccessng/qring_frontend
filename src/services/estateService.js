@@ -199,7 +199,14 @@ export async function getEstateMappings() {
   });
 }
 
-export async function getEstateAccessLogs() {
+export async function getEstateAccessLogs(options = {}) {
+  const category = options.category || "visitors";
+  const limit = options.limit || 100;
+  if (category !== "visitors" || limit !== 100) {
+    const params = new URLSearchParams({ category, limit: String(limit) });
+    const response = await apiRequest(`/estate/access-logs?${params.toString()}`, { noCache: true });
+    return Array.isArray(response?.data) ? response.data : [];
+  }
   return resolveCached(estateServiceCache.accessLogs, async () => {
     const response = await apiRequest("/estate/access-logs");
     return Array.isArray(response?.data) ? response.data : [];
@@ -330,6 +337,22 @@ export async function updateEstateSettings(estateId, payload) {
 export async function listEstateSecurityUsers(estateId) {
   const response = await apiRequest(`/estate/${encodeURIComponent(estateId)}/security-users`, { noCache: true });
   return Array.isArray(response?.data) ? response.data : [];
+}
+
+export async function getEstateSecurityUserDetail(estateId, securityUserId) {
+  const response = await apiRequest(
+    `/estate/${encodeURIComponent(estateId)}/security-users/${encodeURIComponent(securityUserId)}`,
+    { noCache: true }
+  );
+  return response?.data ?? null;
+}
+
+export async function getEstateResidentDetail(estateId, residentId) {
+  const response = await apiRequest(
+    `/estate/${encodeURIComponent(estateId)}/residents/${encodeURIComponent(residentId)}`,
+    { noCache: true }
+  );
+  return response?.data ?? null;
 }
 
 export async function createEstateSecurityUser(payload) {
