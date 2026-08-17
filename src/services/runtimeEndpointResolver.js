@@ -12,9 +12,9 @@ export function resolveHttpUrl(rawValue, fallbackValue, { windowOrigin = "" } = 
   if (!value) return trimTrailingSlash(fallbackValue);
   if (hasHttpProtocol(value)) return trimTrailingSlash(value);
   if (looksLikeDomain(value)) return trimTrailingSlash(`https://${value}`);
-  if (value.startsWith("/") && windowOrigin) {
-    return trimTrailingSlash(`${windowOrigin}${value}`);
-  }
+  if (value.startsWith("/")) return value;
+  if (value.startsWith("./") || value.startsWith("../")) return value;
+  if (windowOrigin && (value.startsWith("?") || value.startsWith("#"))) return `${windowOrigin}${value}`;
   return trimTrailingSlash(fallbackValue);
 }
 

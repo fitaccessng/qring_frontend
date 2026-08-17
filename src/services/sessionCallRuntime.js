@@ -4,10 +4,21 @@ export function remoteMediaIsAttached(stream) {
 
 export function bindStreamToMediaElement(element, stream, { muted = false, autoplay = true, playsInline = true } = {}) {
   if (!element) return;
-  element.srcObject = stream || null;
+  const nextStream = stream || null;
+  const streamChanged = element.srcObject !== nextStream;
+  if (streamChanged) {
+    element.srcObject = nextStream;
+  }
   element.muted = Boolean(muted);
   element.autoplay = Boolean(autoplay);
   element.playsInline = Boolean(playsInline);
+  if (streamChanged && stream && typeof element.load === "function") {
+    try {
+      element.load();
+    } catch {
+      // MediaStream-backed elements may reject load() in some browsers.
+    }
+  }
 }
 
 export function shouldStartCallTimer({ callState = "idle", remoteMediaAttached = false } = {}) {

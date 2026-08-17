@@ -1,12 +1,11 @@
-import React, { useState, useMemo, useRef, useEffect } from "react";
+import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Bell, Plus, User, ArrowLeft, Send, Search,
-  MessageSquare, LayoutGrid, Trash2, X,
-  ShieldAlert, SendHorizontal, MessageCircle, AlertTriangle,
-  MailWarning, CheckCheck, Sparkles, Megaphone, HelpCircle,
-  CheckCircle2, XCircle
+  Bell, Plus, ArrowLeft, Send, Search,
+  MessageSquare, X, ShieldAlert,
+  Phone, Video, CheckCircle2, XCircle,
+  Camera, PhoneIncoming, ChevronRight
 } from "lucide-react";
 import SecureSnapshotImage from "../../components/SecureSnapshotImage";
 import { useAuth } from "../../state/AuthContext";
@@ -17,8 +16,18 @@ import {
   getHomeownerMessages,
   getHomeownerSessionMessages,
   sendHomeownerSessionMessage,
+  startSessionCall,
 } from "../../services/homeownerService";
+import { env } from "../../config/env.js";
+import { RealtimeEvent } from "../../services/realtimeEvents";
+import { getAccessToken } from "../../services/authStorage.js";
+import { createRealtimeSocket, releaseRealtimeSocket } from "../../services/socketClient";
 import { resolveSnapshotUrl } from "../../services/mediaUrl";
+import {
+  mergeSecurityMessages,
+  mergeRealtimeMessageIntoConversation,
+  updateThreadFromRealtimeMessage
+} from "../../utils/securityMessagesRealtime";
 
 const REJECTION_REPLY_OPTIONS = [
   "Please deny entry. I am not expecting this visitor.",
@@ -34,7 +43,7 @@ export default function HomeownerMessagePage() {
   const { unreadCount } = useNotifications();
   const messageEndRef = useRef(null);
   const preferredSessionId = String(searchParams.get("sessionId") || "").trim();
-  
+
   const [activeThreadId, setActiveThreadId] = useState(null);
   const [messagesByThread, setMessagesByThread] = useState({});
   const [isLoading, setIsLoading] = useState(true);
@@ -49,28 +58,255 @@ export default function HomeownerMessagePage() {
   const [rejectReplyText, setRejectReplyText] = useState(REJECTION_REPLY_OPTIONS[0]);
   const [homeownerContext, setHomeownerContext] = useState({ managedByEstate: false, estateName: "" });
   const [threads, setThreads] = useState([]);
+  const [callBusyType, setCallBusyType] = useState("");
+  const [incomingCall, setIncomingCall] = useState(null);
+  const [showSnapshotModal, setShowSnapshotModal] = useState(false);
 
-  async function loadThreads({ keepSelection = false } = {}) {
+  const activeThreadIdRef = useRef(activeThreadId);
+  const incomingCallRef = useRef(null);
+  const refreshThreadsTimerRef = useRef(null);
+  const refreshConversationTimerRef = useRef(null);
+
+  useEffect(() => {
+    activeThreadIdRef.current = activeThreadId;
+  }, [activeThreadId]);
+
+  useEffect(() => {
+    incomingCallRef.current = incomingCall;
+  }, [incomingCall]);
+
+  useEffect(() => () => {
+    if (refreshThreadsTimerRef.current) window.clearTimeout(refreshThreadsTimerRef.current);
+    if (refreshConversationTimerRef.current) window.clearTimeout(refreshConversationTimerRef.current);
+  }, []);
+
+  const getRealtimeSessionId = (payload = {}) => {
+    return String(
+      payload?.sessionId ||
+      payload?.data?.sessionId ||
+      payload?.payload?.sessionId ||
+      payload?.id ||
+      ""
+    ).trim();
+  };
+
+  const loadThreads = useCallback(async ({ keepSelection = false } = {}) => {
     setIsLoading(true);
     setError("");
     try {
       const rows = await getHomeownerMessages();
       setThreads(rows);
-      const selected = preferredSessionId && rows.some((row) => row.id === preferredSessionId)
-        ? preferredSessionId
-        : rows[0]?.id || null;
-      if (!keepSelection || !activeThreadId) setActiveThreadId(selected);
+      if (preferredSessionId && rows.some((row) => row.id === preferredSessionId)) {
+        setActiveThreadId(preferredSessionId);
+      } else if (!keepSelection) {
+        setActiveThreadId(null);
+      }
     } catch (requestError) {
       setError(requestError?.message || "Unable to load messages.");
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [preferredSessionId]);
+
+  const refreshThreadsSoon = (delay = 250) => {
+    if (refreshThreadsTimerRef.current) window.clearTimeout(refreshThreadsTimerRef.current);
+    refreshThreadsTimerRef.current = window.setTimeout(() => {
+      refreshThreadsTimerRef.current = null;
+      loadThreads({ keepSelection: true });
+    }, delay);
+  };
+
+  const refreshActiveConversationSoon = (sessionId, delay = 250) => {
+    const nextSessionId = String(sessionId || "").trim();
+    if (!nextSessionId || String(activeThreadIdRef.current || "") !== nextSessionId) return;
+    if (refreshConversationTimerRef.current) window.clearTimeout(refreshConversationTimerRef.current);
+    refreshConversationTimerRef.current = window.setTimeout(async () => {
+      refreshConversationTimerRef.current = null;
+      try {
+        const rows = await getHomeownerSessionMessages(nextSessionId);
+        if (String(activeThreadIdRef.current || "") !== nextSessionId) return;
+        setMessagesByThread((prev) => ({
+          ...prev,
+          [nextSessionId]: mergeSecurityMessages(prev[nextSessionId] || [], rows)
+        }));
+      } catch (requestError) {
+        setError(requestError?.message || "Unable to refresh conversation.");
+      }
+    }, delay);
+  };
+
+  const handleRealtimeThreadChange = (payload = {}) => {
+    const sessionId = getRealtimeSessionId(payload);
+    const data = payload?.data || payload?.payload?.data || payload?.payload || {};
+    if (sessionId) {
+      const status = payload?.status || data?.status || data?.sessionStatus;
+      const snapshotUrl = payload?.snapshotUrl || payload?.snapshot_url || data?.snapshotUrl || data?.snapshot_url || data?.photoUrl || data?.photo_url;
+      setThreads((prev) => prev.map((thread) => (
+        thread.id === sessionId
+          ? {
+              ...thread,
+              ...(status ? { status, sessionStatus: status } : {}),
+              ...(snapshotUrl ? { snapshotUrl, photoUrl: snapshotUrl } : {}),
+              ...(data && typeof data === "object" ? data : {})
+            }
+          : thread
+      )));
+      refreshActiveConversationSoon(sessionId);
+    }
+    refreshThreadsSoon();
+  };
+
+  useEffect(() => {
+    if (!activeThreadId || !user?.id) return undefined;
+
+    const namespace = env.signalingNamespace ?? "/realtime/signaling";
+    const socket = createRealtimeSocket(namespace, {
+      authBuilder: () => {
+        const token = getAccessToken();
+        return token ? { token } : {};
+      }
+    });
+
+    const joinSession = () => {
+      socket.emit(RealtimeEvent.SESSION_JOIN, {
+        sessionId: activeThreadId,
+        displayName: user?.full_name || user?.name || "Homeowner"
+      });
+    };
+
+    const handleIncomingChatMessage = (payload) => {
+      const sessionId = String(payload?.sessionId || "").trim();
+      if (!sessionId) return;
+
+      setMessagesByThread((prev) => ({
+        ...prev,
+        [sessionId]: mergeRealtimeMessageIntoConversation(prev[sessionId] || [], payload)
+      }));
+      setThreads((prev) => updateThreadFromRealtimeMessage(prev, payload, activeThreadIdRef.current));
+    };
+
+    const handleConnect = () => {
+      try { joinSession(); } catch (e) { console.warn("HomeownerMessagesPage: joinSession failed", e); }
+      loadThreads({ keepSelection: true });
+    };
+
+    socket.on("connect", handleConnect);
+    socket.on(RealtimeEvent.CHAT_MESSAGE, handleIncomingChatMessage);
+    socket.on(RealtimeEvent.CHAT_PERSISTED, handleIncomingChatMessage);
+
+    if (socket.connected) {
+      joinSession();
+    }
+
+    return () => {
+      socket.emit(RealtimeEvent.SESSION_LEAVE, { sessionId: activeThreadId });
+      socket.off("connect", handleConnect);
+      socket.off(RealtimeEvent.CHAT_MESSAGE, handleIncomingChatMessage);
+      socket.off(RealtimeEvent.CHAT_PERSISTED, handleIncomingChatMessage);
+      releaseRealtimeSocket(namespace);
+    };
+  }, [activeThreadId, user?.id, user?.full_name, user?.name, loadThreads]);
+
+  useEffect(() => {
+    if (!user?.id) return undefined;
+
+    const namespace = env.signalingNamespace ?? "/realtime/signaling";
+    const socket = createRealtimeSocket(namespace, {
+      authBuilder: () => {
+        const token = getAccessToken();
+        return token ? { token } : {};
+      }
+    });
+    const threadSessionIds = Array.from(new Set(threads.map((thread) => String(thread?.id || "").trim()).filter(Boolean)));
+
+    const joinThreads = () => {
+      threadSessionIds.forEach((sessionId) => {
+        socket.emit(RealtimeEvent.SESSION_JOIN, {
+          sessionId,
+          displayName: user?.full_name || user?.name || "Homeowner"
+        });
+      });
+    };
+    const handleMessage = (payload) => {
+      const sessionId = getRealtimeSessionId(payload);
+      if (!sessionId) return;
+      setMessagesByThread((prev) => ({
+        ...prev,
+        [sessionId]: mergeRealtimeMessageIntoConversation(prev[sessionId] || [], { ...payload, sessionId })
+      }));
+      setThreads((prev) => updateThreadFromRealtimeMessage(prev, { ...payload, sessionId }, activeThreadIdRef.current));
+      refreshThreadsSoon();
+    };
+
+    const handleSessionChange = (payload) => handleRealtimeThreadChange(payload);
+    const handleConnect = () => {
+      joinThreads();
+      refreshThreadsSoon(0);
+    };
+
+    socket.on("connect", handleConnect);
+    socket.on(RealtimeEvent.CHAT_MESSAGE, handleMessage);
+    socket.on(RealtimeEvent.CHAT_PERSISTED, handleMessage);
+    socket.on(RealtimeEvent.SESSION_SNAPSHOT, handleSessionChange);
+    socket.on(RealtimeEvent.SESSION_STATUS, handleSessionChange);
+    socket.on(RealtimeEvent.SESSION_ACTIVATED, handleSessionChange);
+    if (socket.connected) joinThreads();
+
+    return () => {
+      threadSessionIds.forEach((sessionId) => socket.emit(RealtimeEvent.SESSION_LEAVE, { sessionId }));
+      socket.off("connect", handleConnect);
+      socket.off(RealtimeEvent.CHAT_MESSAGE, handleMessage);
+      socket.off(RealtimeEvent.CHAT_PERSISTED, handleMessage);
+      socket.off(RealtimeEvent.SESSION_SNAPSHOT, handleSessionChange);
+      socket.off(RealtimeEvent.SESSION_STATUS, handleSessionChange);
+      socket.off(RealtimeEvent.SESSION_ACTIVATED, handleSessionChange);
+      releaseRealtimeSocket(namespace);
+    };
+  }, [user?.id, user?.full_name, user?.name, threads]);
+
+  useEffect(() => {
+    if (!user?.id) return undefined;
+    const dashboardSocket = createRealtimeSocket(env.dashboardNamespace, {
+      authBuilder: () => {
+        const token = getAccessToken();
+        return token ? { token } : {};
+      }
+    });
+    const dashboardEvents = [
+      "visitor_forwarded",
+      "gate_action_completed",
+      "security_request_updated",
+      "dashboard.patch",
+      "security.request.created"
+    ];
+    const terminalCallEvents = ["call.accepted", "call.rejected", "call.ended", "call.failed", "call.cancelled", "call.missed"];
+    const handleDashboardEvent = (payload) => handleRealtimeThreadChange(payload);
+    const handleIncomingCall = (payload) => setIncomingCall(payload?.data ?? payload ?? null);
+    const handleCallTerminal = (payload) => {
+      const nextPayload = payload?.data ?? payload ?? {};
+      const nextCallId = String(nextPayload?.callSessionId || nextPayload?.eventId || "").trim();
+      const nextSessionId = String(nextPayload?.sessionId || "").trim();
+      const activeIncoming = incomingCallRef.current;
+      const currentCallId = String(activeIncoming?.callSessionId || activeIncoming?.eventId || "").trim();
+      const currentSessionId = String(activeIncoming?.sessionId || "").trim();
+      if ((currentCallId && nextCallId && currentCallId === nextCallId) || (currentSessionId && nextSessionId && currentSessionId === nextSessionId)) {
+        setIncomingCall(null);
+      }
+    };
+    dashboardEvents.forEach((eventName) => dashboardSocket.on(eventName, handleDashboardEvent));
+    dashboardSocket.on("incoming-call", handleIncomingCall);
+    terminalCallEvents.forEach((eventName) => dashboardSocket.on(eventName, handleCallTerminal));
+    return () => {
+      dashboardEvents.forEach((eventName) => dashboardSocket.off(eventName, handleDashboardEvent));
+      dashboardSocket.off("incoming-call", handleIncomingCall);
+      terminalCallEvents.forEach((eventName) => dashboardSocket.off(eventName, handleCallTerminal));
+      releaseRealtimeSocket(env.dashboardNamespace);
+    };
+  }, [user?.id]);
 
   useEffect(() => {
     loadThreads();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [loadThreads]);
 
   useEffect(() => {
     if (!preferredSessionId || !threads.length) return;
@@ -105,31 +341,23 @@ export default function HomeownerMessagePage() {
     };
   }, [activeThreadId]);
 
-  // Filter threads by search query
   const filteredThreads = useMemo(() => {
-    return threads.filter(t => 
+    return threads.filter(t =>
       [t.name, t.visitorName, t.last, t.door, t.homeName, t.unitName].join(" ").toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [threads, searchQuery]);
 
-  // Get current selected thread details
   const activeThread = useMemo(() => {
     return threads.find(t => t.id === activeThreadId) || null;
   }, [threads, activeThreadId]);
+
   const activeMessages = useMemo(() => messagesByThread[activeThreadId] || [], [activeThreadId, messagesByThread]);
+
   const canDecideActiveThread = useMemo(() => {
-    const status = String(activeThread?.sessionStatus || "").toLowerCase();
-    return Boolean(activeThreadId) && !["approved", "rejected", "closed", "completed"].includes(status);
-  }, [activeThread?.sessionStatus, activeThreadId]);
+    const status = String(activeThread?.sessionStatus || activeThread?.status || "").toLowerCase();
+    return Boolean(activeThreadId) && !["approved", "rejected", "closed", "completed", "denied"].includes(status);
+  }, [activeThread?.sessionStatus, activeThread?.status, activeThreadId]);
 
-  // Handle setting default selected thread
-  useEffect(() => {
-    if (threads.length > 0 && !activeThreadId) {
-      setActiveThreadId(threads[0].id);
-    }
-  }, [threads, activeThreadId]);
-
-  // Scroll active conversation down to bottom
   useEffect(() => {
     messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [activeMessages]);
@@ -171,7 +399,10 @@ export default function HomeownerMessagePage() {
         senderType: "homeowner",
         at: new Date().toISOString(),
       };
-      setMessagesByThread((prev) => ({ ...prev, [activeThreadId]: [...(prev[activeThreadId] || []), message] }));
+      setMessagesByThread((prev) => ({
+        ...prev,
+        [activeThreadId]: mergeRealtimeMessageIntoConversation(prev[activeThreadId] || [], message)
+      }));
       setTypedMessage("");
       loadThreads({ keepSelection: true });
     } catch (requestError) {
@@ -187,9 +418,8 @@ export default function HomeownerMessagePage() {
     setDecisionBusy(action);
     setError("");
     try {
-      let savedReply = null;
       if (action === "reject" && replyText) {
-        savedReply = await sendHomeownerSessionMessage(activeThreadId, replyText);
+        const savedReply = await sendHomeownerSessionMessage(activeThreadId, replyText);
         const message = savedReply || {
           id: `local-reject-${Date.now()}`,
           sessionId: activeThreadId,
@@ -197,7 +427,10 @@ export default function HomeownerMessagePage() {
           senderType: "homeowner",
           at: new Date().toISOString(),
         };
-        setMessagesByThread((prev) => ({ ...prev, [activeThreadId]: [...(prev[activeThreadId] || []), message] }));
+        setMessagesByThread((prev) => ({
+          ...prev,
+          [activeThreadId]: mergeRealtimeMessageIntoConversation(prev[activeThreadId] || [], message)
+        }));
       }
       const result = await decideVisit(activeThreadId, action, {
         communicationChannel: "chat",
@@ -234,482 +467,520 @@ export default function HomeownerMessagePage() {
   const handleCreateThread = (e) => {
     e.preventDefault();
     if (!canCreateTicket) return;
-    const formData = new FormData(e.target);
-    const payload = {
-      type: String(formData.get("type")), // 'management' | 'security' | 'broadcast'
-      subject: String(formData.get("subject")).trim(),
-      message: String(formData.get("message")).trim(),
-      urgency: String(formData.get("urgency") || "normal")
-    };
     setError("New estate support tickets are not connected yet. Use an active visitor conversation for now.");
+    setIsModalOpen(false);
   };
 
+  const handleStartCall = async (type) => {
+    if (!activeThreadId) return;
+    const nextType = type === "video" ? "video" : "audio";
+    setCallBusyType(nextType);
+    setError("");
+    try {
+      const response = await startSessionCall({
+        sessionId: activeThreadId,
+        type: nextType,
+        hasVideo: nextType === "video",
+        communicationTarget: "gateman"
+      });
+      const data = response?.data ?? response ?? {};
+      window.sessionStorage.setItem("qring_call_start_intent", JSON.stringify({
+        pending: true,
+        sessionId: activeThreadId,
+        mode: nextType,
+        callSessionId: data?.callSessionId || "",
+        visitorId: data?.visitorId || activeThreadId,
+        rtcConfig: data?.rtcConfig || null
+      }));
+      navigate(`/session/${activeThreadId}/${nextType}`);
+    } catch (requestError) {
+      setError(requestError?.message || `Unable to start ${nextType} call.`);
+    } finally {
+      setCallBusyType("");
+    }
+  };
+
+  const handleAnswerIncomingCall = () => {
+    if (!incomingCall?.sessionId || !incomingCall?.callSessionId) return;
+    window.sessionStorage.setItem("qring_call_accept_intent", JSON.stringify({
+      sessionId: incomingCall.sessionId,
+      hasVideo: Boolean(incomingCall.hasVideo),
+      callSessionId: incomingCall.callSessionId,
+      visitorId: incomingCall.visitorId || incomingCall.sessionId
+    }));
+    const nextMode = incomingCall.hasVideo ? "video" : "audio";
+    const nextSessionId = incomingCall.sessionId;
+    setIncomingCall(null);
+    navigate(`/session/${nextSessionId}/${nextMode}`);
+  };
+
+  const snapshotPhotoUrl = resolveSnapshotUrl(activeThread?.snapshotUrl || activeThread?.photoUrl);
+
   return (
-    <div className="bg-[#f8f9fa] min-h-screen font-sans text-slate-900 antialiased selection:bg-indigo-500/10 selection:text-indigo-600">
-      
-      {/* STATIC HEADER */}
-      <header className="sticky top-0 z-50 w-full border-b border-slate-200/60 bg-white/80 px-4 py-4 backdrop-blur-md sm:px-6">
-        <div className="mx-auto flex max-w-5xl items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate(-1)}
-              className="p-2 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 hover:text-slate-900 transition-all active:scale-95"
-            >
-              <ArrowLeft size={20} />
-            </button>
-            <div>
-              <h1 className="font-bold text-base sm:text-xl text-slate-900 tracking-tight">Messages</h1>
-              
-            </div>
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100 antialiased selection:bg-indigo-500/20">
+
+      {/* DYNAMIC HEADER */}
+      <header className="sticky top-0 z-40 w-full border-b border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md px-4 py-3 sm:px-6">
+        <div className="mx-auto flex max-w-3xl items-center justify-between">
+          
+          {/* LEFT AREA: BACK BUTTON & TITLE */}
+          <div className="flex items-center gap-3 min-w-0">
+            {activeThreadId ? (
+              <button
+                type="button"
+                onClick={() => setActiveThreadId(null)}
+                className="flex items-center gap-1.5 p-2 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-extrabold text-xs rounded-xl hover:bg-indigo-100 transition active:scale-95"
+              >
+                <ArrowLeft size={16} />
+                
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => navigate(-1)}
+                className="p-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition active:scale-95"
+                aria-label="Go back"
+              >
+                <ArrowLeft size={18} />
+              </button>
+            )}
+
+            {!activeThreadId ? (
+              <h1 className="font-extrabold text-base sm:text-lg text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+                Messages
+                {threads.length > 0 && (
+                  <span className="text-[11px] font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded-full">
+                    {threads.length}
+                  </span>
+                )}
+              </h1>
+            ) : (
+              <div className="min-w-0">
+                <h2 className="font-extrabold text-sm text-slate-900 dark:text-white truncate">
+                  {activeThread?.visitorName || activeThread?.name || "Visitor"}
+                </h2>
+                <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide truncate">
+                  {activeThread?.door || activeThread?.doorName || "Gate Security"}
+                </p>
+              </div>
+            )}
           </div>
 
-          <Link 
-            to="/dashboard/notifications" 
-            className="relative p-2.5 bg-slate-100 hover:bg-slate-200/80 text-slate-700 rounded-xl transition-all active:scale-95"
-          >
-            <Bell size={18} />
-            {unreadCount > 0 && (
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-white" />
-            )}
-          </Link>
+          {/* RIGHT AREA: ACTION BUTTONS */}
+          {!activeThreadId ? (
+            <div className="flex items-center gap-2">
+              {canCreateTicket && (
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(true)}
+                  className="flex items-center gap-1 text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 px-3 py-2 rounded-xl transition"
+                >
+                  <Plus size={14} />
+                  <span>Ticket</span>
+                </button>
+              )}
+              <Link
+                to="/dashboard/notifications"
+                className="relative p-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl transition active:scale-95"
+                aria-label="Notifications"
+              >
+                <Bell size={18} />
+                {unreadCount > 0 && (
+                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-white dark:ring-slate-900 animate-pulse" />
+                )}
+              </Link>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 shrink-0">
+              {snapshotPhotoUrl && (
+                <button
+                  type="button"
+                  onClick={() => setShowSnapshotModal(true)}
+                  className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 transition"
+                  title="View Visitor Photo"
+                >
+                  <Camera size={16} />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => handleStartCall("audio")}
+                disabled={Boolean(callBusyType)}
+                className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 transition disabled:opacity-50"
+                title="Audio Call Gate"
+              >
+                <Phone size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleStartCall("video")}
+                disabled={Boolean(callBusyType)}
+                className="p-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-500 transition shadow-sm disabled:opacity-50"
+                title="Video Call Gate"
+              >
+                <Video size={16} />
+              </button>
+            </div>
+          )}
         </div>
       </header>
 
-      {/* MAIN CONTENT WORKSPACE */}
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        
-        {/* LEFT COLUMN: Conversation Switcher Thread List */}
-        <div className="lg:col-span-5 space-y-4">
-          <div className="bg-white border border-slate-200/80 rounded-3xl p-4 shadow-sm space-y-3.5">
-            <div className="flex justify-between items-center">
-              <h2 className="font-extrabold text-slate-900 tracking-tight text-sm">Inbox Threads</h2>
-              {canCreateTicket ? (
-                <button 
-                  onClick={() => setIsModalOpen(true)}
-                  className="flex items-center gap-1 text-[11px] font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100/80 px-2.5 py-1.5 rounded-xl transition-colors"
+      {/* INCOMING CALL BANNER */}
+      <AnimatePresence>
+        {incomingCall && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="sticky top-14 z-50 bg-indigo-600 text-white shadow-lg border-b border-indigo-500 px-4 py-3"
+          >
+            <div className="mx-auto max-w-3xl flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-white/20 rounded-full animate-bounce">
+                  <PhoneIncoming size={18} />
+                </div>
+                <div>
+                  <p className="text-xs font-black uppercase tracking-wider text-indigo-200">Incoming Gate Call</p>
+                  <p className="text-sm font-bold">{incomingCall.callerName || "Security Gate"}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleAnswerIncomingCall}
+                  className="px-4 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-xs rounded-xl shadow transition"
                 >
-                  <Plus size={14} />
-                  <span>New Ticket</span>
+                  Accept
                 </button>
-              ) : null}
+                <button
+                  type="button"
+                  onClick={() => setIncomingCall(null)}
+                  className="px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white font-bold text-xs rounded-xl transition"
+                >
+                  Decline
+                </button>
+              </div>
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-            {/* Live Thread Search Input Container */}
+      {/* MAIN CONTENT AREA */}
+      <main className="mx-auto max-w-3xl px-4 py-4">
+        
+        {/* VIEW 1: CONVERSATIONS LIST VIEW */}
+        {!activeThreadId && (
+          <motion.div
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="space-y-4"
+          >
+            {/* SEARCH */}
             <div className="relative">
               <input
                 type="text"
-                placeholder="Search conversations..."
+                placeholder="Search visitors, gates or messages..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-4 py-2.5 text-xs font-semibold text-slate-800 focus:bg-white focus:border-indigo-500 transition-all outline-none placeholder:text-slate-400"
+                className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl pl-10 pr-4 py-3 text-xs font-semibold text-slate-800 dark:text-slate-100 shadow-sm focus:border-indigo-500 transition outline-none placeholder:text-slate-400"
               />
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             </div>
 
-            {/* Scrollable List Body Container */}
-            <div className="space-y-2 max-h-[60vh] overflow-y-auto no-scrollbar pr-0.5">
+            {/* THREAD LIST CARDS */}
+            <div className="space-y-2.5">
               {isLoading ? (
-                [1, 2, 3].map(i => <div key={i} className="h-16 bg-slate-50 border border-slate-100 rounded-2xl animate-pulse" />)
+                [1, 2, 3, 4].map(i => (
+                  <div key={i} className="h-20 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl animate-pulse" />
+                ))
               ) : filteredThreads.length > 0 ? (
                 filteredThreads.map((thread) => {
-                  const isActive = activeThreadId === thread.id;
-                  const urgencyColors = thread.urgency === "high" ? "bg-rose-500" : "bg-emerald-500";
+                  const status = String(thread.sessionStatus || thread.status || "").toLowerCase();
+                  const isApproved = status === "approved";
+                  const isRejected = ["rejected", "denied"].includes(status);
+
                   return (
                     <button
                       key={thread.id}
+                      type="button"
                       onClick={() => setActiveThreadId(thread.id)}
-                      className={`w-full p-3.5 rounded-2xl border text-left flex items-start justify-between gap-3 transition-all relative ${
-                        isActive 
-                          ? "bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-600/15" 
-                          : "bg-white border-slate-200/70 hover:bg-slate-50 text-slate-700"
-                      }`}
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-indigo-500/50 p-4 rounded-2xl text-left flex items-center justify-between gap-3 shadow-sm hover:shadow-md transition-all active:scale-[0.99] group"
                     >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className={`w-1.5 h-1.5 rounded-full ${urgencyColors}`} />
-                          <p className={`text-xs font-bold truncate ${isActive ? "text-white" : "text-slate-900"}`}>
-                            {thread.visitorName || thread.name || "Visitor"}
+                      <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                        <div className="w-11 h-11 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-black text-base flex items-center justify-center shrink-0 border border-indigo-100 dark:border-indigo-900/50">
+                          {(thread.visitorName || thread.name || "V").charAt(0).toUpperCase()}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className={`w-2 h-2 rounded-full shrink-0 ${
+                              isApproved ? "bg-emerald-500" : isRejected ? "bg-rose-500" : "bg-amber-400 animate-pulse"
+                            }`} />
+                            <h3 className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white truncate">
+                              {thread.visitorName || thread.name || "Visitor Request"}
+                            </h3>
+                          </div>
+                          <p className="text-xs font-medium text-slate-500 dark:text-slate-400 truncate mt-1">
+                            {thread.last || "Tap to view conversation thread"}
                           </p>
                         </div>
-                        <p className={`text-[11px] font-medium truncate mt-1 ${isActive ? "text-indigo-200" : "text-slate-400"}`}>
-                          {thread.last || "No messages inside thread."}
-                        </p>
                       </div>
-                      <span className={`text-[9px] font-bold whitespace-nowrap uppercase tracking-wider px-2 py-0.5 rounded-md ${
-                        isActive ? "bg-indigo-700 text-indigo-100" : "bg-slate-100 text-slate-500"
-                      }`}>
-                        {thread.door || "Visit"}
-                      </span>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-[10px] font-black uppercase tracking-wider bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-2.5 py-1 rounded-lg">
+                          {thread.door || thread.doorName || "Gate"}
+                        </span>
+                        <ChevronRight size={16} className="text-slate-300 dark:text-slate-600 group-hover:translate-x-0.5 transition-transform" />
+                      </div>
                     </button>
                   );
                 })
               ) : (
-                <div className="text-center py-8 text-slate-400 text-xs">No active threads found.</div>
+                <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-12 text-center text-slate-400 dark:text-slate-500 space-y-2">
+                  <MessageSquare size={32} className="mx-auto stroke-1 text-slate-300 dark:text-slate-600" />
+                  <p className="text-xs font-bold text-slate-600 dark:text-slate-400">No message history found</p>
+                  <p className="text-[11px]">Visitor access requests and gate messages will appear here.</p>
+                </div>
               )}
             </div>
-          </div>
-        </div>
+          </motion.div>
+        )}
 
-        {/* RIGHT COLUMN: Realtime Selected Interactive Chat Pane */}
-        <div className="lg:col-span-7">
-          {activeThread ? (
-            <div className="bg-white border border-slate-200/80 rounded-3xl shadow-sm flex flex-col h-[70vh] overflow-hidden">
-              
-              {/* Active Conversation Banner Area */}
-              <div className="p-4 border-b border-slate-100 bg-white flex justify-between items-center shrink-0">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 bg-slate-100 text-slate-600 rounded-xl flex items-center justify-center font-bold text-xs uppercase">
-                    {(activeThread.visitorName || activeThread.name || "M").charAt(0)}
-                  </div>
-                  <div>
-                    <h3 className="font-extrabold text-xs text-slate-900">{activeThread.visitorName || activeThread.name || "Visitor"}</h3>
-                    <p className="text-[10px] text-slate-400 font-semibold tracking-wide uppercase">
-                      {activeThread.unitName || activeThread.homeName || "Property Unit"} · {activeThread.door || activeThread.doorName || "Gate"}
-                    </p>
-                  </div>
-                </div>
-                {activeThread.unread > 0 && (
-                  <div className="flex items-center gap-1 text-[10px] font-extrabold text-rose-600 bg-rose-50 px-2.5 py-1 rounded-full uppercase">
-                    <ShieldAlert size={12} />
-                    <span>{activeThread.unread} New</span>
-                  </div>
-                )}
+        {/* VIEW 2: SINGLE CONVERSATION / MESSAGE HISTORY VIEW */}
+        {activeThreadId && activeThread && (
+          <motion.div
+            initial={{ opacity: 0, x: 10 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl shadow-sm flex flex-col h-[82vh] min-h-[500px] overflow-hidden"
+          >
+            {/* ERROR BANNER */}
+            {error && (
+              <div className="bg-rose-50 dark:bg-rose-950/40 border-b border-rose-100 dark:border-rose-900/50 px-4 py-2.5 text-xs font-bold text-rose-700 dark:text-rose-300 flex items-center justify-between">
+                <span>{error}</span>
+                <button type="button" onClick={() => setError("")} className="p-1 hover:text-rose-900">
+                  <X size={14} />
+                </button>
               </div>
+            )}
 
-              {error ? (
-                <div className="border-b border-rose-100 bg-rose-50 px-4 py-2 text-[11px] font-bold text-rose-700">
-                  {error}
-                </div>
-              ) : null}
-
-              {canDecideActiveThread ? (
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/80 px-4 py-3 shrink-0">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                    Review this access request
-                  </p>
+            {/* DECISION ACTION BAR */}
+            {canDecideActiveThread && (
+              <div className="bg-slate-50 dark:bg-slate-800/40 border-b border-slate-100 dark:border-slate-800 p-3.5 shrink-0 space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <ShieldAlert className="h-4 w-4 text-amber-500 shrink-0" />
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                      Visitor waiting at gate
+                    </span>
+                  </div>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() => handleDecision("approve")}
                       disabled={Boolean(decisionBusy)}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-[11px] font-black text-white transition hover:bg-emerald-500 disabled:opacity-50"
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-1.5 text-xs font-extrabold transition shadow-sm disabled:opacity-50"
                     >
-                      <CheckCircle2 size={14} />
-                      Approve Pass
+                      <CheckCircle2 size={15} />
+                      <span>Approve</span>
                     </button>
                     <button
                       type="button"
                       onClick={openRejectReply}
                       disabled={Boolean(decisionBusy)}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-white px-3 py-2 text-[11px] font-black text-rose-700 transition hover:bg-rose-50 disabled:opacity-50"
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 px-3.5 py-1.5 text-xs font-extrabold transition disabled:opacity-50"
                     >
-                      <XCircle size={14} />
-                      Reject Pass
+                      <XCircle size={15} />
+                      <span>Reject</span>
                     </button>
                   </div>
-                  {rejectReplyOpen ? (
-                    <form onSubmit={submitRejectReply} className="basis-full rounded-2xl border border-rose-100 bg-white p-3 shadow-sm">
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-[10px] font-black uppercase tracking-wider text-rose-600">Reply to Gateman</p>
-                        <button
-                          type="button"
-                          onClick={() => setRejectReplyOpen(false)}
-                          className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-                          aria-label="Close rejection reply"
-                        >
-                          <X size={14} />
-                        </button>
-                      </div>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {REJECTION_REPLY_OPTIONS.map((option) => (
-                          <button
-                            key={option}
-                            type="button"
-                            onClick={() => setRejectReplyText(option)}
-                            className={`rounded-xl border px-3 py-2 text-left text-[11px] font-bold transition ${
-                              rejectReplyText === option
-                                ? "border-rose-300 bg-rose-50 text-rose-700"
-                                : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                            }`}
-                          >
-                            {option}
-                          </button>
-                        ))}
-                      </div>
-                      <textarea
-                        value={rejectReplyText}
-                        onChange={(event) => setRejectReplyText(event.target.value)}
-                        rows={3}
-                        className="mt-3 w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 outline-none transition focus:border-rose-300 focus:bg-white"
-                        placeholder="Type a custom message for the gateman..."
-                      />
-                      <div className="mt-3 flex justify-end gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setRejectReplyOpen(false)}
-                          disabled={Boolean(decisionBusy)}
-                          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-black text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="submit"
-                          disabled={Boolean(decisionBusy) || !rejectReplyText.trim()}
-                          className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-3 py-2 text-[11px] font-black text-white transition hover:bg-rose-500 disabled:opacity-50"
-                        >
-                          <XCircle size={14} />
-                          Send Reply & Reject
-                        </button>
-                      </div>
-                    </form>
-                  ) : null}
                 </div>
-              ) : null}
 
-              {/* Scrollable Real-time Bubbles Stream */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/50 no-scrollbar">
-                {conversationLoading ? (
-                  <div className="h-full flex items-center justify-center">
-                    <div className="h-6 w-6 rounded-full border-2 border-slate-200 border-t-indigo-600 animate-spin" />
-                  </div>
-                ) : Array.isArray(activeMessages) && activeMessages.length > 0 ? (
-                  activeMessages.map((msg, index) => {
-                    const senderType = String(msg.senderType || msg.senderRole || "").toLowerCase();
-                    const snapshotUrl = resolveSnapshotUrl(msg.snapshotUrl || msg.photoUrl || msg.imageUrl || msg.fileUrl || msg.url);
-                    const isSnapshotMessage = msg.messageType === "visitor_snapshot" || Boolean(snapshotUrl);
-                    const isMe = senderType === "homeowner" || msg.senderId === user?.id || msg.isHomeownerSender;
-                    if (isSnapshotMessage) {
-                      return (
-                        <div key={msg.id || index} className="flex justify-start">
-                          <div className="w-full max-w-[28rem] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                            {snapshotUrl ? (
-                              <SecureSnapshotImage
-                                src={snapshotUrl}
-                                alt={msg.visitorName || "Visitor snapshot"}
-                                className="aspect-video w-full bg-slate-100 object-cover"
-                                fallback={
-                                  <div className="flex aspect-video w-full items-center justify-center bg-slate-100 text-xs font-bold text-slate-400">
-                                    Snapshot unavailable
-                                  </div>
-                                }
-                              />
-                            ) : (
-                              <div className="flex aspect-video w-full items-center justify-center bg-slate-100 text-xs font-bold text-slate-400">
-                                Snapshot unavailable
-                              </div>
-                            )}
-                            <div className="space-y-3 p-3.5">
-                              <div>
-                                <p className="text-[10px] font-black uppercase tracking-wider text-indigo-600">Gate Visitor Intake</p>
-                                <p className="mt-1 text-sm font-black text-slate-950">{msg.visitorName || activeThread.visitorName || activeThread.name || "Visitor"}</p>
-                                <p className="text-[10px] font-semibold text-slate-400">{formatClockTime(msg.at || msg.timestamp)}</p>
-                              </div>
-                              <div className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
-                                <IntakeDetail label="Phone" value={msg.phoneNumber || msg.visitorPhone || activeThread.visitorPhone} />
-                                <IntakeDetail label="Purpose" value={msg.purpose || activeThread.purpose} />
-                                <IntakeDetail label="Property Unit" value={activeThread.unitName || activeThread.homeName} />
-                                <IntakeDetail label="Door" value={msg.doorName || activeThread.doorName || activeThread.door} />
-                                <IntakeDetail label="Security Officer" value={msg.securityOfficerName || msg.handledBySecurityName} />
-                                <IntakeDetail label="Officer ID" value={msg.securityOfficerId || msg.handledBySecurityId} />
-                              </div>
-                              {msg.text ? <p className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600">{msg.text}</p> : null}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    }
-                    return (
-                      <div key={msg.id || index} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
-                        <div className={`max-w-[80%] rounded-2xl px-3.5 py-2.5 text-xs font-semibold leading-relaxed shadow-sm tracking-tight ${
-                          isMe 
-                            ? "bg-indigo-600 text-white rounded-tr-none" 
-                            : "bg-white text-slate-800 border border-slate-200/60 rounded-tl-none"
-                        }`}>
-                          <p>{msg.text || msg.content}</p>
-                          <div className={`text-[9px] font-medium mt-1 text-right flex items-center justify-end gap-1 ${
-                            isMe ? "text-indigo-200" : "text-slate-400"
-                          }`}>
-                            <span>{formatClockTime(msg.at || msg.timestamp)}</span>
-                            {isMe && <CheckCheck size={11} />}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <div className="h-full flex flex-col items-center justify-center text-center text-slate-400 p-6">
-                    <MessageCircle size={24} className="text-slate-300 mb-2" />
-                    <p className="text-xs font-bold tracking-wide uppercase text-slate-400">Direct thread stream opened</p>
-                  </div>
+                {/* QUICK REJECT DRAWER */}
+                {rejectReplyOpen && (
+                  <form onSubmit={submitRejectReply} className="mt-3 p-3 bg-white dark:bg-slate-900 rounded-2xl border border-rose-100 dark:border-rose-900/60 shadow-sm space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-rose-600 dark:text-rose-400">
+                        Select reason for gate security
+                      </span>
+                      <button type="button" onClick={() => setRejectReplyOpen(false)} className="text-slate-400 hover:text-slate-600">
+                        <X size={14} />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                      {REJECTION_REPLY_OPTIONS.map((opt) => (
+                        <button
+                          key={opt}
+                          type="button"
+                          onClick={() => setRejectReplyText(opt)}
+                          className={`p-2 rounded-xl text-left text-[11px] font-bold transition border ${
+                            rejectReplyText === opt
+                              ? "bg-rose-50 dark:bg-rose-950/80 border-rose-300 text-rose-800 dark:text-rose-200"
+                              : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100"
+                          }`}
+                        >
+                          {opt}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex justify-end gap-2 pt-1">
+                      <button
+                        type="submit"
+                        disabled={Boolean(decisionBusy)}
+                        className="px-4 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs rounded-xl transition shadow-sm"
+                      >
+                        Send & Deny Access
+                      </button>
+                    </div>
+                  </form>
                 )}
-                <div ref={messageEndRef} />
               </div>
+            )}
 
-              {/* Message Typing Submission Form Panel */}
-              <form onSubmit={handleSendMessage} className="p-3 border-t border-slate-100 bg-white shrink-0 flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Type your message reply..."
-                  value={typedMessage}
-                  onChange={(e) => setTypedMessage(e.target.value)}
-                  className="flex-1 bg-slate-50 border border-slate-200/80 rounded-xl px-4 py-2.5 text-xs font-semibold text-slate-900 focus:bg-white focus:border-indigo-500 transition-all outline-none"
-                />
-                <button
-                  type="submit"
-                  disabled={sendPending || !typedMessage.trim()}
-                  className="p-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl transition-all active:scale-95 disabled:opacity-50 shrink-0"
-                >
-                  <SendHorizontal size={16} />
-                </button>
-              </form>
+            {/* MESSAGE HISTORY */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/50 dark:bg-slate-950/30">
+              {conversationLoading && activeMessages.length === 0 ? (
+                <div className="flex items-center justify-center h-full text-slate-400 text-xs font-bold">
+                  Loading message history...
+                </div>
+              ) : activeMessages.length > 0 ? (
+                activeMessages.map((msg, idx) => {
+                  const isHomeowner = msg.senderType === "homeowner";
+                  return (
+                    <div
+                      key={msg.id || idx}
+                      className={`flex flex-col ${isHomeowner ? "items-end" : "items-start"}`}
+                    >
+                      <div
+                        className={`max-w-[85%] sm:max-w-[75%] p-3.5 rounded-2xl text-xs font-medium leading-relaxed ${
+                          isHomeowner
+                            ? "bg-indigo-600 text-white rounded-br-none shadow-sm"
+                            : "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 border border-slate-200/80 dark:border-slate-700/80 rounded-bl-none shadow-sm"
+                        }`}
+                      >
+                        {!isHomeowner && (
+                          <p className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-1">
+                            {msg.senderName || "Gate Security"}
+                          </p>
+                        )}
+                        <p className="whitespace-pre-wrap">{msg.text || msg.content}</p>
+                      </div>
+                      <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-1 px-1">
+                        {msg.at ? new Date(msg.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ""}
+                      </span>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-slate-400 dark:text-slate-500 space-y-2">
+                  <MessageSquare size={28} className="stroke-1 text-slate-300 dark:text-slate-600" />
+                  <p className="text-xs font-bold">No messages in this conversation yet.</p>
+                </div>
+              )}
+              <div ref={messageEndRef} />
             </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-20 bg-white rounded-3xl border border-dashed border-slate-300 text-center px-6 shadow-sm">
-              <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center mb-3 text-slate-300">
-                <MessageSquare size={22} />
-              </div>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Select a conversation thread to review streams</p>
-            </div>
-          )}
-        </div>
+
+            {/* INPUT FORM */}
+            <form
+              onSubmit={handleSendMessage}
+              className="p-3 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex items-center gap-2 shrink-0"
+            >
+              <input
+                type="text"
+                placeholder="Type a message to gate control..."
+                value={typedMessage}
+                onChange={(e) => setTypedMessage(e.target.value)}
+                disabled={sendPending}
+                className="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-xs font-semibold text-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 transition outline-none placeholder:text-slate-400"
+              />
+              <button
+                type="submit"
+                disabled={sendPending || !typedMessage.trim()}
+                className="p-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-200 dark:disabled:bg-slate-800 text-white rounded-xl transition shadow-sm"
+              >
+                <Send size={16} />
+              </button>
+            </form>
+          </motion.div>
+        )}
+
       </main>
 
-      {/* NEW DISPATCH CONVERSATION MODAL INTERFACE */}
+      {/* VISITOR PHOTO MODAL */}
       <AnimatePresence>
-        {isModalOpen && canCreateTicket && (
-          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+        {showSnapshotModal && snapshotPhotoUrl && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm">
             <motion.div
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => setIsModalOpen(false)}
-              className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm"
-            />
-
-            <motion.div
-              initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
-              className="relative bg-white w-full sm:max-w-xl rounded-t-[2rem] sm:rounded-3xl flex flex-col h-[85vh] sm:h-auto sm:max-h-[85vh] shadow-2xl overflow-hidden"
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white dark:bg-slate-900 rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800"
             >
-              {/* Modal Banner Header */}
-              <div className="px-6 pt-6 pb-4 bg-white border-b border-slate-100 shrink-0">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <h3 className="font-bold text-lg text-slate-900 tracking-tight">Open Support Desk Ticket</h3>
-                    <p className="text-slate-400 text-xs font-medium mt-0.5">Contact gate control personnel or compound management instantly.</p>
-                  </div>
-                  <button 
-                    onClick={() => setIsModalOpen(false)} 
-                    className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-xl transition-colors active:scale-95"
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
+              <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                <h4 className="font-extrabold text-xs uppercase tracking-wider text-slate-900 dark:text-white">
+                  Visitor Photo Preview
+                </h4>
+                <button
+                  type="button"
+                  onClick={() => setShowSnapshotModal(false)}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 rounded-xl"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="p-4 bg-slate-950 flex justify-center">
+                <SecureSnapshotImage
+                  src={snapshotPhotoUrl}
+                  alt="Visitor Snapshot"
+                  className="max-h-80 w-auto rounded-2xl object-contain"
+                />
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* NEW SUPPORT TICKET MODAL */}
+      <AnimatePresence>
+        {isModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white dark:bg-slate-900 rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4"
+            >
+              <div className="flex justify-between items-center">
+                <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">New Support Ticket</h3>
+                <button type="button" onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                  <X size={18} />
+                </button>
               </div>
 
-              {/* Interactive Submission Form Body */}
-              <form onSubmit={handleCreateThread} className="flex-1 flex flex-col overflow-hidden">
-                <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5 no-scrollbar bg-slate-50/50">
-                  
-                  {/* Recipient Channel Selector Layout */}
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Target Department Channel</label>
-                    <div className="relative">
-                      <select
-                        name="type"
-                        required
-                        className="w-full appearance-none bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-900 focus:border-indigo-500 transition-all outline-none"
-                        defaultValue="management"
-                      >
-                        <option value="management">Estate Management Office</option>
-                        <option value="security">Main Security Gate Patrol</option>
-                        <option value="broadcast">Community Broadcast Alert</option>
-                      </select>
-                      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400"><Megaphone size={16}/></div>
-                    </div>
-                  </div>
-
-                  {/* Priority Selector Layout */}
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Ticket Urgency Flag</label>
-                    <div className="relative">
-                      <select
-                        name="urgency"
-                        required
-                        className="w-full appearance-none bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-900 focus:border-indigo-500 transition-all outline-none"
-                        defaultValue="normal"
-                      >
-                        <option value="normal">Normal Inquiry / Notice</option>
-                        <option value="high">Critical Escalation / Operational Fault</option>
-                      </select>
-                      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400"><HelpCircle size={16}/></div>
-                    </div>
-                  </div>
-
-                  <InputField label="Subject Topic Head" name="subject" placeholder="e.g., Damaged boundary lighting line" icon={<Sparkles size={16}/>} required />
-
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Detailed Message Statement</label>
-                    <div className="relative">
-                      <textarea 
-                        name="message" 
-                        required
-                        placeholder="Provide deep descriptions detailing observations..." 
-                        rows="4" 
-                        className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-900 focus:border-indigo-500 transition-all outline-none resize-none" 
-                      />
-                    </div>
-                  </div>
+              <form onSubmit={handleCreateThread} className="space-y-3">
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-slate-500 mb-1">Type</label>
+                  <select name="type" className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-2.5 text-xs font-bold text-slate-800 dark:text-slate-100">
+                    <option value="security">Security Gate</option>
+                    <option value="management">Estate Management</option>
+                  </select>
                 </div>
-
-                {/* Fixed Action Footer Bar */}
-                <div className="p-4 bg-white border-t border-slate-100 shrink-0">
-                  <button
-                    type="submit"
-                    disabled
-                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs uppercase tracking-wider py-4 rounded-xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:opacity-50 shadow-sm"
-                  >
-                    <Send size={16} />
-                    <span>Send Ticket</span>
-                  </button>
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-slate-500 mb-1">Subject</label>
+                  <input name="subject" required type="text" placeholder="Issue or request title..." className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-2.5 text-xs font-semibold text-slate-800 dark:text-slate-100" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-slate-500 mb-1">Message</label>
+                  <textarea name="message" required rows={3} placeholder="Describe your issue..." className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-2.5 text-xs font-semibold text-slate-800 dark:text-slate-100" />
+                </div>
+                <div className="flex justify-end gap-2 pt-2">
+                  <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold text-xs rounded-xl">Cancel</button>
+                  <button type="submit" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-sm">Submit</button>
                 </div>
               </form>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
-    </div>
-  );
-}
 
-function formatClockTime(value) {
-  if (!value) return "Just now";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Just now";
-  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
-
-function IntakeDetail({ label, value }) {
-  const displayValue = String(value || "").trim();
-  return (
-    <div className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
-      <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">{label}</p>
-      <p className="mt-0.5 break-words text-xs font-bold text-slate-800">{displayValue || "Not provided"}</p>
-    </div>
-  );
-}
-
-// Reusable Custom Input Field Wrapper
-function InputField({ label, icon, ...props }) {
-  return (
-    <div className="space-y-1.5 w-full">
-      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">{label}</label>
-      <div className="relative group">
-        <input
-          {...props}
-          className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-900 focus:border-indigo-500 transition-all outline-none placeholder:text-slate-300"
-        />
-        <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none group-focus-within:text-indigo-600 transition-colors">
-          {icon}
-        </div>
-      </div>
     </div>
   );
 }

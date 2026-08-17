@@ -1,8 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
 import { Bell } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { listMyEstateAlerts } from "../../services/estateService";
-import { showError } from "../../utils/flash";
+import { useMyEstateAlerts } from "../../hooks/useMyEstateAlerts";
 import {
   EstateEmptyState,
   EstateList,
@@ -14,25 +12,7 @@ import {
 
 export default function HomeownerEstateAlertsPage() {
   const navigate = useNavigate();
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  const load = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
-    try {
-      setItems(await listMyEstateAlerts());
-    } catch (error) {
-      showError(error?.message || "Unable to load alerts");
-    } finally {
-      if (!silent) setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    load();
-    const id = setInterval(() => load(true), 15000);
-    return () => clearInterval(id);
-  }, [load]);
+  const { rows: items, loading } = useMyEstateAlerts();
 
   return (
     <EstateMobilePage title="Estate Alerts" subtitle="Notices from your estate" icon={Bell} iconClassName="text-rose-600" onBack={() => navigate(-1)}>

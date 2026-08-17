@@ -110,23 +110,33 @@ export function NotificationsProvider({ children }) {
     if (!user?.role) return () => {};
     let active = true;
 
+    // Do an initial refresh. When a dashboard socket is connected we rely
+    // on realtime events to keep notifications in sync and avoid frequent
+    // polling which can trigger backend rate limits (429).
     refresh();
-    const intervalId = window.setInterval(() => {
-      if (!active) return;
-      refresh({ silent: true });
-    }, POLL_INTERVAL_MS);
-    const onlineHandler = () => {
-      if (!active) return;
-      refresh({ silent: true });
-    };
-    window.addEventListener("online", onlineHandler);
+
+    if (!connected) {
+      const intervalId = window.setInterval(() => {
+        if (!active) return;
+        refresh({ silent: true });
+      }, POLL_INTERVAL_MS);
+      const onlineHandler = () => {
+        if (!active) return;
+        refresh({ silent: true });
+      };
+      window.addEventListener("online", onlineHandler);
+
+      return () => {
+        active = false;
+        window.clearInterval(intervalId);
+        window.removeEventListener("online", onlineHandler);
+      };
+    }
 
     return () => {
       active = false;
-      window.clearInterval(intervalId);
-      window.removeEventListener("online", onlineHandler);
     };
-  }, [user?.id, user?.role]);
+  }, [user?.id, user?.role, connected]);
 
   useEffect(() => {
     if (!user?.id || !user?.role) return () => {};
@@ -175,6 +185,12 @@ export function NotificationsProvider({ children }) {
     const onIncomingCall = (payload) => {
       const nextCall = managerRef.current.ingestIncomingCall(payload);
       if (!nextCall) return;
+      console.debug("qring.call.incoming.received", {
+        callId: nextCall.callId || nextCall.callSessionId,
+        sessionId: nextCall.sessionId,
+        callerUserId: nextCall.callerUserId,
+        callType: nextCall.callType || nextCall.type,
+      });
       setLastRealtimeEvent({ eventName: "incoming-call", payload: nextCall, at: Date.now() });
       setActiveIncomingCall(nextCall);
     };

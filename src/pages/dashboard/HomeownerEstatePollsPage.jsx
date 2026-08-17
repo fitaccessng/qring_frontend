@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
-import { CheckCircle2, Lock, Vote } from "lucide-react";
+import { Bell, CheckCircle2, Lock, Vote } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { listMyEstateAlerts, voteEstatePoll } from "../../services/estateService";
+import { voteEstatePoll } from "../../services/estateService";
+import { useMyEstateAlerts } from "../../hooks/useMyEstateAlerts";
 import { showError, showSuccess } from "../../utils/flash";
 import {
   EstateEmptyState,
@@ -15,38 +15,37 @@ import {
 
 export default function HomeownerEstatePollsPage() {
   const navigate = useNavigate();
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  const load = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
-    try {
-      setItems((await listMyEstateAlerts()).filter((item) => item.alertType === "poll"));
-    } catch (error) {
-      showError(error?.message || "Unable to load polls");
-    } finally {
-      if (!silent) setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    load();
-    const id = setInterval(() => load(true), 15000);
-    return () => clearInterval(id);
-  }, [load]);
+  const { rows: items, loading, refetch } = useMyEstateAlerts("poll");
 
   async function vote(id, index) {
     try {
       await voteEstatePoll(id, index);
       showSuccess("Vote submitted");
-      load(true);
+      refetch({ force: true });
     } catch (error) {
       showError(error?.message || "Unable to vote");
     }
   }
 
+  const NotificationBtn = (
+    <button
+      type="button"
+      onClick={() => navigate("/dashboard/notifications")}
+      aria-label="Notifications"
+      className="p-1.5 rounded-full text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors"
+    >
+      <Bell className="h-5 w-5" />
+    </button>
+  );
+
   return (
-    <EstateMobilePage title="Polls" subtitle="Vote on estate decisions" icon={Vote} iconClassName="text-cyan-600" onBack={() => navigate(-1)}>
+    <EstateMobilePage
+      title="Polls"
+      onBack={() => navigate(-1)}
+      action={NotificationBtn}
+      rightAction={NotificationBtn}
+      rightElement={NotificationBtn}
+    >
       {loading ? (
         <EstateLoadingState label="Polls" />
       ) : items.length ? (

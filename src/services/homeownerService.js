@@ -1,5 +1,6 @@
 import { ApiError, apiRequest, apiUpload } from "./apiClient";
 import { buildStartSessionCallPlan } from "./callRoutePlanner";
+import { invalidateEstateServiceCache, invalidateMyEstateAlertsCache } from "./estateService";
 import { getStoredUser } from "./authStorage";
 import { getVisitorSessionToken } from "./visitorSessionToken";
 
@@ -283,6 +284,8 @@ export async function createMaintenanceRequest(payload) {
     method: "POST",
     body: JSON.stringify(payload)
   });
+  invalidateEstateServiceCache();
+  invalidateMyEstateAlertsCache();
   return response?.data ?? null;
 }
 
@@ -291,6 +294,8 @@ export async function createHomeownerMaintenanceRequest(payload) {
     method: "POST",
     body: JSON.stringify(payload)
   });
+  invalidateEstateServiceCache();
+  invalidateMyEstateAlertsCache();
   return response?.data ?? null;
 }
 
@@ -298,6 +303,7 @@ export async function uploadPaymentProof(alertId, file) {
   const formData = new FormData();
   formData.append("media", file);
   const response = await apiUpload(`/homeowner/alerts/${encodeURIComponent(alertId)}/payment-proof`, formData);
+  invalidateMyEstateAlertsCache();
   return response?.data ?? null;
 }
 
@@ -384,7 +390,8 @@ export async function startSessionCall({
   visitorName,
   type,
   hasVideo,
-  visitorToken
+  visitorToken,
+  communicationTarget
 } = {}) {
   const plan = buildStartSessionCallPlan({
     sessionId,
@@ -393,7 +400,8 @@ export async function startSessionCall({
     visitorName,
     type,
     hasVideo,
-    visitorToken
+    visitorToken,
+    communicationTarget
   });
 
   const legacyRequest = async () => {

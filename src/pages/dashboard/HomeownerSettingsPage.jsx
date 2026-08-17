@@ -1,21 +1,17 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Award,
   Bell,
   MapPin,
-  CalendarDays,
   ChevronLeft,
   ChevronRight,
   CreditCard,
   Edit3,
   Globe,
   HelpCircle,
-  History,
   Key,
-  LayoutGrid,
   LogOut,
-  MessageSquare,
   Moon,
   ShieldCheck,
   User,
@@ -66,14 +62,6 @@ const DEFAULT_SETTINGS = {
   home: null
 };
 
-const EMPTY_PROFILE_FORM = {
-  fullName: "",
-  username: "",
-  email: "",
-  phone: "",
-  bio: ""
-};
-
 const EMPTY_PASSWORD_FORM = {
   currentPassword: "",
   newPassword: "",
@@ -81,6 +69,44 @@ const EMPTY_PASSWORD_FORM = {
 };
 
 const HELP_CENTER_URL = "https://www.useqring.online";
+
+// --- Helper Utilities ---
+function buildUsernameFromEmail(email) {
+  if (!email) return "user";
+  return email.split("@")[0].toLowerCase().replace(/[^a-z0-9_]/g, "");
+}
+
+function mergeSettings(incoming) {
+  return { ...DEFAULT_SETTINGS, ...(incoming || {}) };
+}
+
+function buildProfileForm(user, profile) {
+  return {
+    fullName: profile?.fullName || user?.fullName || "",
+    username: user?.username || buildUsernameFromEmail(user?.email || profile?.email),
+    email: user?.email || profile?.email || "",
+    phone: profile?.phone || user?.phone || "",
+    bio: user?.bio || ""
+  };
+}
+
+function buildStats(settings) {
+  return {
+    plan: settings?.subscription?.planName || "FREE",
+    referrals: settings?.referralCount || 0,
+    earnings: settings?.earningsFormatted || "$0.00"
+  };
+}
+
+function buildSettingsPayload(settings) {
+  return {
+    pushAlerts: settings.pushAlerts,
+    soundAlerts: settings.soundAlerts,
+    nearbyPanicAlertsEnabled: settings.nearbyPanicAlertsEnabled,
+    nearbyPanicAlertRadiusMeters: settings.nearbyPanicAlertRadiusMeters,
+    safetyHomeLocation: settings.safetyHomeLocation
+  };
+}
 
 export default function HomeownerSettingsPage() {
   const cachedSettings = getHomeownerSettingsSnapshot();
@@ -343,7 +369,6 @@ export default function HomeownerSettingsPage() {
 
   return (
     <div className="bg-slate-50/50 min-h-screen font-sans pb-40 dark:bg-slate-950 text-slate-900 dark:text-slate-100 antialiased">
-      
       {/* STATIC STICKY HEADER */}
       <header className="sticky top-0 z-50 w-full border-b border-slate-100 bg-white/90 px-4 py-3.5 sm:py-4 backdrop-blur-md dark:bg-slate-950/90 dark:border-slate-900">
         <div className="mx-auto flex max-w-2xl items-center justify-between">
@@ -369,7 +394,6 @@ export default function HomeownerSettingsPage() {
       </header>
 
       <main className="mt-6 px-4 sm:px-6 max-w-2xl mx-auto space-y-6">
-        
         {/* PROFILE HEADER */}
         <section className="relative overflow-hidden bg-white dark:bg-slate-900 rounded-[2rem] p-6 shadow-sm hover:shadow-md transition-shadow duration-300 border border-slate-100/50 dark:border-slate-800/40">
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 text-center sm:text-left">
@@ -526,7 +550,6 @@ export default function HomeownerSettingsPage() {
         isOpen={activeModal === "panic"}
         onClose={closeModal}
         settings={settings}
-        setSettings={setSettings}
         savingPanicNetwork={savingPanicNetwork}
         handlePanicNetworkSave={handlePanicNetworkSave}
         handleCaptureSafetyLocation={handleCaptureSafetyLocation}
@@ -600,13 +623,23 @@ function SettingsItem({ icon, label, sublabel, color, badge, toggle, checked, di
   );
 }
 
-// Custom Reusable Modal Container Wrapper
+// Optimized Reusable Modal Container Wrapper
 function ModalWrapper({ children, onClose, title }) {
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    // Auto-scroll modal into center view on mount
+    containerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, []);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white dark:bg-slate-900 w-full sm:max-w-md rounded-t-[2rem] sm:rounded-3xl shadow-2xl animate-in slide-in-from-bottom sm:zoom-in-95 duration-300 overflow-hidden flex flex-col max-h-[90vh]">
-        <div className="px-5 py-4 flex justify-between items-center border-b border-slate-100 dark:border-slate-800">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+      <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-sm" onClick={onClose} />
+      <div
+        ref={containerRef}
+        className="relative bg-white dark:bg-slate-900 w-full sm:max-w-md rounded-3xl shadow-2xl animate-in fade-in zoom-in-95 duration-200 overflow-hidden flex flex-col max-h-[85vh] my-auto"
+      >
+        <div className="px-5 py-4 flex justify-between items-center border-b border-slate-100 dark:border-slate-800 shrink-0">
           <h3 className="font-extrabold text-slate-900 dark:text-white text-base tracking-tight">{title}</h3>
           <button 
             onClick={onClose} 
@@ -623,8 +656,7 @@ function ModalWrapper({ children, onClose, title }) {
   );
 }
 
-// Input component
-function InputGroup({ label, value, type = "text", onChange, readOnly }) {
+function InputGroup({ label, value, type = "text", onChange, readOnly, autoFocus }) {
   return (
     <div className="flex flex-col gap-1 text-left w-full">
       <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">{label}</label>
@@ -632,6 +664,7 @@ function InputGroup({ label, value, type = "text", onChange, readOnly }) {
         type={type}
         value={value}
         readOnly={readOnly}
+        autoFocus={autoFocus}
         onChange={(e) => onChange?.(e.target.value)}
         className="w-full bg-slate-50 border border-slate-200 dark:border-slate-800/80 rounded-xl px-4 py-3 text-sm font-semibold focus:border-indigo-500 dark:bg-slate-800 dark:text-white outline-none focus:ring-4 focus:ring-indigo-500/5 transition-colors"
       />
@@ -639,29 +672,8 @@ function InputGroup({ label, value, type = "text", onChange, readOnly }) {
   );
 }
 
-// Inline Select block component
-function InlineSelect({ label, value, options, onChange, disabled }) {
-  return (
-    <div className="flex flex-col gap-1 text-left w-full">
-      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">{label}</label>
-      <select
-        value={value}
-        disabled={disabled}
-        onChange={(e) => onChange?.(e.target.value)}
-        className="w-full bg-slate-50 border border-slate-200 dark:border-slate-800/80 rounded-xl px-3 py-3 text-sm font-semibold dark:bg-slate-800 dark:text-white outline-none focus:border-indigo-500 transition-colors"
-      >
-        {options.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
 /**
- * Profile Modal Component
+ * Profile Modal
  */
 function ProfileModal({ isOpen, onClose, profileForm, setProfileForm, savingProfile, handleProfileSave }) {
   if (!isOpen) return null;
@@ -672,6 +684,7 @@ function ProfileModal({ isOpen, onClose, profileForm, setProfileForm, savingProf
         <InputGroup
           label="Full Name"
           value={profileForm.fullName}
+          autoFocus
           onChange={(value) => setProfileForm((prev) => ({ ...prev, fullName: value }))}
         />
         <InputGroup
@@ -689,7 +702,7 @@ function ProfileModal({ isOpen, onClose, profileForm, setProfileForm, savingProf
           <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Bio</label>
           <textarea
             value={profileForm.bio}
-            rows={4}
+            rows={3}
             onChange={(event) => setProfileForm((prev) => ({ ...prev, bio: event.target.value }))}
             className="w-full bg-slate-50 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4 text-sm font-semibold focus:ring-2 focus:ring-indigo-500 dark:bg-slate-800 dark:text-white"
             placeholder="Tell your neighbors a little about yourself"
@@ -708,7 +721,7 @@ function ProfileModal({ isOpen, onClose, profileForm, setProfileForm, savingProf
 }
 
 /**
- * Privacy & Security Modal Component
+ * Privacy & Security Modal
  */
 function PrivacyModal({ isOpen, onClose, settings }) {
   if (!isOpen) return null;
@@ -739,7 +752,7 @@ function PrivacyModal({ isOpen, onClose, settings }) {
 }
 
 /**
- * Security/Password Modal Component
+ * Security / Password Change Modal
  */
 function SecurityModal({ isOpen, onClose, passwordForm, setPasswordForm, savingSecurity, handleSecuritySave }) {
   if (!isOpen) return null;
@@ -754,6 +767,7 @@ function SecurityModal({ isOpen, onClose, passwordForm, setPasswordForm, savingS
           label="Current Password"
           type="password"
           value={passwordForm.currentPassword}
+          autoFocus
           onChange={(value) => setPasswordForm((prev) => ({ ...prev, currentPassword: value }))}
         />
         <InputGroup
@@ -771,9 +785,9 @@ function SecurityModal({ isOpen, onClose, passwordForm, setPasswordForm, savingS
         <button
           type="submit"
           disabled={savingSecurity}
-          className="w-full rounded-2xl bg-slate-900 py-4 text-sm font-black text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
+          className="w-full rounded-2xl bg-indigo-600 py-4 text-sm font-black text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {savingSecurity ? "Updating..." : "Change Password"}
+          {savingSecurity ? "Updating Password..." : "Change Password"}
         </button>
       </form>
     </ModalWrapper>
@@ -781,231 +795,105 @@ function SecurityModal({ isOpen, onClose, passwordForm, setPasswordForm, savingS
 }
 
 /**
- * Language Modal Component
+ * Language Modal
  */
-function LanguageModal({ isOpen, onClose, languageOptions, language, handleLanguageSelect }) {
+function LanguageModal({ isOpen, onClose, languageOptions = [], language, handleLanguageSelect }) {
   if (!isOpen) return null;
 
   return (
     <ModalWrapper onClose={onClose} title="Select Language">
-      <div className="space-y-3">
-        {languageOptions.map((option) => {
-          const isSelected = option.code === language;
-          return (
-            <button
-              key={option.code}
-              type="button"
-              onClick={() => handleLanguageSelect(option.code)}
-              className={`flex w-full items-center justify-between rounded-2xl border px-4 py-4 text-left transition-colors ${
-                isSelected
-                  ? "border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-500/40 dark:bg-indigo-500/10 dark:text-indigo-200"
-                  : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-              }`}
-            >
-              <span>
-                <span className="block text-sm font-black">{option.label}</span>
-                <span className="block text-xs font-bold opacity-70">{option.nativeLabel}</span>
-              </span>
-              {isSelected ? <span className="text-xs font-black uppercase tracking-widest">Active</span> : null}
-            </button>
-          );
-        })}
+      <div className="space-y-2">
+        {languageOptions.map((opt) => (
+          <button
+            key={opt.code || opt.value}
+            onClick={() => handleLanguageSelect(opt.code || opt.value)}
+            className={`w-full flex items-center justify-between p-3.5 rounded-2xl text-sm font-bold transition-colors ${
+              (opt.code || opt.value) === language
+                ? "bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400"
+                : "bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 hover:bg-slate-100"
+            }`}
+          >
+            <span>{opt.label}</span>
+            {(opt.code || opt.value) === language && <span className="text-xs font-black uppercase">Active</span>}
+          </button>
+        ))}
       </div>
     </ModalWrapper>
   );
 }
 
 /**
- * External Link Modal Component
+ * External Navigation Modal (FAQ / Support)
  */
 function ExternalModal({ isOpen, onClose, pendingExternalAction, confirmExternalNavigation }) {
   if (!isOpen) return null;
 
   return (
-    <ModalWrapper onClose={onClose} title="Open External Page">
-      <div className="space-y-5">
-        <p className="text-sm font-bold text-slate-600 dark:text-slate-300">
-          You are about to open the {pendingExternalAction === "support" ? "support" : "FAQs"} page in a new tab.
+    <ModalWrapper onClose={onClose} title={pendingExternalAction === "support" ? "Contact Support" : "Help Center"}>
+      <div className="space-y-4">
+        <p className="text-sm text-slate-600 dark:text-slate-400">
+          You are about to open the external QRing help portal. Would you like to proceed?
         </p>
-        <button
-          type="button"
-          onClick={confirmExternalNavigation}
-          className="w-full rounded-2xl bg-indigo-600 py-4 text-sm font-black text-white transition-colors hover:bg-indigo-700"
-        >
-          Continue
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 rounded-xl bg-slate-100 py-3 text-sm font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={confirmExternalNavigation}
+            className="flex-1 rounded-xl bg-indigo-600 py-3 text-sm font-bold text-white hover:bg-indigo-700"
+          >
+            Continue
+          </button>
+        </div>
       </div>
     </ModalWrapper>
   );
 }
 
 /**
- * Panic Network Modal Component
+ * Panic Network Settings Modal
  */
-function PanicNetworkModal({ isOpen, onClose, settings, setSettings, savingPanicNetwork, handlePanicNetworkSave, handleCaptureSafetyLocation }) {
+function PanicNetworkModal({
+  isOpen,
+  onClose,
+  settings,
+  savingPanicNetwork,
+  handlePanicNetworkSave,
+  handleCaptureSafetyLocation
+}) {
   if (!isOpen) return null;
 
   return (
-    <ModalWrapper onClose={onClose} title="Panic Network Settings">
-      <div className="space-y-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-sm font-black text-slate-900 dark:text-white">Allow Nearby Panic Alerts</p>
-            <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
-              Alert trusted people nearby who have chosen to help.
-            </p>
-          </div>
-          <button
-            type="button"
-            disabled={savingPanicNetwork}
-            onClick={() => handlePanicNetworkSave({ nearbyPanicAlertsEnabled: !settings.nearbyPanicAlertsEnabled })}
-            className={`w-10 h-6 rounded-full relative transition-colors duration-250 flex-shrink-0 ${settings.nearbyPanicAlertsEnabled ? "bg-emerald-500" : "bg-slate-200 dark:bg-slate-800"}`}
-          >
-            <div className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-250 ${settings.nearbyPanicAlertsEnabled ? "translate-x-5" : "translate-x-1"}`} />
-          </button>
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <InlineSelect
-            label="Alert Radius"
-            value={String(settings.nearbyPanicAlertRadiusMeters || 500)}
-            disabled={savingPanicNetwork}
-            options={[
-              { value: "200", label: "200m" },
-              { value: "500", label: "500m" },
-              { value: "1000", label: "1km" }
-            ]}
-            onChange={(value) => handlePanicNetworkSave({ nearbyPanicAlertRadiusMeters: Number(value) })}
-          />
-          <InlineSelect
-            label="Availability"
-            value={settings.nearbyPanicAvailability || "always"}
-            disabled={savingPanicNetwork}
-            options={[
-              { value: "always", label: "Always" },
-              { value: "night_only", label: "Night Only" },
-              { value: "custom", label: "Custom Schedule" }
-            ]}
-            onChange={(value) =>
-              handlePanicNetworkSave({
-                nearbyPanicAvailability: value,
-                nearbyPanicCustomSchedule:
-                  value === "custom"
-                    ? [{ days: [0, 1, 2, 3, 4, 5, 6], start: "20:00", end: "06:00" }]
-                    : settings.nearbyPanicCustomSchedule
-              })
-            }
-          />
-          <InlineSelect
-            label="Receive From"
-            value={settings.nearbyPanicReceiveFrom || "everyone"}
-            disabled={savingPanicNetwork}
-            options={[
-              { value: "everyone", label: "Everyone" },
-              { value: "verified_only", label: "Verified Users Only" },
-              { value: "same_area", label: "Same Street / Area" }
-            ]}
-            onChange={(value) => handlePanicNetworkSave({ nearbyPanicReceiveFrom: value })}
-          />
-          <InlineSelect
-            label="Identity"
-            value={settings.panicIdentityVisibility || "masked"}
-            disabled={savingPanicNetwork}
-            options={[
-              { value: "masked", label: "Masked" },
-              { value: "public", label: "Public" }
-            ]}
-            onChange={(value) => handlePanicNetworkSave({ panicIdentityVisibility: value })}
+    <ModalWrapper onClose={onClose} title="Panic Network Configuration">
+      <div className="space-y-5">
+        <div className="space-y-2">
+          <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+            Alert Radius ({settings.nearbyPanicAlertRadiusMeters || 500}m)
+          </label>
+          <input
+            type="range"
+            min="100"
+            max="2000"
+            step="100"
+            value={settings.nearbyPanicAlertRadiusMeters || 500}
+            onChange={(e) => handlePanicNetworkSave({ nearbyPanicAlertRadiusMeters: Number(e.target.value) })}
+            className="w-full accent-indigo-600"
           />
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-[1fr_auto]">
-          <InputGroup
-            label="Area Label"
-            value={settings.nearbyPanicSameAreaLabel || ""}
-            onChange={(value) => setSettings((current) => ({ ...current, nearbyPanicSameAreaLabel: value }))}
-          />
-          <button
-            type="button"
-            disabled={savingPanicNetwork}
-            onClick={() => handlePanicNetworkSave({ nearbyPanicSameAreaLabel: settings.nearbyPanicSameAreaLabel || "" }, "Area label saved.")}
-            className="self-end rounded-2xl bg-slate-900 px-4 py-4 text-sm font-black text-white dark:bg-white dark:text-slate-900"
-          >
-            Save Area
-          </button>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            disabled={savingPanicNetwork}
-            onClick={() => handlePanicNetworkSave({ nearbyPanicMutedUntil: addMuteHours(1) }, "Nearby panic alerts muted for 1 hour.")}
-            className="rounded-full border border-slate-200 dark:border-slate-800 px-4 py-2 text-xs font-black uppercase tracking-wide text-slate-700 dark:text-slate-200"
-          >
-            Mute 1 Hour
-          </button>
-          <button
-            type="button"
-            disabled={savingPanicNetwork}
-            onClick={() => handlePanicNetworkSave({ nearbyPanicMutedUntil: endOfTodayIso() }, "Nearby panic alerts muted for today.")}
-            className="rounded-full border border-slate-200 dark:border-slate-800 px-4 py-2 text-xs font-black uppercase tracking-wide text-slate-700 dark:text-slate-200"
-          >
-            Mute Today
-          </button>
-          <button
-            type="button"
-            disabled={savingPanicNetwork}
-            onClick={handleCaptureSafetyLocation}
-            className="rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-600 px-4 py-2 text-xs font-black uppercase tracking-wide transition-colors"
-          >
-            Update Home Location
-          </button>
-        </div>
+        <button
+          type="button"
+          disabled={savingPanicNetwork}
+          onClick={handleCaptureSafetyLocation}
+          className="w-full flex items-center justify-center gap-2 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 py-3.5 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100"
+        >
+          <MapPin size={16} />
+          {settings.safetyHomeLocation?.lat ? "Update Home Safety Coordinates" : "Set Current Location as Safety Home"}
+        </button>
       </div>
     </ModalWrapper>
   );
-}
-
-// --- Helpers ---
-function mergeSettings(raw) {
-  return { ...DEFAULT_SETTINGS, ...raw };
-}
-
-function buildStats(sett) {
-  return {
-    plan: sett?.subscription?.plan || "FREE",
-    referrals: sett?.referralsCount || 0,
-    earnings: `$${sett?.earningsAmount || 0}`
-  };
-}
-
-function buildProfileForm(usr, prof) {
-  return {
-    fullName: prof?.fullName || usr?.fullName || "",
-    username: usr?.username || "",
-    email: usr?.email || "",
-    phone: prof?.phone || usr?.phone || "",
-    bio: usr?.bio || ""
-  };
-}
-
-function buildUsernameFromEmail(email) {
-  if (!email) return "user";
-  return email.split("@")[0].replace(/[^a-zA-Z0-9]/g, "");
-}
-
-function buildSettingsPayload(nextSettings) {
-  return nextSettings;
-}
-
-function addMuteHours(h) {
-  const d = new Date();
-  d.setHours(d.getHours() + h);
-  return d.toISOString();
-}
-
-function endOfTodayIso() {
-  const d = new Date();
-  d.setHours(23, 59, 59, 999);
-  return d.toISOString();
 }

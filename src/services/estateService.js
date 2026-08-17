@@ -72,6 +72,15 @@ export function invalidateEstateServiceCache() {
   }
 }
 
+export function invalidateMyEstateAlertsCache({ notify = true } = {}) {
+  if (typeof globalThis !== "undefined" && globalThis.__qring_alerts_cache) {
+    globalThis.__qring_alerts_cache.at = 0;
+  }
+  if (notify && typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("qring:my-estate-alerts-invalidated"));
+  }
+}
+
 export function getEstateOverviewSnapshot() {
   return estateServiceCache.overview.value;
 }
@@ -410,8 +419,72 @@ export async function deleteEstateSecurityUser(estateId, securityUserId) {
 }
 
 export async function listMyEstateAlerts() {
-  const response = await apiRequest("/estate/alerts/me", { noCache: true });
-  return Array.isArray(response?.data) ? response.data : [];
+  // Use a local cache + in-flight dedupe and rate-limit handling to avoid
+  // repeated requests from multiple components/pollers causing 429s.
+  const now = Date.now();
+  // TTL for fresh alerts cache
+  const ALERTS_CACHE_TTL_MS = 10 * 1000;
+  // Backoff when server returns 429
+  const ALERTS_RATE_LIMIT_TTL_MS = 45 * 1000;
+
+  if (!globalThis.__qring_alerts_cache) {
+    globalThis.__qring_alerts_cache = { rows: [], at: 0 };
+    globalThis.__qring_alerts_inflight = null;
+    globalThis.__qring_alerts_rate_limited_until = 0;
+    globalThis.__qring_alerts_backoff_ms = 0;
+  }
+
+  const cache = globalThis.__qring_alerts_cache;
+  const inFlight = () => globalThis.__qring_alerts_inflight;
+  const setInFlight = (p) => (globalThis.__qring_alerts_inflight = p);
+  const rateLimitedUntil = () => globalThis.__qring_alerts_rate_limited_until;
+  const setRateLimitedUntil = (t) => (globalThis.__qring_alerts_rate_limited_until = t);
+
+  // If recently rate-limited, return cached rows immediately.
+  if (now < rateLimitedUntil()) {
+    return cache.rows;
+  }
+
+  // Serve cache if it's fresh
+  if (cache.at && now - cache.at < ALERTS_CACHE_TTL_MS) {
+    return cache.rows;
+  }
+
+  // Deduplicate concurrent calls
+  if (inFlight()) return inFlight();
+
+  const runner = apiRequest("/estate/alerts/me", { silent: true, retryCount: 0, timeoutMs: 15000 })
+    .then((response) => {
+      const rows = Array.isArray(response?.data) ? response.data : [];
+      cache.rows = rows;
+      cache.at = Date.now();
+      // reset backoff on success
+      globalThis.__qring_alerts_backoff_ms = 0;
+      setRateLimitedUntil(0);
+      return rows;
+    })
+    .catch((error) => {
+      // If rate limited, set a cooldown window and return cached rows.
+      if (error?.status === 429) {
+        // Exponential backoff ramp (min 45s)
+        const prev = Number(globalThis.__qring_alerts_backoff_ms || 0) || ALERTS_RATE_LIMIT_TTL_MS;
+        const next = Math.min(prev * 2 || ALERTS_RATE_LIMIT_TTL_MS, 10 * 60 * 1000);
+        globalThis.__qring_alerts_backoff_ms = next;
+        setRateLimitedUntil(Date.now() + next);
+        return cache.rows;
+      }
+      // For network errors, return stale cache if available, otherwise rethrow
+      if (cache.at && Date.now() - cache.at < ALERTS_RATE_LIMIT_TTL_MS) {
+        return cache.rows;
+      }
+      throw error;
+    })
+    .finally(() => {
+      setInFlight(null);
+    });
+
+  setInFlight(runner);
+  return runner;
 }
 
 export async function respondEstateMeeting(alertId, response) {
@@ -420,6 +493,7 @@ export async function respondEstateMeeting(alertId, response) {
       method: "POST",
       body: JSON.stringify({ response })
     });
+    invalidateMyEstateAlertsCache();
     return res?.data ?? null;
   } catch (error) {
     if (error?.status === 404) return { stale: true, alertId };
@@ -433,6 +507,7 @@ export async function voteEstatePoll(alertId, optionIndex) {
       method: "POST",
       body: JSON.stringify({ optionIndex })
     });
+    invalidateMyEstateAlertsCache();
     return res?.data ?? null;
   } catch (error) {
     if (error?.status === 404) return { stale: true, alertId };
@@ -474,6 +549,7 @@ export async function payEstateAlert(alertId, payload = { paymentMethod: "paysta
       body: JSON.stringify(payload)
     });
     invalidateEstateServiceCache();
+    invalidateMyEstateAlertsCache();
     return response?.data ?? null;
   } catch (error) {
     if (error?.status === 404) return { stale: true, alertId };

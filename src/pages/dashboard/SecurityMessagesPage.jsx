@@ -1,783 +1,842 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { ChevronLeft, Phone, Search, SendHorizontal, Trash2, Video, X, MessageSquare } from "lucide-react";
-import { env } from "../../config/env";
-import { getAccessToken } from "../../services/authStorage";
-import { RealtimeEvent } from "../../services/realtimeEvents";
-import { createRealtimeSocket, releaseRealtimeSocket } from "../../services/socketClient";
-import { playMessageNotificationSound } from "../../utils/notificationSound";
-import SecureSnapshotImage from "../../components/SecureSnapshotImage";
+import { motion, AnimatePresence } from "framer-motion";
 import {
-  deleteSecuritySessionMessage,
+  Bell, ArrowLeft, Send, Search,
+  MessageSquare, X,
+  Phone, Video,
+  Camera, PhoneIncoming, ChevronRight, Loader2, AlertCircle
+} from "lucide-react";
+import SecureSnapshotImage from "../../components/SecureSnapshotImage";
+import { useAuth } from "../../state/AuthContext";
+import { useNotifications } from "../../state/NotificationsContext";
+import {
   getSecurityMessages,
   getSecuritySessionMessages,
-  sendSecuritySessionMessage
+  sendSecuritySessionMessage,
 } from "../../services/securityService";
-import { startSessionCall } from "../../services/homeownerService";
+import {
+  startSessionCall,
+} from "../../services/homeownerService";
+import { env } from "../../config/env.js";
+import { RealtimeEvent } from "../../services/realtimeEvents";
+import { getAccessToken } from "../../services/authStorage.js";
+import { createRealtimeSocket, releaseRealtimeSocket } from "../../services/socketClient";
+import { resolveSnapshotUrl } from "../../services/mediaUrl";
+import {
+  mergeSecurityMessages,
+  mergeRealtimeMessageIntoConversation,
+  updateThreadFromRealtimeMessage
+} from "../../utils/securityMessagesRealtime";
+
+function getThreadId(thread = {}) {
+  return String(thread.sessionId || thread.session_id || thread.visitorSessionId || thread.visitor_session_id || thread.id || "").trim();
+}
 
 export default function SecurityMessagesPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const preferredSessionId = (searchParams.get("sessionId") || "").trim();
-  const [threads, setThreads] = useState([]);
-  const [selectedId, setSelectedId] = useState("");
+  const { user } = useAuth();
+  const { unreadCount } = useNotifications();
+  const messageEndRef = useRef(null);
+  const preferredSessionId = String(searchParams.get("sessionId") || "").trim();
+
+  const [activeThreadId, setActiveThreadId] = useState(null);
   const [messagesByThread, setMessagesByThread] = useState({});
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [conversationLoading, setConversationLoading] = useState(false);
-  const [draft, setDraft] = useState("");
-  const [sending, setSending] = useState(false);
-  const [deletingMessageId, setDeletingMessageId] = useState("");
-  const [query, setQuery] = useState("");
-  const [searchOpen, setSearchOpen] = useState(false);
+  const [sendPending, setSendPending] = useState(false);
   const [error, setError] = useState("");
-  const [callBusy, setCallBusy] = useState("");
-  const [typingByThread, setTypingByThread] = useState({});
-  const [view, setView] = useState("list"); // "list" | "chat" on mobile
-  const messagesRef = useRef(null);
-  const selectedIdRef = useRef("");
-  const threadsRef = useRef([]);
-  const socketRef = useRef(null);
-  const inputRef = useRef(null);
-  const joinedSessionIdsRef = useRef(new Set());
-  const token = getAccessToken();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [typedMessage, setTypedMessage] = useState("");
+  const [threads, setThreads] = useState([]);
+  const [callBusyType, setCallBusyType] = useState("");
+  const [incomingCall, setIncomingCall] = useState(null);
+  const [showSnapshotModal, setShowSnapshotModal] = useState(false);
 
-  useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
-  useEffect(() => { threadsRef.current = threads; }, [threads]);
-
-  async function refreshThreads({ focusSessionId = "", openThread = false, silent = true } = {}) {
-    try {
-      const data = await getSecurityMessages();
-      const normalized = (data || []).map(t => ({ ...t, last: previewText(t?.last || "") }));
-      setThreads(normalized);
-      const targetId = String(focusSessionId || "").trim();
-      if (targetId && normalized.some((row) => row.id === targetId)) {
-        setSelectedId(targetId);
-        if (openThread) setView("chat");
-      } else if (!selectedIdRef.current && normalized[0]?.id) {
-        setSelectedId(normalized[0].id);
-      }
-      return normalized;
-    } catch (e) {
-      if (!silent) setError(e?.message || "Failed to load conversations.");
-      return [];
-    }
-  }
-
-  async function refreshConversation(sessionId, { openThread = false } = {}) {
-    const sid = String(sessionId || "").trim();
-    if (!sid) return;
-    try {
-      const rows = await getSecuritySessionMessages(sid);
-      setMessagesByThread(prev => ({ ...prev, [sid]: mergeMessageCollections(prev[sid] ?? [], rows) }));
-      await refreshThreads({ focusSessionId: sid, openThread, silent: true });
-    } catch (e) {
-      setError(e?.message || "Failed to load conversation.");
-    }
-  }
-
-  function upsertThreadPreview(msg) {
-    if (!msg?.sessionId) return;
-    let found = false;
-    setThreads(prev => {
-      const next = prev.map(t => {
-        if (t.id !== msg.sessionId) return t;
-        found = true;
-        return { ...t, last: previewText(msg.text), time: msg.at, unread: selectedIdRef.current === msg.sessionId || msg.senderType === "security" ? 0 : (t.unread || 0) + 1 };
-      });
-      return next;
-    });
-    if (!found) {
-      refreshThreads({ focusSessionId: msg.sessionId, openThread: preferredSessionId === msg.sessionId }).catch(() => {});
-    }
-  }
+  const activeThreadIdRef = useRef(activeThreadId);
+  const incomingCallRef = useRef(null);
+  const refreshThreadsTimerRef = useRef(null);
+  const refreshConversationTimerRef = useRef(null);
 
   useEffect(() => {
-    let active = true;
-    async function load() {
-      setLoading(true); setError("");
-      try {
-        const data = await refreshThreads({ focusSessionId: preferredSessionId, openThread: Boolean(preferredSessionId), silent: false });
-        if (!active) return;
-        const firstId = preferredSessionId && data.some(r => r.id === preferredSessionId)
-          ? preferredSessionId : data[0]?.id || "";
-        setSelectedId(prev => prev || firstId);
-      } catch (e) {
-        if (active) setError(e?.message || "Failed to load conversations.");
-      } finally {
-        if (active) setLoading(false);
+    activeThreadIdRef.current = activeThreadId;
+  }, [activeThreadId]);
+
+  useEffect(() => {
+    incomingCallRef.current = incomingCall;
+  }, [incomingCall]);
+
+  useEffect(() => () => {
+    if (refreshThreadsTimerRef.current) window.clearTimeout(refreshThreadsTimerRef.current);
+    if (refreshConversationTimerRef.current) window.clearTimeout(refreshConversationTimerRef.current);
+  }, []);
+
+  const getRealtimeSessionId = (payload = {}) => {
+    return String(
+      payload?.sessionId ||
+      payload?.data?.sessionId ||
+      payload?.payload?.sessionId ||
+      payload?.id ||
+      ""
+    ).trim();
+  };
+
+  const loadThreads = useCallback(async ({ keepSelection = false } = {}) => {
+    setIsLoading(true);
+    setError("");
+    try {
+      const rows = await getSecurityMessages();
+      setThreads(rows);
+      if (preferredSessionId && rows.some((row) => getThreadId(row) === preferredSessionId)) {
+        setActiveThreadId(preferredSessionId);
+      } else if (!keepSelection) {
+        setActiveThreadId(null);
       }
+    } catch (requestError) {
+      setError(requestError?.message || "Unable to load messages.");
+    } finally {
+      setIsLoading(false);
     }
-    load();
-    return () => { active = false; };
   }, [preferredSessionId]);
 
+  const refreshThreadsSoon = (delay = 250) => {
+    if (refreshThreadsTimerRef.current) window.clearTimeout(refreshThreadsTimerRef.current);
+    refreshThreadsTimerRef.current = window.setTimeout(() => {
+      refreshThreadsTimerRef.current = null;
+      loadThreads({ keepSelection: true });
+    }, delay);
+  };
+
+  const refreshActiveConversationSoon = (sessionId, delay = 250) => {
+    const nextSessionId = String(sessionId || "").trim();
+    if (!nextSessionId || String(activeThreadIdRef.current || "") !== nextSessionId) return;
+    if (refreshConversationTimerRef.current) window.clearTimeout(refreshConversationTimerRef.current);
+    refreshConversationTimerRef.current = window.setTimeout(async () => {
+      refreshConversationTimerRef.current = null;
+      try {
+        const rows = await getSecuritySessionMessages(nextSessionId);
+        if (String(activeThreadIdRef.current || "") !== nextSessionId) return;
+        setMessagesByThread((prev) => ({
+          ...prev,
+          [nextSessionId]: mergeSecurityMessages(prev[nextSessionId] || [], rows)
+        }));
+      } catch (requestError) {
+        setError(requestError?.message || "Unable to refresh conversation.");
+      }
+    }, delay);
+  };
+
+  const handleRealtimeThreadChange = (payload = {}) => {
+    const sessionId = getRealtimeSessionId(payload);
+    const data = payload?.data || payload?.payload?.data || payload?.payload || {};
+    if (sessionId) {
+      const status = payload?.status || data?.status || data?.sessionStatus;
+      const snapshotUrl = payload?.snapshotUrl || payload?.snapshot_url || data?.snapshotUrl || data?.snapshot_url || data?.photoUrl || data?.photo_url;
+      setThreads((prev) => prev.map((thread) => (
+        getThreadId(thread) === sessionId
+          ? {
+              ...thread,
+              ...(status ? { status, sessionStatus: status } : {}),
+              ...(snapshotUrl ? { snapshotUrl, photoUrl: snapshotUrl } : {}),
+              ...(data && typeof data === "object" ? data : {})
+            }
+          : thread
+      )));
+      refreshActiveConversationSoon(sessionId);
+    }
+    refreshThreadsSoon();
+  };
+
   useEffect(() => {
-    if (!preferredSessionId) return;
-    const exists = threads.some(t => t.id === preferredSessionId);
-    if (!exists) return;
-    setSelectedId(preferredSessionId);
-    setView("chat");
-    setSearchParams(curr => { const n = new URLSearchParams(curr); n.delete("sessionId"); return n; }, { replace: true });
+    if (!activeThreadId || !user?.id) return undefined;
+
+    const namespace = env.signalingNamespace ?? "/realtime/signaling";
+    const socket = createRealtimeSocket(namespace, {
+      authBuilder: () => {
+        const token = getAccessToken();
+        return token ? { token } : {};
+      }
+    });
+
+    const joinSession = () => {
+      socket.emit(RealtimeEvent.SESSION_JOIN, {
+        sessionId: activeThreadId,
+        displayName: user?.full_name || user?.name || "Gate Security"
+      });
+    };
+
+    const handleIncomingChatMessage = (payload) => {
+      const sessionId = String(payload?.sessionId || "").trim();
+      if (!sessionId) return;
+
+      setMessagesByThread((prev) => ({
+        ...prev,
+        [sessionId]: mergeRealtimeMessageIntoConversation(prev[sessionId] || [], payload)
+      }));
+      setThreads((prev) => updateThreadFromRealtimeMessage(prev, payload, activeThreadIdRef.current));
+    };
+
+    const handleConnect = () => {
+      try { joinSession(); } catch (e) { console.warn("SecurityMessagesPage: joinSession failed", e); }
+      loadThreads({ keepSelection: true });
+    };
+
+    socket.on("connect", handleConnect);
+    socket.on(RealtimeEvent.CHAT_MESSAGE, handleIncomingChatMessage);
+    socket.on(RealtimeEvent.CHAT_PERSISTED, handleIncomingChatMessage);
+
+    if (socket.connected) {
+      joinSession();
+    }
+
+    return () => {
+      socket.emit(RealtimeEvent.SESSION_LEAVE, { sessionId: activeThreadId });
+      socket.off("connect", handleConnect);
+      socket.off(RealtimeEvent.CHAT_MESSAGE, handleIncomingChatMessage);
+      socket.off(RealtimeEvent.CHAT_PERSISTED, handleIncomingChatMessage);
+      releaseRealtimeSocket(namespace);
+    };
+  }, [activeThreadId, user?.id, user?.full_name, user?.name, loadThreads]);
+
+  useEffect(() => {
+    if (!user?.id) return undefined;
+
+    const namespace = env.signalingNamespace ?? "/realtime/signaling";
+    const socket = createRealtimeSocket(namespace, {
+      authBuilder: () => {
+        const token = getAccessToken();
+        return token ? { token } : {};
+      }
+    });
+    const threadSessionIds = Array.from(new Set(threads.map((thread) => String(thread?.id || "").trim()).filter(Boolean)));
+
+    const joinThreads = () => {
+      threadSessionIds.forEach((sessionId) => {
+        socket.emit(RealtimeEvent.SESSION_JOIN, {
+          sessionId,
+          displayName: user?.full_name || user?.name || "Gate Security"
+        });
+      });
+    };
+    const handleMessage = (payload) => {
+      const sessionId = getRealtimeSessionId(payload);
+      if (!sessionId) return;
+      setMessagesByThread((prev) => ({
+        ...prev,
+        [sessionId]: mergeRealtimeMessageIntoConversation(prev[sessionId] || [], { ...payload, sessionId })
+      }));
+      setThreads((prev) => updateThreadFromRealtimeMessage(prev, { ...payload, sessionId }, activeThreadIdRef.current));
+      refreshThreadsSoon();
+    };
+
+    const handleSessionChange = (payload) => handleRealtimeThreadChange(payload);
+    const handleConnect = () => {
+      joinThreads();
+      refreshThreadsSoon(0);
+    };
+
+    socket.on("connect", handleConnect);
+    socket.on(RealtimeEvent.CHAT_MESSAGE, handleMessage);
+    socket.on(RealtimeEvent.CHAT_PERSISTED, handleMessage);
+    socket.on(RealtimeEvent.SESSION_SNAPSHOT, handleSessionChange);
+    socket.on(RealtimeEvent.SESSION_STATUS, handleSessionChange);
+    socket.on(RealtimeEvent.SESSION_ACTIVATED, handleSessionChange);
+    if (socket.connected) joinThreads();
+
+    return () => {
+      threadSessionIds.forEach((sessionId) => socket.emit(RealtimeEvent.SESSION_LEAVE, { sessionId }));
+      socket.off("connect", handleConnect);
+      socket.off(RealtimeEvent.CHAT_MESSAGE, handleMessage);
+      socket.off(RealtimeEvent.CHAT_PERSISTED, handleMessage);
+      socket.off(RealtimeEvent.SESSION_SNAPSHOT, handleSessionChange);
+      socket.off(RealtimeEvent.SESSION_STATUS, handleSessionChange);
+      socket.off(RealtimeEvent.SESSION_ACTIVATED, handleSessionChange);
+      releaseRealtimeSocket(namespace);
+    };
+  }, [user?.id, user?.full_name, user?.name, threads]);
+
+  useEffect(() => {
+    if (!user?.id) return undefined;
+    const dashboardSocket = createRealtimeSocket(env.dashboardNamespace, {
+      authBuilder: () => {
+        const token = getAccessToken();
+        return token ? { token } : {};
+      }
+    });
+    const dashboardEvents = [
+      "visitor_forwarded",
+      "gate_action_completed",
+      "security_request_updated",
+      "dashboard.patch",
+      "security.request.created"
+    ];
+    const terminalCallEvents = ["call.accepted", "call.rejected", "call.ended", "call.failed", "call.cancelled", "call.missed"];
+    const handleDashboardEvent = (payload) => handleRealtimeThreadChange(payload);
+    const handleIncomingCall = (payload) => setIncomingCall(payload?.data ?? payload ?? null);
+    const handleCallTerminal = (payload) => {
+      const nextPayload = payload?.data ?? payload ?? {};
+      const nextCallId = String(nextPayload?.callSessionId || nextPayload?.eventId || "").trim();
+      const nextSessionId = String(nextPayload?.sessionId || "").trim();
+      const activeIncoming = incomingCallRef.current;
+      const currentCallId = String(activeIncoming?.callSessionId || activeIncoming?.eventId || "").trim();
+      const currentSessionId = String(activeIncoming?.sessionId || "").trim();
+      if ((currentCallId && nextCallId && currentCallId === nextCallId) || (currentSessionId && nextSessionId && currentSessionId === nextSessionId)) {
+        setIncomingCall(null);
+      }
+    };
+    dashboardEvents.forEach((eventName) => dashboardSocket.on(eventName, handleDashboardEvent));
+    dashboardSocket.on("incoming-call", handleIncomingCall);
+    terminalCallEvents.forEach((eventName) => dashboardSocket.on(eventName, handleCallTerminal));
+    return () => {
+      dashboardEvents.forEach((eventName) => dashboardSocket.off(eventName, handleDashboardEvent));
+      dashboardSocket.off("incoming-call", handleIncomingCall);
+      terminalCallEvents.forEach((eventName) => dashboardSocket.off(eventName, handleCallTerminal));
+      releaseRealtimeSocket(env.dashboardNamespace);
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
+    loadThreads();
+  }, [loadThreads]);
+
+  useEffect(() => {
+    if (!preferredSessionId || !threads.length) return;
+    if (!threads.some((row) => getThreadId(row) === preferredSessionId)) return;
+    setActiveThreadId(preferredSessionId);
+    setSearchParams((curr) => {
+      const next = new URLSearchParams(curr);
+      next.delete("sessionId");
+      return next;
+    }, { replace: true });
   }, [preferredSessionId, setSearchParams, threads]);
 
   useEffect(() => {
-    if (!selectedId) return;
+    if (!activeThreadId) return;
     let active = true;
-    async function loadConvo() {
+    async function loadConversation() {
       setConversationLoading(true);
+      setError("");
       try {
-        const [rows, latest] = await Promise.all([getSecuritySessionMessages(selectedId), getSecurityMessages()]);
+        const rows = await getSecuritySessionMessages(activeThreadId);
         if (!active) return;
-        setMessagesByThread(prev => ({ ...prev, [selectedId]: mergeMessageCollections(prev[selectedId] ?? [], rows) }));
-        setThreads(latest.map(t => ({ ...t, last: previewText(t?.last || ""), unread: t.id === selectedId ? 0 : t.unread })));
-      } catch (e) {
-        if (active) setError(e?.message || "Failed to load conversation.");
+        setMessagesByThread((prev) => ({ ...prev, [activeThreadId]: rows }));
+      } catch (requestError) {
+        if (active) setError(requestError?.message || "Unable to load conversation.");
       } finally {
         if (active) setConversationLoading(false);
       }
     }
-    loadConvo();
-    return () => { active = false; };
-  }, [selectedId]);
-
-  useEffect(() => {
-    if (!token) return;
-    const socket = createRealtimeSocket(env.signalingNamespace ?? "/realtime/signaling", {
-      authBuilder: () => {
-        const t = getAccessToken();
-        return t ? { token: t } : {};
-      }
-    });
-    socketRef.current = socket;
-    joinedSessionIdsRef.current = new Set();
-
-    const handleConnect = () => {
-      const ids = new Set(threadsRef.current.map(t => String(t?.id || "").trim()).filter(Boolean));
-      if (selectedIdRef.current) ids.add(String(selectedIdRef.current));
-      joinedSessionIdsRef.current = new Set();
-      ids.forEach((id) => {
-        socket.timeout(5000).emit(RealtimeEvent.SESSION_JOIN, { sessionId: id, displayName: "Security" }, () => {});
-        joinedSessionIdsRef.current.add(id);
-      });
-    };
-
-    const handleChatMessage = (payload) => {
-      const sid = payload?.sessionId;
-      if (!sid) return;
-      const msg = {
-        id: payload?.id ?? `${payload?.at || Date.now()}-${Math.random()}`,
-        sessionId: sid, text: payload?.text || "",
-        senderType: payload?.senderType || "visitor",
-        displayName: payload?.displayName || "Participant",
-        at: payload?.at || new Date().toISOString()
-      };
-      setMessagesByThread(prev => {
-        const curr = prev[sid] ?? [];
-        return { ...prev, [sid]: mergeMessageCollections(curr, [msg]) };
-      });
-      if (msg.senderType !== "security") playMessageNotificationSound();
-      upsertThreadPreview(msg);
-      if (selectedIdRef.current === sid || preferredSessionId === sid) {
-        refreshConversation(sid, { openThread: preferredSessionId === sid }).catch(() => {});
-      }
-    };
-
-    const handleChatTyping = (payload) => {
-      const sid = String(payload?.sessionId || "").trim();
-      if (!sid) return;
-      setTypingByThread((prev) => ({
-        ...prev,
-        [sid]: {
-          isTyping: Boolean(payload?.isTyping),
-          displayName: payload?.displayName || "Participant"
-        }
-      }));
-    };
-
-    socket.on("connect", handleConnect);
-    socket.on("chat.message", handleChatMessage);
-    socket.on("chat.typing", handleChatTyping);
-
+    loadConversation();
     return () => {
-      socket.off("connect", handleConnect);
-      socket.off("chat.message", handleChatMessage);
-      socket.off("chat.typing", handleChatTyping);
-      socketRef.current = null;
-      releaseRealtimeSocket(env.signalingNamespace ?? "/realtime/signaling", {
-        autoConnect: true,
-        reconnection: true,
-        withCredentials: true
-      });
+      active = false;
     };
-  }, [token]);
-
-  useEffect(() => {
-    if (!token) return;
-    const dashboardSocket = createRealtimeSocket(env.dashboardNamespace ?? "/realtime/dashboard", {
-      authBuilder: () => {
-        const t = getAccessToken();
-        return t ? { token: t } : {};
-      }
-    });
-
-    const handleHomeownerMessage = (payload) => {
-      const data = payload?.data ?? payload ?? {};
-      const sid = String(data?.sessionId || "").trim();
-      if (!sid) {
-        refreshThreads({ silent: true }).catch(() => {});
-        return;
-      }
-      refreshConversation(sid, { openThread: preferredSessionId === sid }).catch(() => {});
-      if (data?.senderType !== "security") playMessageNotificationSound();
-    };
-
-    const handleVisitorForwarded = (payload) => {
-      const data = payload?.data ?? payload ?? {};
-      const sid = String(data?.sessionId || data?.visitorSessionId || data?.id || "").trim();
-      refreshThreads({ focusSessionId: sid, openThread: preferredSessionId === sid, silent: true }).catch(() => {});
-    };
-
-    dashboardSocket.on("homeowner.message", handleHomeownerMessage);
-    dashboardSocket.on("visitor_forwarded", handleVisitorForwarded);
-    return () => {
-      dashboardSocket.off("homeowner.message", handleHomeownerMessage);
-      dashboardSocket.off("visitor_forwarded", handleVisitorForwarded);
-      releaseRealtimeSocket(env.dashboardNamespace ?? "/realtime/dashboard", {
-        autoConnect: true,
-        reconnection: true,
-        withCredentials: true
-      });
-    };
-  }, [token, preferredSessionId]);
-
-  useEffect(() => {
-    if (!token) return;
-    const intervalId = window.setInterval(() => {
-      refreshThreads({ focusSessionId: selectedIdRef.current, silent: true }).catch(() => {});
-      if (selectedIdRef.current) {
-        refreshConversation(selectedIdRef.current).catch(() => {});
-      }
-    }, 7000);
-    return () => window.clearInterval(intervalId);
-  }, [token]);
-
-  useEffect(() => {
-    if (!socketRef.current?.connected) return;
-    const ids = new Set(threads.map(t => String(t?.id || "").trim()).filter(Boolean));
-    if (selectedIdRef.current) ids.add(String(selectedIdRef.current));
-    ids.forEach((id) => {
-      if (joinedSessionIdsRef.current.has(id)) return;
-      socketRef.current?.timeout(5000).emit(RealtimeEvent.SESSION_JOIN, { sessionId: id, displayName: "Security" }, () => {});
-      joinedSessionIdsRef.current.add(id);
-    });
-  }, [threads, selectedId]);
-
-  useEffect(() => {
-    if (!messagesRef.current) return;
-    messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
-  }, [selectedId, messagesByThread]);
+  }, [activeThreadId]);
 
   const filteredThreads = useMemo(() => {
-    const term = query.trim().toLowerCase();
-    if (!term) return threads;
-    return threads.filter(t => [t.name, t.last, t.door].join(" ").toLowerCase().includes(term));
-  }, [threads, query]);
+    return threads.filter(t =>
+      [t.name, t.visitorName, t.last, t.door, t.homeName, t.unitName].join(" ").toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [threads, searchQuery]);
 
-  const selectedThread = useMemo(() => threads.find(t => t.id === selectedId) ?? null, [threads, selectedId]);
-  const selectedMessages = useMemo(() => messagesByThread[selectedId] ?? [], [messagesByThread, selectedId]);
+  const activeThread = useMemo(() => {
+    return threads.find(t => getThreadId(t) === activeThreadId) || null;
+  }, [threads, activeThreadId]);
 
-  async function handleSend(e) {
+  const activeMessages = useMemo(() => messagesByThread[activeThreadId] || [], [activeThreadId, messagesByThread]);
+
+  useEffect(() => {
+    messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [activeMessages]);
+
+  const handleSendMessage = async (e) => {
     e.preventDefault();
-    const text = draft.trim();
-    if (!selectedId || !text) return;
-    setSending(true);
+    if (!typedMessage.trim() || !activeThreadId) return;
+    const text = typedMessage.trim();
+    setSendPending(true);
+    setError("");
     try {
-      const saved = await sendSecuritySessionMessage(selectedId, text);
-      const out = {
-        id: saved?.id ?? `local-${Date.now()}`,
-        sessionId: selectedId, text, senderType: "security",
-        displayName: saved?.displayName || "Security",
-        at: saved?.at || new Date().toISOString()
-      };
-      socketRef.current?.emit("chat.typing", {
-        sessionId: selectedId,
+      const saved = await sendSecuritySessionMessage(activeThreadId, text);
+      const message = saved || {
+        id: `local-${Date.now()}`,
+        sessionId: activeThreadId,
+        text,
         senderType: "security",
-        displayName: "Security",
-        isTyping: false
-      });
-      setMessagesByThread(prev => {
-        const curr = prev[selectedId] ?? [];
-        return { ...prev, [selectedId]: mergeMessageCollections(curr, [out]) };
-      });
-      upsertThreadPreview(out);
-      setDraft("");
-      inputRef.current?.focus();
-    } catch (e) {
-      setError(e?.message || "Unable to send.");
+        at: new Date().toISOString(),
+      };
+      setMessagesByThread((prev) => ({
+        ...prev,
+        [activeThreadId]: mergeRealtimeMessageIntoConversation(prev[activeThreadId] || [], message)
+      }));
+      setTypedMessage("");
+      loadThreads({ keepSelection: true });
+    } catch (requestError) {
+      setError(requestError?.message || "Unable to send message.");
     } finally {
-      setSending(false);
+      setSendPending(false);
     }
-  }
+  };
 
-  async function handleDelete(messageId) {
-    if (!selectedId || !messageId) return;
-    setDeletingMessageId(messageId);
+  const handleStartCall = async (type) => {
+    if (!activeThreadId) return;
+    const nextType = type === "video" ? "video" : "audio";
+    setCallBusyType(nextType);
+    setError("");
     try {
-      await deleteSecuritySessionMessage(selectedId, messageId);
-      setMessagesByThread(prev => ({ ...prev, [selectedId]: (prev[selectedId] || []).filter(m => m.id !== messageId) }));
-    } catch (e) {
-      setError(e?.message || "Unable to delete.");
-    } finally {
-      setDeletingMessageId(""); }
-  }
-
-  async function startCall(type) {
-    if (!selectedId) return;
-    const key = `${selectedId}:${type}`;
-    setCallBusy(key);
-    try {
-      const nextMode = type === "video" ? "video" : "audio";
       const response = await startSessionCall({
-        sessionId: selectedId,
-        visitorName: selectedThread?.name || "Visitor",
-        type: nextMode,
-        hasVideo: nextMode === "video"
+        sessionId: activeThreadId,
+        type: nextType,
+        hasVideo: nextType === "video",
+        communicationTarget: "visitor"
       });
       const data = response?.data ?? response ?? {};
-      window.sessionStorage.setItem(
-        "qring_call_start_intent",
-        JSON.stringify({
-          pending: true,
-          sessionId: selectedId,
-          mode: nextMode,
-          callSessionId: data?.callSessionId || "",
-          visitorId: data?.visitorId || selectedId,
-          rtcConfig: data?.rtcConfig || null
-        })
-      );
-      navigate(`/session/${selectedId}/${type === "video" ? "video" : "audio"}`);
-    } catch (e) {
-      setError(e?.message || "Unable to start call.");
+      window.sessionStorage.setItem("qring_call_start_intent", JSON.stringify({
+        pending: true,
+        sessionId: activeThreadId,
+        mode: nextType,
+        callSessionId: data?.callSessionId || "",
+        visitorId: data?.visitorId || activeThreadId,
+        rtcConfig: data?.rtcConfig || null
+      }));
+      navigate(`/session/${activeThreadId}/${nextType}`);
+    } catch (requestError) {
+      setError(requestError?.message || `Unable to start ${nextType} call.`);
     } finally {
-      setCallBusy(""); }
-  }
+      setCallBusyType("");
+    }
+  };
 
-  function openThread(id) {
-    setSelectedId(id);
-    setView("chat");
-  }
+  const handleAnswerIncomingCall = () => {
+    if (!incomingCall?.sessionId || !incomingCall?.callSessionId) return;
+    window.sessionStorage.setItem("qring_call_accept_intent", JSON.stringify({
+      sessionId: incomingCall.sessionId,
+      hasVideo: Boolean(incomingCall.hasVideo),
+      callSessionId: incomingCall.callSessionId,
+      visitorId: incomingCall.visitorId || incomingCall.sessionId
+    }));
+    const nextMode = incomingCall.hasVideo ? "video" : "audio";
+    const nextSessionId = incomingCall.sessionId;
+    setIncomingCall(null);
+    navigate(`/session/${nextSessionId}/${nextMode}`);
+  };
 
-  const totalUnread = threads.reduce((s, t) => s + (t.unread || 0), 0);
+  const snapshotPhotoUrl = resolveSnapshotUrl(activeThread?.snapshotUrl || activeThread?.photoUrl);
 
   return (
-    <>
-      <style>{`
-        .msg-root { background: #f8fafc; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; color: #0f172a; }
-        .msg-root * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        .dm-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100 antialiased selection:bg-indigo-500/20">
 
-        /* Topbar */
-        .msg-topbar { background: rgba(255,255,255,0.78); backdrop-filter: blur(18px); border-bottom: 1px solid rgba(226,232,240,0.8); flex-shrink: 0; padding-top: env(safe-area-inset-top); }
-
-        /* Thread list */
-        .thread-list { flex: 1; overflow-y: auto; overscroll-behavior: contain; }
-        .thread-list::-webkit-scrollbar { display: none; }
-        .thread-item { display: flex; gap: 12px; align-items: flex-start; margin: 10px 14px 0; padding: 14px; border: 1px solid rgba(226,232,240,0.9); border-radius: 20px; background: #fff; cursor: pointer; transition: background 0.12s, border-color 0.12s; }
-        .thread-item:active { background: #f1f5f9; }
-        .thread-item.selected { background: #eff6ff; border-color: #2563eb; }
-        .thread-avatar { width: 44px; height: 44px; border-radius: 14px; background: #0f172a; display: grid; place-items: center; flex-shrink: 0; }
-
-        /* Chat panel */
-        .chat-panel { display: flex; flex-direction: column; height: 100%; background: #f8fafc; }
-        .chat-header { background: rgba(255,255,255,0.82); backdrop-filter: blur(18px); border-bottom: 1px solid rgba(226,232,240,0.8); flex-shrink: 0; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: max(12px, env(safe-area-inset-top)); }
-        .messages-area { flex: 1; overflow-y: auto; padding: 16px 14px; display: flex; flex-direction: column; gap: 10px; overscroll-behavior: contain; }
-        .messages-area::-webkit-scrollbar { width: 3px; }
-        .messages-area::-webkit-scrollbar-thumb { background: #ddd; border-radius: 4px; }
-
-        /* Bubbles */
-        .bubble { max-width: 78%; padding: 10px 13px; border-radius: 18px; position: relative; animation: bubbleIn 0.15s ease; }
-        @keyframes bubbleIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
-        .bubble-mine { background: #2563eb; color: #fff; border-bottom-right-radius: 4px; align-self: flex-end; box-shadow: 0 12px 24px rgba(37,99,235,0.16); }
-        .bubble-theirs { background: #fff; color: #0f172a; border-bottom-left-radius: 4px; align-self: flex-start; border: 1px solid #e2e8f0; }
-        .bubble-homeowner { background: #fff7ed; border-color: #fed7aa; color: #7c2d12; }
-
-        /* Compose */
-        .compose-bar { background: #fff; border-top: 1px solid #e2e8f0; padding: 10px 14px; flex-shrink: 0; padding-bottom: max(10px, env(safe-area-inset-bottom)); }
-        .compose-inner { display: flex; align-items: flex-end; gap: 8px; background: #f1f5f9; border-radius: 20px; padding: 8px 8px 8px 14px; border: 1px solid #e2e8f0; }
-        .compose-textarea { flex: 1; background: none; border: none; outline: none; font-family: 'Instrument Sans', sans-serif; font-size: 14px; color: #1a1a1a; resize: none; max-height: 120px; min-height: 24px; line-height: 1.5; }
-        .compose-textarea::placeholder { color: #a8a29e; }
-        .send-btn { width: 36px; height: 36px; border-radius: 50%; background: #2563eb; border: none; display: grid; place-items: center; cursor: pointer; flex-shrink: 0; transition: transform 0.12s, opacity 0.12s; }
-        .send-btn:not(:disabled):active { transform: scale(0.9); }
-        .send-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-
-        /* Search overlay */
-        .search-bar { background: #fff; padding: 10px 14px; display: flex; align-items: center; gap: 10px; }
-        .search-input { flex: 1; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 12px; padding: 9px 12px; color: #0f172a; font-size: 14px; outline: none; }
-        .search-input::placeholder { color: #94a3b8; }
-
-        /* Call buttons */
-        .call-btn { width: 38px; height: 38px; border-radius: 12px; border: 1px solid #e2e8f0; background: #f8fafc; display: grid; place-items: center; cursor: pointer; transition: background 0.12s; }
-        .call-btn:active { background: #e5e3dc; }
-        .call-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-
-        /* Mobile nav tabs */
-        .mobile-tabs { display: flex; background: #fff; border-top: 1px solid #e2e8f0; flex-shrink: 0; padding-bottom: env(safe-area-inset-bottom); }
-        .mobile-tab { flex: 1; padding: 10px; display: flex; flex-direction: column; align-items: center; gap: 3px; cursor: pointer; border: none; background: none; font-family: 'Instrument Sans', sans-serif; font-size: 10px; font-weight: 600; color: #a8a29e; letter-spacing: 0.04em; text-transform: uppercase; }
-        .mobile-tab.active { color: #2563eb; }
-
-        /* Empty state */
-        .empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: #a8a29e; padding: 32px; text-align: center; }
-
-        /* Delete hover */
-        .delete-btn { opacity: 0; background: none; border: none; cursor: pointer; padding: 2px 4px; border-radius: 6px; transition: opacity 0.15s; display: inline-flex; align-items: center; gap: 3px; font-family: 'Instrument Sans', sans-serif; font-size: 10px; font-weight: 600; }
-        .bubble-mine:hover .delete-btn { opacity: 1; }
-        .delete-btn-always { opacity: 0.6; }
-
-        /* Unread dot */
-        .unread-dot { background: #2563eb; color: #fff; font-size: 10px; font-weight: 700; min-width: 18px; height: 18px; border-radius: 9px; display: grid; place-items: center; padding: 0 4px; flex-shrink: 0; }
-
-        /* Loading spinner */
-        .spinner { width: 20px; height: 20px; border: 2px solid #e2e8f0; border-top-color: #2563eb; border-radius: 50%; animation: spin 0.7s linear infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-      `}</style>
-
-      <div className="msg-root font-sans antialiased">
-
-        {/* ── TOP BAR ── */}
-        {view === "list" ? (
-          <div className="msg-topbar">
-            {!searchOpen ? (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 16px", height: 64 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <Link to="/dashboard/security" className="grid h-9 w-9 place-items-center rounded-xl bg-slate-100 text-slate-700">
-                    <ChevronLeft size={18} />
-                  </Link>
-                  <span style={{ color: "#0f172a", fontSize: 15, fontWeight: 800 }}>Security Messages</span>
-                  {totalUnread > 0 && (
-                    <span style={{ background: "#2563eb", color: "#fff", fontSize: 10, fontWeight: 700, borderRadius: 20, padding: "2px 7px" }}>
-                      {totalUnread}
-                    </span>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setSearchOpen(true)}
-                  className="grid h-9 w-9 place-items-center rounded-xl bg-slate-100 text-slate-700"
-                >
-                  <Search size={15} />
-                </button>
-              </div>
-            ) : (
-              <div className="search-bar">
-                <Search size={15} color="#64748b" />
-                <input
-                  autoFocus
-                  className="search-input"
-                  placeholder="Search conversations…"
-                  value={query}
-                  onChange={e => setQuery(e.target.value)}
-                />
-                <button
-                  type="button"
-                  onClick={() => { setSearchOpen(false); setQuery(""); }}
-                  style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}
-                >
-                  <X size={15} color="#64748b" />
-                </button>
-              </div>
-            )}
-          </div>
-        ) : (
-          /* Chat header */
-          <div className="chat-header">
-            <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+      {/* DYNAMIC HEADER */}
+      <header className="sticky top-0 z-40 w-full border-b border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md px-4 py-3 sm:px-6">
+        <div className="mx-auto flex max-w-3xl items-center justify-between">
+          
+          {/* LEFT AREA: BACK BUTTON & TITLE */}
+          <div className="flex items-center gap-3 min-w-0">
+            {activeThreadId ? (
               <button
                 type="button"
-                onClick={() => setView("list")}
-                className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-700"
+                onClick={() => setActiveThreadId(null)}
+                className="flex items-center gap-1.5 p-2 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-extrabold text-xs rounded-xl hover:bg-indigo-100 transition active:scale-95"
               >
-                <ChevronLeft size={16} />
+                <ArrowLeft size={16} />
               </button>
-              {selectedThread ? (
-                <div style={{ minWidth: 0 }}>
-                  <p style={{ color: "#0f172a", fontSize: 15, fontWeight: 800, margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {selectedThread.name}
-                  </p>
-                  <p style={{ color: "#64748b", fontSize: 11, margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {selectedThread.door}
-                  </p>
-                </div>
-              ) : (
-                <span style={{ color: "#0f172a", fontSize: 15, fontWeight: 800 }}>Conversation</span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => navigate(-1)}
+                className="p-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition active:scale-95"
+                aria-label="Go back"
+              >
+                <ArrowLeft size={18} />
+              </button>
+            )}
+
+            {!activeThreadId ? (
+              <h1 className="font-extrabold text-base sm:text-lg text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+                Messages
+                {threads.length > 0 && (
+                  <span className="text-[11px] font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded-full">
+                    {threads.length}
+                  </span>
+                )}
+              </h1>
+            ) : (
+              <div className="min-w-0">
+                <h2 className="font-extrabold text-sm text-slate-900 dark:text-white truncate">
+                  {activeThread?.visitorName || activeThread?.name || "Visitor"}
+                </h2>
+                <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide truncate">
+                  {activeThread?.door || activeThread?.doorName || "Gate Security"}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* RIGHT AREA: ACTION BUTTONS */}
+          {!activeThreadId ? (
+            <div className="flex items-center gap-2">
+              <Link
+                to="/dashboard/notifications"
+                className="relative p-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl transition active:scale-95"
+                aria-label="Notifications"
+              >
+                <Bell size={18} />
+                {unreadCount > 0 && (
+                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-white dark:ring-slate-900 animate-pulse" />
+                )}
+              </Link>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 shrink-0">
+              {snapshotPhotoUrl && (
+                <button
+                  type="button"
+                  onClick={() => setShowSnapshotModal(true)}
+                  className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 transition"
+                  title="View Visitor Photo"
+                >
+                  <Camera size={16} />
+                </button>
               )}
-            </div>
-            <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-              <button type="button" className="call-btn" onClick={() => startCall("audio")} disabled={callBusy === `${selectedId}:audio`}>
-                <Phone size={15} color="#2563eb" />
+              <button
+                type="button"
+                onClick={() => handleStartCall("audio")}
+                disabled={Boolean(callBusyType)}
+                className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 transition disabled:opacity-50"
+                title="Audio Call Visitor"
+              >
+                <Phone size={16} />
               </button>
-              <button type="button" className="call-btn" onClick={() => startCall("video")} disabled={callBusy === `${selectedId}:video`}>
-                <Video size={15} color="#2563eb" />
+              <button
+                type="button"
+                onClick={() => handleStartCall("video")}
+                disabled={Boolean(callBusyType)}
+                className="p-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-500 transition shadow-sm disabled:opacity-50"
+                title="Video Call Visitor"
+              >
+                <Video size={16} />
               </button>
             </div>
-          </div>
-        )}
+          )}
+        </div>
+      </header>
 
-        {/* ── ERROR STRIP ── */}
+      {/* INCOMING CALL BANNER */}
+      <AnimatePresence>
+        {incomingCall && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="sticky top-14 z-50 bg-indigo-600 text-white shadow-lg border-b border-indigo-500 px-4 py-3"
+          >
+            <div className="mx-auto max-w-3xl flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-white/20 rounded-full animate-bounce">
+                  <PhoneIncoming size={18} />
+                </div>
+                <div>
+                  <p className="text-xs font-black uppercase tracking-wider text-indigo-200">Incoming Gate Call</p>
+                  <p className="text-sm font-bold">{incomingCall.callerName || "Security Gate"}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleAnswerIncomingCall}
+                  className="px-4 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-xs rounded-xl shadow transition"
+                >
+                  Accept
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIncomingCall(null)}
+                  className="px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white font-bold text-xs rounded-xl transition"
+                >
+                  Decline
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ERROR NOTICE */}
+      <AnimatePresence>
         {error && (
-          <div style={{ background: "#fef2f2", padding: "8px 16px", fontSize: 12, color: "#dc2626", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            {error}
-            <button type="button" onClick={() => setError("")} style={{ background: "none", border: "none", cursor: "pointer" }}>
-              <X size={13} color="#dc2626" />
-            </button>
-          </div>
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="mx-auto max-w-3xl mt-3 px-4"
+          >
+            <div className="p-3.5 bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900 rounded-2xl flex items-center justify-between gap-3 text-rose-700 dark:text-rose-300 text-xs font-medium">
+              <div className="flex items-center gap-2">
+                <AlertCircle size={16} className="shrink-0 text-rose-500" />
+                <span>{error}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setError("")}
+                className="p-1 hover:bg-rose-100 dark:hover:bg-rose-900/50 rounded-lg"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          </motion.div>
         )}
+      </AnimatePresence>
 
-        {/* ── BODY ── */}
-        <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+      {/* MAIN CONTENT AREA */}
+      <main className="mx-auto max-w-3xl px-4 py-4">
+        
+        {/* VIEW 1: CONVERSATIONS LIST VIEW */}
+        {!activeThreadId && (
+          <motion.div
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="space-y-4"
+          >
+            {/* SEARCH */}
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search visitors, gates or messages..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl pl-10 pr-4 py-3 text-xs font-semibold text-slate-800 dark:text-slate-100 shadow-sm focus:border-indigo-500 transition outline-none placeholder:text-slate-400"
+              />
+              <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            </div>
 
-          {/* LIST VIEW */}
-          {view === "list" && (
-            <div className="thread-list">
-              {loading ? (
-                <div style={{ display: "flex", justifyContent: "center", padding: "48px 0" }}>
-                  <div className="spinner" />
-                </div>
-              ) : filteredThreads.length === 0 ? (
-                <div className="empty-state">
-                  <MessageSquare size={32} strokeWidth={1.2} />
-                  <p style={{ fontSize: 16, fontWeight: 800, color: "#475569", margin: 0 }}>
-                    {query ? "No matches" : "No conversations yet"}
-                  </p>
-                  <p style={{ fontSize: 13, color: "#a8a29e", margin: 0 }}>
-                    {query ? "Try a different search." : "Homeowner visitor threads will appear here."}
-                  </p>
-                </div>
-              ) : (
-                filteredThreads.map(thread => (
-                  <div
-                    key={thread.id}
-                    className={`thread-item${selectedId === thread.id ? " selected" : ""}`}
-                    onClick={() => openThread(thread.id)}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={e => e.key === "Enter" && openThread(thread.id)}
-                  >
-                    <div className="thread-avatar">
-                      <span style={{ color: "#60a5fa", fontSize: 16, fontWeight: 800 }}>
-                        {(thread.name || "?").charAt(0).toUpperCase()}
-                      </span>
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 3 }}>
-                        <p style={{ fontSize: 14, fontWeight: 800, color: "#0f172a", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                          {thread.name}
-                        </p>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-                          {thread.time && (
-                            <span className="dm-mono" style={{ fontSize: 10, color: "#a8a29e" }}>
-                              {formatClockTime(thread.time)}
-                            </span>
-                          )}
-                          {thread.unread > 0 && (
-                            <span className="unread-dot">{thread.unread}</span>
-                          )}
+            {/* THREAD LIST CARDS */}
+            <div className="space-y-2.5">
+              {isLoading ? (
+                [1, 2, 3, 4].map(i => (
+                  <div key={i} className="h-20 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl animate-pulse" />
+                ))
+              ) : filteredThreads.length > 0 ? (
+                filteredThreads.map((thread) => {
+                  const threadId = getThreadId(thread);
+                  const status = String(thread.sessionStatus || thread.status || "").toLowerCase();
+                  const isApproved = status === "approved";
+                  const isRejected = ["rejected", "denied"].includes(status);
+
+                  return (
+                    <button
+                      key={threadId}
+                      type="button"
+                      onClick={() => setActiveThreadId(threadId)}
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-indigo-500/50 p-4 rounded-2xl text-left flex items-center justify-between gap-3 shadow-sm hover:shadow-md transition-all active:scale-[0.99] group"
+                    >
+                      <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                        <div className="w-11 h-11 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-black text-base flex items-center justify-center shrink-0 border border-indigo-100 dark:border-indigo-900/50">
+                          {(thread.visitorName || thread.name || "V").charAt(0).toUpperCase()}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className={`w-2 h-2 rounded-full shrink-0 ${
+                              isApproved ? "bg-emerald-500" : isRejected ? "bg-rose-500" : "bg-amber-400 animate-pulse"
+                            }`} />
+                            <h3 className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white truncate">
+                              {thread.visitorName || thread.name || "Visitor Request"}
+                            </h3>
+                          </div>
+                          <p className="text-xs font-medium text-slate-500 dark:text-slate-400 truncate mt-1">
+                            {thread.last || "Tap to view conversation thread"}
+                          </p>
                         </div>
                       </div>
-                      <p style={{ fontSize: 11, color: "#2563eb", fontWeight: 700, margin: "0 0 3px" }}>{thread.door}</p>
-                      <p style={{ fontSize: 13, color: "#78716c", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {thread.last || "No messages yet"}
-                      </p>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
 
-          {/* CHAT VIEW */}
-          {view === "chat" && (
-            <div className="chat-panel">
-              {!selectedThread ? (
-                <div className="empty-state">
-                  <MessageSquare size={32} strokeWidth={1.2} />
-                  <p style={{ fontSize: 16, fontWeight: 800, color: "#475569" }}>Select a conversation</p>
-                </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-[10px] font-black uppercase tracking-wider bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-2.5 py-1 rounded-lg">
+                          {thread.door || thread.doorName || "Gate"}
+                        </span>
+                        <ChevronRight size={16} className="text-slate-300 dark:text-slate-600 group-hover:translate-x-0.5 transition-transform" />
+                      </div>
+                    </button>
+                  );
+                })
               ) : (
-                <>
-                  <div className="messages-area" ref={messagesRef}>
-                    {conversationLoading ? (
-                      <div style={{ display: "flex", justifyContent: "center", padding: "24px 0" }}>
-                        <div className="spinner" />
-                      </div>
-                    ) : selectedMessages.length === 0 ? (
-                      <div style={{ textAlign: "center", padding: "32px 0" }}>
-                        <p style={{ fontSize: 13, color: "#a8a29e" }}>No homeowner replies yet. Send a message or start a call.</p>
-                        {typingByThread[selectedId]?.isTyping ? (
-                          <p style={{ fontSize: 12, color: "#d97706", marginTop: 10 }}>
-                            {typingByThread[selectedId]?.displayName || "Participant"} is typing...
-                          </p>
-                        ) : null}
-                      </div>
-                    ) : (
-                      selectedMessages.map((msg, i) => {
-                        const senderType = String(msg.senderType || "").toLowerCase();
-                        const mine = senderType === "security" || senderType === "office" || senderType === "office_staff";
-                        const fromHomeowner = senderType === "homeowner";
-                        const snapshotUrl = String(msg.snapshotUrl || msg.photoUrl || "").trim();
-                        const isSnapshot = msg.messageType === "visitor_snapshot" || Boolean(snapshotUrl);
-                        const showName = i === 0 || selectedMessages[i - 1]?.senderType !== msg.senderType;
-                        return (
-                          <div key={msg.id} style={{ display: "flex", flexDirection: "column", alignItems: mine ? "flex-end" : "flex-start" }}>
-                            {showName && (
-                              <span style={{ fontSize: 10, fontWeight: 600, color: "#a8a29e", marginBottom: 3, paddingInline: 4, letterSpacing: "0.06em", textTransform: "uppercase" }}>
-                                {mine ? "You" : fromHomeowner ? "Homeowner" : msg.displayName}
-                              </span>
-                            )}
-                            <div className={`bubble ${mine ? "bubble-mine" : `bubble-theirs${fromHomeowner ? " bubble-homeowner" : ""}`}`}>
-                              {isSnapshot ? (
-                                <div style={{ width: "min(64vw, 280px)" }}>
-                                  {snapshotUrl ? (
-                                    <SecureSnapshotImage
-                                      src={snapshotUrl}
-                                      alt="Visitor snapshot"
-                                      visitorSessionId={selectedId}
-                                      className="aspect-video w-full rounded-xl bg-slate-100 object-cover"
-                                      fallback={
-                                        <div className="grid aspect-video w-full place-items-center rounded-xl bg-slate-100 text-xs font-bold text-slate-400">
-                                          Snapshot unavailable
-                                        </div>
-                                      }
-                                    />
-                                  ) : (
-                                    <div className="grid aspect-video w-full place-items-center rounded-xl bg-slate-100 text-xs font-bold text-slate-400">
-                                      Snapshot unavailable
-                                    </div>
-                                  )}
-                                  <p style={{ fontSize: 12, margin: "8px 0 0", lineHeight: 1.4, whiteSpace: "pre-wrap", wordBreak: "break-word", opacity: 0.8 }}>
-                                    {msg.text || "Visitor snapshot submitted."}
-                                  </p>
-                                </div>
-                              ) : (
-                                <p style={{ fontSize: 14, margin: 0, lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{msg.text}</p>
-                              )}
-                              <div style={{ display: "flex", alignItems: "center", justifyContent: mine ? "flex-end" : "flex-start", gap: 6, marginTop: 5 }}>
-                                <span className="dm-mono" style={{ fontSize: 10, opacity: 0.5 }}>
-                                  {formatClockTime(msg.at)}
-                                </span>
-                                {mine && (
-                                  <button
-                                    type="button"
-                                    className={`delete-btn delete-btn-always`}
-                                    onClick={() => handleDelete(msg.id)}
-                                    disabled={deletingMessageId === msg.id}
-                                    style={{ color: "rgba(255,255,255,0.5)" }}
-                                  >
-                                    <Trash2 size={10} />
-                                    {deletingMessageId === msg.id ? "…" : ""}
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-
-                  {/* Compose */}
-                  <div className="compose-bar">
-                    <form className="compose-inner" onSubmit={handleSend}>
-                      <textarea
-                        ref={inputRef}
-                        className="compose-textarea"
-                        value={draft}
-                        rows={1}
-                        onChange={e => {
-                          setDraft(e.target.value);
-                          socketRef.current?.emit("chat.typing", {
-                            sessionId: selectedId,
-                            senderType: "security",
-                            displayName: "Security",
-                            isTyping: Boolean(e.target.value.trim())
-                          });
-                          e.target.style.height = "auto";
-                          e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
-                        }}
-                        onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(e); } }}
-                        placeholder="Reply to homeowner…"
-                      />
-                      <button type="submit" className="send-btn" disabled={sending || !draft.trim()}>
-                        <SendHorizontal size={15} color="#fff" />
-                      </button>
-                    </form>
-                  </div>
-                </>
+                <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-12 text-center text-slate-400 dark:text-slate-500 space-y-2">
+                  <MessageSquare size={32} className="mx-auto stroke-1 text-slate-300 dark:text-slate-600" />
+                  <p className="text-xs font-bold text-slate-600 dark:text-slate-400">No message history found</p>
+                  <p className="text-[11px]">Visitor access requests and gate messages will appear here.</p>
+                </div>
               )}
             </div>
-          )}
-        </div>
+          </motion.div>
+        )}
 
-        {/* ── BOTTOM TABS ── */}
-        <div className="mobile-tabs">
-          <button
-            type="button"
-            className={`mobile-tab${view === "list" ? " active" : ""}`}
-            onClick={() => setView("list")}
+        {/* VIEW 2: SINGLE CONVERSATION / MESSAGE HISTORY VIEW */}
+        {activeThreadId && activeThread && (
+          <motion.div
+            initial={{ opacity: 0, x: 10 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="space-y-4 pb-28"
           >
-            <MessageSquare size={18} strokeWidth={view === "list" ? 2.2 : 1.6} />
-            Threads
-            {totalUnread > 0 && view !== "list" && (
-              <span style={{ position: "absolute", top: 6, fontSize: 8, background: "#2563eb", color: "#fff", borderRadius: 10, padding: "1px 5px", fontWeight: 800 }}>{totalUnread}</span>
-            )}
-          </button>
-          <button
-            type="button"
-            className={`mobile-tab${view === "chat" ? " active" : ""}`}
-            onClick={() => view !== "chat" && selectedId ? setView("chat") : null}
-            style={{ opacity: selectedId ? 1 : 0.4 }}
-          >
-            <Phone size={18} strokeWidth={view === "chat" ? 2.2 : 1.6} />
-            {selectedThread ? selectedThread.name?.split(" ")[0] : "Chat"}
-          </button>
-        </div>
-      </div>
-    </>
+            {/* THREAD CONTEXT CARD */}
+            <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 shadow-sm flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3.5 min-w-0">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white font-black text-lg flex items-center justify-center shrink-0 shadow-md shadow-indigo-500/20">
+                  {(activeThread.visitorName || activeThread.name || "V").charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-extrabold text-sm text-slate-900 dark:text-white truncate">
+                    {activeThread.visitorName || activeThread.name || "Visitor"}
+                  </h3>
+                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400 truncate">
+                    {activeThread.door || activeThread.doorName || "Gate"} • {activeThread.estateName || "Residential Gate"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="shrink-0 text-right">
+                <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                  ["approved", "granted"].includes(String(activeThread.sessionStatus || activeThread.status).toLowerCase())
+                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400"
+                    : ["rejected", "denied"].includes(String(activeThread.sessionStatus || activeThread.status).toLowerCase())
+                    ? "bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400"
+                    : "bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400"
+                }`}>
+                  {activeThread.sessionStatus || activeThread.status || "Pending"}
+                </span>
+              </div>
+            </div>
+
+            {/* MESSAGES FEED */}
+            <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl shadow-sm flex flex-col h-[72vh] min-h-[480px] overflow-hidden">
+              <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/50 dark:bg-slate-950/30">
+                {conversationLoading && activeMessages.length === 0 ? (
+                  <div className="flex items-center justify-center h-full text-slate-400 text-xs font-bold gap-2">
+                    <Loader2 size={18} className="animate-spin" />
+                    <span>Loading message history...</span>
+                  </div>
+                ) : activeMessages.length > 0 ? (
+                  activeMessages.map((msg, index) => {
+                    const senderType = String(msg.senderType || msg.sender_type || msg.senderRole || msg.sender_role || "").toLowerCase();
+                    const isSecurity = ["security", "guard", "gateman", "gate_security"].includes(senderType);
+                    const isSystem = ["system", "status"].includes(senderType);
+
+                    if (isSystem) {
+                      return (
+                        <div key={msg.id || index} className="flex justify-center my-2">
+                          <span className="text-[10px] font-extrabold uppercase tracking-wider bg-slate-200/70 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-3 py-1 rounded-full">
+                            {msg.text || msg.message || msg.content}
+                          </span>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div
+                        key={msg.id || index}
+                        className={`flex flex-col ${isSecurity ? "items-end" : "items-start"}`}
+                      >
+                        <div
+                          className={`max-w-[85%] sm:max-w-[75%] p-3.5 rounded-2xl text-xs font-medium leading-relaxed ${
+                            isSecurity
+                              ? "bg-indigo-600 text-white rounded-br-none shadow-sm"
+                              : "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 border border-slate-200/80 dark:border-slate-700/80 rounded-bl-none shadow-sm"
+                          }`}
+                        >
+                          {!isSecurity && (
+                            <p className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-1">
+                              {msg.senderName || msg.sender_name || "Visitor"}
+                            </p>
+                          )}
+                          <p className="whitespace-pre-wrap break-words">{msg.text || msg.message || msg.content}</p>
+
+                          {msg.snapshotUrl && (
+                            <div className="mt-2 rounded-xl overflow-hidden max-w-xs">
+                              <SecureSnapshotImage
+                                src={resolveSnapshotUrl(msg.snapshotUrl)}
+                                alt="Visitor photo"
+                                className="w-full h-auto object-cover rounded-xl"
+                              />
+                            </div>
+                          )}
+                        </div>
+                        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-1 px-1">
+                          {msg.at ? new Date(msg.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}
+                        </span>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full text-slate-400 dark:text-slate-500 space-y-2">
+                    <MessageSquare size={28} className="stroke-1 text-slate-300 dark:text-slate-600" />
+                    <p className="text-xs font-bold">No messages in this conversation yet.</p>
+                  </div>
+                )}
+                <div ref={messageEndRef} />
+              </div>
+
+              <form
+                onSubmit={handleSendMessage}
+                className="p-3 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex items-center gap-2 shrink-0"
+              >
+                <input
+                  type="text"
+                  placeholder="Type a message to the visitor..."
+                  value={typedMessage}
+                  onChange={(e) => setTypedMessage(e.target.value)}
+                  disabled={sendPending}
+                  className="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-xs font-semibold text-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 transition outline-none placeholder:text-slate-400"
+                />
+                <button
+                  type="submit"
+                  disabled={sendPending || !typedMessage.trim()}
+                  className="p-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-200 dark:disabled:bg-slate-800 text-white rounded-xl transition shadow-sm"
+                  aria-label="Send message"
+                >
+                  {sendPending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                </button>
+              </form>
+            </div>
+          </motion.div>
+        )}
+      </main>
+
+      {/* VISITOR SNAPSHOT PHOTO MODAL */}
+      <AnimatePresence>
+        {showSnapshotModal && snapshotPhotoUrl && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 max-w-md w-full space-y-4 shadow-2xl relative"
+            >
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                <div>
+                  <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">
+                    {activeThread?.visitorName || "Visitor Photo"}
+                  </h3>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
+                    Gate Capture
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowSnapshotModal(false)}
+                  className="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-600 dark:text-slate-300 rounded-xl transition"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 max-h-[60vh] bg-slate-950 flex items-center justify-center">
+                <SecureSnapshotImage
+                  src={snapshotPhotoUrl}
+                  alt={activeThread?.visitorName || "Visitor photo snapshot"}
+                  className="w-full h-auto max-h-[60vh] object-contain"
+                />
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+    </div>
   );
-}
-
-function previewText(value) {
-  const t = String(value || "").trim();
-  return t.length > 90 ? `${t.slice(0, 90)}…` : t;
-}
-
-function formatClockTime(value) {
-  const d = new Date(value);
-  if (isNaN(d.getTime())) return "";
-  return new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(d);
-}
-
-function isLikelyDuplicate(a, b) {
-  if (!a || !b) return false;
-  if (a.id && b.id && a.id === b.id) return true;
-  if ((a.sessionId || "") !== (b.sessionId || "")) return false;
-  if ((a.text || "").trim() !== (b.text || "").trim()) return false;
-  if ((a.senderType || "") !== (b.senderType || "")) return false;
-  const ta = new Date(a.at).getTime();
-  const tb = new Date(b.at).getTime();
-  if (isNaN(ta) || isNaN(tb)) return false;
-  return Math.abs(ta - tb) < 10000;
-}
-
-function mergeMessageCollections(current, incoming) {
-  const merged = [...(current || [])];
-  for (const candidate of incoming || []) {
-    if (!candidate) continue;
-    const existingIndex = merged.findIndex((item) => isLikelyDuplicate(item, candidate));
-    if (existingIndex === -1) {
-      merged.push(candidate);
-      continue;
-    }
-    merged[existingIndex] = { ...merged[existingIndex], ...candidate };
-  }
-  return merged.sort((left, right) => new Date(left.at || 0) - new Date(right.at || 0));
 }

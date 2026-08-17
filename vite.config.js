@@ -31,6 +31,11 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           ws: true
         },
+        "/realtime": {
+          target: backendTarget,
+          changeOrigin: true,
+          ws: true
+        },
         "/uploads": {
           target: backendTarget,
           changeOrigin: true

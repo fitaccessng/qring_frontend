@@ -20,10 +20,17 @@ export default defineConfig({
     baseURL: `http://127.0.0.1:${FRONTEND_PORT}`,
     trace: "on-first-retry",
     extraHTTPHeaders: { "x-e2e-run": "launch-readiness" },
+    launchOptions: {
+      args: [
+        "--use-fake-device-for-media-stream",
+        "--use-fake-ui-for-media-stream",
+        "--autoplay-policy=no-user-gesture-required",
+      ],
+    },
   },
   projects: [
-    { name: "chromium-desktop", use: { ...devices["Desktop Chrome"], permissions: ["notifications"] } },
-    { name: "chromium-mobile", use: { ...devices["Pixel 5"], permissions: ["notifications"] } },
+    { name: "chromium-desktop", use: { ...devices["Desktop Chrome"], permissions: ["notifications", "microphone", "camera"] } },
+    { name: "chromium-mobile", use: { ...devices["Pixel 5"], permissions: ["notifications", "microphone", "camera"] } },
   ],
   webServer: [
     {

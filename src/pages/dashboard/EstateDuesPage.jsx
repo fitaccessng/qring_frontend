@@ -1,421 +1,227 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import {
-  ChevronLeft,
-  Bell,
-  Plus,
-  Wrench,
-  Clock,
-  CheckCircle2,
-  AlertTriangle,
-  Filter,
-  Sliders,
-  Edit3,
-  Trash2,
-  Calendar,
-  X,
-  FileText
-} from 'lucide-react';
-import { showError, showSuccess } from "../../utils/flash";
-import { useSocketEvents } from "../../hooks/useSocketEvents";
-import { getDashboardSocket } from "../../services/socketClient";
-import useResponsiveSheet from "../../hooks/useResponsiveSheet";
-import { estateFieldClassName, estateTextareaClassName } from "../../components/mobile/EstateManagerPageShell";
-import useEstateOverviewState from "../../hooks/useEstateOverviewState";
 import { useNavigate } from "react-router-dom";
+import { ArrowLeft, CalendarDays, CreditCard, Filter, Plus, Search, WalletCards } from "lucide-react";
+import { createEstateAlert, listEstateAlerts } from "../../services/estateService";
+import { getDashboardSocket } from "../../services/socketClient";
+import useEstateOverviewState from "../../hooks/useEstateOverviewState";
+import { useSocketEvents } from "../../hooks/useSocketEvents";
+import { showError, showSuccess } from "../../utils/flash";
+import { estateFieldClassName, estateTextareaClassName } from "../../components/mobile/EstateManagerPageShell";
 
-// Placeholder mock actions matching standard service structure. 
-const mockCreateRequest = async (data) => { console.log("Created:", data); return { success: true }; };
-const mockListRequests = async (id) => [];
+const money = (value) => `NGN ${Number(value || 0).toLocaleString()}`;
 
-const EstateMaintenancePage = () => {
+function statusFor(row) {
+  const summary = row.paymentSummary || {};
+  const paid = Number(summary.paid || 0);
+  const pending = Number(summary.pending || 0);
+  const failed = Number(summary.failed || 0);
+  if (paid > 0 && pending <= 0 && failed <= 0) return "paid";
+  if (paid > 0 && pending > 0) return "partial";
+  const due = row.dueDate ? new Date(row.dueDate) : null;
+  if (due && !Number.isNaN(due.getTime()) && due.getTime() < Date.now() && pending > 0) return "overdue";
+  return "pending";
+}
+
+function statusClass(status) {
+  if (status === "paid") return "bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20";
+  if (status === "overdue") return "bg-rose-50 text-rose-700 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-500/20";
+  if (status === "partial") return "bg-blue-50 text-blue-700 ring-blue-200 dark:bg-blue-500/10 dark:text-blue-300 dark:ring-blue-500/20";
+  return "bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20";
+}
+
+export default function EstateDuesPage() {
+  const navigate = useNavigate();
   const { estateId, error, setError } = useEstateOverviewState();
-  const [issueTitle, setIssueTitle] = useState("");
-  const [category, setCategory] = useState("plumbing");
-  const [priority, setPriority] = useState("medium");
-  const [location, setLocation] = useState("");
-  const [description, setDescription] = useState("");
-  const [requests, setRequests] = useState([]);
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState("all");
+  const [formOpen, setFormOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [composeOpen, setComposeOpen] = useState(false);
-  const [dataLoading, setDataLoading] = useState(false);
+  const [form, setForm] = useState({ title: "", description: "", amountDue: "", dueDate: "" });
 
   useEffect(() => { if (error) showError(error); }, [error]);
-  const navigate = useNavigate();
 
-  const refresh = useCallback(async () => {
+  const load = useCallback(async () => {
     if (!estateId) return;
-    setDataLoading(true);
+    setLoading(true);
     try {
-      const rows = await mockListRequests(estateId);
-      setRequests(rows);
+      setRows(await listEstateAlerts(estateId, "payment_request"));
       setError("");
     } catch (err) {
-      setError(err?.message || "Failed to load maintenance logs");
+      setError(err?.message || "Failed to load dues");
     } finally {
-      setDataLoading(false);
+      setLoading(false);
     }
   }, [estateId, setError]);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
     if (!estateId) return;
-    const socket = getDashboardSocket();
-    socket.emit("dashboard.subscribe", { room: `estate:${estateId}:maintenance` });
+    getDashboardSocket().emit("dashboard.subscribe", { room: `estate:${estateId}:alerts` });
   }, [estateId]);
 
   useSocketEvents(useMemo(() => ({
-    MAINTENANCE_CREATED: refresh,
-    MAINTENANCE_UPDATED: refresh,
-    MAINTENANCE_DELETED: refresh
-  }), [refresh]));
+    ALERT_CREATED: load,
+    ALERT_UPDATED: load,
+    ALERT_DELETED: load,
+    PAYMENT_STATUS_UPDATED: load
+  }), [load]));
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const enrichedRows = useMemo(() => rows.map((row) => ({ ...row, dueStatus: statusFor(row) })), [rows]);
+  const filteredRows = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return enrichedRows.filter((row) => {
+      const matchesStatus = status === "all" || row.dueStatus === status;
+      const text = `${row.title || ""} ${row.description || ""}`.toLowerCase();
+      return matchesStatus && (!needle || text.includes(needle));
+    });
+  }, [enrichedRows, query, status]);
+
+  const metrics = useMemo(() => {
+    const totalExpected = enrichedRows.reduce((sum, row) => sum + Number(row.amountDue || 0), 0);
+    const totalPaidCount = enrichedRows.reduce((sum, row) => sum + Number(row.paymentSummary?.paid || 0), 0);
+    const totalPendingCount = enrichedRows.reduce((sum, row) => sum + Number(row.paymentSummary?.pending || 0), 0);
+    const totalParticipants = totalPaidCount + totalPendingCount;
+    const collectionRate = totalParticipants ? Math.round((totalPaidCount / totalParticipants) * 100) : 0;
+    return {
+      totalExpected,
+      totalCollected: enrichedRows.reduce((sum, row) => sum + (Number(row.amountDue || 0) * Number(row.paymentSummary?.paid || 0)), 0),
+      outstanding: enrichedRows.reduce((sum, row) => sum + (Number(row.amountDue || 0) * Number(row.paymentSummary?.pending || 0)), 0),
+      collectionRate
+    };
+  }, [enrichedRows]);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    if (!form.title.trim()) return showError("Title is required");
+    if (!Number(form.amountDue || 0)) return showError("Amount is required");
     setBusy(true);
     try {
-      await mockCreateRequest({
+      await createEstateAlert({
         estateId,
-        title: issueTitle.trim(),
-        category,
-        priority,
-        location: location.trim(),
-        description: description.trim(),
-        status: "pending"
+        title: form.title.trim(),
+        description: form.description.trim(),
+        alertType: "payment_request",
+        amountDue: Number(form.amountDue),
+        dueDate: form.dueDate || undefined
       });
-      showSuccess("Maintenance request logged.");
-      setIssueTitle("");
-      setCategory("plumbing");
-      setPriority("medium");
-      setLocation("");
-      setDescription("");
-      setComposeOpen(false);
-      await refresh();
-    } catch (err) { 
-      showError(err.message); 
-    } finally { 
-      setBusy(false); 
+      setForm({ title: "", description: "", amountDue: "", dueDate: "" });
+      setFormOpen(false);
+      showSuccess("Due created");
+      await load();
+    } catch (err) {
+      showError(err?.message || "Unable to create due");
+    } finally {
+      setBusy(false);
     }
-  };
-
-  const pendingCount = useMemo(() => requests.filter(r => r.status === "pending").length, [requests]);
-  const inProgressCount = useMemo(() => requests.filter(r => r.status === "in_progress").length, [requests]);
-  const resolvedCount = useMemo(() => requests.filter(r => r.status === "resolved").length, [requests]);
-
-  const resolutionRate = useMemo(() => {
-    if (requests.length === 0) return 100;
-    return Math.round((resolvedCount / requests.length) * 100);
-  }, [requests, resolvedCount]);
+  }
 
   return (
-    <div className="bg-slate-50/50 min-h-screen font-sans pb-32 dark:bg-slate-950 text-slate-900 dark:text-slate-100 antialiased flex flex-col selection:bg-indigo-100 dark:selection:bg-indigo-950/40">
-
-      {/* STATIC STICKY HEADER */}
-      <header className="sticky top-0 z-[100] w-full border-b border-slate-100/80 bg-white/90 px-4 py-3.5 backdrop-blur-md dark:bg-slate-950/90 dark:border-slate-900">
-        <div className="mx-auto flex max-w-4xl items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button 
-              onClick={() => navigate(-1)} 
-              className="p-2 bg-slate-50 text-slate-600 rounded-full hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 transition-all active:scale-95"
-            >
-              <ChevronLeft size={20} />
-            </button>
-            <div>
-              <h1 className="font-extrabold text-sm sm:text-lg text-slate-900 tracking-tight dark:text-white leading-none">Maintenance</h1>
-              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1">Repairs & Facilities</p>
-            </div>
+    <div className="min-h-screen bg-slate-50 pb-24 text-slate-950 dark:bg-slate-950 dark:text-white">
+      <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/90 px-4 py-3 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
+          <button onClick={() => navigate(-1)} className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300" aria-label="Back">
+            <ArrowLeft size={18} />
+          </button>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-lg font-black tracking-tight">Dues</h1>
+            <p className="truncate text-xs font-semibold text-slate-500">Manage estate dues, payments and outstanding balances.</p>
           </div>
-          <button className="relative p-2 bg-slate-50 text-slate-600 dark:bg-slate-900 dark:text-slate-300 rounded-full">
-            <Bell size={18} />
-            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-rose-500 rounded-full border border-white dark:border-slate-950" />
+          <button onClick={() => setFormOpen(true)} className="inline-flex h-10 items-center gap-2 rounded-xl bg-slate-950 px-4 text-xs font-black text-white shadow-sm active:scale-95 dark:bg-white dark:text-slate-950">
+            <Plus size={16} /> Create Due
           </button>
         </div>
       </header>
 
-      <main className="mt-4 px-4 max-w-4xl mx-auto w-full space-y-6 flex-1">
-        
-        {/* Dynamic Header Information */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 px-1">
-          <div>
-            <span className="text-indigo-600 dark:text-indigo-400 font-bold tracking-widest text-[9px] uppercase block">Infrastructure Care</span>
-            <h2 className="text-xl font-black text-slate-900 dark:text-white mt-1">Work Orders</h2>
-            <p className="text-slate-500 dark:text-slate-400 text-xs font-medium mt-1 max-w-md leading-relaxed">
-              Track emergency repairs, review community facility breakdowns, and schedule maintenance technicians.
-            </p>
-          </div>
-          <div className="flex gap-2 shrink-0">
-            <button
-              onClick={() => setComposeOpen(true)}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-bold flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-all text-xs"
-            >
-              <Plus size={14} strokeWidth={2.5} />
-              Log Issue
-            </button>
-          </div>
-        </div>
-
-        {/* Bento Metric Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-          {/* Unresolved / Active Requests */}
-          <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-100/50 dark:border-slate-800/40 flex flex-col justify-between min-h-[135px] shadow-sm">
-            <div className="flex justify-between items-start">
-              <div className="p-2.5 bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-450 rounded-xl">
-                <AlertTriangle size={18} />
-              </div>
-              <span className="text-[8px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider bg-slate-50 dark:bg-slate-850 px-2.5 py-0.5 rounded-full">
-                {pendingCount} Pending
-              </span>
+      <main className="mx-auto max-w-6xl space-y-5 px-4 pt-5">
+        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            ["Total Expected", money(metrics.totalExpected), WalletCards],
+            ["Total Collected", money(metrics.totalCollected), CreditCard],
+            ["Outstanding", money(metrics.outstanding), CalendarDays],
+            ["Collection Rate", `${metrics.collectionRate}%`, Filter]
+          ].map(([label, value, Icon]) => (
+            <div key={label} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <div className="mb-4 grid h-9 w-9 place-items-center rounded-lg bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200"><Icon size={17} /></div>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{label}</p>
+              <p className="mt-1 text-xl font-black">{value}</p>
             </div>
-            <div className="mt-2">
-              <p className="text-slate-450 dark:text-slate-500 text-[10px] font-bold uppercase tracking-wider">Active Work Requests</p>
-              <p className="text-xl font-black text-slate-900 dark:text-white mt-0.5">{pendingCount + inProgressCount} Open</p>
-            </div>
+          ))}
+        </section>
+
+        <section className="rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex flex-col gap-3 border-b border-slate-200 p-4 dark:border-slate-800 md:flex-row md:items-center">
+            <label className="relative flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search dues" className="h-11 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm font-semibold outline-none focus:border-slate-400 dark:border-slate-800 dark:bg-slate-950" />
+            </label>
+            <select value={status} onChange={(event) => setStatus(event.target.value)} className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold outline-none dark:border-slate-800 dark:bg-slate-950">
+              <option value="all">All statuses</option>
+              <option value="paid">Paid</option>
+              <option value="pending">Pending</option>
+              <option value="overdue">Overdue</option>
+              <option value="partial">Partial</option>
+            </select>
           </div>
 
-          {/* Average Resolution Rate */}
-          <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-100/50 dark:border-slate-800/40 flex flex-col justify-between min-h-[135px] shadow-sm">
-            <div className="flex justify-between items-start">
-              <div className="p-2.5 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-450 rounded-xl">
-                <CheckCircle2 size={18} />
-              </div>
-              <span className="text-[8px] font-extrabold text-emerald-650 dark:text-emerald-400 uppercase tracking-wider bg-emerald-50 dark:bg-emerald-500/5 px-2.5 py-0.5 rounded-full">
-                {resolvedCount} Solved
-              </span>
+          {loading ? (
+            <div className="p-8 text-center text-sm font-bold text-slate-500">Loading dues...</div>
+          ) : filteredRows.length ? (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-left text-sm">
+                <thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500 dark:bg-slate-950">
+                  <tr>
+                    <th className="px-4 py-3 font-black">Due</th>
+                    <th className="px-4 py-3 font-black">Amount</th>
+                    <th className="px-4 py-3 font-black">Due Date</th>
+                    <th className="px-4 py-3 font-black">Status</th>
+                    <th className="px-4 py-3 font-black">Payments</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {filteredRows.map((row) => (
+                    <tr key={row.id} className="align-top">
+                      <td className="px-4 py-4"><p className="font-black">{row.title}</p><p className="mt-1 max-w-md text-xs font-medium text-slate-500">{row.description || "Estate payment request"}</p></td>
+                      <td className="px-4 py-4 font-black">{money(row.amountDue)}</td>
+                      <td className="px-4 py-4 font-semibold text-slate-600 dark:text-slate-300">{row.dueDate ? new Date(row.dueDate).toLocaleDateString() : "Not set"}</td>
+                      <td className="px-4 py-4"><span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-black uppercase ring-1 ${statusClass(row.dueStatus)}`}>{row.dueStatus}</span></td>
+                      <td className="px-4 py-4 text-xs font-bold text-slate-500">Paid {row.paymentSummary?.paid ?? 0} · Pending {row.paymentSummary?.pending ?? 0}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            <div className="mt-2">
-              <p className="text-slate-450 dark:text-slate-500 text-[10px] font-bold uppercase tracking-wider">Resolution Efficiency</p>
-              <p className="text-xl font-black text-emerald-600 dark:text-emerald-450 mt-0.5">{resolutionRate}% Rate</p>
+          ) : (
+            <div className="p-8 text-center">
+              <p className="text-sm font-black">{rows.length ? "No dues match your filters." : "No dues created yet."}</p>
+              <p className="mt-1 text-xs font-semibold text-slate-500">Create a payment request to start tracking estate dues.</p>
             </div>
-          </div>
-
-          {/* In Progress Quick View */}
-          <div className="bg-indigo-600 text-white p-5 rounded-3xl relative overflow-hidden flex flex-col justify-between min-h-[135px] shadow-md shadow-indigo-500/10">
-            <div className="relative z-10">
-              <p className="text-white/70 text-[10px] font-bold uppercase tracking-wider">In Progress Work</p>
-              <p className="text-2xl font-black mt-0.5">{inProgressCount} Jobs</p>
-            </div>
-            <div className="relative z-10 w-full bg-white/20 h-2 rounded-full mt-4">
-              <div className="bg-white h-full rounded-full transition-all duration-1000" style={{ width: requests.length > 0 ? `${(inProgressCount / requests.length) * 100}%` : '0%' }}></div>
-            </div>
-            <div className="absolute -right-12 -bottom-12 w-28 h-28 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
-          </div>
-        </div>
-
-        {/* Ledger */}
-        <section className="space-y-3.5">
-          <div className="flex items-center justify-between px-1">
-            <h3 className="text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-wider">Maintenance Logs</h3>
-            <button className="flex items-center gap-1.5 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider hover:opacity-75 transition-all">
-              Filter <Filter size={12} />
-            </button>
-          </div>
-
-          <div className="space-y-2.5">
-            {dataLoading && (
-              <div className="text-center py-10 text-[10px] font-bold uppercase tracking-wider text-slate-400">Syncing logs...</div>
-            )}
-
-            {!dataLoading && requests.length === 0 && (
-              <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl p-8 text-center shadow-sm">
-                <p className="text-slate-400 dark:text-slate-500 font-semibold text-xs">All systems functional. No maintenance requested.</p>
-              </div>
-            )}
-
-            {requests.map((row, idx) => (
-              <div key={idx} className="bg-white dark:bg-slate-900 border border-slate-100/50 dark:border-slate-800/40 p-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3.5 shadow-sm">
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-xl bg-slate-50 dark:bg-slate-850 flex items-center justify-center text-indigo-600 dark:text-indigo-400 border border-slate-100/50 dark:border-slate-800">
-                    <Wrench size={18} />
-                  </div>
-                  <div>
-                    <p className="font-extrabold text-xs text-slate-900 dark:text-white leading-tight">{row.title}</p>
-                    <p className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider mt-0.5">{row.category} • {row.location || "Common Area"}</p>
-                  </div>
-                </div>
-
-                <div className="flex flex-row sm:flex-col justify-between w-full sm:w-auto items-center sm:items-start border-t sm:border-t-0 border-slate-100/50 dark:border-slate-800/40 pt-2.5 sm:pt-0 mt-1 sm:mt-0">
-                  <div>
-                    <span className={`px-2 py-0.5 rounded text-[8px] font-bold tracking-wider uppercase ${
-                      row.priority === "high" 
-                        ? "bg-rose-50 dark:bg-rose-950/20 text-rose-600" 
-                        : "bg-slate-50 dark:bg-slate-800 text-slate-650 dark:text-slate-400"
-                    }`}>
-                      {row.priority} Priority
-                    </span>
-                    <p className="text-[8px] text-slate-450 dark:text-slate-500 font-bold uppercase tracking-wider mt-1.5 flex items-center gap-1">
-                      <Calendar size={10} />
-                      {row.createdAt ? new Date(row.createdAt).toLocaleDateString() : 'Today'}
-                    </p>
-                  </div>
-
-                  <div className={`mt-0 sm:mt-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider flex items-center gap-1.5 ${
-                    row.status === 'resolved' 
-                      ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-450' 
-                      : row.status === 'in_progress'
-                      ? 'bg-indigo-50 text-indigo-650 dark:bg-indigo-500/10 dark:text-indigo-400'
-                      : 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-450'
-                  }`}>
-                    <span className={`w-1 h-1 rounded-full ${row.status === 'resolved' ? 'bg-emerald-500' : row.status === 'in_progress' ? 'bg-indigo-500' : 'bg-amber-500'}`}></span>
-                    {row.status?.replace("_", " ") || 'pending'}
-                  </div>
-                </div>
-
-                <div className="hidden lg:flex items-center gap-1">
-                  <button className="p-2 text-slate-400 hover:text-indigo-600 dark:text-slate-550 dark:hover:text-indigo-450 hover:bg-slate-50 dark:hover:bg-slate-850 rounded-xl transition-all"><FileText size={14} /></button>
-                  <button className="p-2 text-slate-400 hover:text-indigo-600 dark:text-slate-550 dark:hover:text-indigo-450 hover:bg-slate-50 dark:hover:bg-slate-850 rounded-xl transition-all"><Edit3 size={14} /></button>
-                  <button className="p-2 text-slate-400 hover:text-rose-500 dark:text-slate-550 dark:hover:text-rose-450 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-xl transition-all"><Trash2 size={14} /></button>
-                </div>
-              </div>
-            ))}
-          </div>
+          )}
         </section>
       </main>
 
-      {/* MAINTENANCE COMPOSER DRAWER */}
-      <MaintenanceComposerSheet open={composeOpen} onClose={() => setComposeOpen(false)} busy={busy}>
-        <form id="estate-maintenance-form" onSubmit={handleSubmit} className="space-y-4 pt-1">
-          <div className="space-y-1.5">
-            <span className="block text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 ml-0.5">Issue Title</span>
-            <input
-              className={estateFieldClassName}
-              value={issueTitle} onChange={e => setIssueTitle(e.target.value)}
-              placeholder="e.g. Street Light Breakdown" required
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <span className="block text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 ml-0.5">Category</span>
-              <select
-                className={estateFieldClassName}
-                value={category} onChange={e => setCategory(e.target.value)}
-              >
-                <option value="plumbing">Plumbing</option>
-                <option value="electrical">Electrical</option>
-                <option value="security">Security Gates</option>
-                <option value="structural">Structural</option>
-                <option value="horticulture">Gardening & Parks</option>
-              </select>
+      {formOpen ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/55 p-4 backdrop-blur-sm">
+          <form onSubmit={handleSubmit} className="w-full max-w-lg rounded-lg bg-white p-5 shadow-2xl dark:bg-slate-900">
+            <div className="mb-4">
+              <h2 className="text-lg font-black">Create Due</h2>
+              <p className="text-xs font-semibold text-slate-500">Send a payment request to estate homeowners.</p>
             </div>
-            
-            <div className="space-y-1.5">
-              <span className="block text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 ml-0.5">Severity Priority</span>
-              <select
-                className={estateFieldClassName}
-                value={priority} onChange={e => setPriority(e.target.value)}
-              >
-                <option value="low">Low Priority</option>
-                <option value="medium">Medium Priority</option>
-                <option value="high">Urgent (High)</option>
-              </select>
+            <div className="space-y-3">
+              <input required value={form.title} onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))} placeholder="Due title" className={estateFieldClassName} />
+              <input required type="number" min="1" value={form.amountDue} onChange={(event) => setForm((prev) => ({ ...prev, amountDue: event.target.value }))} placeholder="Amount" className={estateFieldClassName} />
+              <input type="date" value={form.dueDate} onChange={(event) => setForm((prev) => ({ ...prev, dueDate: event.target.value }))} className={estateFieldClassName} />
+              <textarea value={form.description} onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))} placeholder="Description" className={estateTextareaClassName} />
             </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <span className="block text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 ml-0.5">Location</span>
-            <input
-              className={estateFieldClassName}
-              value={location} onChange={e => setLocation(e.target.value)}
-              placeholder="e.g. Block C entrance or House 12" required
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <span className="block text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 ml-0.5">Problem Details</span>
-            <textarea
-              className={estateTextareaClassName}
-              value={description}
-              onChange={e => setDescription(e.target.value)}
-              rows={3}
-              placeholder="Describe the failure, leak, or damage..."
-              required
-            />
-          </div>
-        </form>
-      </MaintenanceComposerSheet>
-    </div>
-  );
-};
-
-export default EstateMaintenancePage;
-
-function MaintenanceComposerSheet({ open, onClose, busy, children }) {
-  const sheet = useResponsiveSheet({ open, onClose });
-
-  if (!open) return null;
-
-  const footer = (
-    <div className="border-t border-slate-100/60 dark:border-slate-800 bg-white dark:bg-slate-900 px-5 py-4 shrink-0">
-      <button
-        type="submit"
-        form="estate-maintenance-form"
-        disabled={busy}
-        className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3.5 rounded-xl font-bold text-xs tracking-wider shadow-md transition-all active:scale-95 disabled:opacity-50"
-      >
-        {busy ? "Broadcasting Job..." : "Log Work Request"}
-      </button>
-    </div>
-  );
-
-  // Desktop Overlay/Modal Layout
-  if (!sheet.isMobile) {
-    return (
-      <div className="fixed inset-0 z-[140] flex items-center justify-center px-4">
-        <button type="button" className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={onClose} aria-label="Close form" />
-        <motion.section
-          initial={{ opacity: 0, scale: 0.97, y: 12 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          className="relative w-full overflow-hidden rounded-[2rem] border border-slate-100/50 dark:border-slate-800/40 bg-white dark:bg-slate-900 shadow-2xl max-w-lg z-10"
-        >
-          <div className="flex items-start justify-between border-b border-slate-100/50 dark:border-slate-800/40 px-5 py-4">
-            <div>
-              <p className="text-[9px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400">Infrastructure Care</p>
-              <h3 className="mt-1 text-lg font-black text-slate-900 dark:text-white">New Maintenance Ticket</h3>
+            <div className="mt-5 flex gap-2">
+              <button type="button" onClick={() => setFormOpen(false)} className="h-11 flex-1 rounded-lg border border-slate-200 text-sm font-black dark:border-slate-800">Cancel</button>
+              <button disabled={busy} className="h-11 flex-1 rounded-lg bg-slate-950 text-sm font-black text-white disabled:opacity-60 dark:bg-white dark:text-slate-950">{busy ? "Creating..." : "Create"}</button>
             </div>
-            <button type="button" onClick={onClose} className="rounded-xl bg-slate-50 dark:bg-slate-800 p-2 text-slate-400 transition-all hover:bg-slate-100 dark:hover:bg-slate-755">
-              <X size={16} />
-            </button>
-          </div>
-          <div className="max-h-[60dvh] overflow-y-auto px-5 py-5 overscroll-contain">{children}</div>
-          {footer}
-        </motion.section>
-      </div>
-    );
-  }
-
-  // Mobile Bottom Sheet Layout
-  return (
-    <div className="fixed inset-0 z-[140] flex items-end" style={{ height: sheet.viewportHeight || undefined }}>
-      <button type="button" className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={onClose} aria-label="Close form" />
-      <motion.section
-        {...sheet.mobileSheetProps}
-        className="relative flex w-full flex-col overflow-hidden rounded-t-[2rem] bg-white dark:bg-slate-900 shadow-2xl max-h-[85dvh]"
-      >
-        {/* Drag Indicator handle */}
-        <div onPointerDown={sheet.startDrag} className="flex justify-center py-3 shrink-0 cursor-grab active:cursor-grabbing">
-          <div className="h-1 w-12 rounded-full bg-slate-200 dark:bg-slate-800" />
+          </form>
         </div>
-        <div onPointerDown={sheet.startDrag} className="flex items-start justify-between px-5 pb-4 border-b border-slate-100/50 dark:border-slate-800/40 shrink-0">
-          <div>
-            <p className="text-[9px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400">Infrastructure Care</p>
-            <h3 className="mt-1 text-lg font-black text-slate-900 dark:text-white">New Maintenance Ticket</h3>
-          </div>
-          <button type="button" onClick={onClose} className="rounded-xl bg-slate-50 dark:bg-slate-800 p-2 text-slate-400">
-            <X size={16} />
-          </button>
-        </div>
-        <div
-          ref={sheet.contentRef}
-          onScroll={sheet.onContentScroll}
-          onPointerDown={sheet.onContentPointerDown}
-          className="flex-1 overflow-y-auto px-5 py-5 overscroll-contain"
-        >
-          {children}
-        </div>
-        {footer}
-        <div className="h-[env(safe-area-inset-bottom)] bg-white dark:bg-slate-900 shrink-0" />
-      </motion.section>
+      ) : null}
     </div>
   );
 }

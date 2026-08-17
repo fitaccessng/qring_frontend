@@ -7,6 +7,7 @@ import {
 
 import { decideVisit, endHomeownerSession, getHomeownerAppointments, getHomeownerVisits, startSessionCall } from "../../services/homeownerService";
 import { useNotifications } from "../../state/NotificationsContext";
+import { useSocketEvents } from "../../hooks/useSocketEvents";
 
 export default function HomeownerVisitsPage() {
   const navigate = useNavigate();
@@ -14,7 +15,8 @@ export default function HomeownerVisitsPage() {
 
   // --- Refs & State ---
   const scrollContainerRef = useRef(null);
-  const inFlightRef = useRef(false);
+  const loadPromiseRef = useRef(null);
+  const hasSelectedInitialDateRef = useRef(false);
 
   const [rows, setRows] = useState([]);
   const [appointments, setAppointments] = useState([]);
@@ -32,26 +34,51 @@ export default function HomeownerVisitsPage() {
   }, []);
 
   // --- Data Loading ---
-  const loadVisits = useCallback(async ({ background = false, force = false } = {}) => {
-    if (inFlightRef.current && !force) return;
-    inFlightRef.current = true;
-    if (!background) { setLoading(true); setError(""); }
-    try {
-      const [visitData, appointmentData] = await Promise.all([
-        getHomeownerVisits(),
-        getHomeownerAppointments()
-      ]);
-      setRows(visitData || []);
-      setAppointments(appointmentData || []);
-    } catch (err) {
-      if (!background) setError(err.message ?? "Failed to load visits");
-    } finally {
-      if (!background) setLoading(false);
-      inFlightRef.current = false;
-    }
+  const loadVisits = useCallback(({ background = false } = {}) => {
+    if (loadPromiseRef.current) return loadPromiseRef.current;
+
+    const request = (async () => {
+      if (!background) { setLoading(true); setError(""); }
+      try {
+        const [visitData, appointmentData] = await Promise.all([
+          getHomeownerVisits(),
+          getHomeownerAppointments()
+        ]);
+        const nextRows = Array.isArray(visitData) ? visitData : [];
+        const nextAppointments = Array.isArray(appointmentData) ? appointmentData : [];
+        setRows(nextRows);
+        setAppointments(nextAppointments);
+
+        const latestDate = getLatestActivityDate(nextRows, nextAppointments);
+        if (!hasSelectedInitialDateRef.current && latestDate) {
+          hasSelectedInitialDateRef.current = true;
+          setSelectedDate(latestDate);
+        }
+      } catch (err) {
+        if (!background) setError(err.message ?? "Failed to load visits");
+      } finally {
+        if (!background) setLoading(false);
+        if (loadPromiseRef.current === request) loadPromiseRef.current = null;
+      }
+    })();
+
+    loadPromiseRef.current = request;
+    return request;
   }, []);
 
-  useEffect(() => { loadVisits({ force: true }); }, [loadVisits]);
+  useEffect(() => { loadVisits(); }, [loadVisits]);
+
+  useSocketEvents(
+    useMemo(
+      () => ({
+        new_visitor_request: () => loadVisits({ background: true }),
+        visitor_forwarded: () => loadVisits({ background: true }),
+        gate_action_completed: () => loadVisits({ background: true }),
+        "dashboard.patch": () => loadVisits({ background: true })
+      }),
+      [loadVisits]
+    )
+  );
 
   // --- Auto-Scroll to Today ---
   useEffect(() => {
@@ -64,8 +91,8 @@ export default function HomeownerVisitsPage() {
   }, [loading]);
 
   // --- Filtering & Logic ---
-  const dateScopedRows = useMemo(() => rows.filter((r) => toDateKey(r?.time || r?.startedAt) === selectedDate), [rows, selectedDate]);
-  const dateScopedAppointments = useMemo(() => appointments.filter((a) => toDateKey(a?.startsAt) === selectedDate), [appointments, selectedDate]);
+  const dateScopedRows = useMemo(() => rows.filter((row) => getActivityDateKey(row) === selectedDate), [rows, selectedDate]);
+  const dateScopedAppointments = useMemo(() => appointments.filter((appointment) => getActivityDateKey(appointment) === selectedDate), [appointments, selectedDate]);
 
   const filteredItems = useMemo(() => {
     if (activeTab === "scheduled") return dateScopedAppointments.map(item => ({ ...item, __isAppt: true }));
@@ -79,7 +106,7 @@ export default function HomeownerVisitsPage() {
     accepted: dateScopedRows.filter(r => normalizeVisitState(r) === 'accepted').length
   }), [dateScopedAppointments, dateScopedRows]);
 
-  const dateTiles = useMemo(() => buildMonthDateTiles(), []);
+  const dateTiles = useMemo(() => buildDateTiles(rows, appointments), [rows, appointments]);
 
   // --- Handlers ---
   async function handleDecision(sessionId, action) {
@@ -88,7 +115,7 @@ export default function HomeownerVisitsPage() {
       await decideVisit(sessionId, action);
       await syncVisitRequestNotifications(sessionId);
       await refresh();
-      loadVisits({ background: true });
+      await loadVisits({ background: true });
     } catch (err) { setError(err.message); } finally { setBusyId(""); }
   }
 
@@ -96,7 +123,7 @@ export default function HomeownerVisitsPage() {
     setEndingId(sessionId);
     try {
       await endHomeownerSession(sessionId);
-      loadVisits({ background: true });
+      await loadVisits({ background: true });
     } catch (err) { setError(err.message); } finally { setEndingId(""); }
   }
 
@@ -182,7 +209,10 @@ export default function HomeownerVisitsPage() {
                   return (
                     <button
                         key={item.date}
-                        onClick={() => setSelectedDate(item.date)}
+                        onClick={() => {
+                          hasSelectedInitialDateRef.current = true;
+                          setSelectedDate(item.date);
+                        }}
                         className={`flex-shrink-0 w-12 sm:w-14 h-16 sm:h-20 flex flex-col items-center justify-center rounded-2xl transition-all snap-start relative ${
                         isActive
                             ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20 scale-100 z-10"
@@ -312,7 +342,7 @@ function ActivityCard({ item, isAppt, busyId, endingId, callBusyId, onApprove, o
           </div>
 
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-widest">
-            <div className="flex items-center gap-1.5"><Clock3 size={13} className="text-indigo-500"/> {formatTime(item.time || item.startedAt || item.startsAt)}</div>
+            <div className="flex items-center gap-1.5"><Clock3 size={13} className="text-indigo-500"/> {formatTime(getActivityTimestamp(item))}</div>
             <div className="flex items-center gap-1.5"><ShieldCheck size={13} className="text-indigo-500"/> SECURE_LINK</div>
           </div>
         </div>
@@ -357,13 +387,31 @@ function normalizeVisitState(row) {
 }
 
 function formatTime(val) {
-    if (!val) return "Live";
-    return new Date(val).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  if (!val) return "Live";
+  const date = new Date(val);
+  if (Number.isNaN(date.getTime())) return "Live";
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 function toDateKey(val) {
-    const d = new Date(val);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const d = new Date(val);
+  if (Number.isNaN(d.getTime())) return "";
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function getActivityTimestamp(item) {
+  return item?.time || item?.timestamp || item?.startedAt || item?.startsAt || item?.createdAt || item?.updatedAt || item?.endedAt || "";
+}
+
+function getActivityDateKey(item) {
+  return toDateKey(getActivityTimestamp(item));
+}
+
+function getLatestActivityDate(rows, appointments) {
+  return [...rows, ...appointments]
+    .map((item) => ({ date: getActivityDateKey(item), timestamp: new Date(getActivityTimestamp(item)).getTime() }))
+    .filter((item) => item.date && !Number.isNaN(item.timestamp))
+    .sort((a, b) => b.timestamp - a.timestamp)[0]?.date || "";
 }
 
 function formatDateHeader(key) {
@@ -371,20 +419,31 @@ function formatDateHeader(key) {
     return d.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'short' });
 }
 
-function buildMonthDateTiles() {
-    const days = [];
+function buildDateTiles(rows, appointments) {
+    const dates = new Set();
     const baseDate = new Date();
     baseDate.setHours(0, 0, 0, 0); // Strip time anomalies
     
     for (let i = -7; i <= 21; i++) {
         const d = new Date(baseDate.getTime());
         d.setDate(baseDate.getDate() + i);
-        days.push({
-            date: toDateKey(d),
-            day: d.getDate(),
-            month: d.toLocaleString('en-US', { month: 'short' }),
-            weekday: d.toLocaleString('en-US', { weekday: 'short' })
-        });
+        dates.add(toDateKey(d));
     }
-    return days;
+
+    [...rows, ...appointments]
+      .map(getActivityDateKey)
+      .filter(Boolean)
+      .forEach((date) => dates.add(date));
+
+    return [...dates]
+      .sort()
+      .map((date) => {
+        const d = new Date(`${date}T00:00:00`);
+        return {
+          date,
+          day: d.getDate(),
+          month: d.toLocaleString('en-US', { month: 'short' }),
+          weekday: d.toLocaleString('en-US', { weekday: 'short' })
+        };
+      });
 }

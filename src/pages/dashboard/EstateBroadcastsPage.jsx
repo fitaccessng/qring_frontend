@@ -109,15 +109,15 @@ const EstateBroadcastsPage = () => {
       <header className="sticky top-0 z-[100] w-full border-b border-slate-100/80 bg-white/90 px-4 py-3.5 backdrop-blur-md dark:bg-slate-950/90 dark:border-slate-900">
         <div className="mx-auto flex max-w-2xl items-center justify-between">
           <div className="flex items-center gap-3">
-            <button 
+            {/* <button 
               onClick={() => navigate(-1)} 
               className="p-2 bg-slate-50 text-slate-600 rounded-full hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 transition-all active:scale-95"
             >
               <ChevronLeft size={20} />
-            </button>
+            </button> */}
             <div>
               <h1 className="font-extrabold text-sm sm:text-lg text-slate-900 tracking-tight dark:text-white leading-none">Broadcasts</h1>
-              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1">Communications Hub</p>
+              {/* <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1">Communications Hub</p> */}
             </div>
           </div>
           <button 

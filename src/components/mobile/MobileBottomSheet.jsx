@@ -5,12 +5,14 @@ import { X } from "lucide-react";
 
 export default function BottomSheet({
   open,
+  isOpen,
   onClose,
   title,
   children,
   footer,
 }) {
   const [isMobile, setIsMobile] = useState(true);
+  const isSheetOpen = Boolean(open ?? isOpen);
 
   // Handle responsive check purely on mount/resize
   useEffect(() => {
@@ -22,29 +24,29 @@ export default function BottomSheet({
 
   // Prevent body scroll when open
   useEffect(() => {
-    if (open) {
+    if (isSheetOpen) {
       const previousOverflow = document.body.style.overflow;
       document.body.style.overflow = "hidden";
       return () => {
         document.body.style.overflow = previousOverflow;
       };
     }
-  }, [open]);
+  }, [isSheetOpen]);
 
   // ESC key support
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (open && e.key === "Escape") onClose();
+      if (isSheetOpen && e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose, open]);
+  }, [isSheetOpen, onClose]);
 
   if (typeof document === "undefined") return null;
 
   return createPortal(
     <AnimatePresence>
-      {open && (
+      {isSheetOpen && (
         <div className="fixed inset-0 z-[150] flex justify-center items-end md:items-center">
           {/* Backdrop Blur & Fade */}
           <motion.div

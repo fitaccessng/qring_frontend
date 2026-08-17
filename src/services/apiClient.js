@@ -87,7 +87,7 @@ function buildResponseHeadersObject(headers) {
 }
 
 function shouldRetryResponseStatus(status) {
-  return status === 408 || status === 425 || status === 429 || status >= 500;
+  return status === 408 || status === 425 || status >= 500;
 }
 
 function shouldEmitNetworkToast() {
@@ -128,7 +128,25 @@ function shouldRetryAgainstDirectBackend(path, response) {
 export function buildApiUrl(path = "", baseUrl = getCurrentApiBaseUrl()) {
   if (!path) return baseUrl;
   if (/^https?:\/\//i.test(path)) return path;
-  if (String(path).startsWith("/uploads/")) return path;
+  if (String(path).startsWith("/api/v1/")) return path;
+  // Special handling for backend-hosted uploads:
+  // - In development when `baseUrl` is a relative path (eg `/api/v1`) the dev server
+  //   may proxy `/uploads` to the backend; return the path unchanged so the proxy
+  //   can apply. In production or when `baseUrl` is absolute, resolve uploads
+  //   to the backend origin so the browser requests the backend directly.
+  if (String(path).startsWith("/uploads/")) {
+    try {
+      // If baseUrl is an absolute URL, use its origin as the uploads host.
+      if (/^https?:\/\//i.test(baseUrl)) {
+        const origin = new URL(baseUrl).origin;
+        return `${origin}${path}`;
+      }
+    } catch {
+      // ignore and fall through to return path for proxying
+    }
+    return path;
+  }
+
   return `${baseUrl}${normalizePath(path)}`;
 }
 
@@ -557,7 +575,7 @@ export async function apiRequest(path, options = {}, attempt = 0) {
         }
       }
       if (attempt < retryCount) {
-        await new Promise((resolve) => setTimeout(resolve, 350));
+        await new Promise((resolve) => setTimeout(resolve, Math.min(350 * 2 ** attempt, 5000)));
         return apiRequest(path, options, attempt + 1);
       }
       const message = buildTransportErrorMessage(networkError);
@@ -614,7 +632,7 @@ export async function apiRequest(path, options = {}, attempt = 0) {
 
     if (!response.ok) {
       if (attempt < retryCount && shouldRetryResponseStatus(response.status)) {
-        await new Promise((resolve) => setTimeout(resolve, 350 * (attempt + 1)));
+        await new Promise((resolve) => setTimeout(resolve, Math.min(350 * 2 ** attempt, 5000)));
         return apiRequest(path, options, attempt + 1);
       }
       const shouldHandleSessionTimeout = response.status === 401 && (Boolean(token) || requiresAuthenticatedUser(path));

@@ -52,7 +52,7 @@ export default function HomeownerEstateApprovalsPage() {
   }, [rows]);
 
   return (
-    <EstateMobilePage title="Approval Logs" subtitle="Visitor access decisions for your door" icon={ClipboardList} iconClassName="text-emerald-600" onBack={() => navigate(-1)}>
+    <EstateMobilePage title="Approval Logs"  onBack={() => navigate(-1)}>
       {loading ? (
         <EstateLoadingState label="Approval Logs" />
       ) : logs.length ? (

@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { CalendarDays, Check, X } from "lucide-react";
+import { useMemo } from "react";
+import { Bell, CalendarDays, Check, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { listMyEstateAlerts, respondEstateMeeting } from "../../services/estateService";
+import { respondEstateMeeting } from "../../services/estateService";
+import { useMyEstateAlerts } from "../../hooks/useMyEstateAlerts";
 import { showError, showSuccess } from "../../utils/flash";
 import {
   EstateEmptyState,
@@ -15,25 +16,7 @@ import {
 
 export default function HomeownerEstateMeetingsPage() {
   const navigate = useNavigate();
-  const [meetings, setMeetings] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  const load = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
-    try {
-      setMeetings((await listMyEstateAlerts()).filter((item) => item.alertType === "meeting"));
-    } catch (error) {
-      showError(error?.message || "Unable to load meetings");
-    } finally {
-      if (!silent) setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    load();
-    const id = setInterval(() => load(true), 15000);
-    return () => clearInterval(id);
-  }, [load]);
+  const { rows: meetings, loading, refetch } = useMyEstateAlerts("meeting");
 
   const grouped = useMemo(() => {
     const now = Date.now();
@@ -47,14 +30,31 @@ export default function HomeownerEstateMeetingsPage() {
     try {
       await respondEstateMeeting(id, response);
       showSuccess("Attendance response recorded");
-      load(true);
+      refetch({ force: true });
     } catch (error) {
       showError(error?.message || "Unable to respond");
     }
   }
 
+  const NotificationBtn = (
+    <button
+      type="button"
+      onClick={() => navigate("/dashboard/notifications")}
+      aria-label="Notifications"
+      className="p-1.5 rounded-full text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors"
+    >
+      <Bell className="h-5 w-5" />
+    </button>
+  );
+
   return (
-    <EstateMobilePage title="Meetings" subtitle="Estate meeting invites and RSVP" icon={CalendarDays} iconClassName="text-cyan-600" onBack={() => navigate(-1)}>
+    <EstateMobilePage
+      title="Meetings"
+      onBack={() => navigate(-1)}
+      action={NotificationBtn}
+      rightAction={NotificationBtn}
+      rightElement={NotificationBtn}
+    >
       {loading ? (
         <EstateLoadingState label="Meetings" />
       ) : meetings.length ? (

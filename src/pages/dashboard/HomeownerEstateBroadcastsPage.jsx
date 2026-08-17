@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Bell, Calendar, Megaphone, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { listMyEstateAlerts } from "../../services/estateService";
+import { useMyEstateAlerts } from "../../hooks/useMyEstateAlerts";
 import { getHomeownerContext } from "../../services/homeownerService";
 import BottomSheet from "../../components/system/BottomSheet";
 import { showError, showSuccess } from "../../utils/flash";
@@ -29,25 +29,29 @@ export default function HomeownerEstateBroadcastsPage() {
       return [];
     }
   });
-
-  const load = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
-    try {
-      const [alerts, context] = await Promise.all([listMyEstateAlerts(), getHomeownerContext()]);
-      setItems(alerts.filter((item) => item.alertType === "notice"));
-      setUnit(context?.unitLabel || context?.home?.name || "Your home");
-    } catch (error) {
-      showError(error?.message || "Unable to load announcements");
-    } finally {
-      if (!silent) setLoading(false);
-    }
-  }, []);
+  const { rows: noticeRows, loading: alertsLoading } = useMyEstateAlerts("notice");
 
   useEffect(() => {
-    load();
-    const id = setInterval(() => load(true), 15000);
-    return () => clearInterval(id);
-  }, [load]);
+    setItems(noticeRows);
+  }, [noticeRows]);
+
+  useEffect(() => {
+    let mounted = true;
+    async function loadContext() {
+      try {
+        const context = await getHomeownerContext();
+        if (mounted) setUnit(context?.unitLabel || context?.home?.name || "Your home");
+      } catch (error) {
+        showError(error?.message || "Unable to load announcements");
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+    loadContext();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const visible = items.filter((item) => !hidden.includes(String(item.id)));
 
@@ -61,9 +65,9 @@ export default function HomeownerEstateBroadcastsPage() {
 
   return (
     <EstateMobilePage
-      title="Broadcasts"
-      subtitle={unit ? `For ${unit}` : "Estate announcements"}
-      icon={Megaphone}
+      title="Annoucmements"
+      
+   
       iconClassName="text-cyan-600"
       onBack={() => navigate(-1)}
       action={
@@ -72,7 +76,7 @@ export default function HomeownerEstateBroadcastsPage() {
         </button>
       }
     >
-      {loading ? (
+      {loading || alertsLoading ? (
         <EstateLoadingState label="Announcements" />
       ) : visible.length ? (
         <section>

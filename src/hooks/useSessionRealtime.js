@@ -293,6 +293,20 @@ function clearCallIntentStorage() {
   clearJsonStorage(CALL_ACCEPT_INTENT_KEY);
 }
 
+function emitRtcCheckpoint(name, detail = {}) {
+  if (typeof console === "undefined") return;
+  console.info(name, {
+    callSessionId: detail.callSessionId || null,
+    sessionId: detail.sessionId || null,
+    participantType: detail.participantType || null,
+    audio: detail.audio,
+    video: detail.video,
+    trackKind: detail.trackKind,
+    trackId: detail.trackId,
+    at: new Date().toISOString()
+  });
+}
+
 function persistLowBandwidthMode(enabled) {
   if (typeof window === "undefined") return;
   try {
@@ -402,7 +416,9 @@ function normalizeMediaPermissionError(error, wantsVideo) {
   return rawMessage || `Unable to access the ${mediaKind}.`;
 }
 
-export function useSessionRealtime(sessionId) {
+export function useSessionRealtime(sessionId, options = {}) {
+  const requestedCallMode = String(options?.requestedCallMode || "").trim().toLowerCase();
+  const routeWantsVideo = requestedCallMode === CALL_MEDIA_MODE.VIDEO;
   const context = useMemo(() => getParticipantContext(), []);
   const { participantType, canStartCall: baseCanStartCall, displayName, polite, user } = context;
   const currentUserRole = String(user?.role || "").toLowerCase();
@@ -437,7 +453,7 @@ export function useSessionRealtime(sessionId) {
   const [callLaunchStartedAt, setCallLaunchStartedAt] = useState(null);
   const [callConnectedAt, setCallConnectedAt] = useState(null);
   const [incomingCall, setIncomingCall] = useState(createIncomingCallState);
-  const [acceptedCallMode, setAcceptedCallMode] = useState("");
+  const [acceptedCallMode, setAcceptedCallMode] = useState(routeWantsVideo ? CALL_MEDIA_MODE.VIDEO : "");
   const [visitorCallInitiationAllowed, setVisitorCallInitiationAllowed] = useState(false);
   const [remoteVideoActive, setRemoteVideoActive] = useState(false);
   const [callLogs, setCallLogs] = useState([]);
@@ -470,7 +486,7 @@ export function useSessionRealtime(sessionId) {
   const callSessionRef = useRef("");
   const callVisitorIdRef = useRef("");
   const currentRtcConfigRef = useRef(buildSessionRtcConfig());
-  const callModeRef = useRef(CALL_MEDIA_MODE.AUDIO);
+  const callModeRef = useRef(routeWantsVideo ? CALL_MEDIA_MODE.VIDEO : CALL_MEDIA_MODE.AUDIO);
   const shouldForceRelayRef = useRef(false);
   const callStateRef = useRef("idle");
   const incomingCallRef = useRef(createIncomingCallState());
@@ -640,6 +656,16 @@ export function useSessionRealtime(sessionId) {
   }
 
   function updateRemoteMediaBindings() {
+    const pc = peerRef.current;
+    if (pc?.getReceivers && remoteStreamRef.current?.addTrack) {
+      const existingTrackIds = new Set(remoteStreamRef.current.getTracks().map((track) => track.id));
+      pc.getReceivers().forEach((receiver) => {
+        const track = receiver.track;
+        if (!track || existingTrackIds.has(track.id)) return;
+        remoteStreamRef.current.addTrack(track);
+        existingTrackIds.add(track.id);
+      });
+    }
     if (remoteAudioRef.current) {
       bindStreamToMediaElement(remoteAudioRef.current, remoteStreamRef.current.getAudioTracks().length ? remoteStreamRef.current : null, {
         muted: !speakerOn
@@ -654,6 +680,15 @@ export function useSessionRealtime(sessionId) {
       });
       void safePlayMedia(remoteVideoRef.current);
     }
+  }
+
+  function refreshRemoteMediaBindingsSoon() {
+    updateRemoteMediaBindings();
+    [250, 1000].forEach((delay) => {
+      window.setTimeout(() => {
+        updateRemoteMediaBindings();
+      }, delay);
+    });
   }
 
   function resetRemoteStream() {
@@ -831,9 +866,18 @@ export function useSessionRealtime(sessionId) {
       const { remoteStream: nextStream } = applyRemoteTrackEvent(remoteStreamRef.current, event);
       remoteStreamRef.current = nextStream;
       const targetStream = remoteStreamRef.current;
+      emitRtcCheckpoint("qring.webrtc.track.subscribed", {
+        sessionId,
+        participantType,
+        callSessionId: callSessionRef.current,
+        trackKind: event.track?.kind,
+        trackId: event.track?.id,
+        audio: targetStream.getAudioTracks().length > 0,
+        video: targetStream.getVideoTracks().length > 0
+      });
       setRemoteMuted(!targetStream.getAudioTracks().some((track) => track.enabled));
       setRemoteVideoActive(targetStream.getVideoTracks().length > 0);
-      updateRemoteMediaBindings();
+      refreshRemoteMediaBindingsSoon();
       if (shouldStartCallTimer({ callState: "connected", remoteMediaAttached: remoteMediaIsAttached(targetStream) }) && !callConnectedAt) {
         setCallConnectedAt(Date.now());
       }
@@ -962,6 +1006,13 @@ export function useSessionRealtime(sessionId) {
       }
     });
     stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+    emitRtcCheckpoint("qring.webrtc.track.published", {
+      sessionId,
+      participantType,
+      callSessionId: callSessionRef.current,
+      audio: stream.getAudioTracks().length > 0,
+      video: stream.getVideoTracks().length > 0
+    });
     await optimizeSenders(pc);
     return stream;
   }
@@ -1469,6 +1520,13 @@ export function useSessionRealtime(sessionId) {
         hasVideo: snapshot.hasVideo,
         idempotencyKey: snapshot.eventId || snapshot.callSessionId
       }, "call.accepted");
+      emitRtcCheckpoint("qring.webrtc.call.accepted", {
+        sessionId,
+        participantType,
+        callSessionId: snapshot.callSessionId,
+        audio: true,
+        video: snapshot.hasVideo
+      });
       pushLog("Call accepted", {
         hasVideo: snapshot.hasVideo
       });
@@ -1477,6 +1535,7 @@ export function useSessionRealtime(sessionId) {
       if (pendingOfferPayloadRef.current?.sdp) {
         const pc = createPeerConnection({ forceRelay: shouldForceRelayRef.current });
         await pc.setRemoteDescription(new RTCSessionDescription(pendingOfferPayloadRef.current.sdp));
+        refreshRemoteMediaBindingsSoon();
         await drainPendingCandidates();
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
@@ -2073,13 +2132,14 @@ export function useSessionRealtime(sessionId) {
     const handleCallRequested = (payload) => handleCallInvite(payload);
 
     const handleCallAccepted = async (payload) => {
-      if (String(payload?.sessionId || "") !== String(sessionId || "")) return;
-      if (String(payload?.callSessionId || "") && payload.callSessionId !== callSessionRef.current) return;
-      const eventId = String(payload?.eventId || payload?.callSessionId || "").trim();
+      const data = payload?.data && typeof payload.data === "object" ? payload.data : payload;
+      if (String(payload?.sessionId || data?.sessionId || "") !== String(sessionId || "")) return;
+      if (String(data?.callSessionId || "") && data.callSessionId !== callSessionRef.current) return;
+      const eventId = String(payload?.eventId || data?.eventId || data?.callSessionId || "").trim();
       if (eventId && seenCallLifecycleEventIdsRef.current.has(`accepted:${eventId}`)) {
         pushLog("Duplicate call accepted suppressed", {
           eventId,
-          callSessionId: payload?.callSessionId || callSessionRef.current
+          callSessionId: data?.callSessionId || callSessionRef.current
         });
         return;
       }
@@ -2088,14 +2148,14 @@ export function useSessionRealtime(sessionId) {
       }
       setStatus("Call accepted. Connecting media...");
       transitionIncomingCall("connected", {
-        callSessionId: String(payload?.callSessionId || callSessionRef.current || ""),
+        callSessionId: String(data?.callSessionId || callSessionRef.current || ""),
         sessionId,
         visitorId: callVisitorIdRef.current || sessionId,
         hasVideo: callModeRef.current === CALL_MEDIA_MODE.VIDEO,
-        eventId: String(payload?.callSessionId || callSessionRef.current || "")
+        eventId: String(data?.callSessionId || callSessionRef.current || "")
       }, "remote_call_accepted");
       pushLog("Remote accepted call", {
-        callSessionId: payload?.callSessionId || callSessionRef.current
+        callSessionId: data?.callSessionId || callSessionRef.current
       });
       if (canStartCall && localStreamRef.current && !(participantType === "visitor" && incomingCallRef.current.pending)) {
         await sendOffer();
@@ -2269,6 +2329,7 @@ export function useSessionRealtime(sessionId) {
           await ensureLocalStream({ video: Boolean(payload?.hasVideo) });
         }
         await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+        refreshRemoteMediaBindingsSoon();
         await drainPendingCandidates();
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
@@ -2295,6 +2356,7 @@ export function useSessionRealtime(sessionId) {
       clearConnectTimers();
       try {
         await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+        refreshRemoteMediaBindingsSoon();
         await drainPendingCandidates();
         setCallStateSafe("connecting");
         pushLog("Remote answer applied");
@@ -2461,14 +2523,28 @@ export function useSessionRealtime(sessionId) {
     if (pendingAcceptIntentRef.current) {
       const acceptIntent = pendingAcceptIntentRef.current;
       pendingAcceptIntentRef.current = null;
+      const acceptCallSessionId = String(acceptIntent.callSessionId || "");
       const snapshot = {
         hasVideo: Boolean(acceptIntent.hasVideo),
-        callSessionId: String(acceptIntent.callSessionId || ""),
+        callSessionId: acceptCallSessionId,
         visitorId: String(acceptIntent.visitorId || sessionId),
         sessionId,
         phase: "incoming",
-        eventId: String(acceptIntent.callSessionId || "")
+        eventId: String(acceptIntent.eventId || acceptCallSessionId),
+        roomName: String(acceptIntent.roomName || ""),
+        callerRole: String(acceptIntent.callerRole || ""),
+        callerName: String(acceptIntent.callerName || "")
       };
+      callSessionRef.current = acceptCallSessionId;
+      callVisitorIdRef.current = snapshot.visitorId;
+      grantSessionCallAccess(sessionId, "incoming");
+      emitRtcCheckpoint("qring.webrtc.accept_intent.replayed", {
+        sessionId,
+        participantType,
+        callSessionId: acceptCallSessionId,
+        audio: true,
+        video: snapshot.hasVideo
+      });
       transitionIncomingCall("incoming", snapshot, "accept_intent_replayed");
       void acceptIncomingCallRef.current?.(snapshot);
     }
@@ -2528,6 +2604,12 @@ export function useSessionRealtime(sessionId) {
   }, [callState]);
 
   useEffect(() => {
+    if (!routeWantsVideo) return;
+    callModeRef.current = CALL_MEDIA_MODE.VIDEO;
+    setAcceptedCallMode((current) => current || CALL_MEDIA_MODE.VIDEO);
+  }, [routeWantsVideo]);
+
+  useEffect(() => {
     incomingCallRef.current = incomingCall;
   }, [incomingCall]);
 
@@ -2560,6 +2642,25 @@ export function useSessionRealtime(sessionId) {
       remoteAudioRef.current.muted = !speakerOn;
     }
   }, [speakerOn]);
+
+  useEffect(() => {
+    updateRemoteMediaBindings();
+  }, [callState, remoteMuted, remoteVideoActive, speakerOn]);
+
+  useEffect(() => {
+    if (!["connecting", "reconnecting", "connected"].includes(callState)) return undefined;
+    const startedAt = Date.now();
+    const timer = window.setInterval(() => {
+      updateRemoteMediaBindings();
+      if (
+        Date.now() - startedAt > 10000 ||
+        (remoteAudioRef.current?.srcObject && (!remoteVideoActive || remoteVideoRef.current?.srcObject))
+      ) {
+        window.clearInterval(timer);
+      }
+    }, 500);
+    return () => window.clearInterval(timer);
+  }, [callState, remoteVideoActive, speakerOn]);
 
   useEffect(() => {
     if (callState === "connected") {

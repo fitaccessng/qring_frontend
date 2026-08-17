@@ -23,3 +23,11 @@ test("production runtime URLs never fall back to localhost", () => {
     })
   ).toBe(true);
 });
+
+test("local dev keeps a relative API base so Vite proxy can route requests to the backend", () => {
+  const apiBaseUrl = resolveApiBaseUrl("/api/v1", "/api/v1", { windowOrigin: "http://localhost:5173" });
+  const socketUrl = resolveSocketUrl("", "", { windowOrigin: "http://localhost:5173" });
+
+  expect(apiBaseUrl).toBe("/api/v1");
+  expect(socketUrl).toBe("");
+});

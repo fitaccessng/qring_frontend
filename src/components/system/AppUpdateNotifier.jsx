@@ -21,7 +21,7 @@ function writeUpdateNoticeDismissed(value) {
 }
 
 export default function AppUpdateNotifier() {
-  const [updateReady, setUpdateReady] = useState(() => !readUpdateNoticeDismissed());
+  const [updateReady, setUpdateReady] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {

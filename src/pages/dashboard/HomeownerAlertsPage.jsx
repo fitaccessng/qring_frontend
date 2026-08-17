@@ -1,65 +1,33 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import AppShell from "../../layouts/AppShell";
-import { listMyEstateAlerts, payEstateAlert, respondEstateMeeting, voteEstatePoll } from "../../services/estateService";
+import { payEstateAlert, respondEstateMeeting, voteEstatePoll } from "../../services/estateService";
 import { uploadPaymentProof } from "../../services/homeownerService";
 import { showError, showSuccess } from "../../utils/flash";
-import { useSocketEvents } from "../../hooks/useSocketEvents";
+import { useMyEstateAlerts } from "../../hooks/useMyEstateAlerts";
 
 export default function HomeownerAlertsPage() {
-  const [alerts, setAlerts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { rows: alerts, loading, error, refetch } = useMyEstateAlerts();
   const [payingAlertId, setPayingAlertId] = useState("");
   const [respondingAlertId, setRespondingAlertId] = useState("");
   const [votingAlertId, setVotingAlertId] = useState("");
-  const [error, setError] = useState("");
   const [paymentMethodByAlert, setPaymentMethodByAlert] = useState({});
   const [bankRefByAlert, setBankRefByAlert] = useState({});
   const [proofUploadingId, setProofUploadingId] = useState("");
   const [proofFileByAlert, setProofFileByAlert] = useState({});
 
-  async function load() {
-    setLoading(true);
-    setError("");
-    try {
-      const rows = await listMyEstateAlerts();
-      setAlerts(rows);
-    } catch (requestError) {
-      setError(requestError?.message ?? "Failed to load alerts");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    load();
-  }, []);
-
   useEffect(() => {
     if (error) showError(error);
   }, [error]);
 
-  useSocketEvents(
-    useMemo(
-      () => ({
-        ALERT_CREATED: () => load(),
-        ALERT_UPDATED: () => load(),
-        ALERT_DELETED: () => load(),
-        PAYMENT_STATUS_UPDATED: () => load()
-      }),
-      []
-    )
-  );
-
   async function handlePayNow(alertId, method = "paystack", reference) {
     if (payingAlertId) return;
     setPayingAlertId(alertId);
-    setError("");
     try {
       const payload = { paymentMethod: method };
       if (reference) payload.reference = reference;
       const data = await payEstateAlert(alertId, payload);
       if (data?.stale) {
-        await load();
+        await refetch({ force: true });
         return;
       }
       if (data?.authorizationUrl) {
@@ -73,9 +41,9 @@ export default function HomeownerAlertsPage() {
       } else if (method === "wallet") {
         showSuccess("Wallet payment requested. Awaiting verification.");
       }
-      await load();
+      await refetch({ force: true });
     } catch (requestError) {
-      setError(requestError?.message ?? "Unable to initialize payment");
+      showError(requestError?.message ?? "Unable to initialize payment");
     } finally {
       setPayingAlertId("");
     }
@@ -85,13 +53,12 @@ export default function HomeownerAlertsPage() {
     const file = proofFileByAlert[alertId];
     if (!alertId || !file) return;
     setProofUploadingId(alertId);
-    setError("");
     try {
       await uploadPaymentProof(alertId, file);
       showSuccess("Payment proof uploaded.");
-      await load();
+      await refetch({ force: true });
     } catch (requestError) {
-      setError(requestError?.message ?? "Unable to upload proof");
+      showError(requestError?.message ?? "Unable to upload proof");
     } finally {
       setProofUploadingId("");
     }
@@ -100,16 +67,15 @@ export default function HomeownerAlertsPage() {
   async function handleMeetingResponse(alertId, response) {
     if (respondingAlertId) return;
     setRespondingAlertId(alertId);
-    setError("");
     try {
       const res = await respondEstateMeeting(alertId, response);
       if (res?.stale) {
-        await load();
+        await refetch({ force: true });
         return;
       }
-      await load();
+      await refetch({ force: true });
     } catch (requestError) {
-      setError(requestError?.message ?? "Unable to submit response");
+      showError(requestError?.message ?? "Unable to submit response");
     } finally {
       setRespondingAlertId("");
     }
@@ -118,16 +84,15 @@ export default function HomeownerAlertsPage() {
   async function handlePollVote(alertId, optionIndex) {
     if (votingAlertId) return;
     setVotingAlertId(alertId);
-    setError("");
     try {
       const res = await voteEstatePoll(alertId, optionIndex);
       if (res?.stale) {
-        await load();
+        await refetch({ force: true });
         return;
       }
-      await load();
+      await refetch({ force: true });
     } catch (requestError) {
-      setError(requestError?.message ?? "Unable to vote");
+      showError(requestError?.message ?? "Unable to vote");
     } finally {
       setVotingAlertId("");
     }

@@ -49,6 +49,15 @@ export default function SecureSnapshotImage({
     setResolvedSrc("");
     // eslint-disable-next-line no-console
     console.info("qring.snapshot.fetch.start", { assetUrl, visitorSessionId: visitorSessionId || undefined });
+    // Detailed debug info to trace where fetch will be sent from in runtime
+    // (temporary - used to diagnose frontend-origin requests)
+    // eslint-disable-next-line no-console
+    console.log("qring.snapshot.debug", {
+      originalSrc: raw,
+      resolvedUrl: assetUrl,
+      apiBaseUrl: import.meta.env.VITE_API_BASE_URL,
+      windowOrigin: typeof window !== 'undefined' ? window.location.origin : undefined,
+    });
 
     const fetchSnapshot = (url) => apiRequestBinary(url, {
       headers: {
@@ -81,9 +90,13 @@ export default function SecureSnapshotImage({
       .catch((error) => {
         if (!active) return;
         setResolvedSrc("");
+        // Provide richer debug output in development without leaking secrets
+        const status = error?.status ?? (error?.payload?.status || undefined);
         // eslint-disable-next-line no-console
         console.warn("qring.snapshot.fetch.failed", {
-          assetUrl,
+          originalUrl: raw,
+          resolvedUrl: assetUrl,
+          status: status,
           error: error?.message || "unknown_snapshot_error"
         });
         if (typeof onErrorRef.current === "function") {

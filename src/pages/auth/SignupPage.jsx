@@ -144,14 +144,14 @@ export default function SignupPage() {
           <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-10 -mt-4" />
 
           {/* Role Selection Cluster */}
-          <div className="grid grid-cols-1 gap-3 mb-8">
+          {/* <div className="grid grid-cols-1 gap-3 mb-8">
             <RoleTab 
               active
               onClick={() => setForm({ ...form, role: "estate" })}
               icon={Building2}
               label="Estate"
             />
-          </div>
+          </div> */}
 
           {error && (
             <div className="mb-6 p-4 rounded-2xl text-xs font-bold bg-red-50 text-red-600 border border-red-100 animate-in fade-in slide-in-from-top-2 text-center">

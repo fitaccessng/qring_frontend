@@ -23,6 +23,7 @@ import { ThemeProvider } from "./state/ThemeContext";
 import BlockingModal from "./components/BlockingModal";
 import AppPreloader from "./components/mobile/AppPreloader";
 import PanicAlertCenter from "./components/panic/PanicAlertCenter";
+import GlobalIncomingCallOverlay from "./components/GlobalIncomingCallOverlay";
 import PersistentAppMobileNav from "./components/system/PersistentAppMobileNav";
 import ToastCenter from "./components/ToastCenter";
 import AppUpdateNotifier from "./components/system/AppUpdateNotifier";
@@ -454,6 +455,7 @@ function AppRoutes() {
               <Route path="/dashboard" element={<Navigate to={nativeEntryRoute} replace />} />
               <Route path="*" element={<NotFoundPage />} />
             </Routes>
+            <GlobalIncomingCallOverlay />
             <PersistentAppMobileNav />
           </div>
         </>

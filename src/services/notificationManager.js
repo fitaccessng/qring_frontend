@@ -6,6 +6,42 @@ function normalizeKey(value) {
   return String(value || "").trim();
 }
 
+function readAny(source, keys) {
+  for (const key of keys) {
+    const value = source?.[key];
+    if (value !== undefined && value !== null && value !== "") return value;
+  }
+  return "";
+}
+
+export function normalizeIncomingCallPayload(raw) {
+  const payload = raw?.data ?? raw ?? {};
+  const callSessionId = normalizeKey(readAny(payload, ["callSessionId", "call_id", "callId", "call_session_id", "eventId", "event_id"]));
+  const sessionId = normalizeKey(readAny(payload, ["sessionId", "session_id", "visitorSessionId", "visitor_session_id"]));
+  const callerUserId = normalizeKey(readAny(payload, ["callerUserId", "caller_user_id", "userId", "user_id"]));
+  const callType = normalizeKey(readAny(payload, ["callType", "call_type", "type"])).toLowerCase() || (payload?.hasVideo ? "video" : "audio");
+  const hasVideo = payload?.hasVideo !== undefined ? Boolean(payload.hasVideo) : callType === "video";
+
+  return {
+    ...payload,
+    notificationId: readAny(payload, ["notificationId", "notification_id", "id"]) || callSessionId || sessionId,
+    eventId: readAny(payload, ["eventId", "event_id"]) || callSessionId,
+    sessionId,
+    callSessionId,
+    callId: normalizeKey(readAny(payload, ["callId", "call_id"])) || callSessionId,
+    callerUserId,
+    callerName: readAny(payload, ["callerName", "caller_name"]) || "Caller",
+    callerRole: readAny(payload, ["callerRole", "caller_role", "role"]),
+    callerOrigin: readAny(payload, ["callerOrigin", "caller_origin"]),
+    visitorId: readAny(payload, ["visitorId", "visitor_id"]) || sessionId,
+    roomName: readAny(payload, ["roomName", "room_name"]),
+    callType,
+    type: callType,
+    hasVideo,
+    payload: parseNotificationPayload(payload.payload),
+  };
+}
+
 function createState() {
   return {
     seenNotificationIds: new Set(),
@@ -121,16 +157,8 @@ export function createNotificationManager() {
 
   function ingestIncomingCall(raw) {
     if (state.syncing) return null;
-    const payload = raw?.data ?? raw ?? {};
-    const envelope = {
-      ...payload,
-      notificationId: payload.notificationId || payload.callSessionId || payload.eventId || payload.sessionId,
-      sessionId: payload.sessionId,
-      callSessionId: payload.callSessionId,
-      eventId: payload.eventId || payload.callSessionId,
-      type: payload.type || "incoming-call",
-      payload: parseNotificationPayload(payload.payload),
-    };
+    const envelope = normalizeIncomingCallPayload(raw);
+    if (!envelope.callSessionId || !envelope.sessionId) return null;
     if (hasBeenDismissed(envelope)) return null;
     if (!registerEnvelope(envelope)) return null;
 

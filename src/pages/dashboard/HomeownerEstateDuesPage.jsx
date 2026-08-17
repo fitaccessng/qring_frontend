@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { CreditCard } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { listMyEstateAlerts, payEstateAlert } from "../../services/estateService";
+import { payEstateAlert } from "../../services/estateService";
+import { useMyEstateAlerts } from "../../hooks/useMyEstateAlerts";
 import { showError } from "../../utils/flash";
 import {
   EstateEmptyState,
@@ -16,32 +17,14 @@ import {
 
 export default function HomeownerEstateDuesPage() {
   const navigate = useNavigate();
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [payingId, setPayingId] = useState("");
-
-  const load = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
-    try {
-      setItems((await listMyEstateAlerts()).filter((item) => item.alertType === "payment_request"));
-    } catch (error) {
-      showError(error?.message || "Unable to load dues");
-    } finally {
-      if (!silent) setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    load();
-    const id = setInterval(() => load(true), 15000);
-    return () => clearInterval(id);
-  }, [load]);
+  const { rows: items, loading, refetch } = useMyEstateAlerts("payment_request");
 
   async function handlePay(item) {
     setPayingId(item.id);
     try {
       await payEstateAlert(item.id);
-      await load(true);
+      await refetch({ force: true });
     } catch (error) {
       showError(error?.message || "Unable to start payment");
     } finally {
