@@ -201,19 +201,12 @@ export async function getHomeownerSessionMessages(sessionId) {
   return Array.isArray(response?.data) ? response.data : [];
 }
 
-export async function sendHomeownerSessionMessage(sessionId, text) {
+export async function sendHomeownerSessionMessage(sessionId, text, communicationTarget = null) {
+  const body = { text };
+  if (communicationTarget) body.communicationTarget = communicationTarget;
   const response = await apiRequest(`/homeowner/messages/${sessionId}`, {
     method: "POST",
-    body: JSON.stringify({ text })
-  export async function sendHomeownerSessionMessage(sessionId, text, communicationTarget = null) {
-    const body = { text }
-    if (communicationTarget) body.communicationTarget = communicationTarget
-    const response = await apiRequest(`/homeowner/messages/${sessionId}`, {
-      method: "POST",
-      body: JSON.stringify(body)
-    });
-  const response = await apiRequest(`/homeowner/messages/${sessionId}/${messageId}`, {
-    method: "DELETE"
+    body: JSON.stringify(body)
   });
   return response?.data ?? null;
 }
