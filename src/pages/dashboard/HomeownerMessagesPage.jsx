@@ -54,6 +54,7 @@ export default function HomeownerMessagePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [typedMessage, setTypedMessage] = useState("");
+  const [communicationTarget, setCommunicationTarget] = useState("visitor");
   const [rejectReplyOpen, setRejectReplyOpen] = useState(false);
   const [rejectReplyText, setRejectReplyText] = useState(REJECTION_REPLY_OPTIONS[0]);
   const [homeownerContext, setHomeownerContext] = useState({ managedByEstate: false, estateName: "" });
@@ -391,7 +392,8 @@ export default function HomeownerMessagePage() {
     setSendPending(true);
     setError("");
     try {
-      const saved = await sendHomeownerSessionMessage(activeThreadId, text);
+      const target = communicationTarget === "gateman" ? "gateman" : "visitor";
+      const saved = await sendHomeownerSessionMessage(activeThreadId, text, target);
       const message = saved || {
         id: `local-${Date.now()}`,
         sessionId: activeThreadId,
@@ -883,14 +885,24 @@ export default function HomeownerMessagePage() {
               onSubmit={handleSendMessage}
               className="p-3 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex items-center gap-2 shrink-0"
             >
-              <input
-                type="text"
-                placeholder="Type a message to gate control..."
-                value={typedMessage}
-                onChange={(e) => setTypedMessage(e.target.value)}
-                disabled={sendPending}
-                className="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-xs font-semibold text-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 transition outline-none placeholder:text-slate-400"
-              />
+                <div className="flex items-center space-x-2 w-full">
+                  <select
+                    value={communicationTarget}
+                    onChange={(e) => setCommunicationTarget(e.target.value)}
+                    className="border rounded-xl p-2 text-xs font-bold"
+                  >
+                    <option value="visitor">Visitor</option>
+                    <option value="gateman">Security</option>
+                  </select>
+                  <input
+                    type="text"
+                    placeholder="Type a message to gate control..."
+                    value={typedMessage}
+                    onChange={(e) => setTypedMessage(e.target.value)}
+                    disabled={sendPending}
+                    className="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-xs font-semibold text-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 transition outline-none placeholder:text-slate-400"
+                  />
+                </div>
               <button
                 type="submit"
                 disabled={sendPending || !typedMessage.trim()}

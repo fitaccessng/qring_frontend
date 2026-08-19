@@ -205,11 +205,13 @@ export async function sendHomeownerSessionMessage(sessionId, text) {
   const response = await apiRequest(`/homeowner/messages/${sessionId}`, {
     method: "POST",
     body: JSON.stringify({ text })
-  });
-  return response?.data ?? null;
-}
-
-export async function deleteHomeownerSessionMessage(sessionId, messageId) {
+  export async function sendHomeownerSessionMessage(sessionId, text, communicationTarget = null) {
+    const body = { text }
+    if (communicationTarget) body.communicationTarget = communicationTarget
+    const response = await apiRequest(`/homeowner/messages/${sessionId}`, {
+      method: "POST",
+      body: JSON.stringify(body)
+    });
   const response = await apiRequest(`/homeowner/messages/${sessionId}/${messageId}`, {
     method: "DELETE"
   });
