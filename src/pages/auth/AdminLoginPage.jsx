@@ -109,9 +109,13 @@ export default function AdminLoginPage() {
             </>
           ) : null}
 
-          <div className="text-center text-xs text-slate-500">
+          <div className="flex items-center justify-center gap-3 text-center text-xs text-slate-500">
             <Link to="/login" className="hover:text-brand-500">
               User login
+            </Link>
+            <span className="text-slate-300">|</span>
+            <Link to="/admin/register/user" className="hover:text-brand-500">
+              Create admin account
             </Link>
           </div>
         </form>
