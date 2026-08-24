@@ -18,13 +18,15 @@ import { env } from "../../config/env";
 import {
   createHomeownerDoor,
   generateHomeownerDoorQr,
-  getHomeownerDoors
+  getHomeownerDoors,
+  getHomeownerContext,
 } from "../../services/homeownerService";
 import { showError, showSuccess } from "../../utils/flash";
 
 // Components
 import QrPrintDesigner from "../../components/qr/QrPrintDesigner";
 import BottomSheet from "../../components/system/BottomSheet";
+import WalkthroughModal from "../../components/Onboarding/WalkthroughModal";
 
 function getPrimaryQrId(door) {
   return Array.isArray(door?.qr) && door.qr.length > 0 ? door.qr[0] : "";
@@ -46,6 +48,16 @@ export default function HomeownerDoorsPage() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [language] = useState("English");
+  const ONBOARDING_KEY = 'onboarding_walkthrough_completed_v1';
+  const [showWalkthrough, setShowWalkthrough] = useState(() => {
+    try {
+      const v = localStorage.getItem(ONBOARDING_KEY);
+      return !v || !(JSON.parse(v)?.completed);
+    } catch (e) {
+      return true;
+    }
+  });
+  const [hasSecurity, setHasSecurity] = useState(false);
 
   const activeDoor = useMemo(() => doors.find((d) => String(d.id) === String(activeDoorId)), [doors, activeDoorId]);
 
@@ -57,6 +69,13 @@ export default function HomeownerDoorsPage() {
       const doorList = doorData?.doors ?? [];
       setDoors(doorList);
       setSubscription(doorData?.subscription ?? null);
+
+      try {
+        const ctx = await getHomeownerContext();
+        setHasSecurity(Boolean(ctx?.hasSecurity));
+      } catch (e) {
+        setHasSecurity(false);
+      }
 
       if (doorList.length > 0) {
         setActiveDoorId((currentId) => {
@@ -133,6 +152,27 @@ export default function HomeownerDoorsPage() {
     const firstQrId = getPrimaryQrId(door);
     setActiveDoorId(door.id);
     setSelectedQrId(firstQrId);
+  };
+
+  const handleDownloadQr = async (qrId) => {
+    if (!qrId) return;
+    const url = buildQrImageUrl(toScanUrl(qrId), 1024);
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Network error');
+      const blob = await res.blob();
+      const a = document.createElement('a');
+      const objectUrl = URL.createObjectURL(blob);
+      a.href = objectUrl;
+      a.download = `${qrId}.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(objectUrl);
+      showSuccess('Download started');
+    } catch (err) {
+      showError('Failed to download QR');
+    }
   };
 
   const handleGenerateDoorQr = async (door) => {
@@ -293,13 +333,32 @@ export default function HomeownerDoorsPage() {
                         
                         <div className="flex items-center gap-2">
                           {qrCount > 0 && (
-                            <button
-                              onClick={() => { handleSelectDoor(door); setIsModalOpen(true); }}
-                              className="p-2.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-xl transition-colors active:scale-95"
-                              title="View Access Pass"
-                            >
-                              <QrCode size={18} />
-                            </button>
+                            <>
+                              <button
+                                onClick={() => { handleSelectDoor(door); setIsModalOpen(true); }}
+                                className="p-2.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-xl transition-colors active:scale-95"
+                                title="View Access Pass"
+                              >
+                                <QrCode size={18} />
+                              </button>
+
+                              <button
+                                onClick={() => handleDownloadQr(getPrimaryQrId(door))}
+                                className="p-2.5 bg-slate-50 text-slate-600 hover:bg-slate-100 rounded-xl transition-colors active:scale-95"
+                                title="Download QR"
+                              >
+                                Download
+                              </button>
+
+                              <button
+                                onClick={() => handleGenerateDoorQr(door)}
+                                disabled={isGenerating || ((subscription?.maxQrCodes ?? 0) - (subscription?.usedQrCodes ?? 0) <= 0)}
+                                className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all disabled:opacity-50 active:scale-95"
+                                title="Regenerate QR"
+                              >
+                                {isGenerating ? 'Generating...' : 'Regenerate'}
+                              </button>
+                            </>
                           )}
                         </div>
                       </div>
@@ -379,6 +438,14 @@ export default function HomeownerDoorsPage() {
         </div>
       </main>
 
+      <WalkthroughModal
+        open={showWalkthrough}
+        onClose={() => setShowWalkthrough(false)}
+        subscription={subscription}
+        doors={doors}
+        hasSecurity={hasSecurity}
+      />
+
       {/* DIALOG ACCESS MODAL - Floating Bottom-Sheet on mobile, Centered Modal on Desktop */}
       <BottomSheet open={isModalOpen} onClose={() => setIsModalOpen(false)} title="Instant Pass Code">
             <div className="text-center">
@@ -395,12 +462,31 @@ export default function HomeownerDoorsPage() {
                <p className="text-slate-400 text-xs font-medium mb-6">
                  Hold this code up to the automated reader for instantaneous access.
                </p>
-               <button 
-                onClick={() => copyToClipboard(toScanUrl(selectedQrId))} 
-                className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm shadow-sm transition-all active:scale-[0.98]"
-               >
-                 Copy Link Address
-               </button>
+               <div className="space-y-3">
+                 <button
+                   onClick={() => copyToClipboard(toScanUrl(selectedQrId))}
+                   className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm shadow-sm transition-all active:scale-[0.98]"
+                 >
+                   Copy Link Address
+                 </button>
+
+                 <div className="grid grid-cols-2 gap-3">
+                   <button
+                     onClick={() => handleDownloadQr(selectedQrId)}
+                     className="w-full py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl font-semibold text-sm border border-slate-100"
+                   >
+                     Download
+                   </button>
+
+                   <button
+                     onClick={() => handleGenerateDoorQr(activeDoor)}
+                     disabled={generatingQrDoorId === String(activeDoor?.id) || ((subscription?.maxQrCodes ?? 0) - (subscription?.usedQrCodes ?? 0) <= 0)}
+                     className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold text-sm disabled:opacity-50"
+                   >
+                     {generatingQrDoorId === String(activeDoor?.id) ? 'Generating...' : 'Regenerate'}
+                   </button>
+                 </div>
+               </div>
             </div>
       </BottomSheet>
     </div>
