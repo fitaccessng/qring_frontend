@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Bell,
   ChevronLeft,
@@ -34,6 +34,7 @@ function getPrimaryQrId(door) {
 
 export default function HomeownerDoorsPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { token } = useAuth();
   const { unreadCount: globalUnreadCount } = useNotifications();
 
@@ -48,16 +49,39 @@ export default function HomeownerDoorsPage() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [language] = useState("English");
-  const ONBOARDING_KEY = 'onboarding_walkthrough_completed_v1';
   const [showWalkthrough, setShowWalkthrough] = useState(() => {
     try {
-      const v = localStorage.getItem(ONBOARDING_KEY);
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('onboarding') === 'reset') {
+        return true;
+      }
+
+      const v = localStorage.getItem('onboarding_walkthrough_completed_v1');
       return !v || !(JSON.parse(v)?.completed);
     } catch (e) {
       return true;
     }
   });
   const [hasSecurity, setHasSecurity] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const shouldReset = params.get('onboarding') === 'reset';
+
+    if (shouldReset) {
+      setShowWalkthrough(true);
+      const nextUrl = new URL(window.location.href);
+      nextUrl.searchParams.delete('onboarding');
+      window.history.replaceState({}, '', nextUrl);
+    } else {
+      try {
+        const saved = localStorage.getItem('onboarding_walkthrough_completed_v1');
+        setShowWalkthrough(!saved || !(JSON.parse(saved)?.completed));
+      } catch (e) {
+        setShowWalkthrough(true);
+      }
+    }
+  }, [location.search]);
 
   const activeDoor = useMemo(() => doors.find((d) => String(d.id) === String(activeDoorId)), [doors, activeDoorId]);
 

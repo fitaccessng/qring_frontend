@@ -1,6 +1,32 @@
 import React, { useMemo, useState, useEffect } from 'react';
 
-const STORAGE_KEY = 'onboarding_walkthrough_completed_v1';
+export const WALKTHROUGH_STORAGE_KEY = 'onboarding_walkthrough_completed_v1';
+
+export function clearWalkthroughStorage() {
+  try {
+    localStorage.removeItem(WALKTHROUGH_STORAGE_KEY);
+  } catch (e) {
+    // ignore storage access issues in restricted environments
+  }
+}
+
+export function shouldShowWalkthroughModal() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('onboarding') === 'reset') {
+      clearWalkthroughStorage();
+      return true;
+    }
+
+    const raw = localStorage.getItem(WALKTHROUGH_STORAGE_KEY);
+    if (!raw) return true;
+
+    const parsed = JSON.parse(raw);
+    return !parsed?.completed;
+  } catch (e) {
+    return true;
+  }
+}
 
 export default function WalkthroughModal({ open = true, onClose = () => {}, subscription = null, doors = [], hasSecurity = false }) {
   const [localProgress, setLocalProgress] = useState({});
@@ -30,7 +56,7 @@ export default function WalkthroughModal({ open = true, onClose = () => {}, subs
 
   const finish = () => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ completed: true, ts: Date.now(), progress: localProgress }));
+      localStorage.setItem(WALKTHROUGH_STORAGE_KEY, JSON.stringify({ completed: true, ts: Date.now(), progress: localProgress }));
     } catch (e) {
       // ignore
     }
@@ -38,7 +64,7 @@ export default function WalkthroughModal({ open = true, onClose = () => {}, subs
   };
 
   const skip = () => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ completed: true, ts: Date.now(), skipped: true })); } catch {};
+    try { localStorage.setItem(WALKTHROUGH_STORAGE_KEY, JSON.stringify({ completed: true, ts: Date.now(), skipped: true })); } catch {};
     onClose();
   };
 
