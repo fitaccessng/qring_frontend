@@ -47,7 +47,7 @@ const EstateInvitesPage = () => {
 
   const buildTemporaryPassword = (formData) => {
     const safeName = (formData?.fullName || "resident").replace(/\s+/g, "").slice(0, 6) || "resident";
-    return `${safeName}#Qring2026`;
+    return `${safeName}#Qring2026`.slice(0, 72);
   };
 
   async function handleResend(person) {
