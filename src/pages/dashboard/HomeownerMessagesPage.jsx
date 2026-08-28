@@ -483,7 +483,7 @@ export default function HomeownerMessagePage() {
         sessionId: activeThreadId,
         type: nextType,
         hasVideo: nextType === "video",
-        communicationTarget: "gateman"
+        communicationTarget
       });
       const data = response?.data ?? response ?? {};
       window.sessionStorage.setItem("qring_call_start_intent", JSON.stringify({
@@ -896,7 +896,7 @@ export default function HomeownerMessagePage() {
                   </select>
                   <input
                     type="text"
-                    placeholder="Type a message to gate control..."
+                    placeholder={communicationTarget === "gateman" ? "Type a message to security..." : "Type a message to the visitor..."}
                     value={typedMessage}
                     onChange={(e) => setTypedMessage(e.target.value)}
                     disabled={sendPending}
