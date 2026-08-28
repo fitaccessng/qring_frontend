@@ -145,16 +145,6 @@ export function createNotificationManager() {
     }));
   }
 
-  function getUndisplayedNotifications(items) {
-    return (items || []).filter((item) => {
-      const notificationId = normalizeKey(item.notificationId || item.id);
-      const phase = state.notificationPhaseById.get(notificationId) || "NEW";
-      if (!item.unread || phase !== "NEW") return false;
-      state.notificationPhaseById.set(notificationId, "DISPLAYED");
-      return true;
-    });
-  }
-
   function ingestIncomingCall(raw) {
     if (state.syncing) return null;
     const envelope = normalizeIncomingCallPayload(raw);
@@ -196,7 +186,6 @@ export function createNotificationManager() {
     beginSync,
     endSync,
     ingestNotificationList,
-    getUndisplayedNotifications,
     ingestIncomingCall,
     dismissIncomingCall,
     invalidateSession,

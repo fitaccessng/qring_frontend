@@ -103,7 +103,7 @@ export function getNotificationMeta(kind = "", payload = {}) {
 }
 
 export function normalizeNotification(raw, route = "/dashboard/notifications") {
-  const payload = parseNotificationPayload(raw?.payload);
+  const payload = parseNotificationPayload(raw?.data || raw?.payload);
   const kind = String(raw?.kind || raw?.type || payload.kind || payload.type || "system.update").toLowerCase();
   const meta = getNotificationMeta(kind, payload);
   const createdAt = toDateValue(raw?.createdAt, raw?.created_at, raw?.timestamp, payload?.createdAt);
@@ -130,7 +130,7 @@ export function normalizeNotification(raw, route = "/dashboard/notifications") {
     route: String(payload?.route || route || "/dashboard/notifications"),
     category: meta.category,
     priority: String(meta.priority || "normal").toLowerCase(),
-    unread: !readAt,
+    unread: typeof raw?.is_read === "boolean" ? !raw.is_read : !readAt,
     sessionId,
     canRespondToVisit
   };

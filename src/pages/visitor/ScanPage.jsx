@@ -147,6 +147,15 @@ function getDoorLabel(door, fallbackId = "") {
   return String(door?.name || door?.label || door?.doorName || fallbackId || "").trim();
 }
 
+function getResidentVisitLabel(door, fallbackId = "") {
+  const residentName = String(door?.residentName || door?.homeownerName || "").trim();
+  const unitName = String(door?.homeName || door?.unitName || "").trim();
+  const entryName = getDoorLabel(door, fallbackId);
+  return [residentName || unitName || entryName || "Resident", unitName && unitName !== residentName ? unitName : "", entryName && entryName !== unitName ? entryName : ""]
+    .filter(Boolean)
+    .join(" - ");
+}
+
 export default function ScanPage() {
   const { qrId } = useParams();
   const navigate = useNavigate();
@@ -199,6 +208,8 @@ export default function ScanPage() {
     [selectedDoor, doorId, qr]
   );
   const office = qr?.office ?? null;
+  const estateName = String(qr?.estateName || qr?.estate?.name || "").trim();
+  const isEstateQr = Boolean(estateName || qr?.estateId || qr?.estate_id);
   const isOfficeQr = Boolean(office?.id || String(qr?.type || "").toLowerCase() === "office" || String(qr?.plan || "").toLowerCase() === "office");
   const doorOptions = useMemo(() => getDoorList(qr), [qr]);
   const snapshotCaptured = Boolean(visitorForm.snapshotDataUrl);
@@ -1003,6 +1014,23 @@ export default function ScanPage() {
 
                   {/* Form Input Deck Side Column */}
                   <div className="w-full lg:flex-1 bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-5">
+                    {isEstateQr && (
+                      <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3">
+                        <div className="flex items-start gap-3">
+                          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-emerald-700 shadow-xs">
+                            <Building2 size={18} />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Estate QR</p>
+                            <p className="mt-0.5 text-sm font-black text-slate-900">{estateName || "Registered estate"}</p>
+                            <p className="mt-1 text-xs font-medium leading-relaxed text-slate-600">
+                              Your request will be routed to the resident and unit you select below.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     <div>
                       <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Visitor Credentials</h3>
                       <p className="text-xs text-slate-500">Provide authentic background details for instant verification</p>
@@ -1011,7 +1039,7 @@ export default function ScanPage() {
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div className="sm:col-span-2">
                         <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
-                          <Building2 size={14} className="text-slate-400" /> Target Entry Gate/Door
+                          <Building2 size={14} className="text-slate-400" /> {isEstateQr ? "Resident / Unit to Visit" : "Target Entry Gate/Door"}
                         </label>
                         <select
                           value={doorId}
@@ -1022,10 +1050,15 @@ export default function ScanPage() {
                           {doorOptions.length === 0 && <option value="">No access endpoints available</option>}
                           {doorOptions.map((door) => (
                             <option key={door.id} value={door.id}>
-                              {getDoorLabel(door, door.id)}
+                              {isEstateQr ? getResidentVisitLabel(door, door.id) : getDoorLabel(door, door.id)}
                             </option>
                           ))}
                         </select>
+                        {isEstateQr && selectedDoor && (
+                          <p className="mt-2 text-xs font-medium text-slate-500">
+                            Selected host: {getResidentVisitLabel(selectedDoor, doorId)}
+                          </p>
+                        )}
                       </div>
 
                       <div>

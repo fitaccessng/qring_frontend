@@ -21,22 +21,11 @@ import { isFirebaseConfigured } from "../config/firebase";
 import { playPanicAlertSound } from "../utils/notificationSound";
 
 const NotificationsContext = createContext(null);
-const POLL_INTERVAL_MS = 10000;
-const SOCKET_EVENTS = new Set([
-  "notification.created",
-  "notification.updated",
-  "notifications.updated",
-  "visitor.snapshot",
-  "NOTIFICATION_CREATED",
-  "NOTIFICATION_UPDATED",
-  "ALERT_CREATED",
-  "ALERT_UPDATED",
-  "PAYMENT_STATUS_UPDATED",
-  "VISITOR_REQUESTED"
-]);
+const DISPLAYED_STORAGE_PREFIX = "qring.notifications.displayed.";
+const MAX_DISPLAYED_IDS = 500;
 
 function toNotification(raw, role) {
-  const payload = parseNotificationPayload(raw?.payload);
+  const payload = parseNotificationPayload(raw?.data || raw?.payload);
   return normalizeNotification(
     raw,
     resolveNotificationRoute({
@@ -45,6 +34,30 @@ function toNotification(raw, role) {
       payload
     })
   );
+}
+
+function displayedStorageKey(userId) {
+  return `${DISPLAYED_STORAGE_PREFIX}${String(userId || "anonymous")}`;
+}
+
+function readDisplayedIds(userId) {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(displayedStorageKey(userId)) || "[]");
+    return new Set(Array.isArray(parsed) ? parsed.map((item) => String(item)).filter(Boolean) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function writeDisplayedIds(userId, ids) {
+  if (typeof window === "undefined") return;
+  try {
+    const values = Array.from(ids).slice(-MAX_DISPLAYED_IDS);
+    window.localStorage.setItem(displayedStorageKey(userId), JSON.stringify(values));
+  } catch {
+    // Local storage is best-effort; in-memory dedupe still protects this tab.
+  }
 }
 
 export function NotificationsProvider({ children }) {
@@ -61,7 +74,7 @@ export function NotificationsProvider({ children }) {
   const [activeIncomingCall, setActiveIncomingCall] = useState(null);
   const [lastRealtimeEvent, setLastRealtimeEvent] = useState(null);
   const isMountedRef = useRef(false);
-  const shownNotificationIdsRef = useRef(new Set());
+  const displayedNotificationIdsRef = useRef(new Set());
   const managerRef = useRef(createNotificationManager());
 
   useEffect(() => {
@@ -73,12 +86,12 @@ export function NotificationsProvider({ children }) {
 
   useEffect(() => {
     setItems([]);
-    shownNotificationIdsRef.current.clear();
+    displayedNotificationIdsRef.current = readDisplayedIds(user?.id);
     managerRef.current.reset();
     setActiveIncomingCall(null);
     setLastRealtimeEvent(null);
     setSyncing(false);
-  }, [user?.id, user?.role]);
+  }, [user?.id]);
 
   async function refresh({ silent = false } = {}) {
     if (!user?.role) return [];
@@ -107,36 +120,9 @@ export function NotificationsProvider({ children }) {
   }
 
   useEffect(() => {
-    if (!user?.role) return () => {};
-    let active = true;
-
-    // Do an initial refresh. When a dashboard socket is connected we rely
-    // on realtime events to keep notifications in sync and avoid frequent
-    // polling which can trigger backend rate limits (429).
-    refresh();
-
-    if (!connected) {
-      const intervalId = window.setInterval(() => {
-        if (!active) return;
-        refresh({ silent: true });
-      }, POLL_INTERVAL_MS);
-      const onlineHandler = () => {
-        if (!active) return;
-        refresh({ silent: true });
-      };
-      window.addEventListener("online", onlineHandler);
-
-      return () => {
-        active = false;
-        window.clearInterval(intervalId);
-        window.removeEventListener("online", onlineHandler);
-      };
-    }
-
-    return () => {
-      active = false;
-    };
-  }, [user?.id, user?.role, connected]);
+    if (!user?.role) return;
+    void refresh();
+  }, [user?.id, user?.role]);
 
   useEffect(() => {
     if (!user?.id || !user?.role) return () => {};
@@ -159,6 +145,30 @@ export function NotificationsProvider({ children }) {
       if (managerRef.current.state.syncing) return;
       await refresh({ silent: true });
     };
+    const displayNotificationOnce = (notification) => {
+      const notificationId = String(notification?.notificationId || notification?.id || "").trim();
+      if (!notificationId || displayedNotificationIdsRef.current.has(notificationId)) return;
+      displayedNotificationIdsRef.current.add(notificationId);
+      writeDisplayedIds(user.id, displayedNotificationIdsRef.current);
+      if (notification.kind === "safety.panic") {
+        playPanicAlertSound();
+      }
+      notify({
+        type: notification.priority === "critical" ? "warning" : "info",
+        title: notification.title,
+        message: notification.message,
+        kind: notification.kind,
+        route: notification.route,
+        duration: notification.priority === "critical" ? 5200 : 3600
+      });
+    };
+    const upsertNotification = (notification) => {
+      setItems((current) => {
+        const notificationId = String(notification?.notificationId || notification?.id || "").trim();
+        const withoutDuplicate = current.filter((item) => String(item?.notificationId || item?.id || "").trim() !== notificationId);
+        return managerRef.current.ingestNotificationList([notification, ...withoutDuplicate], user?.role);
+      });
+    };
 
     const onConnect = async () => {
       setConnected(true);
@@ -176,11 +186,12 @@ export function NotificationsProvider({ children }) {
       setLastRealtimeEvent({ eventName: "notifications.updated", at: Date.now() });
       await triggerRefresh();
     };
-    const onAny = (eventName) => {
-      if (managerRef.current.state.syncing) return;
-      if (SOCKET_EVENTS.has(eventName) || String(eventName || "").toLowerCase().includes("notification")) {
-        void triggerRefresh();
-      }
+    const onNotificationCreated = (payload) => {
+      const raw = payload?.data ?? payload ?? {};
+      const notification = toNotification(raw, user?.role);
+      setLastRealtimeEvent({ eventName: "notification.created", payload: notification, at: Date.now() });
+      upsertNotification(notification);
+      displayNotificationOnce(notification);
     };
     const onIncomingCall = (payload) => {
       const nextCall = managerRef.current.ingestIncomingCall(payload);
@@ -242,7 +253,7 @@ export function NotificationsProvider({ children }) {
 
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);
-    socket.on("notification.created", onNotificationUpdate);
+    socket.on("notification.created", onNotificationCreated);
     socket.on("notification.updated", onNotificationUpdate);
     socket.on("notifications.updated", onNotificationUpdate);
     socket.on("incoming-call", onIncomingCall);
@@ -252,7 +263,6 @@ export function NotificationsProvider({ children }) {
       socket.on(eventName, listener);
     });
     socket.on("visitor.snapshot", onVisitorSnapshot);
-    socket.onAny(onAny);
     if (socket.connected) {
       setConnected(true);
       setSyncing(true);
@@ -267,7 +277,7 @@ export function NotificationsProvider({ children }) {
     return () => {
       socket.off("connect", onConnect);
       socket.off("disconnect", onDisconnect);
-      socket.off("notification.created", onNotificationUpdate);
+      socket.off("notification.created", onNotificationCreated);
       socket.off("notification.updated", onNotificationUpdate);
       socket.off("notifications.updated", onNotificationUpdate);
       socket.off("incoming-call", onIncomingCall);
@@ -275,7 +285,6 @@ export function NotificationsProvider({ children }) {
         socket.off(eventName, listener);
       });
       socket.off("visitor.snapshot", onVisitorSnapshot);
-      socket.offAny(onAny);
       setConnected(false);
       setSyncing(false);
     };
@@ -332,26 +341,6 @@ export function NotificationsProvider({ children }) {
         setPushStatus("registration_failed");
       });
   }, [nativeApp, user?.id]);
-
-  useEffect(() => {
-    managerRef.current
-      .getUndisplayedNotifications(items)
-      .forEach((item) => {
-        if (shownNotificationIdsRef.current.has(item.id)) return;
-        shownNotificationIdsRef.current.add(item.id);
-        if (item.kind === "safety.panic") {
-          playPanicAlertSound();
-        }
-        notify({
-          type: item.priority === "critical" ? "warning" : "info",
-          title: item.title,
-          message: item.message,
-          kind: item.kind,
-          route: item.route,
-          duration: item.priority === "critical" ? 5200 : 3600
-        });
-      });
-  }, [items]);
 
   async function handleMarkRead(notificationId) {
     if (!notificationId) return;
