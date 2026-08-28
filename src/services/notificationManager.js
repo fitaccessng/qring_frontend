@@ -14,12 +14,23 @@ function readAny(source, keys) {
   return "";
 }
 
+function isExplicitIncomingCallPayload(raw, payload) {
+  const eventName = normalizeKey(readAny(raw || {}, ["eventName", "event", "type"])).toLowerCase();
+  const kind = normalizeKey(readAny(payload || {}, ["kind", "notificationKind", "eventType", "event_type"])).toLowerCase();
+  return eventName === "incoming-call" || kind === "incoming-call" || kind === "call.requested";
+}
+
 export function normalizeIncomingCallPayload(raw) {
   const payload = raw?.data ?? raw ?? {};
   const callSessionId = normalizeKey(readAny(payload, ["callSessionId", "call_id", "callId", "call_session_id", "eventId", "event_id"]));
   const sessionId = normalizeKey(readAny(payload, ["sessionId", "session_id", "visitorSessionId", "visitor_session_id"]));
   const callerUserId = normalizeKey(readAny(payload, ["callerUserId", "caller_user_id", "userId", "user_id"]));
-  const callType = normalizeKey(readAny(payload, ["callType", "call_type", "type"])).toLowerCase() || (payload?.hasVideo ? "video" : "audio");
+  const nestedPayload = parseNotificationPayload(payload.payload);
+  const explicitCallType =
+    readAny(payload, ["callType", "call_type"]) ||
+    readAny(nestedPayload, ["callType", "call_type", "type"]) ||
+    readAny(payload, ["type"]);
+  const callType = normalizeKey(explicitCallType).toLowerCase() === "video" ? "video" : "audio";
   const hasVideo = payload?.hasVideo !== undefined ? Boolean(payload.hasVideo) : callType === "video";
 
   return {
@@ -38,7 +49,7 @@ export function normalizeIncomingCallPayload(raw) {
     callType,
     type: callType,
     hasVideo,
-    payload: parseNotificationPayload(payload.payload),
+    payload: nestedPayload,
   };
 }
 
@@ -147,6 +158,8 @@ export function createNotificationManager() {
 
   function ingestIncomingCall(raw) {
     if (state.syncing) return null;
+    const payload = raw?.data ?? raw ?? {};
+    if (!isExplicitIncomingCallPayload(raw, payload)) return null;
     const envelope = normalizeIncomingCallPayload(raw);
     if (!envelope.callSessionId || !envelope.sessionId) return null;
     if (hasBeenDismissed(envelope)) return null;
