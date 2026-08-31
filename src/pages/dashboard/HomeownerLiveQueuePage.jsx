@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { CheckCircle2, Clock3, MessageSquare, Phone, RefreshCw, ShieldCheck, Video, XCircle } from "lucide-react";
 import AppShell from "../../layouts/AppShell";
 import { fetchVisitorSnapshotFileUrl } from "../../services/advancedService";
-import { decideVisit, getHomeownerVisits } from "../../services/homeownerService";
+import { decideVisit, getHomeownerContext, getHomeownerVisits } from "../../services/homeownerService";
 import { useSocketEvents } from "../../hooks/useSocketEvents";
 
 const channelOptions = [
@@ -18,6 +18,7 @@ export default function HomeownerLiveQueuePage() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [hasSecurity, setHasSecurity] = useState(true);
   const [busyId, setBusyId] = useState("");
   const [snapshotUrls, setSnapshotUrls] = useState({});
   const snapshotUrlsRef = useRef({});
@@ -70,7 +71,18 @@ export default function HomeownerLiveQueuePage() {
   }, [defaultChannel]);
 
   useEffect(() => {
+    let active = true;
+    async function loadContext() {
+      try {
+        const context = await getHomeownerContext();
+        if (active) setHasSecurity(Boolean(context?.hasSecurity));
+      } catch {
+        if (active) setHasSecurity(true);
+      }
+    }
+    loadContext();
     loadQueue();
+    return () => { active = false; };
   }, [loadQueue]);
 
   useSocketEvents(
@@ -159,10 +171,10 @@ export default function HomeownerLiveQueuePage() {
       const communicationTarget =
         targetBySession[row.id] ||
         row.preferredCommunicationTarget ||
-        (row.requestSource === "gateman_assisted" ? "gateman" : "visitor");
+        (hasSecurity && row.requestSource === "gateman_assisted" ? "gateman" : "visitor");
       await decideVisit(row.id, action, {
         communicationChannel,
-        communicationTarget
+        communicationTarget: hasSecurity ? communicationTarget : "visitor",
       });
       await loadQueue({ background: true });
       if (action === "approve") {
@@ -224,7 +236,7 @@ export default function HomeownerLiveQueuePage() {
               const selectedTarget =
                 targetBySession[row.id] ||
                 row.preferredCommunicationTarget ||
-                (row.requestSource === "gateman_assisted" ? "gateman" : "visitor");
+                (hasSecurity && row.requestSource === "gateman_assisted" ? "gateman" : "visitor");
               return (
                 <article key={row.id} className="rounded-[1.8rem] border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/80 sm:p-5">
                   <div className="grid gap-4 lg:grid-cols-[104px_minmax(0,1fr)]">
@@ -258,7 +270,7 @@ export default function HomeownerLiveQueuePage() {
                         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-950/50">
                           <p className="text-xs font-black uppercase tracking-[0.24em] text-slate-500">Reply Target</p>
                           <div className="mt-3 flex flex-wrap gap-2">
-                            {["visitor", "gateman"].map((target) => (
+                            {hasSecurity ? ["visitor", "gateman"].map((target) => (
                               <button
                                 key={target}
                                 type="button"
@@ -271,7 +283,14 @@ export default function HomeownerLiveQueuePage() {
                               >
                                 {target === "visitor" ? "Visitor" : "Gateman"}
                               </button>
-                            ))}
+                            )) : (
+                              <button
+                                type="button"
+                                className="rounded-full bg-slate-900 px-4 py-2 text-sm font-bold text-white dark:bg-white dark:text-slate-900"
+                              >
+                                Visitor
+                              </button>
+                            )}
                           </div>
                         </div>
 

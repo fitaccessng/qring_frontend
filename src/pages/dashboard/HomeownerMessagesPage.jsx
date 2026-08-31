@@ -57,7 +57,7 @@ export default function HomeownerMessagePage() {
   const [communicationTarget, setCommunicationTarget] = useState("visitor");
   const [rejectReplyOpen, setRejectReplyOpen] = useState(false);
   const [rejectReplyText, setRejectReplyText] = useState(REJECTION_REPLY_OPTIONS[0]);
-  const [homeownerContext, setHomeownerContext] = useState({ managedByEstate: false, estateName: "" });
+  const [homeownerContext, setHomeownerContext] = useState({ managedByEstate: false, estateName: "", hasSecurity: true });
   const [threads, setThreads] = useState([]);
   const [callBusyType, setCallBusyType] = useState("");
   const [incomingCall, setIncomingCall] = useState(null);
@@ -384,6 +384,13 @@ export default function HomeownerMessagePage() {
   }, [user?.role]);
 
   const canCreateTicket = Boolean(homeownerContext?.managedByEstate);
+  const hasSecurityTarget = Boolean(homeownerContext?.hasSecurity);
+
+  useEffect(() => {
+    if (!hasSecurityTarget && communicationTarget === "gateman") {
+      setCommunicationTarget("visitor");
+    }
+  }, [communicationTarget, hasSecurityTarget]);
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
@@ -392,7 +399,7 @@ export default function HomeownerMessagePage() {
     setSendPending(true);
     setError("");
     try {
-      const target = communicationTarget === "gateman" ? "gateman" : "visitor";
+      const target = hasSecurityTarget && communicationTarget === "gateman" ? "gateman" : "visitor";
       const saved = await sendHomeownerSessionMessage(activeThreadId, text, target);
       const message = saved || {
         id: `local-${Date.now()}`,
@@ -436,7 +443,7 @@ export default function HomeownerMessagePage() {
       }
       const result = await decideVisit(activeThreadId, action, {
         communicationChannel: "chat",
-        communicationTarget: "gateman",
+        communicationTarget: hasSecurityTarget && communicationTarget === "gateman" ? "gateman" : "visitor",
       });
       const nextStatus = result?.status || (action === "approve" ? "approved" : "rejected");
       setThreads((prev) => prev.map((thread) => (
@@ -892,7 +899,7 @@ export default function HomeownerMessagePage() {
                     className="border rounded-xl p-2 text-xs font-bold"
                   >
                     <option value="visitor">Visitor</option>
-                    <option value="gateman">Security</option>
+                    {hasSecurityTarget ? <option value="gateman">Security</option> : null}
                   </select>
                   <input
                     type="text"

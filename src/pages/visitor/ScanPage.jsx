@@ -438,6 +438,7 @@ export default function ScanPage() {
     const startedAt = Date.now();
     const requestId = createVisitorRequestId();
     const { snapshotBase64, snapshotMime } = getSnapshotPayloadParts(visitorForm.snapshotDataUrl);
+    if (!snapshotBase64) return setError("Please capture your visitor photo before submitting.");
 
     setRequestLatencyMs(0);
     setRequestState((prev) => ({
@@ -571,6 +572,7 @@ export default function ScanPage() {
         ? Boolean(visitorForm.name.trim())
         : Boolean(visitorForm.name.trim() && visitorForm.phone.trim() && visitorForm.purpose.trim() && visitorForm.staffName.trim())
       : Boolean(doorId && visitorForm.name.trim() && visitorForm.phone.trim() && visitorForm.purpose.trim())) &&
+    (isOfficeQr || snapshotCaptured) &&
     !requestState.sending
   );
 
@@ -1124,7 +1126,7 @@ export default function ScanPage() {
                       </button>
                       {!isFormValid && (
                         <p className="mt-2 text-center text-[11px] text-slate-400 font-medium">
-                          Fill out all required fields to unlock submission
+                          Fill out all required fields and capture your photo to unlock submission
                         </p>
                       )}
                     </div>
