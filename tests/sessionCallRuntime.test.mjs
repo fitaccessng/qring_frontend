@@ -7,6 +7,7 @@ import {
   shouldStartCallTimer,
   stopStreamTracks
 } from "../src/services/sessionCallRuntime.js";
+import { buildIncomingCallAcceptIntent } from "../src/components/GlobalIncomingCallOverlay.jsx";
 
 test("remote media and timer gating require an attached stream", () => {
   const stream = {
@@ -67,4 +68,39 @@ test("local and remote media bindings attach streams and track remote events", (
   expect(stream._addedTrack).toBe(track);
   expect(result.remoteMediaAttached).toBe(true);
   expect(result.hasVideo).toBe(true);
+});
+
+test("incoming call accept intent preserves routing and WebRTC metadata", () => {
+  const intent = buildIncomingCallAcceptIntent({
+    sessionId: "session-1",
+    callSessionId: "call-session-1",
+    callId: "call-1",
+    callerId: "homeowner-1",
+    recipientId: "visitor-1",
+    estateId: "estate-1",
+    callType: "video",
+    communicationTarget: "visitor",
+    visitorId: "visitor-session-user",
+    eventId: "event-1",
+    roomName: "room-1",
+    callerRole: "homeowner",
+    callerName: "Ada"
+  });
+
+  expect(intent).toMatchObject({
+    sessionId: "session-1",
+    callSessionId: "call-session-1",
+    callId: "call-1",
+    callerId: "homeowner-1",
+    recipientId: "visitor-1",
+    estateId: "estate-1",
+    callType: "video",
+    communicationTarget: "visitor",
+    visitorId: "visitor-session-user",
+    eventId: "event-1",
+    roomName: "room-1",
+    callerRole: "homeowner",
+    callerName: "Ada",
+    hasVideo: true
+  });
 });

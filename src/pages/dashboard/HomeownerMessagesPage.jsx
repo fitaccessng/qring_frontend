@@ -569,7 +569,7 @@ export default function HomeownerMessagePage() {
                   {activeThread?.visitorName || activeThread?.name || "Visitor"}
                 </h2>
                 <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide truncate">
-                  {activeThread?.door || activeThread?.doorName || "Gate Security"}
+                  {activeThread?.door || activeThread?.doorName || "Visitor request"}
                 </p>
               </div>
             )}
@@ -616,7 +616,7 @@ export default function HomeownerMessagePage() {
                 onClick={() => handleStartCall("audio")}
                 disabled={Boolean(callBusyType)}
                 className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 transition disabled:opacity-50"
-                title="Audio Call Gate"
+                title={hasSecurityTarget && communicationTarget === "gateman" ? "Audio call security" : "Audio call visitor"}
               >
                 <Phone size={16} />
               </button>
@@ -625,7 +625,7 @@ export default function HomeownerMessagePage() {
                 onClick={() => handleStartCall("video")}
                 disabled={Boolean(callBusyType)}
                 className="p-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-500 transition shadow-sm disabled:opacity-50"
-                title="Video Call Gate"
+                title={hasSecurityTarget && communicationTarget === "gateman" ? "Video call security" : "Video call visitor"}
               >
                 <Video size={16} />
               </button>
@@ -649,8 +649,8 @@ export default function HomeownerMessagePage() {
                   <PhoneIncoming size={18} />
                 </div>
                 <div>
-                  <p className="text-xs font-black uppercase tracking-wider text-indigo-200">Incoming Gate Call</p>
-                  <p className="text-sm font-bold">{incomingCall.callerName || "Security Gate"}</p>
+                  <p className="text-xs font-black uppercase tracking-wider text-indigo-200">Incoming Call</p>
+                  <p className="text-sm font-bold">{incomingCall.callerName || "Visitor"}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -808,7 +808,7 @@ export default function HomeownerMessagePage() {
                   <form onSubmit={submitRejectReply} className="mt-3 p-3 bg-white dark:bg-slate-900 rounded-2xl border border-rose-100 dark:border-rose-900/60 shadow-sm space-y-2.5">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-black uppercase tracking-wider text-rose-600 dark:text-rose-400">
-                        Select reason for gate security
+                        {hasSecurityTarget ? "Select reason for gate security" : "Select rejection reason"}
                       </span>
                       <button type="button" onClick={() => setRejectReplyOpen(false)} className="text-slate-400 hover:text-slate-600">
                         <X size={14} />
@@ -867,7 +867,7 @@ export default function HomeownerMessagePage() {
                       >
                         {!isHomeowner && (
                           <p className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-1">
-                            {msg.senderName || "Gate Security"}
+                            {msg.senderName || msg.displayName || (msg.senderType === "security" ? "Security" : "Visitor")}
                           </p>
                         )}
                         <p className="whitespace-pre-wrap">{msg.text || msg.content}</p>
@@ -978,7 +978,7 @@ export default function HomeownerMessagePage() {
                 <div>
                   <label className="block text-[10px] font-black uppercase text-slate-500 mb-1">Type</label>
                   <select name="type" className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-2.5 text-xs font-bold text-slate-800 dark:text-slate-100">
-                    <option value="security">Security Gate</option>
+                    {hasSecurityTarget ? <option value="security">Security Gate</option> : null}
                     <option value="management">Estate Management</option>
                   </select>
                 </div>

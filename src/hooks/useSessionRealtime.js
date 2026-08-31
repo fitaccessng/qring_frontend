@@ -906,8 +906,14 @@ export function useSessionRealtime(sessionId, options = {}) {
       setCallDiagnostics((prev) => ({ ...prev, connectionState: state, updatedAt: new Date().toISOString() }));
       if (state === "connected") {
         clearConnectTimers();
-        setCallStateSafe("connected");
-        updateNetwork("good", shouldForceRelayRef.current ? "Connected through TURN relay" : "Direct media connected");
+        if (remoteMediaIsAttached(remoteStreamRef.current)) {
+          setCallStateSafe("connected");
+          updateNetwork("good", shouldForceRelayRef.current ? "Connected through TURN relay" : "Direct media connected");
+        } else {
+          setCallStateSafe("connecting");
+          updateNetwork("reconnecting", "Media path connected; waiting for remote audio/video...");
+          refreshRemoteMediaBindingsSoon();
+        }
       } else if (state === "connecting") {
         setCallStateSafe("connecting");
         updateNetwork("reconnecting", "Negotiating media path...");

@@ -727,7 +727,7 @@ export default function ScanPage() {
           {loading ? (
             <div className="flex flex-col items-center justify-center py-20 rounded-2xl bg-white border border-slate-200 shadow-xs">
               <div className="h-8 w-8 animate-spin rounded-full border-4 border-sky-200 border-t-sky-600" />
-              <p className="mt-3 text-sm font-medium text-slate-500">Resolving security endpoint profile...</p>
+              <p className="mt-3 text-sm font-medium text-slate-500">Resolving visitor request profile...</p>
             </div>
           ) : qr && !requestState.sent ? (
             <form onSubmit={handleSubmit} className="flex flex-col gap-6 items-start">

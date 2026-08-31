@@ -7,7 +7,7 @@ vi.mock("../src/services/apiClient", () => ({
 }));
 
 import { apiRequest } from "../src/services/apiClient";
-import { decideVisit, sendHomeownerSessionMessage } from "../src/services/homeownerService";
+import { decideVisit, getHomeownerContext, sendHomeownerSessionMessage } from "../src/services/homeownerService";
 
 describe("homeowner visit messaging service", () => {
   beforeEach(() => {
@@ -43,5 +43,22 @@ describe("homeowner visit messaging service", () => {
       })
     });
     expect(result).toEqual({ status: "rejected" });
+  });
+
+  it("keeps configured security separate from current security availability", async () => {
+    apiRequest.mockResolvedValue({
+      data: {
+        managedByEstate: true,
+        estateId: "estate-1",
+        securityEnabled: true,
+        securityAvailable: false
+      }
+    });
+
+    const result = await getHomeownerContext();
+
+    expect(result.hasSecurity).toBe(true);
+    expect(result.securityEnabled).toBe(true);
+    expect(result.securityAvailable).toBe(false);
   });
 });
