@@ -204,6 +204,7 @@ export const env = {
     importMetaEnv.VITE_DASHBOARD_NAMESPACE ?? "/realtime/dashboard",
   signalingNamespace:
     importMetaEnv.VITE_SIGNALING_NAMESPACE ?? "/realtime/signaling",
+  liveKitUrl: String(importMetaEnv.VITE_LIVEKIT_URL ?? "").trim(),
   webRtcIceServers: parseIceServers(importMetaEnv.VITE_WEBRTC_ICE_SERVERS),
   rtcMonitoringUrl: String(importMetaEnv.VITE_RTC_MONITORING_URL ?? "").trim(),
   callConnectTimeoutMs: toInteger(importMetaEnv.VITE_CALL_CONNECT_TIMEOUT_MS, 8000),
