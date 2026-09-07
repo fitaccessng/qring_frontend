@@ -13,7 +13,7 @@ const rolePath = {
 const MOBILE_ONBOARDING_INTENT_KEY = "qring_mobile_onboarding_intent";
 
 export default function GoogleRolePage() {
-  const { googleSignUp, loading } = useAuth();
+  const { completeGoogleSignUp, loading } = useAuth();
   const [role, setRole] = useState("estate");
   const [error, setError] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
@@ -28,7 +28,7 @@ export default function GoogleRolePage() {
 
     try {
       localStorage.removeItem(onboardingIntentKey);
-      const data = await googleSignUp(role);
+      const data = await completeGoogleSignUp(role);
       if (intent === "signup") {
         setShowSuccess(true);
         localStorage.setItem(MOBILE_ONBOARDING_INTENT_KEY, "1");

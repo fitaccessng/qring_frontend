@@ -23,6 +23,10 @@ export async function googleSignUp(role) {
   return googleAuth.signUpWithGoogle(role);
 }
 
+export async function completeGoogleSignUp(role) {
+  return googleAuth.completeGoogleSignup(role);
+}
+
 export async function beginGoogleSignUp(referralCode = "") {
   return googleAuth.beginGoogleSignup(referralCode);
 }

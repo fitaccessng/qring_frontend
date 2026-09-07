@@ -200,6 +200,26 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const completeGoogleSignUp = async (role) => {
+    setLoading(true);
+    try {
+      const response = await authService.completeGoogleSignUp(role);
+      const data = requireAccessToken(
+        normalizeAuthData(response),
+        response,
+        "Google signup did not return an access token."
+      );
+      if (!data.user?.role && data.accessToken) {
+        data.user = { ...(data.user ?? {}), role };
+      }
+      persistAuth(data);
+      setAuthStatus("authenticated");
+      return data;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const beginGoogleSignUp = async (referralCode = "") => {
     setLoading(true);
     try {
@@ -396,6 +416,7 @@ export function AuthProvider({ children }) {
       signup,
       googleSignIn,
       googleSignUp,
+      completeGoogleSignUp,
       beginGoogleSignUp,
       resumeGoogleRedirect,
       forgotPassword,

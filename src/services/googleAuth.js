@@ -290,9 +290,9 @@ export async function beginGoogleSignup(referralCode = "") {
 }
 
 export async function completeGoogleSignup(role = "homeowner") {
-  let pending = readPendingGoogleSignup();
+  const pending = readPendingGoogleSignup();
   if (!pending?.idToken) {
-    pending = await beginGoogleSignup();
+    throw new Error("Complete Google sign-in before choosing an account role.");
   }
 
   try {
@@ -323,6 +323,7 @@ export async function completeGoogleSignup(role = "homeowner") {
 }
 
 export async function signUpWithGoogle(role = "homeowner") {
+  await beginGoogleSignup();
   return completeGoogleSignup(role);
 }
 
