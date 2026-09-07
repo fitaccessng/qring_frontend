@@ -1,4 +1,4 @@
-import { initializeApp } from "firebase/app";
+import { getApps, initializeApp } from "firebase/app";
 import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
 
 const firebaseConfig = {
@@ -23,14 +23,18 @@ export const firebaseConfigError = isFirebaseConfigured
   : "Missing Firebase configuration. Set VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_PROJECT_ID, and VITE_FIREBASE_APP_ID.";
 
 // Initialize Firebase only when env is present so the app does not white-screen.
-const app = isFirebaseConfigured ? initializeApp(firebaseConfig) : null;
+const app = isFirebaseConfigured
+  ? getApps()[0] ?? initializeApp(firebaseConfig)
+  : null;
 export const auth = app ? getAuth(app) : null;
 
-// Set persistence to LOCAL so user stays logged in
-if (auth) {
-  setPersistence(auth, browserLocalPersistence).catch((error) => {
-    console.error("Error setting Firebase persistence:", error);
-  });
-}
+export const firebasePersistenceReady = auth
+  ? setPersistence(auth, browserLocalPersistence)
+      .then(() => true)
+      .catch((error) => {
+        console.warn("Firebase Auth persistence unavailable:", error?.code || "unknown-error");
+        return false;
+      })
+  : Promise.resolve(false);
 
 export default app;

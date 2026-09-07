@@ -3,6 +3,20 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
+  const requiredFirebaseVariables = [
+    "VITE_FIREBASE_API_KEY",
+    "VITE_FIREBASE_AUTH_DOMAIN",
+    "VITE_FIREBASE_PROJECT_ID",
+    "VITE_FIREBASE_STORAGE_BUCKET",
+    "VITE_FIREBASE_MESSAGING_SENDER_ID",
+    "VITE_FIREBASE_APP_ID",
+  ];
+  const missingFirebaseVariables = requiredFirebaseVariables.filter((name) => !String(env[name] || "").trim());
+  if (mode === "production" && missingFirebaseVariables.length > 0) {
+    throw new Error(
+      `Missing required production Firebase build variables: ${missingFirebaseVariables.join(", ")}`,
+    );
+  }
   const appBuildTarget = String(process.env.VITE_APP_BUILD_TARGET ?? env.VITE_APP_BUILD_TARGET ?? "").trim().toLowerCase();
   const backendTarget = "http://localhost:8000";
 

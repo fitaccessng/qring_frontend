@@ -226,8 +226,7 @@ export function AuthProvider({ children }) {
       }
       return result;
     } catch (error) {
-      // Silently fail - it's just a redirect check, not a user action
-      return null;
+      throw error;
     }
   };
 

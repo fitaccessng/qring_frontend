@@ -5,8 +5,14 @@ import {
   signInWithPopup,
   signInWithRedirect,
 } from "firebase/auth";
-import { auth, firebaseConfigError, isFirebaseConfigured } from "../config/firebase";
+import {
+  auth,
+  firebaseConfigError,
+  firebasePersistenceReady,
+  isFirebaseConfigured,
+} from "../config/firebase";
 import { isNativeApp, shouldUseGoogleAuth } from "../utils/nativeRuntime";
+import { normalizeGoogleAuthError } from "./authError";
 import { apiRequest } from "./apiClient";
 
 const googleProvider = new GoogleAuthProvider();
@@ -26,13 +32,14 @@ googleProvider.addScope("profile");
 googleProvider.addScope("email");
 googleProvider.setCustomParameters({ prompt: "select_account" });
 
-function ensureFirebaseReady() {
+async function ensureFirebaseReady() {
   if (!shouldUseGoogleAuth()) {
     throw new Error("Google authentication is available on the web app only.");
   }
   if (!isFirebaseConfigured || !auth) {
     throw new Error(firebaseConfigError || "Google auth is not configured for this environment.");
   }
+  await firebasePersistenceReady;
 }
 
 function getGoogleAuthStorage() {
@@ -70,7 +77,7 @@ async function getNativeGoogleAuth() {
 
 async function ensureNativeGoogleReady() {
   if (!isNativeApp()) return null;
-  ensureFirebaseReady();
+  await ensureFirebaseReady();
 
   const GoogleAuth = await getNativeGoogleAuth();
   if (!nativeGoogleInitialized) {
@@ -83,43 +90,6 @@ async function ensureNativeGoogleReady() {
     nativeGoogleInitialized = true;
   }
   return GoogleAuth;
-}
-
-function normalizeGoogleError(error, fallbackMessage) {
-  const rawMessage = String(error?.message || "").trim();
-  const code = String(error?.code || "").trim();
-  const combined = `${code} ${rawMessage}`.toLowerCase();
-
-  if (rawMessage === "Redirecting to Google...") {
-    return new Error(rawMessage);
-  }
-
-  if (
-    combined.includes("developer_error") ||
-    combined.includes("sign in failed") ||
-    combined.includes("12500") ||
-    combined.includes("10:")
-  ) {
-    return new Error(
-      "Google Sign-In is not configured for this Android release build yet. Add the release SHA-1 and SHA-256 for com.kelvin.qringapp in Firebase or Google Cloud, then replace google-services.json and rebuild.",
-    );
-  }
-
-  if (code === "auth/popup-closed-by-user") {
-    return new Error("Google sign-in was cancelled.");
-  }
-
-  if (code === "auth/popup-blocked") {
-    return new Error("Google sign-in was blocked. Please allow popups.");
-  }
-
-  if (rawMessage === "Google Sign-In did not return an ID token.") {
-    return new Error(
-      "Google Sign-In completed without an ID token. Confirm the Android release SHA fingerprints and Google OAuth client setup for this app.",
-    );
-  }
-
-  return new Error(rawMessage || fallbackMessage);
 }
 
 function savePendingGoogleSignup(payload) {
@@ -177,7 +147,7 @@ async function signInToFirebaseWithNativeGoogle() {
 }
 
 async function getGoogleUserFromAuth(intent = "signin") {
-  ensureFirebaseReady();
+  await ensureFirebaseReady();
 
   if (isNativeApp()) {
     const nativeSession = await signInToFirebaseWithNativeGoogle();
@@ -217,44 +187,48 @@ function buildGoogleProfile(user, referralCode = undefined) {
 }
 
 export async function resumeGoogleRedirectAuth() {
-  ensureFirebaseReady();
-  if (isNativeApp()) return null;
+  try {
+    await ensureFirebaseReady();
+    if (isNativeApp()) return null;
 
-  const intent = getRedirectIntent();
-  if (!intent) return null;
+    const intent = getRedirectIntent();
+    if (!intent) return null;
 
-  const redirectResult = await getRedirectResult(auth);
-  if (!redirectResult?.user) return null;
+    const redirectResult = await getRedirectResult(auth);
+    if (!redirectResult?.user) return null;
 
-  clearRedirectIntent();
-  const user = redirectResult.user;
-  const idToken = await user.getIdToken(true);
+    clearRedirectIntent();
+    const user = redirectResult.user;
+    const idToken = await user.getIdToken(true);
 
-  if (intent === "signin") {
-    const response = await apiRequest("/auth/google-signin", {
-      method: "POST",
-      ...GOOGLE_AUTH_REQUEST_OPTIONS,
-      body: JSON.stringify({
+    if (intent === "signin") {
+      const response = await apiRequest("/auth/google-signin", {
+        method: "POST",
+        ...GOOGLE_AUTH_REQUEST_OPTIONS,
+        body: JSON.stringify({
+          idToken,
+          email: user.email,
+          displayName: user.displayName,
+          photoURL: user.photoURL,
+        }),
+      });
+      return { intent: "signin", response };
+    }
+
+    if (intent === "signup") {
+      const pending = readPendingGoogleSignup();
+      const merged = {
+        ...buildGoogleProfile(user, pending?.referralCode),
         idToken,
-        email: user.email,
-        displayName: user.displayName,
-        photoURL: user.photoURL,
-      }),
-    });
-    return { intent: "signin", response };
-  }
+      };
+      savePendingGoogleSignup(merged);
+      return { intent: "signup", pending: merged };
+    }
 
-  if (intent === "signup") {
-    const pending = readPendingGoogleSignup();
-    const merged = {
-      ...buildGoogleProfile(user, pending?.referralCode),
-      idToken,
-    };
-    savePendingGoogleSignup(merged);
-    return { intent: "signup", pending: merged };
+    return null;
+  } catch (error) {
+    throw normalizeGoogleAuthError(error, "Google sign-in failed");
   }
-
-  return null;
 }
 
 export async function signInWithGoogle() {
@@ -282,7 +256,7 @@ export async function signInWithGoogle() {
       }),
     });
   } catch (error) {
-    throw normalizeGoogleError(error, "Google sign-in failed");
+    throw normalizeGoogleAuthError(error, "Google sign-in failed");
   }
 }
 
@@ -310,7 +284,7 @@ export async function beginGoogleSignup(referralCode = "") {
     savePendingGoogleSignup(pending);
     return pending;
   } catch (error) {
-    throw normalizeGoogleError(error, "Google sign-up failed");
+    throw normalizeGoogleAuthError(error, "Google sign-up failed");
   }
 }
 
@@ -343,7 +317,7 @@ export async function completeGoogleSignup(role = "homeowner") {
     clearPendingGoogleSignup();
     return response;
   } catch (error) {
-    throw normalizeGoogleError(error, "Google sign-up failed");
+    throw normalizeGoogleAuthError(error, "Google sign-up failed");
   }
 }
 
@@ -353,7 +327,7 @@ export async function signUpWithGoogle(role = "homeowner") {
 
 export async function signOutFromGoogle() {
   try {
-    ensureFirebaseReady();
+    await ensureFirebaseReady();
     if (isNativeApp()) {
       const GoogleAuth = await ensureNativeGoogleReady();
       await GoogleAuth.signOut().catch(() => {});

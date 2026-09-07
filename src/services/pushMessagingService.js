@@ -24,7 +24,9 @@ async function ensureMessagingReady() {
   if (isNativeApp()) return null;
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) return null;
   if (!(await isSupported())) return null;
-  const registration = await navigator.serviceWorker.register(getMessagingServiceWorkerUrl(), { scope: "/" });
+  const registration = await navigator.serviceWorker.register(getMessagingServiceWorkerUrl(), {
+    scope: "/firebase-messaging/",
+  });
   const messaging = getMessaging(app);
   return { messaging, registration };
 }
