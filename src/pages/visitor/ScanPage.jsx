@@ -208,6 +208,8 @@ export default function ScanPage() {
   const snapshotCaptured = Boolean(visitorForm.snapshotDataUrl);
   const canReacceptConsent = canReacceptConsentFromError(error);
 
+  const requiresPhotoCapture = !isOfficeQr || (isOfficeQr && officeEntryMode === "visitor");
+
   useEffect(() => {
     if (!qrId) return;
     try {
@@ -247,10 +249,10 @@ export default function ScanPage() {
   }, [consentAccepted, qrId]);
 
   useEffect(() => {
-    if (!consentAccepted || loading || requestState.sent || visitorForm.snapshotDataUrl || isOfficeQr) return;
+    if (!consentAccepted || loading || requestState.sent || visitorForm.snapshotDataUrl || !requiresPhotoCapture) return;
     if (cameraState.ready || cameraState.starting) return;
     void startCamera();
-  }, [consentAccepted, loading, qr, requestState.sent, visitorForm.snapshotDataUrl, isOfficeQr]);
+  }, [consentAccepted, loading, qr, requestState.sent, visitorForm.snapshotDataUrl, requiresPhotoCapture]);
 
   useEffect(() => {
     if (!requestState.sent) return;
@@ -500,7 +502,10 @@ export default function ScanPage() {
       if (!visitorForm.phone.trim()) return setError("Please enter a valid phone number.");
       if (!visitorForm.purpose.trim()) return setError("State the objective of your visit.");
       if (!visitorForm.staffName.trim()) return setError("Name of the staff member you are visiting.");
+      if (!visitorForm.snapshotDataUrl) return setError("A fresh photo snapshot is required for verification.");
     }
+
+    const { snapshotBase64, snapshotMime } = getSnapshotPayloadParts(visitorForm.snapshotDataUrl);
 
     const startedAt = Date.now();
     const requestId = createVisitorRequestId();
@@ -530,6 +535,8 @@ export default function ScanPage() {
         staffName: staffName,
         entryMode: nextMode,
         staffAction: isStaffMode ? nextAction : undefined,
+        snapshotBase64: !isStaffMode ? snapshotBase64 : undefined,
+        snapshotMime: !isStaffMode ? snapshotMime : undefined,
         ...(buildVisitorConsentPayload(consentState) || {})
       });
       const data = response?.data ?? response;
@@ -560,7 +567,7 @@ export default function ScanPage() {
         ? Boolean((visitorForm.staffName || visitorForm.name).trim())
         : Boolean(visitorForm.name.trim() && visitorForm.phone.trim() && visitorForm.purpose.trim() && visitorForm.staffName.trim())
       : Boolean(doorId && visitorForm.name.trim() && visitorForm.phone.trim() && visitorForm.purpose.trim())) &&
-    (isOfficeQr || snapshotCaptured) &&
+    (!requiresPhotoCapture || snapshotCaptured) &&
     !requestState.sending
   );
 
@@ -739,7 +746,7 @@ export default function ScanPage() {
                   </div>
                 )}
 
-                {!isOfficeQr && (
+                {requiresPhotoCapture && (
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Verification Photo</label>
                     <div className="relative aspect-4/3 rounded-2xl bg-slate-900 overflow-hidden flex flex-col items-center justify-center text-white">
