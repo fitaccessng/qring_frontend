@@ -1,5 +1,5 @@
 import { getMessaging, getToken, isSupported, onMessage } from "firebase/messaging";
-import app, { isFirebaseConfigured } from "../config/firebase";
+import { initializeFirebaseApp, isFirebaseConfigured } from "../config/firebase";
 import { registerPushSubscription } from "./notificationService";
 import { isNativeApp } from "../utils/nativeRuntime";
 
@@ -19,7 +19,7 @@ function getMessagingServiceWorkerUrl() {
 const LAST_FCM_TOKEN_KEY = "qring.lastFcmToken";
 
 async function ensureMessagingReady() {
-  if (!isFirebaseConfigured || !app) return null;
+  if (!isFirebaseConfigured) return null;
   if (!import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID) return null;
   if (isNativeApp()) return null;
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) return null;
@@ -27,6 +27,7 @@ async function ensureMessagingReady() {
   const registration = await navigator.serviceWorker.register(getMessagingServiceWorkerUrl(), {
     scope: "/firebase-messaging/",
   });
+  const app = initializeFirebaseApp();
   const messaging = getMessaging(app);
   return { messaging, registration };
 }

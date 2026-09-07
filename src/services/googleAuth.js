@@ -6,9 +6,9 @@ import {
   signInWithRedirect,
 } from "firebase/auth";
 import {
-  auth,
   firebaseConfigError,
-  firebasePersistenceReady,
+  getFirebaseAuth,
+  initializeFirebaseAuth,
   isFirebaseConfigured,
 } from "../config/firebase";
 import { isNativeApp, shouldUseGoogleAuth } from "../utils/nativeRuntime";
@@ -36,10 +36,10 @@ async function ensureFirebaseReady() {
   if (!shouldUseGoogleAuth()) {
     throw new Error("Google authentication is available on the web app only.");
   }
-  if (!isFirebaseConfigured || !auth) {
+  if (!isFirebaseConfigured) {
     throw new Error(firebaseConfigError || "Google auth is not configured for this environment.");
   }
-  await firebasePersistenceReady;
+  return initializeFirebaseAuth();
 }
 
 function getGoogleAuthStorage() {
@@ -127,6 +127,7 @@ function getRedirectIntent() {
 }
 
 async function signInToFirebaseWithNativeGoogle() {
+  const firebaseAuth = await ensureFirebaseReady();
   const GoogleAuth = await ensureNativeGoogleReady();
   const googleUser = await GoogleAuth.signIn();
   const idToken = String(googleUser?.authentication?.idToken || "").trim();
@@ -137,7 +138,7 @@ async function signInToFirebaseWithNativeGoogle() {
 
   const accessToken = String(googleUser?.authentication?.accessToken || "").trim();
   const credential = GoogleAuthProvider.credential(idToken, accessToken || undefined);
-  const result = await signInWithCredential(auth, credential);
+  const result = await signInWithCredential(firebaseAuth, credential);
   const firebaseIdToken = await result.user.getIdToken(true);
 
   return {
@@ -147,7 +148,7 @@ async function signInToFirebaseWithNativeGoogle() {
 }
 
 async function getGoogleUserFromAuth(intent = "signin") {
-  await ensureFirebaseReady();
+  const firebaseAuth = await ensureFirebaseReady();
 
   if (isNativeApp()) {
     const nativeSession = await signInToFirebaseWithNativeGoogle();
@@ -156,7 +157,7 @@ async function getGoogleUserFromAuth(intent = "signin") {
   }
 
   try {
-    const result = await signInWithPopup(auth, googleProvider);
+    const result = await signInWithPopup(firebaseAuth, googleProvider);
     clearRedirectIntent();
     return result.user;
   } catch (error) {
@@ -171,7 +172,7 @@ async function getGoogleUserFromAuth(intent = "signin") {
     }
 
     setRedirectIntent(intent);
-    await signInWithRedirect(auth, googleProvider);
+    await signInWithRedirect(firebaseAuth, googleProvider);
     throw new Error("Redirecting to Google...");
   }
 }
@@ -188,13 +189,13 @@ function buildGoogleProfile(user, referralCode = undefined) {
 
 export async function resumeGoogleRedirectAuth() {
   try {
-    await ensureFirebaseReady();
+    const firebaseAuth = await ensureFirebaseReady();
     if (isNativeApp()) return null;
 
     const intent = getRedirectIntent();
     if (!intent) return null;
 
-    const redirectResult = await getRedirectResult(auth);
+    const redirectResult = await getRedirectResult(firebaseAuth);
     if (!redirectResult?.user) return null;
 
     clearRedirectIntent();
@@ -327,12 +328,12 @@ export async function signUpWithGoogle(role = "homeowner") {
 
 export async function signOutFromGoogle() {
   try {
-    await ensureFirebaseReady();
+    const firebaseAuth = await ensureFirebaseReady();
     if (isNativeApp()) {
       const GoogleAuth = await ensureNativeGoogleReady();
       await GoogleAuth.signOut().catch(() => {});
     }
-    await auth.signOut();
+    await firebaseAuth.signOut();
   } catch (error) {
     console.error("Error signing out:", error);
     throw new Error("Failed to sign out");
@@ -340,6 +341,5 @@ export async function signOutFromGoogle() {
 }
 
 export function getCurrentGoogleUser() {
-  if (!auth) return null;
-  return auth.currentUser;
+  return getFirebaseAuth()?.currentUser ?? null;
 }

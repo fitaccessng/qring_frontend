@@ -104,6 +104,7 @@ export function AuthProvider({ children }) {
   });
   const [loading, setLoading] = useState(false);
   const [ready, setReady] = useState(false);
+  const [authStatus, setAuthStatus] = useState("loading");
 
   function clearLocalAuthState() {
     clearAuthSession();
@@ -134,6 +135,7 @@ export function AuthProvider({ children }) {
         "Login did not return an access token."
       );
       persistAuth(data);
+      setAuthStatus("authenticated");
       return data;
     } finally {
       setLoading(false);
@@ -152,6 +154,7 @@ export function AuthProvider({ children }) {
           "Signup did not return an access token."
         );
         persistAuth(resolved);
+        setAuthStatus("authenticated");
         return resolved;
       }
       return response;
@@ -170,6 +173,7 @@ export function AuthProvider({ children }) {
         "Google sign-in did not return an access token."
       );
       persistAuth(data);
+      setAuthStatus("authenticated");
       return data;
     } finally {
       setLoading(false);
@@ -189,6 +193,7 @@ export function AuthProvider({ children }) {
         data.user = { ...(data.user ?? {}), role };
       }
       persistAuth(data);
+      setAuthStatus("authenticated");
       return data;
     } finally {
       setLoading(false);
@@ -238,6 +243,7 @@ export function AuthProvider({ children }) {
       }
     } finally {
       clearLocalAuthState();
+      setAuthStatus("unauthenticated");
     }
   };
 
@@ -252,9 +258,11 @@ export function AuthProvider({ children }) {
         const restoredUser = restored?.user ? JSON.parse(restored.user) : getStoredUser();
         setAccessToken(restoredToken);
         setUser(restoredToken ? restoredUser ?? null : null);
+        setAuthStatus(restoredToken ? "authenticated" : "unauthenticated");
       } catch {
         if (!active) return;
         clearLocalAuthState();
+        setAuthStatus("unauthenticated");
       } finally {
         if (active) {
           setReady(true);
@@ -301,11 +309,15 @@ export function AuthProvider({ children }) {
           });
           setAccessToken(data.accessToken);
           if (data?.user) setUser(data.user);
+          setAuthStatus("authenticated");
         } catch {
           const tokenExpiryMs = getTokenExpiryMs(accessToken) ?? 0;
           if (Date.now() >= tokenExpiryMs) {
             clearLocalAuthState();
+            setAuthStatus("unauthenticated");
             window.dispatchEvent(new Event(SESSION_TIMEOUT_EVENT));
+          } else {
+            setAuthStatus("temporarily_unavailable");
           }
         } finally {
           refreshInFlightPromise = null;
@@ -378,6 +390,7 @@ export function AuthProvider({ children }) {
       accessToken,
       loading,
       ready,
+      authStatus,
       isAuthenticated: Boolean(user && accessToken),
       login,
       signup,
@@ -389,7 +402,7 @@ export function AuthProvider({ children }) {
       logout,
       updateUser
     }),
-    [user, accessToken, loading, ready]
+    [user, accessToken, loading, ready, authStatus]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

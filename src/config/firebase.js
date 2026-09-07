@@ -1,5 +1,10 @@
 import { getApps, initializeApp } from "firebase/app";
-import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
+import {
+  browserLocalPersistence,
+  browserSessionPersistence,
+  getAuth,
+  setPersistence,
+} from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "",
@@ -22,19 +27,76 @@ export const firebaseConfigError = isFirebaseConfigured
   ? ""
   : "Missing Firebase configuration. Set VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_PROJECT_ID, and VITE_FIREBASE_APP_ID.";
 
-// Initialize Firebase only when env is present so the app does not white-screen.
-const app = isFirebaseConfigured
-  ? getApps()[0] ?? initializeApp(firebaseConfig)
-  : null;
-export const auth = app ? getAuth(app) : null;
+let app = null;
+let auth = null;
+let firebaseAuthPromise = null;
 
-export const firebasePersistenceReady = auth
-  ? setPersistence(auth, browserLocalPersistence)
+function withTimeout(promise, timeoutMs) {
+  return Promise.race([
+    promise,
+    new Promise((resolve) => {
+      setTimeout(() => resolve(false), timeoutMs);
+    }),
+  ]);
+}
+
+async function configurePersistence(nextAuth) {
+  const localReady = await withTimeout(
+    setPersistence(nextAuth, browserLocalPersistence)
       .then(() => true)
-      .catch((error) => {
-        console.warn("Firebase Auth persistence unavailable:", error?.code || "unknown-error");
-        return false;
-      })
-  : Promise.resolve(false);
+      .catch(() => false),
+    3000,
+  );
+  if (localReady) return "local";
 
-export default app;
+  const sessionReady = await withTimeout(
+    setPersistence(nextAuth, browserSessionPersistence)
+      .then(() => true)
+      .catch(() => false),
+    3000,
+  );
+  if (sessionReady) return "session";
+
+  console.warn("Firebase Auth persistence unavailable");
+  return "none";
+}
+
+export async function initializeFirebaseAuth() {
+  if (!isFirebaseConfigured) {
+    throw new Error(firebaseConfigError);
+  }
+  if (auth) return auth;
+  if (firebaseAuthPromise) return firebaseAuthPromise;
+
+  firebaseAuthPromise = (async () => {
+    await initializeFirebaseApp();
+    auth = getAuth(app);
+    await configurePersistence(auth);
+    return auth;
+  })().catch((error) => {
+    firebaseAuthPromise = null;
+    app = null;
+    auth = null;
+    throw error;
+  });
+
+  return firebaseAuthPromise;
+}
+
+export function initializeFirebaseApp() {
+  if (!isFirebaseConfigured) {
+    throw new Error(firebaseConfigError);
+  }
+  app = app ?? getApps()[0] ?? initializeApp(firebaseConfig);
+  return app;
+}
+
+export function getFirebaseApp() {
+  return app;
+}
+
+export function getFirebaseAuth() {
+  return auth;
+}
+
+export default null;
