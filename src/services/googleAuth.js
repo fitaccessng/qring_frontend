@@ -21,7 +21,7 @@ const GOOGLE_REDIRECT_INTENT_KEY = "qring_google_redirect_intent";
 const GOOGLE_WEB_CLIENT_ID_FALLBACK =
   "333641553431-dnpj0r2echhl0t3ccad573s17gn2qstn.apps.googleusercontent.com";
 const GOOGLE_AUTH_REQUEST_OPTIONS = {
-  timeoutMs: 12000,
+  timeoutMs: 30000,
   retryCount: 0,
 };
 
