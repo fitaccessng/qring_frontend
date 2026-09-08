@@ -3,29 +3,9 @@ import { ArrowRight, Check, ChevronRight, Home, HardHat, Shield, Sparkles, Users
 import { useLocation, useNavigate } from "react-router-dom";
 import { getEstateOverview, listEstateArtisans, listEstateSecurityUsers } from "../../services/estateService";
 import { getHomeownerContext } from "../../services/homeownerService";
+import { getOnboardingState, updateOnboardingState } from "../../services/onboardingService";
 
-const STORAGE_PREFIX = "qring_getting_started_v1";
 const NEW_USER_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
-
-function storageKey(user) {
-  return `${STORAGE_PREFIX}:${user?.role || "unknown"}:${user?.id || user?.email || "anonymous"}`;
-}
-
-function readProgress(user) {
-  try {
-    return JSON.parse(localStorage.getItem(storageKey(user)) || "{}") || {};
-  } catch {
-    return {};
-  }
-}
-
-function writeProgress(user, progress) {
-  try {
-    localStorage.setItem(storageKey(user), JSON.stringify(progress));
-  } catch {
-    // Continue with in-memory progress when browser storage is unavailable.
-  }
-}
 
 function isNewUser(user) {
   const createdAt = Date.parse(user?.createdAt || "");
@@ -43,7 +23,8 @@ const homeownerSteps = [
 export default function GettingStarted({ user }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const [progress, setProgress] = useState(() => readProgress(user));
+  const [progress, setProgress] = useState({});
+  const [serverState, setServerState] = useState(null);
   const [estateData, setEstateData] = useState({ estates: [], homeowners: [], securityUsers: [], artisans: [] });
   const [homeownerContext, setHomeownerContext] = useState(null);
   const [open, setOpen] = useState(false);
@@ -54,16 +35,19 @@ export default function GettingStarted({ user }) {
   const newUser = isNewUser(user);
 
   useEffect(() => {
-    setProgress(readProgress(user));
-  }, [user?.id, user?.email, user?.role]);
-
-  useEffect(() => {
     if (!eligible || !newUser) return undefined;
     let active = true;
-    if (role === "estate") {
-      Promise.allSettled([
-        getEstateOverview(),
-      ]).then(async ([overviewResult]) => {
+    async function loadProgressAndData() {
+      try {
+        const onboardingResult = await getOnboardingState();
+        if (!active) return;
+        setServerState(onboardingResult);
+        setProgress(onboardingResult?.state || {});
+      } catch {
+        // Keep the dashboard usable when onboarding state is temporarily unavailable.
+      }
+      if (role === "estate") {
+        Promise.allSettled([getEstateOverview({ force: true })]).then(async ([overviewResult]) => {
         if (!active) return;
         const overview = overviewResult.status === "fulfilled" ? overviewResult.value || {} : {};
         const estates = overview.estates || (overview.estate ? [overview.estate] : []);
@@ -79,12 +63,23 @@ export default function GettingStarted({ user }) {
           artisans: artisanResult?.status === "fulfilled" ? artisanResult.value : []
         });
       });
-    } else {
-      getHomeownerContext().then((data) => {
-        if (active) setHomeownerContext(data || {});
-      }).catch(() => {});
+      } else {
+        getHomeownerContext().then((data) => {
+          if (active) setHomeownerContext(data || {});
+        }).catch(() => {});
+      }
+    };
+    loadProgressAndData();
+    const refresh = () => {
+      if (document.visibilityState === "visible") loadProgressAndData();
+    };
+    const interval = window.setInterval(loadProgressAndData, 15000);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", refresh);
     }
-    return () => { active = false; };
   }, [eligible, newUser, role]);
 
   const estateSteps = useMemo(() => [
@@ -96,24 +91,19 @@ export default function GettingStarted({ user }) {
   ], [estateData, progress]);
 
   const steps = role === "estate" ? estateSteps : homeownerSteps.map((item) => ({ ...item, complete: Boolean(progress[item.id]) }));
-  const requiredComplete = role === "homeowner" ? Boolean(progress.completed) : estateSteps.filter((item) => !item.optional).every((item) => item.complete);
-  const allComplete = role === "homeowner" ? Boolean(progress.completed) : requiredComplete && Boolean(progress.explore || progress.completed);
+  const requiredComplete = Boolean(serverState?.requiredComplete) || (role === "homeowner" ? Boolean(progress.completed) : false);
+  const allComplete = Boolean(serverState?.complete) || (role === "homeowner" ? Boolean(progress.completed) : false);
   const completeCount = steps.filter((item) => item.complete).length;
-
-  useEffect(() => {
-    if (requiredComplete && role === "estate" && progress.completed !== true && progress.explore) {
-      const next = { ...progress, completed: true };
-      setProgress(next);
-      writeProgress(user, next);
-    }
-  }, [progress, requiredComplete, role, user]);
 
   if (!eligible || !newUser || allComplete || location.pathname === "/onboarding") return null;
 
   function updateProgress(patch) {
     const next = { ...progress, ...patch };
     setProgress(next);
-    writeProgress(user, next);
+    updateOnboardingState(patch).then((data) => {
+      setServerState(data);
+      setProgress(data?.state || next);
+    }).catch(() => {});
   }
 
   function openStep(index = 0) {
@@ -122,7 +112,10 @@ export default function GettingStarted({ user }) {
   }
 
   function handleCta(item) {
-    if (item.id === "explore") updateProgress({ explore: true, completed: true });
+    if (role === "homeowner") {
+      updateProgress({ [item.id]: true, ...(item.id === "notifications" ? { completed: true } : {}) });
+    }
+    if (item.id === "explore") updateProgress({ explore: true });
     if (item.route) navigate(item.route);
     setOpen(false);
   }
