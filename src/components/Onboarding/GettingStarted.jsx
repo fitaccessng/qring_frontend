@@ -5,12 +5,6 @@ import { getEstateOverview, listEstateArtisans, listEstateSecurityUsers } from "
 import { getHomeownerContext } from "../../services/homeownerService";
 import { getOnboardingState, updateOnboardingState } from "../../services/onboardingService";
 
-const NEW_USER_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
-
-function isNewUser(user) {
-  const createdAt = Date.parse(user?.createdAt || "");
-  return Number.isFinite(createdAt) && Date.now() - createdAt <= NEW_USER_WINDOW_MS;
-}
 
 const homeownerSteps = [
   { id: "visitors", title: "Manage visitors", body: "Review visitor requests and decide who can access your home.", route: "/dashboard/homeowner/visits", icon: Users },
@@ -32,10 +26,9 @@ export default function GettingStarted({ user }) {
 
   const role = user?.role;
   const eligible = role === "estate" || role === "homeowner";
-  const newUser = isNewUser(user);
 
   useEffect(() => {
-    if (!eligible || !newUser) return undefined;
+    if (!eligible) return undefined;
     let active = true;
     async function loadProgressAndData() {
       try {
@@ -80,7 +73,7 @@ export default function GettingStarted({ user }) {
       window.clearInterval(interval);
       document.removeEventListener("visibilitychange", refresh);
     }
-  }, [eligible, newUser, role]);
+  }, [eligible, role]);
 
   const estateSteps = useMemo(() => [
     { id: "estate", title: "Create your estate", body: "Your estate is the home base for residents, doors, visitors, and security activity.", route: "/dashboard/estate/create", icon: Home, complete: estateData.estates.length > 0 },
@@ -95,7 +88,7 @@ export default function GettingStarted({ user }) {
   const allComplete = Boolean(serverState?.complete) || (role === "homeowner" ? Boolean(progress.completed) : false);
   const completeCount = steps.filter((item) => item.complete).length;
 
-  if (!eligible || !newUser || allComplete || location.pathname === "/onboarding") return null;
+  if (!eligible || !serverState?.eligible || allComplete || location.pathname === "/onboarding") return null;
 
   function updateProgress(patch) {
     const next = { ...progress, ...patch };

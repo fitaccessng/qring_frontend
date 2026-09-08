@@ -291,12 +291,6 @@ export default function VerifyEmailPage() {
                 {!state.loading && <ChevronRight className="w-5 h-5 font-bold" />}
               </button>
 
-              <Link
-                to="/login"
-                className="text-center text-slate-400 text-xs font-black uppercase tracking-widest hover:text-brand-500 transition-colors mt-4"
-              >
-                Cancel and Login
-              </Link>
             </form>
           )}
         </div>
