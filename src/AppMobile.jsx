@@ -5,7 +5,6 @@ import LoginPage from "./pages/auth/LoginPage";
 import AdminLoginPage from "./pages/auth/AdminLoginPage";
 import AdminSignupPage from "./pages/auth/AdminSignupPage";
 import SignupPage from "./pages/auth/SignupPage";
-import GoogleRolePage from "./pages/auth/GoogleRolePage";
 import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
 import VerifyEmailPage from "./pages/auth/VerifyEmailPage";
 import UnauthorizedPage from "./pages/common/UnauthorizedPage";
@@ -238,7 +237,6 @@ function AppRoutes() {
                 <Route path="/admin/register/user" element={<AdminSignupPage />} />
                 <Route path="/admin/signup" element={<Navigate to="/admin/register/user" replace />} />
                 <Route path="/signup" element={<SignupPage />} />
-                <Route path="/google-role" element={<GoogleRolePage />} />
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                 <Route path="/reset-password" element={<ForgotPasswordPage />} />
                 <Route path="/verify-email" element={<VerifyEmailPage />} />

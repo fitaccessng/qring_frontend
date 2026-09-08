@@ -220,15 +220,6 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const beginGoogleSignUp = async (referralCode = "") => {
-    setLoading(true);
-    try {
-      return await authService.beginGoogleSignUp(referralCode);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const forgotPassword = async (email) =>
     authService.forgotPassword({
       email
@@ -417,7 +408,6 @@ export function AuthProvider({ children }) {
       googleSignIn,
       googleSignUp,
       completeGoogleSignUp,
-      beginGoogleSignUp,
       resumeGoogleRedirect,
       forgotPassword,
       logout,

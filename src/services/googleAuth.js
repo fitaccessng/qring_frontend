@@ -289,7 +289,7 @@ export async function beginGoogleSignup(referralCode = "") {
   }
 }
 
-export async function completeGoogleSignup(role = "homeowner") {
+export async function completeGoogleSignup() {
   const pending = readPendingGoogleSignup();
   if (!pending?.idToken) {
     throw new Error("Complete Google sign-in before choosing an account role.");
@@ -304,7 +304,6 @@ export async function completeGoogleSignup(role = "homeowner") {
         email: pending.email,
         displayName: pending.displayName,
         photoURL: pending.photoURL,
-        role,
         referralCode: pending.referralCode,
       }),
     });
@@ -322,9 +321,9 @@ export async function completeGoogleSignup(role = "homeowner") {
   }
 }
 
-export async function signUpWithGoogle(role = "homeowner") {
+export async function signUpWithGoogle() {
   await beginGoogleSignup();
-  return completeGoogleSignup(role);
+  return completeGoogleSignup();
 }
 
 export async function signOutFromGoogle() {

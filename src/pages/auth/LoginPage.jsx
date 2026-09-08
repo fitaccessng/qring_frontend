@@ -21,7 +21,7 @@ function resolveTargetPath(data, fromPath) {
 }
 
 export default function LoginPage() {
-  const { login, googleSignIn, resumeGoogleRedirect } = useAuth();
+  const { login, googleSignIn, completeGoogleSignUp, resumeGoogleRedirect } = useAuth();
   const [searchParams] = useSearchParams();
   const initialLogin = searchParams.get("email") ?? searchParams.get("username") ?? "";
   
@@ -56,11 +56,12 @@ export default function LoginPage() {
         const resumed = await resumeGoogleRedirect();
         if (!active || !resumed) return;
         if (resumed.intent === "signup") {
-          navigate("/google-role", { replace: true, state: { intent: "signup" } });
+          await completeGoogleSignUp();
+          navigate("/onboarding", { replace: true });
           return;
         }
         const target = resolveTargetPath(resumed.data, redirectPath);
-        navigate(target || "/google-role", { replace: true });
+        navigate(target || "/dashboard", { replace: true });
       } catch (err) {
         if (active) setError(err.message ?? "Google sign-in failed");
       }

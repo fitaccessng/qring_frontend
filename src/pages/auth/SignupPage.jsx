@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { Building2, User, Mail, Lock, Gift, ChevronRight, Eye, EyeOff } from "lucide-react";
+import { User, Mail, Lock, Gift, ChevronRight, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "../../state/AuthContext";
 import quickdropLogo from "../../assets/qring_logo.jpeg";
 import { shouldUseGoogleAuth } from "../../utils/nativeRuntime";
@@ -10,7 +10,7 @@ const IS_MOBILE_APP_BUILD = !shouldUseGoogleAuth();
 const TERMS_URL = "https://www.useqring.online/terms";
 
 export default function SignupPage() {
-  const { signup, beginGoogleSignUp, resumeGoogleRedirect } = useAuth();
+  const { signup, googleSignUp, completeGoogleSignUp, resumeGoogleRedirect } = useAuth();
   const navigate = useNavigate();
   const googleAuthEnabled = shouldUseGoogleAuth();
 
@@ -18,7 +18,6 @@ export default function SignupPage() {
     fullName: "",
     email: "",
     password: "",
-    role: "estate",
     referralCode: ""
   });
 
@@ -46,7 +45,8 @@ export default function SignupPage() {
         const resumed = await resumeGoogleRedirect();
         if (!active || !resumed) return;
         if (resumed.intent === "signup") {
-          navigate("/google-role", { replace: true, state: { intent: "signup" } });
+          await completeGoogleSignUp();
+          navigate("/onboarding", { replace: true });
         }
       } catch (resumeError) {
         if (!active) return;
@@ -71,7 +71,6 @@ export default function SignupPage() {
           const normalizedEmail = form.email.trim().toLowerCase();
           const payload = {
             ...form,
-            role: "estate",
             email: normalizedEmail,
             referralCode: form.referralCode.trim() || undefined,
           };
@@ -104,8 +103,8 @@ export default function SignupPage() {
         setError("");
         setSubmitting(true);
         try {
-          await beginGoogleSignUp(form.referralCode);
-          navigate("/google-role", { replace: true, state: { intent: "signup" } });
+          await googleSignUp();
+          navigate("/onboarding", { replace: true });
         } catch (err) {
           if (err?.message !== "Redirecting to Google...") {
             setError(err?.message ?? "Google sign-up failed");
