@@ -97,6 +97,16 @@ export default function VerifyEmailPage() {
     }
   };
 
+  const handleOtpPaste = (index, event) => {
+    const pastedDigits = event.clipboardData?.getData("text")?.replace(/\D/g, "").slice(0, OTP_LENGTH) || "";
+    if (!pastedDigits) return;
+    event.preventDefault();
+    const prefix = otpDigits.slice(0, index).join("");
+    const nextCode = `${prefix}${pastedDigits}`.slice(0, OTP_LENGTH);
+    setForm((previous) => ({ ...previous, code: nextCode }));
+    otpRefs.current[Math.min(nextCode.length, OTP_LENGTH - 1)]?.focus();
+  };
+
   const handleOfficeSubmit = async (event) => {
     event.preventDefault();
     setOfficeSubmitting(true);
@@ -276,6 +286,7 @@ export default function VerifyEmailPage() {
                       value={digit}
                       onChange={(e) => handleOtpChange(index, e.target.value)}
                       onKeyDown={(e) => handleOtpKeyDown(index, e)}
+                      onPaste={(e) => handleOtpPaste(index, e)}
                       className="h-14 w-full bg-slate-50 border-2 border-transparent rounded-xl text-center text-xl font-bold text-slate-900 outline-none transition-all focus:bg-white focus:border-brand-500/20 focus:ring-4 focus:ring-brand-500/5"
                     />
                   ))}
