@@ -46,7 +46,7 @@ export default function SignupPage() {
         if (!active || !resumed) return;
         if (resumed.intent === "signup") {
           await completeGoogleSignUp();
-          navigate("/onboarding", { replace: true });
+          navigate("/dashboard/estate", { replace: true });
         }
       } catch (resumeError) {
         if (!active) return;
@@ -104,7 +104,7 @@ export default function SignupPage() {
         setSubmitting(true);
         try {
           await googleSignUp();
-          navigate("/onboarding", { replace: true });
+          navigate("/dashboard/estate", { replace: true });
         } catch (err) {
           if (err?.message !== "Redirecting to Google...") {
             setError(err?.message ?? "Google sign-up failed");

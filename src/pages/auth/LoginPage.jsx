@@ -57,7 +57,7 @@ export default function LoginPage() {
         if (!active || !resumed) return;
         if (resumed.intent === "signup") {
           await completeGoogleSignUp();
-          navigate("/onboarding", { replace: true });
+          navigate("/dashboard/estate", { replace: true });
           return;
         }
         const target = resolveTargetPath(resumed.data, redirectPath);

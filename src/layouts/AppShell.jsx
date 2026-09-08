@@ -8,6 +8,7 @@ import NotificationPanel from "../components/notifications/NotificationPanel";
 import { useNotifications } from "../state/NotificationsContext";
 import { getUserInitials } from "../utils/profile";
 import useSubscription from "../hooks/useSubscription";
+import GettingStarted from "../components/Onboarding/GettingStarted";
 
 const navByRole = {
   homeowner: [
@@ -112,28 +113,6 @@ let homeownerContextCacheAt = 0;
 
 function isCacheFresh(cachedAt, ttlMs) {
   return Number(cachedAt) > 0 && Date.now() - cachedAt < ttlMs;
-}
-
-function onboardingSeenForUser(user) {
-  const role = user?.role;
-  if (role !== "homeowner" && role !== "estate") return true;
-  const keys = [];
-  if (user?.id) {
-    keys.push(`qring_dashboard_welcome_seen_${role}_id:${user.id}`);
-    keys.push(`qring_dashboard_welcome_seen_${role}_${user.id}`);
-    keys.push(`qring_onboarding_seen_${role}_id:${user.id}`);
-    keys.push(`qring_onboarding_seen_${role}_${user.id}`);
-  }
-  if (user?.email) {
-    const email = String(user.email).trim().toLowerCase();
-    keys.push(`qring_dashboard_welcome_seen_${role}_email:${email}`);
-    keys.push(`qring_dashboard_welcome_seen_${role}_${email}`);
-    keys.push(`qring_onboarding_seen_${role}_email:${email}`);
-    keys.push(`qring_onboarding_seen_${role}_${email}`);
-  }
-  keys.push(`qring_dashboard_welcome_seen_${role}_anonymous`);
-  keys.push(`qring_onboarding_seen_${role}_anonymous`);
-  return keys.some((key) => localStorage.getItem(key) === "true");
 }
 
 export default function AppShell({ title, children, showTopBar = true, showMobileNav = false }) {
@@ -336,18 +315,6 @@ export default function AppShell({ title, children, showTopBar = true, showMobil
       active = false;
     };
   }, [user?.role]);
-
-  useEffect(() => {
-    if (isNativeApp) return;
-    if (user?.role !== "homeowner" && user?.role !== "estate") return;
-    const atDashboardHome =
-      location.pathname === "/dashboard/homeowner/overview" ||
-      location.pathname === "/dashboard/estate";
-    if (!atDashboardHome) return;
-    if (!onboardingSeenForUser(user)) {
-      navigate("/onboarding", { replace: true });
-    }
-  }, [isNativeApp, user?.role, user?.email, user?.id, location.pathname, navigate]);
 
   useEffect(() => {
     if (!notificationsOpen) return;
@@ -626,6 +593,7 @@ export default function AppShell({ title, children, showTopBar = true, showMobil
           </div>
         </nav>
       ) : null}
+      <GettingStarted user={user} />
     </div>
   );
 }
