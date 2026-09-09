@@ -121,7 +121,7 @@ export default function EstateManagerDashboard() {
   const toolkitItems = showAllToolkit ? [...PRIMARY_TOOLKIT_ITEMS, ...EXTRA_TOOLKIT_ITEMS] : PRIMARY_TOOLKIT_ITEMS;
 
   return (
-    <div className="bg-[#f8f9fa] text-slate-800 min-h-screen pb-32 font-sans overflow-x-hidden">
+    <div className="bg-[#f8f9fa] text-slate-800 min-h-screen pb-28 font-sans overflow-x-hidden">
       <header className="backdrop-blur-xl border-b border-slate-100 fixed top-0 w-full z-50 flex justify-between items-center px-4 md:px-6 h-16 bg-white/80">
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-9 h-9 flex-shrink-0 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center">
@@ -229,30 +229,30 @@ export default function EstateManagerDashboard() {
         </section>
       </main>
 
-      {/* --- Fixed Static Bottom Navigation --- */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-xl border-t border-slate-100 px-6 py-3 shadow-[0_-8px_30px_rgba(0,0,0,0.04)]">
-        <div className="max-w-md mx-auto flex items-center justify-between">
+      {/* --- Fixed Bottom Navigation --- */}
+      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-slate-100 px-4 py-2.5 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+        <div className="max-w-md mx-auto flex items-center justify-between gap-2">
           <BottomNavLink
             to="/dashboard/estate"
-            icon={<Home size={20} />}
+            icon={<Home size={22} />}
             label="Home"
             active={location.pathname === "/dashboard/estate"}
           />
           <BottomNavLink
             to="/dashboard/estate/create"
-            icon={<Plus size={20} />}
+            icon={<Plus size={22} />}
             label="Create Estate"
             active={location.pathname === "/dashboard/estate/create"}
           />
           <BottomNavLink
             to="/dashboard/estate/logs"
-            icon={<ClipboardList size={20} />}
+            icon={<ClipboardList size={22} />}
             label="View Log"
             active={location.pathname === "/dashboard/estate/logs"}
           />
           <BottomNavLink
             to="/dashboard/estate/settings"
-            icon={<Settings size={20} />}
+            icon={<Settings size={22} />}
             label="Settings"
             active={location.pathname === "/dashboard/estate/settings"}
           />
@@ -290,14 +290,14 @@ function BottomNavLink({ to, icon, label, active = false }) {
   return (
     <Link
       to={to}
-      className={`flex flex-col items-center gap-1 flex-1 transition-all active:scale-90 ${
-        active ? "text-indigo-600" : "text-slate-400 hover:text-slate-600"
+      className={`flex flex-col items-center justify-center flex-1 py-1 transition-all active:scale-90 ${
+        active ? "text-indigo-600 font-bold" : "text-slate-400 hover:text-slate-600 font-medium"
       }`}
     >
       <div className={`p-1.5 rounded-xl transition-all ${active ? "bg-indigo-50 text-indigo-600" : ""}`}>
         {icon}
       </div>
-      <span className="text-[9px] font-bold tracking-tight">{label}</span>
+      <span className="text-[10px] tracking-tight mt-0.5 whitespace-nowrap">{label}</span>
     </Link>
   );
 }
