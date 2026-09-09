@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { 
   Bell, 
+  CircleHelp,
   ClipboardCheck, 
   Users, 
   MessageSquare, 
@@ -152,12 +153,17 @@ export default function HomeownerDashboardPage() {
             </div>
           </div>
           
-          <Link to="/dashboard/notifications" className="relative p-2.5 bg-slate-100 hover:bg-slate-200/80 text-slate-700 rounded-xl transition-all group">
-            <Bell className="w-5 h-5" />
-            {unreadCount > 0 && (
-              <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-blue-600 rounded-full ring-2 ring-white" />
-            )}
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link to="/onboarding" aria-label="Open Getting Started" title="Getting Started" className="p-2.5 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-600 rounded-xl transition-all group">
+              <CircleHelp className="w-5 h-5" />
+            </Link>
+            <Link to="/dashboard/notifications" className="relative p-2.5 bg-slate-100 hover:bg-slate-200/80 text-slate-700 rounded-xl transition-all group">
+              <Bell className="w-5 h-5" />
+              {unreadCount > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-blue-600 rounded-full ring-2 ring-white" />
+              )}
+            </Link>
+          </div>
         </div>
       </header>
 

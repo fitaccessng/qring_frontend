@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Bell,
+  CircleHelp,
   Plus,
   UserPlus,
   Crown,
@@ -194,10 +195,15 @@ export default function EstateManagerDashboard() {
             {stats.estateName}
           </span>
         </div>
-        <Link to="/dashboard/notifications" className="relative p-2.5 bg-slate-50 text-slate-500 rounded-full flex-shrink-0">
-          <Bell size={20} />
-          {unreadCount > 0 ? <span className="absolute top-2.5 right-2.5 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white" /> : null}
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link to="/onboarding" aria-label="Open Getting Started" title="Getting Started" className="p-2.5 bg-slate-50 text-slate-500 rounded-full flex-shrink-0 hover:bg-indigo-50 hover:text-indigo-600">
+            <CircleHelp size={20} />
+          </Link>
+          <Link to="/dashboard/notifications" className="relative p-2.5 bg-slate-50 text-slate-500 rounded-full flex-shrink-0">
+            <Bell size={20} />
+            {unreadCount > 0 ? <span className="absolute top-2.5 right-2.5 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white" /> : null}
+          </Link>
+        </div>
       </header>
 
       <main className="pt-24 px-4 md:px-6 max-w-5xl mx-auto space-y-7 md:space-y-8">
