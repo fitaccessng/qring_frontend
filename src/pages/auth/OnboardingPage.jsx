@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { useAuth } from "../../state/AuthContext";
+import GettingStarted from "../../components/Onboarding/GettingStarted";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowRight,
@@ -13,7 +15,6 @@ import {
   UserPlus,
   Wifi,
 } from "lucide-react";
-import { useAuth } from "../../state/AuthContext";
 
 const ONBOARDING_STEPS = [
   {
@@ -58,6 +59,12 @@ function getIdentity(user) {
 }
 
 export default function OnboardingPage() {
+  const { user } = useAuth();
+  return <GettingStarted user={user} openOnMount />;
+}
+
+/* Legacy tutorial components remain below for compatibility with old imports. */
+function LegacyOnboardingPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const accountRole = user?.role === "estate" ? "estate" : user?.role === "security" ? "security" : "homeowner";

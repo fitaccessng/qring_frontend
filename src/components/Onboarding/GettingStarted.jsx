@@ -14,14 +14,14 @@ const homeownerSteps = [
   { id: "notifications", title: "Notifications", body: "Keep important visitor and estate alerts close at hand.", route: "/dashboard/notifications", icon: Sparkles }
 ];
 
-export default function GettingStarted({ user }) {
+export default function GettingStarted({ user, openOnMount = false }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [progress, setProgress] = useState({});
   const [serverState, setServerState] = useState(null);
   const [estateData, setEstateData] = useState({ estates: [], homeowners: [], securityUsers: [], artisans: [] });
   const [homeownerContext, setHomeownerContext] = useState(null);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(openOnMount);
   const [stepIndex, setStepIndex] = useState(0);
 
   const role = user?.role;
@@ -88,7 +88,7 @@ export default function GettingStarted({ user }) {
   const allComplete = Boolean(serverState?.complete) || (role === "homeowner" ? Boolean(progress.completed) : false);
   const completeCount = steps.filter((item) => item.complete).length;
 
-  if (!eligible || !serverState?.eligible || allComplete || location.pathname === "/onboarding") return null;
+  if (!eligible || !serverState?.eligible || allComplete) return null;
 
   function updateProgress(patch) {
     const next = { ...progress, ...patch };
