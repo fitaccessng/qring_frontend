@@ -83,9 +83,22 @@ export async function connectLiveKitCall({
         element.muted = true;
         element.playsInline = true;
       }
-      void element.play?.().catch(() => {});
+      const playPromise = element.play?.();
+      if (playPromise?.catch) {
+        playPromise.catch((error) => {
+          onError?.(error);
+          log("livekit playback blocked", { kind: track.kind, participant: publication?.participantIdentity || publication?.name || "remote" });
+        });
+      }
       onRemoteMedia?.({ kind: track.kind, active: true });
-      log("track subscribed", { kind: track.kind, sid: publication.trackSid });
+      log("LIVEKIT REMOTE TRACK", {
+        callType,
+        kind: track.kind,
+        source: publication?.source,
+        participant: publication?.participantIdentity || publication?.name || "remote",
+        room: room.name,
+        attachedTo: track.kind === Track.Kind.Video ? "videoElement" : "audioElement"
+      });
     } catch (error) {
       onError?.(error);
     }
@@ -105,7 +118,11 @@ export async function connectLiveKitCall({
       onParticipantLeft?.(participant);
     })
     .on(RoomEvent.TrackSubscribed, (track, publication) => {
+      log("LIVEKIT TRACK SUBSCRIBED", { kind: track.kind, source: publication?.source, sid: publication?.trackSid });
       attachPublication({ ...publication, track });
+    })
+    .on(RoomEvent.TrackPublished, (publication) => {
+      log("LIVEKIT TRACK PUBLISHED", { kind: publication?.kind, source: publication?.source, sid: publication?.trackSid });
     })
     .on(RoomEvent.TrackUnsubscribed, (track) => {
       try {
@@ -129,7 +146,7 @@ export async function connectLiveKitCall({
       onState?.(ConnectionState.Connected);
     });
 
-  log("connecting");
+  log("LIVEKIT CONNECT", { callType, url, room: "pending", participantIdentity: token ? "token-present" : "token-missing" });
   try {
     await room.connect(url, token, { autoSubscribe: true });
   } catch (error) {
@@ -168,7 +185,10 @@ export async function connectLiveKitCall({
         videoTrack.attach(localVideoElement);
         localVideoElement.muted = true;
         localVideoElement.playsInline = true;
-        void localVideoElement.play?.().catch(() => {});
+        void localVideoElement.play?.().catch((error) => {
+          onError?.(error);
+          log("livekit local preview playback blocked", { kind: "video" });
+        });
       }
       await room.localParticipant.publishTrack(videoTrack);
     }
@@ -181,6 +201,7 @@ export async function connectLiveKitCall({
   room.remoteParticipants.forEach((participant) => {
     participant.trackPublications.forEach((publication) => attachPublication(publication));
   });
+  log("LIVEKIT CONNECT", { callType, url, room: room.name, participantIdentity: room.localParticipant?.identity || "unknown" });
   log("connected", { name: room.name });
 
   return { room, localTracks };
