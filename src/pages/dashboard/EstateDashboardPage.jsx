@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import {
   Bell,
   CircleHelp,
@@ -16,15 +16,12 @@ import {
   CreditCard,
   Wrench,
   BarChart3,
-  LayoutDashboard,
-  MessageSquare,
   Building2,
   Home,
   ShieldCheck,
   QrCode,
   Settings,
   Shield,
-  Network,
   ClipboardList,
   ArrowDown,
   ArrowUp,
@@ -54,6 +51,7 @@ const EXTRA_TOOLKIT_ITEMS = [
 ];
 
 export default function EstateManagerDashboard() {
+  const location = useLocation();
   const { overview, estateId, setEstateId, loading, error } = useEstateOverviewState();
   const { unreadCount } = useEstateNotifications(estateId);
   const [showAllToolkit, setShowAllToolkit] = useState(false);
@@ -104,10 +102,6 @@ export default function EstateManagerDashboard() {
   const maxHomes = Math.max(Number(planRestrictions.maxHomes ?? 0), estateHomes.length, 1);
   const homeProgressPercentage = Math.min(100, (estateHomes.length / maxHomes) * 100);
 
-  const analytics = overview?.analytics ?? {};
-  const peakHour = analytics?.peakEntryTimes?.[0] ?? null;
-  const busiestHome = analytics?.mostVisitedHouses?.[0] ?? null;
-
   const stats = useMemo(
     () => ({
       estateName: currentEstate?.name || "No estate yet",
@@ -124,69 +118,11 @@ export default function EstateManagerDashboard() {
     [currentEstate, estateDoors.length, estateHomeowners.length, estateHomes.length, estates.length, subscription]
   );
 
-  const detailProgressItems = [
-    {
-      label: "Houses/Units",
-      value: `${estateHomes.length} / ${maxHomes}`,
-      helper: `${Math.max(maxHomes - estateHomes.length, 0)} included unit${maxHomes - estateHomes.length === 1 ? "" : "s"} left`,
-      percent: homeProgressPercentage,
-      tone: "indigo"
-    },
-    {
-      label: "House QR Ready",
-      value: `${usedQrCodes}`,
-      helper: "One QR code for each registered house",
-      percent: usedQrCodes ? 100 : 0,
-      tone: "sky"
-    },
-    {
-      label: "Homes Added",
-      value: `${estateHomes.length}`,
-      helper: estateHomes.length ? "Estate properties connected" : "No homes added yet",
-      percent: estateHomes.length ? 100 : 0,
-      tone: "emerald"
-    },
-    {
-      label: "Homeowners Added",
-      value: `${estateHomeowners.length}`,
-      helper: estateHomeowners.length ? "Estate homeowners available for mapping" : "Invite estate homeowners next",
-      percent: estateHomeowners.length ? 100 : 0,
-      tone: "amber"
-    }
-  ];
-
-  const taskItems = [
-    {
-      icon: <DoorOpen size={18} />,
-      title: "Door Coverage",
-      subtitle: `${activeDoors} configured`,
-      to: "/dashboard/estate/doors"
-    },
-    {
-      icon: <MapPin size={18} />,
-      title: "Resident Onboarding",
-      subtitle: `${estateHomeowners.length} estate homeowners linked`,
-      to: "/dashboard/estate/invites"
-    },
-    {
-      icon: <QrCode size={18} />,
-      title: "QR Provisioning",
-      subtitle: `${usedQrCodes} house QR codes active`,
-      to: "/dashboard/estate/doors"
-    },
-    {
-      icon: <Shield size={18} />,
-      title: "Security Team",
-      subtitle: `${estateSecurityUsers.length} guard${estateSecurityUsers.length === 1 ? "" : "s"} active`,
-      to: "/dashboard/estate/security"
-    }
-  ];
-
   const toolkitItems = showAllToolkit ? [...PRIMARY_TOOLKIT_ITEMS, ...EXTRA_TOOLKIT_ITEMS] : PRIMARY_TOOLKIT_ITEMS;
 
   return (
     <div className="bg-[#f8f9fa] text-slate-800 min-h-screen pb-32 font-sans overflow-x-hidden">
-      <header className="backdrop-blur-xl border-b border-slate-100 fixed top-0 w-full z-50 flex justify-between items-center px-4 md:px-6 h-16">
+      <header className="backdrop-blur-xl border-b border-slate-100 fixed top-0 w-full z-50 flex justify-between items-center px-4 md:px-6 h-16 bg-white/80">
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-9 h-9 flex-shrink-0 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center">
             <ShieldCheck size={18} className="text-indigo-600" />
@@ -261,15 +197,7 @@ export default function EstateManagerDashboard() {
               </div>
             </div>
           </div>
-
-
         </div>
-
-        <section className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.95fr)] gap-4 md:gap-5">
-
-
-
-        </section>
 
         <section>
           <div className="flex items-center justify-between mb-5 md:mb-6 px-1">
@@ -300,22 +228,37 @@ export default function EstateManagerDashboard() {
           </div>
         </section>
       </main>
-    </div>
-  );
-}
 
-function TaskItem({ icon, title, subtitle, to }) {
-  return (
-    <Link to={to} className="bg-white p-4 md:p-5 rounded-[1.2rem] md:rounded-[1.5rem] flex items-center gap-4 border border-transparent hover:border-indigo-100 transition-all active:scale-[0.98]">
-      <div className="w-10 h-10 md:w-12 md:h-12 bg-slate-50 rounded-xl flex items-center justify-center text-indigo-600 flex-shrink-0">
-        {icon}
-      </div>
-      <div className="flex-1 min-w-0">
-        <h4 className="font-black text-[13px] md:text-sm text-slate-900 truncate">{title}</h4>
-        <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest mt-0.5 truncate">{subtitle}</p>
-      </div>
-      <ChevronRight size={16} className="text-slate-300 flex-shrink-0" />
-    </Link>
+      {/* --- Fixed Static Bottom Navigation --- */}
+      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-xl border-t border-slate-100 px-6 py-3 shadow-[0_-8px_30px_rgba(0,0,0,0.04)]">
+        <div className="max-w-md mx-auto flex items-center justify-between">
+          <BottomNavLink
+            to="/dashboard/estate"
+            icon={<Home size={20} />}
+            label="Home"
+            active={location.pathname === "/dashboard/estate"}
+          />
+          <BottomNavLink
+            to="/dashboard/estate/create"
+            icon={<Plus size={20} />}
+            label="Create Estate"
+            active={location.pathname === "/dashboard/estate/create"}
+          />
+          <BottomNavLink
+            to="/dashboard/estate/logs"
+            icon={<ClipboardList size={20} />}
+            label="View Log"
+            active={location.pathname === "/dashboard/estate/logs"}
+          />
+          <BottomNavLink
+            to="/dashboard/estate/settings"
+            icon={<Settings size={20} />}
+            label="Settings"
+            active={location.pathname === "/dashboard/estate/settings"}
+          />
+        </div>
+      </nav>
+    </div>
   );
 }
 
@@ -345,9 +288,16 @@ function AssetCard({ count, label, icon, primary = false }) {
 
 function BottomNavLink({ to, icon, label, active = false }) {
   return (
-    <Link to={to} className={`flex flex-col items-center gap-1 flex-1 transition-all active:scale-90 ${active ? "text-indigo-600" : "text-slate-400"}`}>
-      <div className={`${active ? "bg-indigo-50 p-2 rounded-xl" : "p-2"}`}>{icon}</div>
-      <span className="text-[8px] font-black uppercase tracking-wider">{label}</span>
+    <Link
+      to={to}
+      className={`flex flex-col items-center gap-1 flex-1 transition-all active:scale-90 ${
+        active ? "text-indigo-600" : "text-slate-400 hover:text-slate-600"
+      }`}
+    >
+      <div className={`p-1.5 rounded-xl transition-all ${active ? "bg-indigo-50 text-indigo-600" : ""}`}>
+        {icon}
+      </div>
+      <span className="text-[9px] font-bold tracking-tight">{label}</span>
     </Link>
   );
 }
@@ -361,52 +311,11 @@ function MiniDetail({ label, value }) {
   );
 }
 
-function ProgressDetailRow({ label, value, helper, percent, tone }) {
-  const barClassName = {
-    indigo: "bg-indigo-600",
-    sky: "bg-sky-500",
-    emerald: "bg-emerald-500",
-    amber: "bg-amber-500"
-  }[tone] || "bg-indigo-600";
-
-  return (
-    <div className="rounded-[1.5rem] border border-white/70 bg-white px-5 py-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">{label}</p>
-          <p className="mt-1 text-sm font-semibold text-slate-500">{helper}</p>
-        </div>
-        <p className="text-base font-black text-slate-900 whitespace-nowrap">{value}</p>
-      </div>
-      <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
-        <div className={`${barClassName} h-full rounded-full transition-all duration-1000`} style={{ width: `${Math.max(6, percent)}%` }} />
-      </div>
-    </div>
-  );
-}
-
-function SignalCard({ label, value, helper }) {
-  return (
-    <div className="rounded-[1.5rem] bg-slate-50 border border-slate-100 px-4 py-4">
-      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">{label}</p>
-      <p className="mt-2 text-lg font-black text-slate-900 truncate">{value}</p>
-      <p className="mt-1 text-xs font-medium text-slate-500">{helper}</p>
-    </div>
-  );
-}
-
 function formatDate(value) {
   if (!value) return "Not set";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Not set";
   return new Intl.DateTimeFormat(undefined, { day: "2-digit", month: "short", year: "numeric" }).format(date);
-}
-
-function formatHour(hour) {
-  if (!Number.isFinite(Number(hour))) return "N/A";
-  const date = new Date();
-  date.setHours(Number(hour), 0, 0, 0);
-  return new Intl.DateTimeFormat(undefined, { hour: "numeric" }).format(date);
 }
 
 function toTitleCase(value) {
