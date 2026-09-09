@@ -1,5 +1,6 @@
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { CircleHelp } from "lucide-react";
 import { useAuth } from "../state/AuthContext";
 import { getHomeownerContext } from "../services/homeownerService";
 import BrandMark from "../components/BrandMark";
@@ -259,7 +260,7 @@ export default function AppShell({ title, children, showTopBar = true, showMobil
   }, [hasFeature, isEstateManagedHomeowner, mobileNavItems, routeRole]);
   const isEstateMobileNav = routeRole === "estate";
   const isOfficeMobileNav = routeRole === "office";
-  const showHelpButton = routeRole === "estate" || routeRole === "security";
+  const showHelpButton = routeRole === "estate" || routeRole === "homeowner" || routeRole === "security";
   const mobileContentBottomPaddingClass = !showMobileNavShell
     ? "pb-8 sm:pb-8"
     : isEstateMobileNav
@@ -475,6 +476,17 @@ export default function AppShell({ title, children, showTopBar = true, showMobil
                     </div>
                   ) : null}
                   <div className="relative ml-auto flex items-center gap-2">
+                    {showHelpButton ? (
+                      <button
+                        type="button"
+                        onClick={() => navigate("/onboarding")}
+                        className="grid h-9 w-9 place-items-center rounded-full bg-slate-100 text-slate-600 transition hover:bg-blue-50 hover:text-brand-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                        aria-label="Open Getting Started"
+                        title="Getting Started"
+                      >
+                        <CircleHelp className="h-5 w-5" />
+                      </button>
+                    ) : null}
                     <div ref={notificationsButtonRef}>
                       <NotificationBell
                         unreadCount={unreadCount}
