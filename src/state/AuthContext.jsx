@@ -268,7 +268,17 @@ export function AuthProvider({ children }) {
         const restoredToken = String(restored?.accessToken || "");
         const restoredUser = restored?.user ? JSON.parse(restored.user) : getStoredUser();
         setAccessToken(restoredToken);
-        setUser(restoredToken ? restoredUser ?? null : null);
+        let resolvedUser = restoredToken ? restoredUser ?? null : null;
+        if (restoredToken) {
+          try {
+            const currentUser = await authService.getCurrentUser();
+            resolvedUser = currentUser ?? resolvedUser;
+            if (currentUser) storeUser(currentUser);
+          } catch {
+            // Preserve the cached session when profile refresh is unavailable.
+          }
+        }
+        setUser(resolvedUser);
         setAuthStatus(restoredToken ? "authenticated" : "unauthenticated");
       } catch {
         if (!active) return;

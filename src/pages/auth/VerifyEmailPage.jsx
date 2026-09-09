@@ -282,7 +282,6 @@ export default function VerifyEmailPage() {
                       required
                       inputMode="numeric"
                       pattern="[0-9]*"
-                      maxLength={1}
                       value={digit}
                       onChange={(e) => handleOtpChange(index, e.target.value)}
                       onKeyDown={(e) => handleOtpKeyDown(index, e)}
