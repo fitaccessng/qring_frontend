@@ -50,6 +50,7 @@ describe("homeowner visit messaging service", () => {
       data: {
         managedByEstate: true,
         estateId: "estate-1",
+        hasSecurity: false,
         securityEnabled: true,
         securityAvailable: false
       }
@@ -57,7 +58,7 @@ describe("homeowner visit messaging service", () => {
 
     const result = await getHomeownerContext();
 
-    expect(result.hasSecurity).toBe(true);
+    expect(result.hasSecurity).toBe(false);
     expect(result.securityEnabled).toBe(true);
     expect(result.securityAvailable).toBe(false);
   });

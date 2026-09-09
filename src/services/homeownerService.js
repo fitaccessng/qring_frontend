@@ -173,8 +173,8 @@ export async function getHomeownerContext() {
     estateId: data?.estateId ?? null,
     estateName: data?.estateName ?? null,
     estateOwnerId: data?.estateOwnerId ?? null,
-    hasSecurity: Boolean(data?.securityEnabled ?? data?.hasSecurity),
-    securityEnabled: Boolean(data?.securityEnabled ?? data?.hasSecurity),
+    hasSecurity: Boolean(data?.hasSecurity),
+    securityEnabled: Boolean(data?.securityEnabled),
     securityAvailable: Boolean(data?.securityAvailable),
     home: data?.home ?? null,
     unitLabel: data?.unitLabel ?? data?.home?.name ?? null
