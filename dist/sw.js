@@ -1,4 +1,4 @@
-const CACHE_NAME = "qring-static-v3";
+const CACHE_NAME = "qring-static-v4";
 const APP_SHELL_URLS = ["/", "/index.html", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
@@ -20,6 +20,22 @@ self.addEventListener("fetch", (event) => {
   // Never turn a missing hashed asset into an HTML SPA fallback.
   if (requestUrl.pathname.startsWith("/assets/")) {
     event.respondWith(fetch(event.request));
+    return;
+  }
+
+  const isAppShellRequest = event.request.mode === "navigate"
+    || requestUrl.pathname === "/"
+    || requestUrl.pathname === "/index.html";
+  if (isAppShellRequest) {
+    event.respondWith(
+      fetch(event.request, { cache: "no-cache" }).then((response) => {
+        if (response.ok && response.headers.get("content-type")?.includes("text/html")) {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put("/index.html", copy));
+        }
+        return response;
+      }).catch(() => caches.match("/index.html"))
+    );
     return;
   }
 
