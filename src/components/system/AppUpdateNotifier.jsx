@@ -1,47 +1,28 @@
-import { useEffect, useState } from "react";
-
-const UPDATE_NOTICE_DISMISSED_STORAGE_KEY = "qring:update-notifier-dismissed";
-
-function readUpdateNoticeDismissed() {
-  if (typeof window === "undefined") return false;
-  try {
-    return window.sessionStorage.getItem(UPDATE_NOTICE_DISMISSED_STORAGE_KEY) === "true";
-  } catch {
-    return false;
-  }
-}
-
-function writeUpdateNoticeDismissed(value) {
-  if (typeof window === "undefined") return;
-  try {
-    window.sessionStorage.setItem(UPDATE_NOTICE_DISMISSED_STORAGE_KEY, value ? "true" : "false");
-  } catch {
-    // Ignore storage write failures.
-  }
-}
+import { useEffect } from "react";
 
 export default function AppUpdateNotifier() {
-  const [updateReady, setUpdateReady] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-
   useEffect(() => {
     let active = true;
 
     const handleControllerChange = () => {
-      if (!active) return;
+      if (!active || !navigator.serviceWorker.controller) return;
       window.location.reload();
     };
 
-    const trackInstalling = (worker) => {
+    const activateUpdate = (worker) => {
       if (!worker) return;
-      worker.addEventListener("statechange", () => {
-        if (!active) return;
-        if (worker.state === "installed" && navigator.serviceWorker.controller) {
-          if (!readUpdateNoticeDismissed()) {
-            setUpdateReady(true);
-          }
+      worker.postMessage({ type: "SKIP_WAITING" });
+    };
+
+    const watchInstalling = (worker, hasController) => {
+      if (!worker || !hasController) return;
+      const activateIfInstalled = () => {
+        if (active && worker.state === "installed") {
+          activateUpdate(worker);
         }
-      });
+      };
+      worker.addEventListener("statechange", activateIfInstalled);
+      activateIfInstalled();
     };
 
     const register = async () => {
@@ -52,19 +33,18 @@ export default function AppUpdateNotifier() {
 
       try {
         const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
-        if (registration.waiting && !readUpdateNoticeDismissed()) {
-          setUpdateReady(true);
-        }
+        const hasController = Boolean(navigator.serviceWorker.controller);
+        navigator.serviceWorker.addEventListener("controllerchange", handleControllerChange);
 
-        if (registration.installing) {
-          trackInstalling(registration.installing);
+        if (registration.waiting && hasController) {
+          activateUpdate(registration.waiting);
         }
+        watchInstalling(registration.installing, hasController);
 
         registration.addEventListener("updatefound", () => {
-          trackInstalling(registration.installing);
+          watchInstalling(registration.installing, hasController);
         });
 
-        navigator.serviceWorker.addEventListener("controllerchange", handleControllerChange);
         await registration.update();
       } catch (error) {
         console.warn("Service worker registration failed", error);
@@ -79,52 +59,5 @@ export default function AppUpdateNotifier() {
     };
   }, []);
 
-  if (!updateReady) return null;
-
-  const handleDismiss = () => {
-    writeUpdateNoticeDismissed(true);
-    setUpdateReady(false);
-  };
-
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    try {
-      const registration = await navigator.serviceWorker.getRegistration();
-      if (registration?.waiting) {
-        registration.waiting.postMessage({ type: "SKIP_WAITING" });
-        return;
-      }
-    } catch (error) {
-      console.warn("Unable to apply app update", error);
-    }
-    window.location.reload();
-  };
-
-  return (
-    <div className="fixed inset-x-4 top-4 z-[9999] rounded-2xl border border-slate-200 bg-white/95 px-4 py-3 shadow-lg backdrop-blur md:left-auto md:right-4 md:w-[360px]">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-semibold text-slate-900">Update ready</p>
-          <p className="mt-1 text-sm text-slate-600">A new version of Qring is available. Refresh to use the latest experience.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleDismiss}
-            className="rounded-full border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
-          >
-            Dismiss
-          </button>
-          <button
-            type="button"
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            className="rounded-full bg-[#2456f5] px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-[#1b46c6] disabled:cursor-wait disabled:opacity-70"
-          >
-            {isRefreshing ? "Updating..." : "Refresh"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+  return null;
 }

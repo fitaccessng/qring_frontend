@@ -109,19 +109,20 @@ const EstateBroadcastsPage = () => {
       <header className="sticky top-0 z-[100] w-full border-b border-slate-100/80 bg-white/90 px-4 py-3.5 backdrop-blur-md dark:bg-slate-950/90 dark:border-slate-900">
         <div className="mx-auto flex max-w-2xl items-center justify-between">
           <div className="flex items-center gap-3">
-            {/* <button 
+            <button 
               onClick={() => navigate(-1)} 
+              aria-label="Go back"
               className="p-2 bg-slate-50 text-slate-600 rounded-full hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 transition-all active:scale-95"
             >
               <ChevronLeft size={20} />
-            </button> */}
+            </button>
             <div>
               <h1 className="font-extrabold text-sm sm:text-lg text-slate-900 tracking-tight dark:text-white leading-none">Broadcasts</h1>
-              {/* <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1">Communications Hub</p> */}
             </div>
           </div>
           <button 
             onClick={() => navigate("/dashboard/notifications")} 
+            aria-label="Notifications"
             className="relative p-2 bg-slate-50 text-slate-600 dark:bg-slate-900 dark:text-slate-300 rounded-full"
           >
             <Bell size={18} />
@@ -192,12 +193,14 @@ const EstateBroadcastsPage = () => {
                   <div className="flex gap-1.5">
                     <button 
                       onClick={() => openEdit(item)} 
+                      aria-label="Edit broadcast"
                       className="p-1.5 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100 text-slate-400 hover:text-indigo-600 dark:text-slate-400 rounded-lg transition-all"
                     >
                       <Edit3 size={14} />
                     </button>
                     <button 
                       onClick={() => handleDelete(item.id)} 
+                      aria-label="Delete broadcast"
                       className="p-1.5 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100 text-slate-400 hover:text-rose-600 dark:text-slate-400 rounded-lg transition-all"
                     >
                       <Trash2 size={14} />
@@ -217,9 +220,10 @@ const EstateBroadcastsPage = () => {
         </section>
       </main>
 
-      {/* FLOATING ACTION ACTION SHORTCUT */}
+      {/* FLOATING ACTION SHORTCUT */}
       <button 
         onClick={openCreate} 
+        aria-label="Create broadcast"
         className="fixed bottom-6 right-6 w-14 h-14 bg-indigo-600 text-white rounded-full flex items-center justify-center shadow-lg shadow-indigo-500/25 z-40 active:scale-90 hover:bg-indigo-700 transition-all"
       >
         <Plus size={24} strokeWidth={2.5} />

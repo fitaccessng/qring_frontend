@@ -22,6 +22,7 @@ import { LanguageProvider } from "./state/LanguageContext";
 import { ThemeProvider } from "./state/ThemeContext";
 import BlockingModal from "./components/BlockingModal";
 import AppPreloader from "./components/mobile/AppPreloader";
+import AppUpdateNotifier from "./components/system/AppUpdateNotifier";
 import PanicAlertCenter from "./components/panic/PanicAlertCenter";
 import ToastCenter from "./components/ToastCenter";
 import { env } from "./config/env";
@@ -112,6 +113,7 @@ export default function AppMobile() {
             <NotificationsProvider>
               <Router>
                 <AppRoutes />
+                <AppUpdateNotifier />
               </Router>
             </NotificationsProvider>
           </QueryClientProvider>

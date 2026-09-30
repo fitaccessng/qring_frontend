@@ -1,6 +1,7 @@
 import { apiRequest } from "./apiClient";
 
 const ESTATE_SERVICE_CACHE_TTL_MS = 2 * 60 * 1000;
+const SETTINGS_FORCE_REFRESH_INTERVAL_MS = 60 * 1000;
 export const ESTATE_DATA_UPDATED_EVENT = "qring:estate-data-updated";
 
 const estateServiceCache = {
@@ -16,7 +17,7 @@ const estateServiceCache = {
 };
 
 function createCacheSlot() {
-  return { value: null, at: 0, promise: null };
+  return { value: null, at: 0, promise: null, lastForcedAt: 0, lastForcedError: null };
 }
 
 function isFresh(slot, ttlMs = ESTATE_SERVICE_CACHE_TTL_MS) {
@@ -55,6 +56,8 @@ function clearSlot(slot) {
   slot.value = null;
   slot.at = 0;
   slot.promise = null;
+  slot.lastForcedAt = 0;
+  slot.lastForcedError = null;
 }
 
 export function invalidateEstateServiceCache() {
@@ -119,11 +122,33 @@ export async function getEstateOverview({ force = false } = {}) {
   }, { force });
 }
 
-export async function getEstateSettingsSummary() {
-  return resolveCached(estateServiceCache.settingsSummary, async () => {
-    const response = await apiRequest("/estate/settings-summary");
-    return response?.data ?? {};
-  });
+export async function getEstateSettingsSummary({ force = false, bypassCooldown = false } = {}) {
+  const slot = estateServiceCache.settingsSummary;
+  const now = Date.now();
+  if (force && slot.promise) return slot.promise;
+  const withinRefreshCooldown = !bypassCooldown && now - slot.lastForcedAt < SETTINGS_FORCE_REFRESH_INTERVAL_MS;
+  if (force && withinRefreshCooldown) {
+    if (slot.value) return slot.value;
+    if (slot.lastForcedError) throw slot.lastForcedError;
+  }
+
+  const shouldForce = force && !withinRefreshCooldown;
+  if (shouldForce) {
+    slot.lastForcedAt = now;
+    slot.lastForcedError = null;
+  }
+
+  try {
+    const summary = await resolveCached(slot, async () => {
+      const response = await apiRequest("/estate/settings-summary", { noCache: shouldForce });
+      return response?.data ?? {};
+    }, { force: shouldForce });
+    if (shouldForce) slot.lastForcedError = null;
+    return summary;
+  } catch (error) {
+    if (shouldForce) slot.lastForcedError = error;
+    throw error;
+  }
 }
 
 export async function listEstateArtisans(estateId) {

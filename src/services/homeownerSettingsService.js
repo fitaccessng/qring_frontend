@@ -1,6 +1,7 @@
 import { apiRequest } from "./apiClient";
 
 const HOMEOWNER_SETTINGS_CACHE_TTL_MS = 2 * 60 * 1000;
+const SETTINGS_FORCE_REFRESH_INTERVAL_MS = 60 * 1000;
 export const DEFAULT_HOMEOWNER_SETTINGS = {
   pushAlerts: true,
   soundAlerts: true,
@@ -30,7 +31,9 @@ export const DEFAULT_HOMEOWNER_SETTINGS = {
 const homeownerSettingsCache = {
   value: null,
   at: 0,
-  promise: null
+  promise: null,
+  lastForcedAt: 0,
+  lastForcedError: null
 };
 
 function isFresh() {
@@ -98,19 +101,34 @@ export function invalidateHomeownerSettingsCache() {
   homeownerSettingsCache.value = null;
   homeownerSettingsCache.at = 0;
   homeownerSettingsCache.promise = null;
+  homeownerSettingsCache.lastForcedAt = 0;
+  homeownerSettingsCache.lastForcedError = null;
 }
 
-export async function getHomeownerSettings() {
-  if (isFresh()) {
-    return homeownerSettingsCache.value;
+export async function getHomeownerSettings({ force = false, bypassCooldown = false } = {}) {
+  const now = Date.now();
+  if (force && homeownerSettingsCache.promise) return homeownerSettingsCache.promise;
+  const withinRefreshCooldown = !bypassCooldown && now - homeownerSettingsCache.lastForcedAt < SETTINGS_FORCE_REFRESH_INTERVAL_MS;
+  if (force && withinRefreshCooldown) {
+    if (homeownerSettingsCache.value) return homeownerSettingsCache.value;
+    if (homeownerSettingsCache.lastForcedError) throw homeownerSettingsCache.lastForcedError;
   }
+  const shouldForce = force && !withinRefreshCooldown;
+  if (!shouldForce && isFresh()) return homeownerSettingsCache.value;
   if (homeownerSettingsCache.promise) {
     return homeownerSettingsCache.promise;
   }
+  if (shouldForce) {
+    homeownerSettingsCache.lastForcedAt = now;
+    homeownerSettingsCache.lastForcedError = null;
+  }
   homeownerSettingsCache.promise = (async () => {
     try {
-      const response = await apiRequest("/homeowner/settings");
+      const response = await apiRequest("/homeowner/settings", { noCache: shouldForce });
       return setCache(response?.data ?? null);
+    } catch (error) {
+      if (shouldForce) homeownerSettingsCache.lastForcedError = error;
+      throw error;
     } finally {
       homeownerSettingsCache.promise = null;
     }

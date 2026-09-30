@@ -8,8 +8,6 @@ import {
   Crown,
   Calendar,
   DoorOpen,
-  MapPin,
-  ChevronRight,
   Megaphone,
   Users,
   Vote,
@@ -19,7 +17,6 @@ import {
   Building2,
   Home,
   ShieldCheck,
-  QrCode,
   Settings,
   Shield,
   ClipboardList,
@@ -33,21 +30,21 @@ import { showError } from "../../utils/flash";
 import useEstateOverviewState from "../../hooks/useEstateOverviewState";
 
 const PRIMARY_TOOLKIT_ITEMS = [
-  { label: "Broadcast", icon: <Megaphone size={20} />, to: "/dashboard/estate/broadcasts" },
-  { label: "Meetings", icon: <Users size={20} />, to: "/dashboard/estate/meetings" },
-  { label: "Polls", icon: <Vote size={20} />, to: "/dashboard/estate/polls" },
-  { label: "Dues", icon: <CreditCard size={20} />, to: "/dashboard/estate/dues" },
-  { label: "Repair", icon: <Wrench size={20} />, to: "/dashboard/estate/maintenance" },
-  { label: "Stats", icon: <BarChart3 size={20} />, to: "/dashboard/estate/stats" }
+  { label: "Broadcast", icon: <Megaphone size={18} />, to: "/dashboard/estate/broadcasts" },
+  { label: "Meetings", icon: <Users size={18} />, to: "/dashboard/estate/meetings" },
+  { label: "Polls", icon: <Vote size={18} />, to: "/dashboard/estate/polls" },
+  { label: "Dues", icon: <CreditCard size={18} />, to: "/dashboard/estate/dues" },
+  { label: "Repair", icon: <Wrench size={18} />, to: "/dashboard/estate/maintenance" },
+  { label: "Stats", icon: <BarChart3 size={18} />, to: "/dashboard/estate/stats" }
 ];
 
 const EXTRA_TOOLKIT_ITEMS = [
-  { label: "Estates", icon: <Building2 size={20} />, to: "/dashboard/estate/create" },
-  { label: "Residents", icon: <UserPlus size={20} />, to: "/dashboard/estate/invites" },
-  { label: "Security", icon: <Shield size={20} />, to: "/dashboard/estate/security" },
-  { label: "Logs", icon: <ClipboardList size={20} />, to: "/dashboard/estate/logs" },
-  { label: "Artisans", icon: <HardHat size={20} />, to: "/dashboard/estate/artisans" },
-  { label: "Settings", icon: <Settings size={20} />, to: "/dashboard/estate/settings" }
+  { label: "Estates", icon: <Building2 size={18} />, to: "/dashboard/estate/create" },
+  { label: "Residents", icon: <UserPlus size={18} />, to: "/dashboard/estate/invites" },
+  { label: "Security", icon: <Shield size={18} />, to: "/dashboard/estate/security" },
+  { label: "Logs", icon: <ClipboardList size={18} />, to: "/dashboard/estate/logs" },
+  { label: "Artisans", icon: <HardHat size={18} />, to: "/dashboard/estate/artisans" },
+  { label: "Settings", icon: <Settings size={18} />, to: "/dashboard/estate/settings" }
 ];
 
 export default function EstateManagerDashboard() {
@@ -90,15 +87,9 @@ export default function EstateManagerDashboard() {
     () => (overview?.homeowners ?? []).filter((row) => homeownerIds.has(String(row.id))),
     [homeownerIds, overview]
   );
-  const estateSecurityUsers = useMemo(
-    () => (overview?.securityUsers ?? []).filter((row) => !currentEstateId || String(row.estateId) === String(currentEstateId)),
-    [currentEstateId, overview]
-  );
 
   const planRestrictions = overview?.planRestrictions ?? {};
   const subscription = overview?.subscription ?? {};
-  const activeDoors = Number(planRestrictions.usedDoors ?? estateDoors.length ?? 0);
-  const usedQrCodes = Number(planRestrictions.usedQrCodes ?? 0);
   const maxHomes = Math.max(Number(planRestrictions.maxHomes ?? 0), estateHomes.length, 1);
   const homeProgressPercentage = Math.min(100, (estateHomes.length / maxHomes) * 100);
 
@@ -121,117 +112,132 @@ export default function EstateManagerDashboard() {
   const toolkitItems = showAllToolkit ? [...PRIMARY_TOOLKIT_ITEMS, ...EXTRA_TOOLKIT_ITEMS] : PRIMARY_TOOLKIT_ITEMS;
 
   return (
-    <div className="bg-[#f8f9fa] text-slate-800 min-h-screen pb-28 font-sans overflow-x-hidden">
-      <header className="backdrop-blur-xl border-b border-slate-100 fixed top-0 w-full z-50 flex justify-between items-center px-4 md:px-6 h-16 bg-white/80">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-9 h-9 flex-shrink-0 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center">
-            <ShieldCheck size={18} className="text-indigo-600" />
+    <div className="bg-white text-slate-900 min-h-screen pb-40 font-sans">
+      {/* Top Minimalist Header */}
+      <header className="fixed top-0 w-full z-40 bg-white/95 backdrop-blur-md border-b border-slate-100 flex justify-between items-center px-6 h-20">
+        <div className="flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600 shadow-sm border border-blue-100/50">
+            <ShieldCheck size={22} />
           </div>
-          <span className="text-lg md:text-xl font-bold text-slate-900 tracking-tight truncate">
-            {stats.estateName}
-          </span>
+          <div>
+            <span className="text-xs font-semibold text-slate-400 block leading-tight mb-0.5">Portal</span>
+            <span className="text-base font-bold text-slate-900 tracking-tight block truncate max-w-[180px] sm:max-w-xs">
+              {stats.estateName}
+            </span>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Link to="/onboarding" aria-label="Open Getting Started" title="Getting Started" className="p-2.5 bg-slate-50 text-slate-500 rounded-full flex-shrink-0 hover:bg-indigo-50 hover:text-indigo-600">
+        <div className="flex items-center gap-3">
+          <Link 
+            to="/onboarding" 
+            aria-label="Getting Started" 
+            className="p-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-2xl transition-colors border border-slate-100 shadow-sm"
+          >
             <CircleHelp size={20} />
           </Link>
-          <Link to="/dashboard/notifications" className="relative p-2.5 bg-slate-50 text-slate-500 rounded-full flex-shrink-0">
+          <Link 
+            to="/dashboard/notifications" 
+            aria-label="Notifications" 
+            className="relative p-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-2xl transition-colors border border-slate-100 shadow-sm"
+          >
             <Bell size={20} />
-            {unreadCount > 0 ? <span className="absolute top-2.5 right-2.5 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white" /> : null}
+            {unreadCount > 0 && (
+              <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-blue-600 rounded-full" />
+            )}
           </Link>
         </div>
       </header>
 
-      <main className="pt-24 px-4 md:px-6 max-w-5xl mx-auto space-y-7 md:space-y-8">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-5">
-          <div className="min-w-0">
-            <span className="text-indigo-600 font-bold uppercase tracking-[0.2em] text-[10px] mb-2 block">Executive Dashboard</span>
-            <h1 className="text-3xl md:text-4xl font-black tracking-tighter text-slate-900 truncate">Estate Overview</h1>
+      {/* Main Container */}
+      <main className="pt-28 px-6 max-w-3xl mx-auto space-y-8">
+        
+        {/* Title & Quick Action Buttons */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-black tracking-tight text-slate-900">Overview</h1>
+            <p className="text-sm text-slate-400 mt-0.5">Manage your estate properties & operations</p>
           </div>
-          <div className="flex gap-2 md:gap-3">
+          <div className="flex items-center gap-3">
             <Link
               to="/dashboard/estate/create"
-              className="flex-1 md:flex-none bg-white border border-slate-200 text-slate-700 px-4 md:px-5 py-3 rounded-2xl text-xs md:text-sm font-bold flex items-center justify-center gap-2 active:scale-95 transition-all"
+              className="flex-1 sm:flex-none bg-slate-50 hover:bg-slate-100 active:scale-95 text-slate-700 px-5 py-3.5 rounded-2xl text-sm font-bold flex items-center justify-center gap-2 transition-all border border-slate-200/60 shadow-sm"
             >
-              <Plus size={16} /> <span className="whitespace-nowrap">Estate</span>
+              <Plus size={18} className="text-slate-400" /> <span>Estate</span>
             </Link>
             <Link
               to="/dashboard/estate/invites"
-              className="flex-1 md:flex-none bg-indigo-600 text-white px-4 md:px-5 py-3 rounded-2xl text-xs md:text-sm font-bold shadow-lg shadow-indigo-100 flex items-center justify-center gap-2 active:scale-95 transition-all"
+              className="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-700 active:scale-95 text-white px-6 py-3.5 rounded-2xl text-sm font-bold shadow-md shadow-blue-600/20 transition-all flex items-center justify-center gap-2"
             >
-              <UserPlus size={16} /> <span className="whitespace-nowrap">Resident</span>
+              <UserPlus size={18} /> <span>Resident</span>
             </Link>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-5">
-          <div className="md:col-span-7 bg-white p-6 md:p-7 rounded-[2rem] md:rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col justify-between">
-            <div className="min-w-0">
-              <div className="flex justify-between items-start mb-5 md:mb-6">
-                <div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600 flex-shrink-0">
-                  <Crown size={22} fill="currentColor" fillOpacity={0.2} />
-                </div>
-                <span className={`px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${loading ? "bg-slate-50 text-slate-400 border-slate-100" : badgeToneForStatus(stats.status)}`}>
-                  {loading ? "Syncing" : labelForStatus(stats.status)}
-                </span>
+        {/* Clean Subscription Card */}
+        <div className="bg-slate-50/70 p-7 sm:p-8 rounded-[2.5rem] border border-slate-100 space-y-6 shadow-sm">
+          <div className="flex justify-between items-start">
+            <div className="flex items-center gap-4">
+              <div className="p-3.5 bg-white shadow-sm rounded-2xl text-blue-600 border border-slate-100">
+                <Crown size={22} />
               </div>
-              <h3 className="text-xl md:text-2xl font-black text-slate-900 mb-1 truncate">{stats.estateName}</h3>
-              <p className="text-slate-500 font-medium text-xs md:text-sm mb-5 md:mb-6">
-                {toTitleCase(stats.tier)} management tier
-              </p>
-            </div>
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="text-slate-400 font-black uppercase tracking-tighter text-[10px]">Houses/Units</span>
-                <span className="font-black text-slate-900 text-sm">{estateHomes.length} / {maxHomes}</span>
-              </div>
-              <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                <div className="bg-indigo-600 h-full transition-all duration-1000 ease-out rounded-full" style={{ width: `${homeProgressPercentage}%` }} />
-              </div>
-              <div className="grid grid-cols-2 gap-2.5">
-                <MiniDetail label="Homes" value={stats.portfolio.homes} />
-                <MiniDetail label="Residents" value={stats.portfolio.residents} />
-              </div>
-              <div className="pt-3.5 border-t border-slate-50 flex items-center gap-2 text-slate-400 text-[9px] font-black uppercase tracking-widest">
-                <Calendar size={12} /> <span>Expires {stats.expiryDate}</span>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">{stats.estateName}</h3>
+                <p className="text-xs text-slate-500 font-medium">{toTitleCase(stats.tier)} Plan</p>
               </div>
             </div>
+            <span className={`px-3.5 py-1.5 rounded-full text-xs font-bold tracking-wide border ${loading ? "bg-slate-100 text-slate-400 border-slate-200" : badgeToneForStatus(stats.status)}`}>
+              {loading ? "Syncing..." : labelForStatus(stats.status)}
+            </span>
+          </div>
+
+          <div className="space-y-2.5 pt-1">
+            <div className="flex justify-between items-center text-xs">
+              <span className="text-slate-400 font-medium">Capacity Used</span>
+              <span className="font-bold text-slate-800">{estateHomes.length} of {maxHomes} homes</span>
+            </div>
+            <div className="w-full bg-slate-200/60 rounded-full h-2 overflow-hidden">
+              <div 
+                className="bg-blue-600 h-full transition-all duration-500 rounded-full" 
+                style={{ width: `${homeProgressPercentage}%` }} 
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 pt-1">
+            <MiniDetail label="Total Homes" value={stats.portfolio.homes} />
+            <MiniDetail label="Total Residents" value={stats.portfolio.residents} />
+          </div>
+
+          <div className="flex items-center gap-2 text-slate-400 text-xs font-medium pt-1">
+            <Calendar size={15} className="text-blue-500" /> 
+            <span>Renews / Expires {stats.expiryDate}</span>
           </div>
         </div>
 
-        <section>
-          <div className="flex items-center justify-between mb-5 md:mb-6 px-1">
-            <h2 className="text-xl md:text-2xl font-black tracking-tight text-slate-900">Toolkit</h2>
+        {/* Toolkit Section */}
+        <section className="space-y-3">
+          <div className="flex items-center justify-between px-0.5">
+            <h2 className="text-base font-bold tracking-tight text-slate-900">Toolkit</h2>
             <button
               type="button"
               onClick={() => setShowAllToolkit((prev) => !prev)}
-              className="inline-flex items-center gap-1 text-indigo-600 text-[10px] font-black uppercase tracking-[0.2em]"
+              className="text-blue-600 hover:text-blue-700 text-xs font-bold flex items-center gap-1.5 py-1 px-2 rounded-lg hover:bg-blue-50/50 transition-colors"
             >
               {showAllToolkit ? "Show Less" : "View All"}
-              {showAllToolkit ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
+              {showAllToolkit ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
             </button>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2.5">
             {toolkitItems.map((item) => (
               <ToolkitItem key={item.label} {...item} />
             ))}
           </div>
         </section>
 
-        <section className="pb-4">
-          <h2 className="text-xl md:text-2xl font-black tracking-tight mb-5 md:mb-6 px-1 text-slate-900">Assets</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-            <AssetCard count={stats.portfolio.estates} label="Estates" icon={<Building2 size={18} />} primary />
-            <AssetCard count={stats.portfolio.homes} label="Homes" icon={<Home size={18} />} />
-            <AssetCard count={stats.portfolio.doors} label="Doors" icon={<DoorOpen size={18} />} />
-            <AssetCard count={stats.portfolio.residents} label="Residents" icon={<Users size={18} />} />
-          </div>
-        </section>
       </main>
 
-      {/* --- Fixed Bottom Navigation --- */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-slate-100 px-4 py-2.5 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
-        <div className="max-w-md mx-auto flex items-center justify-between gap-2">
+      {/* Floating Minimalist Bottom Navigation */}
+      <nav className="fixed bottom-6 left-5 right-5 z-50 max-w-md mx-auto bg-white/95 backdrop-blur-xl border border-slate-100 rounded-3xl shadow-2xl shadow-slate-300/50 px-4 py-3">
+        <div className="flex items-center justify-around gap-2">
           <BottomNavLink
             to="/dashboard/estate"
             icon={<Home size={22} />}
@@ -241,13 +247,13 @@ export default function EstateManagerDashboard() {
           <BottomNavLink
             to="/dashboard/estate/create"
             icon={<Plus size={22} />}
-            label="Create Estate"
+            label="Create"
             active={location.pathname === "/dashboard/estate/create"}
           />
           <BottomNavLink
             to="/dashboard/estate/logs"
             icon={<ClipboardList size={22} />}
-            label="View Log"
+            label="Logs"
             active={location.pathname === "/dashboard/estate/logs"}
           />
           <BottomNavLink
@@ -266,23 +272,13 @@ function ToolkitItem({ icon, label, to }) {
   return (
     <Link
       to={to}
-      className="group bg-white p-5 md:p-6 rounded-[1.8rem] md:rounded-[2.5rem] text-center hover:bg-indigo-600 hover:text-white transition-all border border-slate-100 shadow-sm active:scale-95 flex flex-col items-center justify-center"
+      className="bg-slate-50/60 hover:bg-blue-50/60 hover:border-blue-200/80 active:scale-95 p-3 rounded-2xl text-center transition-all border border-slate-100 flex flex-col items-center justify-center gap-1.5 group shadow-xs"
     >
-      <div className="mb-2.5 text-indigo-600 transition-colors group-hover:text-white">{icon}</div>
-      <span className="text-[9px] font-black uppercase tracking-tight">{label}</span>
-    </Link>
-  );
-}
-
-function AssetCard({ count, label, icon, primary = false }) {
-  return (
-    <div className="bg-white p-5 md:p-6 rounded-[1.8rem] md:rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col items-center text-center">
-      <div className={`mb-2.5 p-2 rounded-lg ${primary ? "bg-indigo-50 text-indigo-600" : "bg-slate-50 text-slate-400"}`}>
+      <div className="p-2 rounded-xl bg-white text-slate-600 group-hover:text-blue-600 group-hover:bg-blue-100/50 transition-all border border-slate-100">
         {icon}
       </div>
-      <span className={`text-3xl md:text-5xl font-black mb-1 tracking-tighter ${primary ? "text-indigo-600" : "text-slate-900"}`}>{count}</span>
-      <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">{label}</span>
-    </div>
+      <span className="text-[11px] font-bold text-slate-700 group-hover:text-blue-700 transition-colors tracking-tight">{label}</span>
+    </Link>
   );
 }
 
@@ -290,23 +286,21 @@ function BottomNavLink({ to, icon, label, active = false }) {
   return (
     <Link
       to={to}
-      className={`flex flex-col items-center justify-center flex-1 py-1 transition-all active:scale-90 ${
-        active ? "text-indigo-600 font-bold" : "text-slate-400 hover:text-slate-600 font-medium"
+      className={`flex flex-col items-center justify-center flex-1 py-2 px-3 rounded-2xl transition-all active:scale-95 ${
+        active ? "text-blue-600 bg-blue-50/80 font-bold shadow-xs border border-blue-100/50" : "text-slate-400 hover:text-slate-600 font-medium"
       }`}
     >
-      <div className={`p-1.5 rounded-xl transition-all ${active ? "bg-indigo-50 text-indigo-600" : ""}`}>
-        {icon}
-      </div>
-      <span className="text-[10px] tracking-tight mt-0.5 whitespace-nowrap">{label}</span>
+      {icon}
+      <span className="text-[11px] tracking-tight mt-1">{label}</span>
     </Link>
   );
 }
 
 function MiniDetail({ label, value }) {
   return (
-    <div className="rounded-2xl bg-slate-50 px-4 py-2.5 border border-slate-100">
-      <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">{label}</p>
-      <p className="mt-1 text-lg font-black text-slate-900">{value}</p>
+    <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-xs">
+      <p className="text-xs text-slate-400 font-medium">{label}</p>
+      <p className="mt-1 text-base font-bold text-slate-900">{value}</p>
     </div>
   );
 }
@@ -333,10 +327,10 @@ function labelForStatus(status) {
 function badgeToneForStatus(status) {
   const value = String(status || "").trim().toLowerCase();
   if (value === "active" || value === "trial" || value === "expiring_soon") {
-    return "bg-emerald-50 text-emerald-600 border-emerald-100";
+    return "bg-emerald-50 text-emerald-700 border-emerald-200/60";
   }
   if (value === "grace_period" || value === "payment_pending") {
-    return "bg-amber-50 text-amber-600 border-amber-100";
+    return "bg-amber-50 text-amber-700 border-amber-200/60";
   }
-  return "bg-rose-50 text-rose-600 border-rose-100";
+  return "bg-rose-50 text-rose-700 border-rose-200/60";
 }

@@ -1,4 +1,4 @@
-const CACHE_NAME = "qring-static-v4";
+const CACHE_NAME = "qring-static-v5";
 const APP_SHELL_URLS = ["/", "/index.html", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {

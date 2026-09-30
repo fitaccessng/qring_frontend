@@ -12,7 +12,10 @@ import {
   CreditCard,
   Lock,
   ArrowUpRight,
-  TrendingDown
+  TrendingDown,
+  Activity,
+  CheckCircle2,
+  XCircle
 } from 'lucide-react';
 import { getEstateStatsSummary, getEstateStatsSummarySnapshot } from "../../services/estateService";
 import useSubscription from "../../hooks/useSubscription";
@@ -54,6 +57,9 @@ export default function EstateStatsPage() {
     };
   }, [summary]);
 
+  const approvalRate = stats.totalVisits > 0 ? Math.round((stats.approved / stats.totalVisits) * 100) : 0;
+  const rejectionRate = stats.totalVisits > 0 ? Math.round((stats.rejected / stats.totalVisits) * 100) : 0;
+
   const entitled = isSubscriptionEntitled(subscription, { requiredFeature: "analytics" });
   const restricted = !subscriptionLoading && !entitled && !loading && !summary && Boolean(error);
 
@@ -62,46 +68,53 @@ export default function EstateStatsPage() {
 
       {/* --- STICKY GLASS HEADER --- */}
       <header className="sticky top-0 z-[100] w-full border-b border-slate-100/80 bg-white/90 px-4 py-3.5 backdrop-blur-md dark:bg-slate-950/90 dark:border-slate-900">
-        <div className="mx-auto flex max-w-7xl items-center justify-between">
+        <div className="mx-auto flex max-w-2xl items-center justify-between">
           <div className="flex items-center gap-3">
             <button
               onClick={() => navigate(-1)}
+              aria-label="Go back"
               className="p-2 bg-slate-50 text-slate-600 rounded-full hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 transition-all active:scale-95"
             >
               <ChevronLeft size={20} />
             </button>
             <div>
               <h1 className="font-extrabold text-sm sm:text-lg text-slate-900 tracking-tight dark:text-white leading-none">Estate Stats</h1>
-              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1">Analytics & Metrics</p>
             </div>
           </div>
-          <button className="relative p-2 bg-slate-50 text-slate-600 dark:bg-slate-900 dark:text-slate-300 rounded-full">
+          <button 
+            onClick={() => navigate("/dashboard/notifications")} 
+            aria-label="Notifications"
+            className="relative p-2 bg-slate-50 text-slate-600 dark:bg-slate-900 dark:text-slate-300 rounded-full"
+          >
             <Bell size={18} />
             <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-rose-500 rounded-full border border-white dark:border-slate-950" />
           </button>
         </div>
       </header>
 
-      <main className="mt-6 px-4 max-w-7xl mx-auto w-full space-y-6 flex-1">
+      <main className="mt-4 px-4 max-w-2xl mx-auto w-full space-y-4 flex-1">
 
         {/* --- TITLE & ACTION SEGMENTS --- */}
-        <section className="flex flex-col md:flex-row md:items-end justify-between gap-4 px-1">
+        <section className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 px-1">
           <div>
             <span className="text-indigo-600 dark:text-indigo-400 font-bold tracking-widest text-[9px] uppercase block">
               {loading ? "Refreshing Database..." : "Live Performance Monitor"}
             </span>
             <h2 className="text-xl font-black text-slate-900 dark:text-white mt-1">Operational Analytics</h2>
-            <p className="text-slate-500 dark:text-slate-400 text-xs font-medium mt-1 max-w-md leading-relaxed">
+            <p className="text-slate-500 dark:text-slate-400 text-xs font-medium mt-1 leading-relaxed">
               Real-time audit records, traffic behavior, and community density summaries.
             </p>
           </div>
 
           {!restricted && (
             <div className="flex items-center gap-2 shrink-0">
-              <button className="bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider shadow-sm hover:bg-slate-50 dark:hover:bg-slate-850 transition-all active:scale-95">
+              <button className="bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider shadow-sm hover:bg-slate-50 dark:hover:bg-slate-850 transition-all active:scale-95 text-slate-700 dark:text-slate-300">
                 Last 30 Days
               </button>
-              <button className="bg-indigo-600 hover:bg-indigo-700 text-white p-2.5 rounded-xl shadow-md shadow-indigo-500/10 active:scale-95 transition-all">
+              <button 
+                aria-label="Download Report"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded-xl shadow-md shadow-indigo-500/10 active:scale-95 transition-all"
+              >
                 <Download size={16} strokeWidth={2.5} />
               </button>
             </div>
@@ -110,7 +123,7 @@ export default function EstateStatsPage() {
 
         {restricted ? (
           /* --- RESTRICTED / PAYWALL LAYER --- */
-          <section className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-slate-100/50 dark:border-slate-800/45 shadow-sm text-center flex flex-col items-center max-w-lg mx-auto mt-8">
+          <section className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-slate-100/50 dark:border-slate-800/45 shadow-sm text-center flex flex-col items-center mx-auto mt-8 w-full">
             <div className="w-14 h-14 bg-indigo-50 dark:bg-indigo-500/10 rounded-2xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 mb-5">
               <Lock size={24} />
             </div>
@@ -128,9 +141,9 @@ export default function EstateStatsPage() {
         ) : (
           <>
             {/* --- BENTO METRICS GRID --- */}
-            <section className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+            <section className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {/* Card 1: Total Residents */}
-              <div className="bg-indigo-50 dark:bg-indigo-500/5 p-5 rounded-3xl border border-indigo-100/40 dark:border-indigo-500/10 flex flex-col justify-between min-h-[145px] relative overflow-hidden">
+              <div className="bg-indigo-50 dark:bg-indigo-500/5 p-4 rounded-3xl border border-indigo-100/40 dark:border-indigo-500/10 flex flex-col justify-between min-h-[130px] relative overflow-hidden">
                 <div className="flex justify-between items-start">
                   <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl text-indigo-600 dark:text-indigo-400 border border-indigo-100/20 dark:border-indigo-500/10 shadow-sm z-10">
                     <ShieldCheck size={18} />
@@ -141,52 +154,94 @@ export default function EstateStatsPage() {
                 </div>
                 <div className="z-10 mt-3">
                   <p className="text-indigo-500/70 dark:text-indigo-400/50 text-[10px] font-bold uppercase tracking-wider">Total Residents</p>
-                  <p className="text-2xl font-black text-indigo-950 dark:text-white mt-0.5">{stats.residents}</p>
+                  <p className="text-xl font-black text-indigo-950 dark:text-white mt-0.5">{stats.residents}</p>
                 </div>
                 <div className="absolute -right-8 -bottom-8 w-24 h-24 bg-indigo-600/10 rounded-full blur-2xl pointer-events-none" />
               </div>
 
               {/* Card 2: Total Visits */}
-              <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-100/50 dark:border-slate-800/40 flex flex-col justify-between min-h-[145px] shadow-sm relative overflow-hidden">
+              <div className="bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-100/50 dark:border-slate-800/40 flex flex-col justify-between min-h-[130px] shadow-sm relative overflow-hidden">
                 <div className="flex justify-between items-start">
-                  <div className="p-2.5 bg-slate-50 dark:bg-slate-850 rounded-xl text-slate-450 dark:text-slate-400 border border-slate-100/50 dark:border-slate-800 shadow-sm">
+                  <div className="p-2.5 bg-slate-50 dark:bg-slate-850 rounded-xl text-slate-600 dark:text-slate-400 border border-slate-100/50 dark:border-slate-800 shadow-sm">
                     <TrendingUp size={18} />
                   </div>
-                  <span className="text-[8px] font-extrabold text-emerald-650 dark:text-emerald-400 uppercase tracking-wider bg-emerald-50 dark:bg-emerald-500/5 px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                    <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-[8px] font-extrabold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider bg-emerald-50 dark:bg-emerald-500/10 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                     LIVE
                   </span>
                 </div>
                 <div className="mt-3">
                   <p className="text-slate-400 dark:text-slate-500 text-[10px] font-bold uppercase tracking-wider">Total Check-Ins</p>
-                  <p className="text-2xl font-black text-slate-900 dark:text-white mt-0.5">{stats.totalVisits}</p>
+                  <p className="text-xl font-black text-slate-900 dark:text-white mt-0.5">{stats.totalVisits}</p>
                 </div>
               </div>
 
               {/* Card 3: Approval Ratio */}
-              <div className="bg-emerald-50/50 dark:bg-emerald-500/5 p-5 rounded-3xl border border-emerald-100/40 dark:border-emerald-500/10 flex flex-col justify-between min-h-[145px] relative overflow-hidden">
+              <div className="bg-emerald-50/50 dark:bg-emerald-500/5 p-4 rounded-3xl border border-emerald-100/40 dark:border-emerald-500/10 flex flex-col justify-between min-h-[130px] relative overflow-hidden">
                 <div className="flex justify-between items-start">
-                  <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl text-emerald-600 dark:text-emerald-450 border border-emerald-100/20 dark:border-emerald-500/10 shadow-sm z-10">
+                  <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl text-emerald-600 dark:text-emerald-400 border border-emerald-100/20 dark:border-indigo-500/10 shadow-sm z-10">
                     <ThumbsUp size={18} />
                   </div>
+                  <span className="text-[8px] font-extrabold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider bg-emerald-100/50 dark:bg-emerald-500/10 px-2.5 py-0.5 rounded-full">
+                    Performance
+                  </span>
                 </div>
                 <div className="z-10 mt-3">
                   <p className="text-emerald-600/70 dark:text-emerald-400/50 text-[10px] font-bold uppercase tracking-wider">Approval Rate</p>
-                  <p className="text-2xl font-black text-emerald-700 dark:text-emerald-400 mt-0.5">
-                    {stats.totalVisits > 0 ? Math.round((stats.approved / stats.totalVisits) * 100) : 0}%
+                  <p className="text-xl font-black text-emerald-700 dark:text-emerald-400 mt-0.5">
+                    {approvalRate}%
                   </p>
                 </div>
                 <div className="absolute -right-8 -bottom-8 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
               </div>
             </section>
 
-            {/* --- OPERATIONAL HEALTH CHART & ACTIVITY SHEET --- */}
-         
+            {/* --- DETAILED BREAKDOWN SECTION --- */}
+            <section className="space-y-3">
+              <div className="px-1">
+                <h4 className="font-bold text-[10px] text-slate-400 uppercase tracking-widest">Traffic Breakdown</h4>
+              </div>
+
+              <div className="bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-100/50 dark:border-slate-800/40 shadow-sm space-y-3.5">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800/60">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                      <CheckCircle2 size={16} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-black text-slate-900 dark:text-white">Approved Visits</p>
+                      <p className="text-[10px] text-slate-400 font-medium">Successfully verified entries</p>
+                    </div>
+                  </div>
+                  <span className="text-sm font-black text-slate-900 dark:text-white">{stats.approved}</span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-rose-50 dark:bg-rose-500/10 flex items-center justify-center text-rose-600 dark:text-rose-400">
+                      <XCircle size={16} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-black text-slate-900 dark:text-white">Rejected Visits</p>
+                      <p className="text-[10px] text-slate-400 font-medium">Declined or unauthorized entries</p>
+                    </div>
+                  </div>
+                  <span className="text-sm font-black text-slate-900 dark:text-white">{stats.rejected}</span>
+                </div>
+              </div>
+            </section>
+
             {/* --- FOOTER CARD METRICS --- */}
-            <section className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-              <InsightCard label="Active Homes" val={stats.activeHomes} icon={<Building2 size={16} />} color="indigo" />
-              <InsightCard label="Access Points" val={stats.activeDoors} icon={<CreditCard size={16} />} color="emerald" />
-              <InsightCard label="Approved Today" val={stats.approved} icon={<Users size={16} />} color="slate" />
+            <section className="space-y-3">
+              <div className="px-1">
+                <h4 className="font-bold text-[10px] text-slate-400 uppercase tracking-widest">Infrastructure Overview</h4>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <InsightCard label="Active Homes" val={stats.activeHomes} icon={<Building2 size={16} />} color="indigo" />
+                <InsightCard label="Access Points" val={stats.activeDoors} icon={<CreditCard size={16} />} color="emerald" />
+                <InsightCard label="Approved Today" val={stats.approved} icon={<Users size={16} />} color="slate" />
+              </div>
             </section>
           </>
         )}
@@ -202,7 +257,7 @@ function InsightCard({ label, val, icon, color }) {
       bg: "bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-100/20",
     },
     emerald: {
-      bg: "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-450 border-emerald-100/20",
+      bg: "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-100/20",
     },
     slate: {
       bg: "bg-slate-50 dark:bg-slate-850 text-slate-500 dark:text-slate-400 border-slate-100/50",
@@ -213,11 +268,11 @@ function InsightCard({ label, val, icon, color }) {
 
   return (
     <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100/50 dark:border-slate-800/40 shadow-sm flex items-center gap-3.5">
-      <div className={`w-11 h-11 rounded-xl flex items-center justify-center border ${activeTheme.bg}`}>
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center border shrink-0 ${activeTheme.bg}`}>
         {icon}
       </div>
       <div>
-        <h4 className="text-lg font-black text-slate-900 dark:text-white leading-none">{val}</h4>
+        <h4 className="text-base font-black text-slate-900 dark:text-white leading-none">{val}</h4>
         <p className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider mt-1">{label}</p>
       </div>
     </div>

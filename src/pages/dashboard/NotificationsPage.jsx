@@ -12,11 +12,13 @@ import {
   Zap
 } from "lucide-react";
 import NotificationFeed from "../../components/notifications/NotificationFeed";
+import { useAuth } from "../../state/AuthContext";
 import { useNotifications } from "../../state/NotificationsContext";
 import { getNotificationDetailRoute } from "../../utils/notificationMeta";
 
 export default function NotificationsPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const {
     items,
     loading,
@@ -105,7 +107,7 @@ export default function NotificationsPage() {
 
           <div className="flex items-center gap-2">
             <button
-              onClick={() => navigate("/dashboard/homeowner/settings")}
+              onClick={() => navigate(user?.role === "estate" ? "/dashboard/estate/settings" : "/dashboard/homeowner/safety")}
               className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-gray-600 transition hover:bg-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
               aria-label="Settings"
             >

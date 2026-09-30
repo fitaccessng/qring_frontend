@@ -18,7 +18,9 @@ export default defineConfig(({ mode }) => {
     );
   }
   const appBuildTarget = String(process.env.VITE_APP_BUILD_TARGET ?? env.VITE_APP_BUILD_TARGET ?? "").trim().toLowerCase();
-  const backendTarget = "http://localhost:8000";
+  const backendTarget = String(
+    process.env.VITE_BACKEND_PROXY_TARGET ?? env.VITE_BACKEND_PROXY_TARGET ?? "http://127.0.0.1:8001",
+  ).trim();
 
   return {
     plugins: [react()],

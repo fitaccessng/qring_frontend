@@ -28,6 +28,7 @@ import { estateFieldClassName } from "../../components/mobile/EstateManagerPageS
 import BottomSheet from "../../components/system/BottomSheet";
 
 const ACTIVE_ESTATE_STORAGE_KEY = "qring.activeEstateId";
+const SETTINGS_AUTO_REFRESH_INTERVAL_MS = 60_000;
 
 function readActiveEstateId() {
   if (typeof window === "undefined") return "";
@@ -252,10 +253,10 @@ export default function EstateSettingsPage() {
 
   useEffect(() => {
     let active = true;
-    async function loadSummary() {
-      if (!cachedSummary) setLoading(true);
+    async function loadSummary({ bypassCooldown = false } = {}) {
+      if (!getEstateSettingsSummarySnapshot()) setLoading(true);
       try {
-        const data = await getEstateSettingsSummary();
+        const data = await getEstateSettingsSummary({ force: true, bypassCooldown });
         if (!active) return;
         setSummary(data || { estates: [], doors: [], subscription: {} });
         setLoadError("");
@@ -266,9 +267,24 @@ export default function EstateSettingsPage() {
         if (active) setLoading(false);
       }
     }
-    loadSummary();
-    return () => { active = false; };
-  }, [cachedSummary]);
+
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") {
+        loadSummary();
+      }
+    };
+
+    loadSummary({ bypassCooldown: true });
+    const refreshInterval = window.setInterval(refreshWhenVisible, SETTINGS_AUTO_REFRESH_INTERVAL_MS);
+    window.addEventListener("focus", refreshWhenVisible);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      active = false;
+      window.clearInterval(refreshInterval);
+      window.removeEventListener("focus", refreshWhenVisible);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [user?.id]);
 
   useEffect(() => {
     if (!selectedEstateId && summary?.estates?.length) {

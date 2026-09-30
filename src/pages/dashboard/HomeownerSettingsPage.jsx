@@ -69,6 +69,7 @@ const EMPTY_PASSWORD_FORM = {
 };
 
 const HELP_CENTER_URL = "https://www.useqring.online";
+const SETTINGS_AUTO_REFRESH_INTERVAL_MS = 60_000;
 
 // --- Helper Utilities ---
 function buildUsernameFromEmail(email) {
@@ -131,12 +132,10 @@ export default function HomeownerSettingsPage() {
   useEffect(() => {
     let active = true;
 
-    async function loadSettings() {
-      if (!cachedSettings) {
-        setLoading(true);
-      }
+    async function loadSettings({ bypassCooldown = false } = {}) {
+      if (!getHomeownerSettingsSnapshot()) setLoading(true);
       try {
-        const data = (await getHomeownerSettings()) || DEFAULT_SETTINGS;
+        const data = (await getHomeownerSettings({ force: true, bypassCooldown })) || DEFAULT_SETTINGS;
         if (!active) return;
         const merged = mergeSettings(data);
         setSettings(merged);
@@ -153,11 +152,23 @@ export default function HomeownerSettingsPage() {
       }
     }
 
-    loadSettings();
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") {
+        loadSettings();
+      }
+    };
+
+    loadSettings({ bypassCooldown: true });
+    const refreshInterval = window.setInterval(refreshWhenVisible, SETTINGS_AUTO_REFRESH_INTERVAL_MS);
+    window.addEventListener("focus", refreshWhenVisible);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
     return () => {
       active = false;
+      window.clearInterval(refreshInterval);
+      window.removeEventListener("focus", refreshWhenVisible);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
-  }, [user]);
+  }, [user?.id]);
 
   useEffect(() => {
     if (!activeModal) return undefined;

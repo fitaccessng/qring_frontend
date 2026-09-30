@@ -51,63 +51,30 @@
 
 @layer utilities {
   @keyframes qring-loader {
-    0% {
-      transform: translateX(-100%);
-    }
-    50% {
-      transform: translateX(40%);
-    }
-    100% {
-      transform: translateX(220%);
-    }
+    0% { transform: translateX(-100%); }
+    50% { transform: translateX(40%); }
+    100% { transform: translateX(220%); }
   }
 
   @keyframes qring-slide-up {
-    from {
-      opacity: 0;
-      transform: translateY(12px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
   }
 
   @keyframes qring-letter-in {
-    from {
-      opacity: 0;
-      transform: translateY(10px) scale(0.92);
-      filter: blur(4px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0) scale(1);
-      filter: blur(0);
-    }
+    from { opacity: 0; transform: translateY(10px) scale(0.92); filter: blur(4px); }
+    to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
   }
 
   @keyframes qring-bonus-sweep {
-    0% {
-      opacity: 0;
-      transform: translateX(-18%);
-    }
-    45% {
-      opacity: 1;
-    }
-    100% {
-      opacity: 0;
-      transform: translateX(18%);
-    }
+    0% { opacity: 0; transform: translateX(-18%); }
+    45% { opacity: 1; }
+    100% { opacity: 0; transform: translateX(18%); }
   }
 
   @keyframes qring-pulse-fade {
-    0%,
-    100% {
-      opacity: 0.35;
-    }
-    50% {
-      opacity: 0.95;
-    }
+    0%, 100% { opacity: 0.35; }
+    50% { opacity: 0.95; }
   }
 
   .animate-screen-enter {
@@ -123,80 +90,69 @@
 }
 
 @layer components {
-  html.dark [class*="bg-[#f8f9fa]"] {
-    background-color: rgb(2 6 23) !important;
-  }
-
-  html.dark .bg-white {
+  :where(html.dark) :is(.bg-white, [class*="bg-white/"]):not([class*="dark:bg-"]) {
     background-color: rgb(15 23 42);
   }
 
-  html.dark [class*="bg-white/"] {
-    background-color: rgb(15 23 42 / 0.92) !important;
-  }
-
-  html.dark .bg-slate-50 {
+  :where(html.dark) :is(.bg-slate-50, [class*="bg-slate-50/"]):not([class*="dark:bg-"]) {
     background-color: rgb(15 23 42 / 0.82);
   }
 
-  html.dark [class*="bg-slate-50/"] {
-    background-color: rgb(15 23 42 / 0.82) !important;
-  }
-
-  html.dark .bg-slate-100 {
+  :where(html.dark) :is(.bg-slate-100, [class*="bg-slate-100/"]):not([class*="dark:bg-"]) {
     background-color: rgb(30 41 59 / 0.8);
   }
 
-  html.dark [class*="bg-slate-100/"] {
-    background-color: rgb(30 41 59 / 0.8) !important;
-  }
-
-  html.dark .text-slate-900 {
+  :where(html.dark) :is(.text-slate-950, .text-slate-900):not([class*="dark:text-"]) {
     color: rgb(248 250 252);
   }
 
-  html.dark .text-slate-800,
-  html.dark .text-slate-700 {
+  :where(html.dark) :is(.text-slate-800, .text-slate-700, .text-black, [class~="text-gray-950"], [class~="text-gray-900"], [class~="text-gray-800"], [class~="text-gray-700"], [class~="text-zinc-950"], [class~="text-zinc-900"], [class~="text-zinc-800"], [class~="text-zinc-700"], [class~="text-neutral-950"], [class~="text-neutral-900"], [class~="text-neutral-800"], [class~="text-neutral-700"], [class~="text-stone-950"], [class~="text-stone-900"], [class~="text-stone-800"], [class~="text-stone-700"]):not([class*="dark:text-"]) {
     color: rgb(226 232 240);
   }
 
-  html.dark .text-slate-600 {
-    color: rgb(203 213 225);
-  }
-
-  html.dark .text-slate-500,
-  html.dark .text-slate-400 {
+  :where(html.dark) :is(.text-slate-600, .text-slate-500, .text-slate-400, [class~="text-gray-600"], [class~="text-gray-500"], [class~="text-gray-400"], [class~="text-zinc-600"], [class~="text-zinc-500"], [class~="text-zinc-400"], [class~="text-neutral-600"], [class~="text-neutral-500"], [class~="text-neutral-400"], [class~="text-stone-600"], [class~="text-stone-500"], [class~="text-stone-400"]):not([class*="dark:text-"]) {
     color: rgb(148 163 184);
   }
 
-  html.dark .text-slate-300 {
+  :where(html.dark) :is(.text-slate-300):not([class*="dark:text-"]) {
     color: rgb(203 213 225);
   }
 
-  html.dark .border-slate-100,
-  html.dark .border-slate-200 {
-    border-color: rgb(51 65 85 / 0.9);
+  :where(html.dark) :is(.bg-gray-50, .bg-gray-100, .bg-gray-200, .bg-zinc-50, .bg-zinc-100, .bg-zinc-200, .bg-neutral-50, .bg-neutral-100, .bg-neutral-200, .bg-stone-50, .bg-stone-100, .bg-stone-200, [class*="bg-gray-50/"], [class*="bg-gray-100/"], [class*="bg-gray-200/"], [class*="bg-zinc-50/"], [class*="bg-zinc-100/"], [class*="bg-zinc-200/"], [class*="bg-neutral-50/"], [class*="bg-neutral-100/"], [class*="bg-neutral-200/"], [class*="bg-stone-50/"], [class*="bg-stone-100/"], [class*="bg-stone-200/"]):not([class*="dark:bg-"]) {
+    background-color: rgb(30 41 59 / 0.88);
   }
 
-  html.dark .border-slate-300,
-  html.dark [class*="border-slate-100/"],
-  html.dark [class*="border-slate-200/"],
-  html.dark [class*="border-slate-300/"] {
-    border-color: rgb(71 85 105 / 0.9) !important;
-  }
+  :where(html.dark) :is(.bg-blue-50, .bg-blue-100, .bg-blue-200, [class*="bg-blue-50/"], [class*="bg-blue-100/"], [class*="bg-blue-200/"]):not([class*="dark:bg-"]) { background-color: rgb(30 58 138 / 0.42); }
+  :where(html.dark) :is(.bg-indigo-50, .bg-indigo-100, .bg-indigo-200, [class*="bg-indigo-50/"], [class*="bg-indigo-100/"], [class*="bg-indigo-200/"]):not([class*="dark:bg-"]) { background-color: rgb(49 46 129 / 0.42); }
+  :where(html.dark) :is(.bg-emerald-50, .bg-emerald-100, .bg-emerald-200, [class*="bg-emerald-50/"], [class*="bg-emerald-100/"], [class*="bg-emerald-200/"]):not([class*="dark:bg-"]) { background-color: rgb(6 78 59 / 0.42); }
+  :where(html.dark) :is(.bg-green-50, .bg-green-100, .bg-green-200, [class*="bg-green-50/"], [class*="bg-green-100/"], [class*="bg-green-200/"]):not([class*="dark:bg-"]) { background-color: rgb(20 83 45 / 0.42); }
+  :where(html.dark) :is(.bg-rose-50, .bg-rose-100, .bg-rose-200, [class*="bg-rose-50/"], [class*="bg-rose-100/"], [class*="bg-rose-200/"]):not([class*="dark:bg-"]) { background-color: rgb(136 19 55 / 0.42); }
+  :where(html.dark) :is(.bg-red-50, .bg-red-100, .bg-red-200, [class*="bg-red-50/"], [class*="bg-red-100/"], [class*="bg-red-200/"]):not([class*="dark:bg-"]) { background-color: rgb(127 29 29 / 0.42); }
+  :where(html.dark) :is(.bg-amber-50, .bg-amber-100, .bg-amber-200, [class*="bg-amber-50/"], [class*="bg-amber-100/"], [class*="bg-amber-200/"]):not([class*="dark:bg-"]) { background-color: rgb(120 53 15 / 0.42); }
+  :where(html.dark) :is(.bg-orange-50, .bg-orange-100, .bg-orange-200, [class*="bg-orange-50/"], [class*="bg-orange-100/"], [class*="bg-orange-200/"]):not([class*="dark:bg-"]) { background-color: rgb(124 45 18 / 0.42); }
+  :where(html.dark) :is(.bg-cyan-50, .bg-cyan-100, .bg-cyan-200, [class*="bg-cyan-50/"], [class*="bg-cyan-100/"], [class*="bg-cyan-200/"]):not([class*="dark:bg-"]) { background-color: rgb(8 51 68 / 0.42); }
+  :where(html.dark) :is(.bg-sky-50, .bg-sky-100, .bg-sky-200, [class*="bg-sky-50/"], [class*="bg-sky-100/"], [class*="bg-sky-200/"]):not([class*="dark:bg-"]) { background-color: rgb(12 74 110 / 0.42); }
 
-  html.dark .placeholder\:text-slate-300::placeholder,
-  html.dark .placeholder\:text-slate-400::placeholder,
-  html.dark .placeholder\:text-slate-500::placeholder {
-    color: rgb(148 163 184);
-  }
+  :where(html.dark) :is(.text-brand-500, .text-brand-600, .text-brand-700, [class~="text-blue-500"], [class~="text-blue-600"], [class~="text-blue-700"], [class~="text-blue-800"], [class*="text-[#3b82f6]"]):not([class*="dark:text-"]) { color: rgb(147 197 253); }
+  :where(html.dark) :is([class~="text-indigo-500"], [class~="text-indigo-600"], [class~="text-indigo-700"], [class~="text-indigo-800"]):not([class*="dark:text-"]) { color: rgb(165 180 252); }
+  :where(html.dark) :is([class~="text-emerald-500"], [class~="text-emerald-600"], [class~="text-emerald-700"], [class~="text-emerald-800"]):not([class*="dark:text-"]) { color: rgb(110 231 183); }
+  :where(html.dark) :is([class~="text-green-500"], [class~="text-green-600"], [class~="text-green-700"], [class~="text-green-800"]):not([class*="dark:text-"]) { color: rgb(134 239 172); }
+  :where(html.dark) :is([class~="text-rose-500"], [class~="text-rose-600"], [class~="text-rose-700"], [class~="text-rose-800"], [class~="text-red-500"], [class~="text-red-600"], [class~="text-red-700"], [class~="text-red-800"]):not([class*="dark:text-"]) { color: rgb(253 164 175); }
+  :where(html.dark) :is([class~="text-amber-500"], [class~="text-amber-600"], [class~="text-amber-700"], [class~="text-amber-800"], [class~="text-orange-600"], [class~="text-orange-700"], [class~="text-orange-800"]):not([class*="dark:text-"]) { color: rgb(252 211 77); }
+  :where(html.dark) :is([class~="text-cyan-600"], [class~="text-cyan-700"], [class~="text-cyan-800"], [class~="text-sky-700"], [class~="text-sky-800"]):not([class*="dark:text-"]) { color: rgb(103 232 249); }
 
-  html.dark .shadow-indigo-100,
-  html.dark .shadow-indigo-200,
-  html.dark .shadow-slate-100,
-  html.dark .shadow-slate-200 {
-    --tw-shadow-color: rgb(15 23 42 / 0.65);
-  }
+  :where(html.dark) :is([class~="border-gray-50"], [class~="border-gray-100"], [class~="border-gray-200"], [class~="border-gray-300"], [class~="border-zinc-50"], [class~="border-zinc-100"], [class~="border-zinc-200"], [class~="border-zinc-300"], [class~="border-neutral-50"], [class~="border-neutral-100"], [class~="border-neutral-200"], [class~="border-neutral-300"], [class~="border-stone-50"], [class~="border-stone-100"], [class~="border-stone-200"], [class~="border-stone-300"]):not([class*="dark:border-"]) { border-color: rgb(71 85 105 / 0.9); }
+  :where(html.dark) :is([class~="placeholder-gray-300"], [class~="placeholder-gray-400"], [class~="placeholder-gray-500"], [class~="placeholder-zinc-300"], [class~="placeholder-zinc-400"], [class~="placeholder-zinc-500"], [class~="placeholder-neutral-300"], [class~="placeholder-neutral-400"], [class~="placeholder-neutral-500"], [class~="placeholder-stone-300"], [class~="placeholder-stone-400"], [class~="placeholder-stone-500"]):not([class*="dark:placeholder-"])::placeholder { color: rgb(148 163 184); opacity: 1; }
+
+  :where(html.dark) :is([class*="bg-[#f8f9fa]"], [class*="bg-[#f7f5ee]"], [class*="bg-[#f6f8fb]"], [class*="bg-[#f3f4ef]"], [class*="bg-[#f3f4f5]"], [class*="bg-[#f1f3f5]"], [class*="bg-[#eef1f4]"], [class*="bg-[#edf1f5]"], [class*="bg-[#fcfcfd]"], [class*="bg-[#fcfcfc]"], [class*="bg-[#fafafa]"], [class*="bg-[#fffdf8]"], [class*="bg-[#e7e8e9]"], [class*="bg-[#e1e3e4]"], [class*="bg-[#ebe8f8]"], [class*="bg-[#eef4ff]"], [class*="bg-[#d7e2ff]"], [class*="bg-[#d7dce2]"], [class*="bg-[#dfe0ff]"], [class*="bg-[#9bf0d3]"]):not([class*="dark:bg-"]) { background-color: rgb(30 41 59 / 0.9); }
+
+  :where(html.dark) :is([class*="text-[#00346f]"], [class*="text-[#004a99]"], [class*="text-[#3b48a6]"], [class*="text-[#4955b3]"]):not([class*="dark:text-"]) { color: rgb(191 219 254); }
+  :where(html.dark) :is([class*="fill-[#00346f]"]):not([class*="dark:fill-"]) { fill: rgb(191 219 254); }
+  :where(html.dark) :is([class*="text-[#191c1d]"], [class*="text-[#2b3437]"]):not([class*="dark:text-"]) { color: rgb(241 245 249); }
+  :where(html.dark) :is([class*="text-[#08233c]"], [class*="text-[#001b3f]"], [class*="text-[#424751]"]):not([class*="dark:text-"]) { color: rgb(203 213 225); }
+  :where(html.dark) :is([class*="text-[#737783]"]):not([class*="dark:text-"]) { color: rgb(148 163 184); }
+  :where(html.dark) :is([class*="text-[#016b54]"], [class*="text-[#0c7058]"], [class*="text-[#006b61]"]):not([class*="dark:text-"]) { color: rgb(110 231 183); }
+  :where(html.dark) :is([class*="text-[#9e3f4e]"]):not([class*="dark:text-"]) { color: rgb(253 164 175); }
 
   .dashboard-canvas h2 {
     @apply text-slate-900 dark:text-white;
