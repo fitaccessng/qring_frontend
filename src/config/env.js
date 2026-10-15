@@ -24,7 +24,7 @@ const toInteger = (value, fallback) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
-const productionBackendOrigin = "https://qring-backend-production.up.railway.app";
+const productionBackendOrigin = "https://iron-code-97m0.dockhive.app";
 const productionFrontendOrigin = "https://www.useqring.online";
 const buildId = String(
   importMetaEnv.VITE_BUILD_ID ??
